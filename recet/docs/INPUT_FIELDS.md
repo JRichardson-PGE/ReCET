@@ -163,7 +163,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `measures` | Measure.csv | `--measures` | (required unless a workbook is given) | Path to the CET `Measure.csv`. |
 | `programcost` | ProgramCost.csv | `--programcost` | none | Path to `ProgramCost.csv`; without it there are no program costs (NoAdmin = regular costs, `WeightedProgramCost` = 0). |
 | `workbook` | Job workbook (.xlsx) | `--workbook` | none | An Excel job workbook (section 4.7) used instead of the separate files; each of its data sheets supplies the matching input. A file given separately wins over its sheet. |
-| `out_dir` | Output folder | `--out` | `poc_results` (GUI: `~/recet_results`) | Folder in which the run's folder is created. |
+| `out_dir` | Output folder | `--out` | `recet_results` (GUI: `~/recet_results`) | Folder in which the run's folder is created. |
 | `run_name` | Run name | `--name` | a timestamp | Prefix of the run folder name. |
 | `acc_version` | Run against | `--acc` | `2024` | `2024` (2024 ACC, CET Version 2026), `2026` (draft 2026 ACC, Version 2027) or a new label defined by supplied ACC files. |
 | `acc_electric_file`, `acc_gas_file` | Electric ACC file, Gas ACC file | `--acc-electric-file`, `--acc-gas-file` | none | Supplied ACC file(s); replace the built-in file of `acc_version`, or define a new version. |

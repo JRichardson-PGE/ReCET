@@ -381,7 +381,7 @@ class App:
         return RunConfig(
             measures="" if excel else str(g("measures")).strip(), programcost=None if excel else blank(g("programcost")),
             workbook=blank(g("workbook")) if excel else None,
-            out_dir=str(g("out_dir")).strip() or "poc_results", run_name=str(g("run_name")).strip(),
+            out_dir=str(g("out_dir")).strip() or "recet_results", run_name=str(g("run_name")).strip(),
             acc_version=acc_text.split()[0] if acc_text else "2024",
             acc_electric_file=blank(g("acc_electric_file")), acc_gas_file=blank(g("acc_gas_file")), e3_version=int_or_none(g("e3_version")),
             profiles_8760_file=blank(g("profiles_8760_file")), profiles_gas_file=blank(g("profiles_gas_file")), reference_dir=blank(g("reference_dir")),
@@ -403,7 +403,7 @@ class App:
         elif c.workbook:
             s("workbook", c.workbook)
             self._set_input_mode("excel")
-        s("out_dir", c.out_dir if c.out_dir != "poc_results" else str(Path.home() / "recet_results"))
+        s("out_dir", c.out_dir if c.out_dir != "recet_results" else str(Path.home() / "recet_results"))
         s("run_name", c.run_name)
         label = dict(versions.choices()).get(c.acc_version)
         s("acc_version", f"{c.acc_version}  -  {label}" if label else c.acc_version)

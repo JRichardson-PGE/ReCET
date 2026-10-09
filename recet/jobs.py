@@ -36,7 +36,7 @@ class RunConfig:
     measures: str = ""                       # CET Measure.csv (pipe-delimited)
     programcost: str | None = None           # CET ProgramCost.csv (optional)
     workbook: str | None = None              # an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760 sheets) instead of files
-    out_dir: str = "poc_results"
+    out_dir: str = "recet_results"
     run_name: str = ""                       # folder name prefix; default is a timestamp
     # --- ACC version and supplied ACC files
     acc_version: str = "2024"                # "2024", "2026", or a new label defined by the supplied files
