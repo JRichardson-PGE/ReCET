@@ -1,0 +1,37 @@
+code,start_year,end_year,claim_spec,filing_spec,description
+DEER1314,2011,,1,1,DEER2011 and DEER2014
+DEER2005,2005,,1,1,official DEER 2005 release
+DEER2008,2008,,1,1,official DEER 2005 release (v2.05)
+DEER2011,2011,,1,1,DEER 2011 updates for 2013-14
+DEER2013,2013,,1,1,DEER Update for 2013
+DEER2014,2014,,1,1,DEER Code Update for 2013-14 cycle
+DEER2015,2015,,1,1,DEER Code Update for 2015
+DEER2016,2016,,1,1,DEER Update for 2016
+DEER2017,2017,,1,1,DEER Update for 2017
+DEER2018,2018,,1,1,DEER Update for 2018
+DEER2019,2019,,1,1,DEER Update for 2019
+DEER2020,2020,,1,1,DEER update for 2020
+DEER2021,2021,,1,1,DEER update for 2021
+DEER2022,2022,,1,1,DEER update for 2022
+DEER2023,2023,,1,1,DEER update for 2023
+DEER2024,2024,,1,1,DEER Update for 2024
+DEER2025,2025,,1,1,DEER update for 2025
+DEER2026,2026,,1,1,DEER update for 2026
+ExAnte2010,2010,,1,1,non-DEER source
+ExAnte2013,2013,,1,1,non-DEER source
+ExAnte2014,2014,,1,1,non-DEER source
+ExAnte2015,2015,,1,1,non-DEER source
+ExAnte2016,2016,,1,1,non-DEER source
+ExAnte2017,2017,,1,1,non-DEER source
+ExAnte2018,2018,,1,1,non-DEER source
+ExAnte2019,2019,,1,1,non-DEER source
+ExAnte2020,2020,,1,1,non-DEER source
+ExAnte2021,2021,,1,1,non-DEER source
+ExAnte2022,2022,,1,1,non-DEER source
+ExAnte2023,2023,,1,1,Non-DEER source
+ExAnte2024,2024,,1,1,PA Update for 2024
+ExAnte2025,2025,,1,1,PA update for 2025
+ExAnte2026,2026,,1,1,PA update for 2026
+ExAnte2027,2027,,1,1,PA update for 2027
+ExAnte2028,2028,,1,1,PA update for 2028
+ExAnte2029,2029,,1,1,PA update for 2029

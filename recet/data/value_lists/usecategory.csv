@@ -1,0 +1,20 @@
+code,start_year,end_year,claim_spec,filing_spec,description
+AppPlug,2013,,1,1,Appliance or Plug Load
+BldgEnv,2013,,1,1,Building Envelope
+CompAir,2013,,1,1,Compressed Air
+ComRefrig,2013,,1,1,Commercial Refrigeration
+C&S,2013,,1,1,Codes & Standards
+FoodServ,2013,,1,1,Food Service
+HVAC,2013,,1,1,HVAC
+Irrigate,2013,,1,1,Irrigation
+Lighting,2013,,1,1,Lighting
+NonSav,2013,,1,1,Non-Savings Measure
+ProcDist,2013,,1,1,Process Distribution
+ProcDry,2013,,1,1,Process Drying
+ProcHeat,2013,,1,1,Process Heat
+ProcRefrig,2013,,1,1,Process Refrigeration
+Recreate,2013,,1,1,Recreation
+SCW,2023,,1,1,Service and Domestic Cold Water
+Service,2013,,1,1,Service
+SHW,2013,,1,1,Service and Domestic Hot Water
+WhlBldg,2013,,1,1,Whole Building

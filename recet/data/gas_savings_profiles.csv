@@ -1,0 +1,73 @@
+Profile,Month,Impact
+Summer Only,1,0
+Summer Only,2,0
+Summer Only,3,0
+Summer Only,4,0.16666666666666666
+Summer Only,5,0.16666666666666666
+Summer Only,6,0.16666666666666666
+Summer Only,7,0.16666666666666666
+Summer Only,8,0.16666666666666666
+Summer Only,9,0.16666666666666666
+Summer Only,10,0
+Summer Only,11,0
+Summer Only,12,0
+Winter Only,1,0.16666666666666666
+Winter Only,2,0.16666666666666666
+Winter Only,3,0.16666666666666666
+Winter Only,4,0
+Winter Only,5,0
+Winter Only,6,0
+Winter Only,7,0
+Winter Only,8,0
+Winter Only,9,0
+Winter Only,10,0.16666666666666666
+Winter Only,11,0.16666666666666666
+Winter Only,12,0.16666666666666666
+Annual,1,0.08333333333333333
+Annual,2,0.08333333333333333
+Annual,3,0.08333333333333333
+Annual,4,0.08333333333333333
+Annual,5,0.08333333333333333
+Annual,6,0.08333333333333333
+Annual,7,0.08333333333333333
+Annual,8,0.08333333333333333
+Annual,9,0.08333333333333333
+Annual,10,0.08333333333333333
+Annual,11,0.08333333333333333
+Annual,12,0.08333333333333333
+Summer Only-FuelSub-ToElec,1,0
+Summer Only-FuelSub-ToElec,2,0
+Summer Only-FuelSub-ToElec,3,0
+Summer Only-FuelSub-ToElec,4,0.16666666666666666
+Summer Only-FuelSub-ToElec,5,0.16666666666666666
+Summer Only-FuelSub-ToElec,6,0.16666666666666666
+Summer Only-FuelSub-ToElec,7,0.16666666666666666
+Summer Only-FuelSub-ToElec,8,0.16666666666666666
+Summer Only-FuelSub-ToElec,9,0.16666666666666666
+Summer Only-FuelSub-ToElec,10,0
+Summer Only-FuelSub-ToElec,11,0
+Summer Only-FuelSub-ToElec,12,0
+Winter Only-FuelSub-ToElec,1,0.16666666666666666
+Winter Only-FuelSub-ToElec,2,0.16666666666666666
+Winter Only-FuelSub-ToElec,3,0.16666666666666666
+Winter Only-FuelSub-ToElec,4,0
+Winter Only-FuelSub-ToElec,5,0
+Winter Only-FuelSub-ToElec,6,0
+Winter Only-FuelSub-ToElec,7,0
+Winter Only-FuelSub-ToElec,8,0
+Winter Only-FuelSub-ToElec,9,0
+Winter Only-FuelSub-ToElec,10,0.16666666666666666
+Winter Only-FuelSub-ToElec,11,0.16666666666666666
+Winter Only-FuelSub-ToElec,12,0.16666666666666666
+Annual-FuelSub-ToElec,1,0.08333333333333333
+Annual-FuelSub-ToElec,2,0.08333333333333333
+Annual-FuelSub-ToElec,3,0.08333333333333333
+Annual-FuelSub-ToElec,4,0.08333333333333333
+Annual-FuelSub-ToElec,5,0.08333333333333333
+Annual-FuelSub-ToElec,6,0.08333333333333333
+Annual-FuelSub-ToElec,7,0.08333333333333333
+Annual-FuelSub-ToElec,8,0.08333333333333333
+Annual-FuelSub-ToElec,9,0.08333333333333333
+Annual-FuelSub-ToElec,10,0.08333333333333333
+Annual-FuelSub-ToElec,11,0.08333333333333333
+Annual-FuelSub-ToElec,12,0.08333333333333333

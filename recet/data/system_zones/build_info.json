@@ -1,0 +1,21 @@
+{
+  "library_bytes": 8959269276,
+  "deciding_cost_test": "TRC",
+  "acc": {
+    "2024": {
+      "electric_bytes": 844174873,
+      "years": [
+        2024,
+        2054
+      ]
+    },
+    "2026": {
+      "electric_bytes": 989753997,
+      "years": [
+        2026,
+        2055
+      ]
+    }
+  },
+  "profiles": 20497
+}

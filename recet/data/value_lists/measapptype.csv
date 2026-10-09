@@ -1,0 +1,15 @@
+code,start_year,end_year,start_date,end_date,claim_spec,filing_spec,description
+AOE,2019,,2019-01-01,,1,1,Add-on Equipment
+AR,2019,,2019-01-01,,1,1,Accelerated Replacement
+BRO-Bhv,2019,,2019-01-01,,1,1,BRO-Behavioral
+BRO-Op,2019,,2019-01-01,,1,1,BRO-Operational
+BRO-RCx,2019,,2019-01-01,,1,1,BRO-Retrocommissioning
+BW,2019,,2019-01-01,,1,1,Building Weatherization
+ER,2013,2018,2013-01-01,2018-12-31,1,1,Early retirement
+NC,2013,,2013-01-01,,1,1,New Construction
+NR,2019,,2019-01-01,,1,1,Normal Replacement (includes Replace on Burnout)
+RC,2013,2018,2013-01-01,2018-12-31,1,1,Retro-Commissioning
+REA,2013,2018,2013-01-01,2018-12-31,1,1,Retrofit Add-On
+RET,2013,2018,2013-01-01,2018-12-31,1,1,Retrofit
+ROB,2013,2018,2013-01-01,2018-12-31,1,1,Replace on Burnout
+ROBNC,2013,2018,2013-01-01,2018-12-31,1,1,ROB or NC

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recet"
+dynamic = ["version"]
+description = "ReCET, the rebuilt CEDARS Cost Effectiveness Tool: price CET-format inputs hour by hour on the 2024 or draft 2026 ACC, with a graphical interface"
+readme = "PACKAGE_README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "openpyxl>=3.1",        # the Excel job workbook and its template
+    "sv-ttk>=2.6",          # the window's Sun Valley theme (the window falls back to the system theme without it)
+    "tksheet>=7.4",         # the Edit inputs tab's grid (the tab says how to install it if it is missing)
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+excel = ["openpyxl>=3.1"]
+
+[project.scripts]
+recet = "recet.cli:main"
+
+[project.gui-scripts]
+recet-gui = "recet.gui:launch"
+
+[tool.setuptools.dynamic]
+version = { attr = "recet.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["recet*"]
+
+[tool.setuptools.package-data]
+recet = ["data/**/*", "docs/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

@@ -1,0 +1,48 @@
+"""Applying a run's configuration to the pipeline, and resetting it between runs.
+
+The pipeline modules cache heavily (the ACC parquet, profile shapes, TOU rates ...) and read their file locations through `recet.paths`. To run more than one
+ACC version -- or the same one with different supplied profiles -- in a single process, `apply()` points the paths and user overrides at this run's inputs and
+`clear_caches()` drops everything derived from the previous run. (The GUI and `run_both` avoid the question by running each job in its own process.)
+"""
+from __future__ import annotations
+
+import importlib
+import os
+
+from . import paths
+
+_PIPELINE_MODULES = ("real_avoided_cost_v2", "gas_avoided_cost", "real_impact_profiles", "gas_savings_profiles", "tou_profiles", "emissions",
+                     "discount_settings", "rate_schedules", "scg_electric_avoided_cost", "statewide_allocation", "cost_tests", "system_zones")
+
+
+def clear_caches() -> int:
+    """Call cache_clear() on every lru_cached function in the pipeline modules; returns how many were cleared."""
+    n = 0
+    for name in _PIPELINE_MODULES:
+        mod = importlib.import_module(f"{__package__}.pipeline.{name}")
+        for attr in vars(mod).values():
+            if callable(attr) and hasattr(attr, "cache_clear"):
+                attr.cache_clear()
+                n += 1
+    return n
+
+
+def apply(acc, *, user_profiles=None, user_gas_profiles=None, run_parameters=None, sw_factors=None, programs=None, reference_dir=None) -> None:
+    """Point the pipeline at this run's ACC files and overrides.
+
+    acc: versions.ResolvedAcc. Every electric measure, SCG included, is priced on the 8,760 path; CET's quarterly tables are never read
+    (POC_NO_CET_TABLES is always set). user_profiles: overrides.UserProfiles or None. user_gas_profiles: {name: array(12)} or None.
+    run_parameters: overrides.load_run_parameters' table or None. sw_factors: overrides.load_sw_factors' table or None.
+    programs: programs.load_programs' table or None."""
+    if reference_dir is not None:
+        paths.set_reference_dir(reference_dir)
+    paths.configure_runtime(acc_electric=acc.electric, acc_gas=acc.gas)
+    os.environ["POC_NO_CET_TABLES"] = "1"
+    from .pipeline import discount_settings, gas_savings_profiles, real_impact_profiles, statewide_allocation
+    real_impact_profiles.set_user_profiles(user_profiles)
+    gas_savings_profiles.set_user_profiles(user_gas_profiles)
+    discount_settings.set_user_parameters(run_parameters)
+    statewide_allocation.set_user_factors(sw_factors)
+    from . import programs as programs_mod
+    programs_mod.set_user_programs(programs)
+    clear_caches()

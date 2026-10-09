@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Never commit the reference data (electric ACC parquets, impact-profile library) or job inputs/outputs:
+# they live in the reference data folder and the user's own folders, not in the repository.
+/data/
+/reference_data/
+/results/
+*_results/

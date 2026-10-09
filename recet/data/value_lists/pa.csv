@@ -1,0 +1,23 @@
+code,start_year,end_year,claim_spec,filing_spec,description,pa_group,is_lead
+AVA,2024,,1,1,Ava Community Energy,CCA_REN,0
+BAY,2016,,1,1,Bay Area Regional Energy Network,CCA_REN,1
+CCR,2024,,1,1,Central California Rural REN,CCA_REN,0
+CPSF,2024,,1,1,CleanPowerSF,CCA_REN,0
+EBCE,2022,2023,1,1,East Bay Community Energy,CCA_REN,0
+IREN,2022,,1,1,Inland Regional Energy Network,CCA_REN,0
+LCE,2019,2021,1,1,Lancaster Choice Energy,CCA_REN,0
+MCE,2016,,1,1,Marin Clean Energy,CCA_REN,0
+PAC,2027,,0,1,PacifiCorp,IOU,0
+PCE,2022,,1,1,Peninsula Clean Energy,CCA_REN,0
+PGE,2016,,1,1,Pacific Gas & Electric,IOU,1
+RCEA,2020,,1,1,Redwood Coast Energy Authority,CCA_REN,0
+RRN,2024,,1,1,Rural REN North,CCA_REN,0
+SCE,2016,,1,1,Southern California Edison,IOU,1
+SCG,2016,,1,1,Southern California Gas,IOU,1
+SCP,2022,,1,1,Sonoma Clean Power,CCA_REN,0
+SCR,2016,,1,1,Southern California Regional Energy Network,CCA_REN,0
+SDGE,2016,,1,1,San Diego Gas & Electric,IOU,1
+SDRN,2024,,1,1,San Diego REN,CCA_REN,0
+SJCE,2021,,1,1,San Jose Clean Energy,CCA_REN,0
+SW,2021,,1,1,Statewide,SW,0
+TCR,2019,,1,1,Tri-county Regional Energy Network,CCA_REN,0

@@ -1,0 +1,34 @@
+code,start_year,end_year,claim_spec,filing_spec,description
+Area-100Win,2013,,1,1,100 sqft window
+Area-1kFP,2013,,1,1,"1,000 sqft footprint"
+Area-1kH,2013,,1,1,"1,000 sqft house"
+Area-1kR,2013,,1,1,"1,000 sqft roof"
+Area-1kW,2013,,1,1,"1,000 sqft wall (exc. windows)"
+Area-Acre,2013,,1,1,per Acre
+Area-ft2,2013,,1,1,square feet of technology
+Area-ft2-BA,2013,,1,1,square feet of Building area
+Building,2013,,1,1,building associated with the technology
+Cap-kBTUh,2013,,1,1,kBTUh of input capacity
+Cap-kW,2013,,1,1,kW of input capacity
+Cap-MBTUh,2013,,1,1,MBTUh of input capacity
+CapOut-kBtuh,2023,,1,1,kBtuh of output capacity
+Cap-Tons,2013,,1,1,ton of cooling capacity
+Ctrl-kW,2013,,1,1,kW Controlled
+Each,2013,,1,1,installation of technology
+Fixture,2013,,1,1,lighting or plumbing fixture
+Flow-CFM,2013,,1,1,CFM of rated air flow
+Flow-GPM,2013,,1,1,gallons per minute of rated flow
+Household,2013,,1,1,dwelling or household
+Installation,2013,,1,1,technology installation 
+KiloLumen,2013,,1,1,kiloLumens of light output
+kW,2013,,1,1,kiloWatt demand
+kWh,2013,,1,1,annual kWh consumption
+kWhreduced,2024,,1,1,annual kWh reduction
+kWreduced,2013,,1,1,kiloWatt demand reduction
+Lamp,2013,,1,1,per lamp
+Len-ft,2013,,1,1,length (feet)
+Proc-lbs,2013,,1,1,Pounds of material processed
+Rated-HP,2013,,1,1,nameplate HP
+SurfArea-ft2,2013,,1,1,surface area (ft2)
+therm,2013,,1,1,annual therm consumption
+Vol-Refr-ft3,2023,,1,1,Refrigerated volume (ft3)
