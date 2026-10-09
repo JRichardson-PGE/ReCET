@@ -1,6 +1,13 @@
 """Shared fixtures: tiny synthetic inputs so the tests run without the 11 GB reference data."""
 from __future__ import annotations
 
+import os
+import tempfile
+
+# Before recet is imported: its research-checkout setting is read at import time, so keep it (and the real config) out of the tests.
+os.environ.pop("RECET_RESEARCH_ROOT", None)
+os.environ["RECET_HOME"] = tempfile.mkdtemp(prefix="recet_test_home_")
+
 import numpy as np
 import pandas as pd
 import pytest

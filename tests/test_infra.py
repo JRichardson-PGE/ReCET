@@ -32,6 +32,18 @@ def test_reference_dir_precedence(tmp_path, monkeypatch):
     assert paths.reference_dir() == tmp_path / "explicit"
 
 
+def test_research_root_needs_the_setting_and_a_real_checkout(tmp_path, monkeypatch):
+    checkout = tmp_path / "CEDARS-Review"
+    monkeypatch.setenv("RECET_RESEARCH_ROOT", str(checkout))
+    assert paths._research_root() is None                                   # not a research checkout (no "2024 ACC Extraction")
+    (checkout / "2024 ACC Extraction").mkdir(parents=True)
+    assert paths._research_root() == checkout                               # the environment variable
+    monkeypatch.delenv("RECET_RESEARCH_ROOT")
+    assert paths._research_root() is None                                   # nothing configured
+    paths.save_config(research_root=str(checkout))
+    assert paths._research_root() == checkout                               # ... or the config file
+
+
 def test_ref_path_prefers_the_folder_then_the_checkout(tmp_path, monkeypatch):
     files = _fake_ref(tmp_path, monkeypatch)
     assert paths.ref_path("impact_hourly") == files["impact_hourly"].dev                       # only the checkout has it

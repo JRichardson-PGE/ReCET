@@ -13,8 +13,9 @@ The reference data folder is resolved, first match wins:
   2. the environment variable `RECET_DATA`,
   3. the saved setting in `~/.recet/config.json` (`recet data set-dir PATH` or the GUI's "Save as default"; the config folder itself can be
      moved with `RECET_HOME`),
-  4. the files where the CEDARS review research scripts wrote them, when run from inside that research checkout (never true for a ReCET
-     install; kept so `RefFile.dev` and its tests still work).
+  4. the files where the CEDARS review research scripts wrote them, when a *research checkout* is configured (development machines only):
+     the environment variable `RECET_RESEARCH_ROOT`, or `"research_root"` in `~/.recet/config.json`, naming the CEDARS-Review checkout.
+     The research scripts' own datasets (`poc/data`, `DEV_DATA_DIR`) are found the same way.
 
 Layout of the reference folder (`recet data status` lists what is present; `manifest.json` carries sizes and checksums):
 
@@ -36,9 +37,25 @@ from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PKG_DATA = PACKAGE_DIR / "data"
-_CHECKOUT = PACKAGE_DIR.parent.parent
-DEV_ROOT: Path | None = _CHECKOUT if (_CHECKOUT / "2024 ACC Extraction").exists() else None   # None when pip-installed
-DEV_DATA_DIR = PACKAGE_DIR.parent / "data"                                                      # research/dev datasets; absent in ReCET
+ENV_RESEARCH = "RECET_RESEARCH_ROOT"
+
+
+def _research_root() -> Path | None:
+    """The CEDARS-Review research checkout, if this machine has one configured (env RECET_RESEARCH_ROOT, else "research_root" in the config
+    file). Read once at import; None on an ordinary install."""
+    p = os.environ.get(ENV_RESEARCH)
+    if not p:
+        try:
+            cfg = Path(os.environ.get("RECET_HOME") or (Path.home() / ".recet")) / "config.json"
+            p = json.loads(cfg.read_text(encoding="utf-8")).get("research_root")
+        except (OSError, ValueError):
+            p = None
+    root = Path(p).expanduser() if p else None
+    return root if root is not None and (root / "2024 ACC Extraction").exists() else None
+
+
+DEV_ROOT: Path | None = _research_root()                                                        # None on an ordinary install
+DEV_DATA_DIR = DEV_ROOT / "poc" / "data" if DEV_ROOT else PACKAGE_DIR.parent / "data"           # the research scripts' datasets
 
 ENV_DATA = "RECET_DATA"
 
@@ -107,7 +124,7 @@ def reference_dir_source() -> str:
         return f"environment variable {ENV_DATA}"
     if read_config().get("data_dir"):
         return f"saved default ({config_path()})"
-    return "not set" + (" (using the source checkout's own files)" if DEV_ROOT else "")
+    return "not set" + (f" (using the research checkout's files: {DEV_ROOT})" if DEV_ROOT else "")
 
 
 @dataclass(frozen=True)
