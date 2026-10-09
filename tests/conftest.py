@@ -4,8 +4,7 @@ from __future__ import annotations
 import os
 import tempfile
 
-# Before recet is imported: its research-checkout setting is read at import time, so keep it (and the real config) out of the tests.
-os.environ.pop("RECET_RESEARCH_ROOT", None)
+# Keep the developer's real ~/.recet config out of the tests from the first import on.
 os.environ["RECET_HOME"] = tempfile.mkdtemp(prefix="recet_test_home_")
 
 import numpy as np

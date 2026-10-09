@@ -3,7 +3,7 @@
 The big files (the two electric ACC parquets and the CEDARS impact-profile library, ~11 GB together) do not live in the repository. They live in a *reference data
 folder* laid out as described in `recet.paths`, with a `manifest.json` recording each file's size and SHA-256:
 
-  build_reference_folder(dest)         assemble the folder from a source checkout's files (copy, or hard link on the same drive)
+  build_reference_folder(dest)         copy the current reference folder's files to a new folder (or hard link, same drive)
   verify(folder, full=False)           check the folder against its manifest (sizes; add full=True for the checksums)
   pack(folder, out_dir, part_gb=4)     write the folder as a plain (uncompressed -- parquet is already compressed) tar split into parts <= part_gb, e.g. to fit FAT32
                                        drives or upload limits, plus SHA256SUMS
@@ -44,7 +44,7 @@ def sha256_file(path: Path, log: Log | None = None) -> str:
 
 
 def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = print, checksums: bool = True) -> Path:
-    """Copy (or hard-link, same drive only) every file in paths.REF_FILES that exists in the source checkout / current reference folder into `dest` and write the manifest."""
+    """Copy (or hard-link, same drive only) every file in paths.REF_FILES that exists in the current reference folder into `dest` and write the manifest."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -53,7 +53,7 @@ def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = p
         if src is None:
             log(f"  MISSING {rf.rel} ({rf.what})" + ("" if rf.required else " -- optional, skipped"))
             if rf.required:
-                raise FileNotFoundError(f"cannot build the reference folder: {rf.rel} not found in the current reference folder or source checkout")
+                raise FileNotFoundError(f"cannot build the reference folder: {rf.rel} not found in the current reference folder")
             continue
         target = dest / rf.rel
         target.parent.mkdir(parents=True, exist_ok=True)

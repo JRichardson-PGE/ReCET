@@ -324,7 +324,6 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 | `acc/2026/electric_hourly.parquet` | ~1 GB | The draft 2026 ACC's, same layout. |
 | `impact_profiles/catalog.parquet` | small | The CEDARS impact-profile catalog: one row per profile. Columns used: `id` (profile ID), `end_use_name` (= `E3MeaElecEndUseShape`), `iou_ac_territory` (`PGE`...), `target_sector`, `year_represented` (the calendar year the shape follows; blank = 2009). Other columns (`pa` long name, `climate_zones`, `start_year`, `explicit_end_year`, `description`, `source_impact_type`, `ac_version`) are informational. |
 | `impact_profiles/hourly.parquet` | ~9 GB | The 8,760-hour profiles: `impact_profile_id` (matches `id`), `climate_zone` (a zone or `System`), `hour_of_year` (1-8760), `impact` (fraction of annual savings in that hour; each (profile, zone) sums to 1). One row group per profile. |
-| `cet_tables/scg_electric_ac_2026.parquet` | optional | CET's quarterly SCG electric avoided-cost table (2024 ACC only): `TS` (target sector), `EU` (end use), `CZ` (zone), `Qtr` (`YYYYQn`), `Gen`, `TD` and their `_SB` / `_SH` versions (all $ per kWh-equivalent, already profile-weighted), `CO2`. Used only with "Use CET's SCG electric table". |
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -338,8 +337,6 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 | `e3_tables/e3_rate_schedule_elec.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
 | `e3_tables/e3_rate_schedule_elec_mapping.parquet` | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
 | `e3_tables/e3_rate_schedule_gas.parquet`, `e3_rate_schedule_gas_mapping.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
-| `tou/tou_factors.csv` | `pa`, `target_sector`, `end_use`, `zone` (`All` for PG&E), `e0`..`e4` (energy share of each TOU period), `kw0`..`kw4` (demand factors), `kw_form` (`per_kwh` or `rel_kw`), `ds_type` (`kW` or `kWh`), `source`, `status` | Reference only, not used in pricing since 2026-10-02 (C5.2 retired): the H-factors the retired TOU route used. The TOU 8,760s in the library replace them. |
-| `tou/pge_map_1991.npy`, `sce_map_1991.npy` | 8,760 integers | Reference only (C5.2 retired): the TOU period of each hour on a 1991 calendar (1 summer on-peak, 2 summer partial, 3 summer off-peak, 5 winter partial, 6 winter off-peak). |
 | `gas_savings_profiles.csv` | `Profile`, `Month`, `Impact` | The library of gas monthly profiles (C4.3). |
 | `acc/2024/gas_components.parquet`, `acc/2026/gas_components.parquet` | the gas ACC layout of section 4.4 | The two gas ACCs, extracted from E3's workbooks. |
 | `statewide_allocation/statewide_factors_20260918.csv` | `Year`, `ProgramID`, `PercentElectric`, `<IOU>GasFactor`, `<IOU>ElectricFactor`, `<IOU>WeightedFactor` for PGE, SDGE, SCE, SCG | The IOU shares of each statewide program (C15). |

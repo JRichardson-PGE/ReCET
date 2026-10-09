@@ -10,16 +10,18 @@ from recet import cli, datapack, overrides, paths, templates, versions
 
 # ------------------------------------------------------------------------------------------------------------------ reference folder resolution
 def _fake_ref(tmp_path, monkeypatch):
-    """Two tiny fake reference files whose 'source checkout' copies live in tmp_path/dev."""
-    dev = tmp_path / "dev"
-    dev.mkdir()
-    files = {}
+    """Two tiny fake reference files in a source reference folder (tmp_path/src), set as the current folder. Returns {key: path}."""
+    src = tmp_path / "src"
+    files, paths_by_key = {}, {}
     for key, rel in (("acc_electric_2024", "acc/2024/electric_hourly.parquet"), ("impact_hourly", "impact_profiles/hourly.parquet")):
-        f = dev / rel.replace("/", "_")
+        f = src / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(np.random.default_rng(len(rel)).bytes(50_000))
-        files[key] = paths.RefFile(key, rel, key, f)
+        files[key] = paths.RefFile(key, rel, key)
+        paths_by_key[key] = f
     monkeypatch.setattr(paths, "REF_FILES", files)
-    return files
+    paths.set_reference_dir(src)
+    return paths_by_key
 
 
 def test_reference_dir_precedence(tmp_path, monkeypatch):
@@ -32,28 +34,16 @@ def test_reference_dir_precedence(tmp_path, monkeypatch):
     assert paths.reference_dir() == tmp_path / "explicit"
 
 
-def test_research_root_needs_the_setting_and_a_real_checkout(tmp_path, monkeypatch):
-    checkout = tmp_path / "CEDARS-Review"
-    monkeypatch.setenv("RECET_RESEARCH_ROOT", str(checkout))
-    assert paths._research_root() is None                                   # not a research checkout (no "2024 ACC Extraction")
-    (checkout / "2024 ACC Extraction").mkdir(parents=True)
-    assert paths._research_root() == checkout                               # the environment variable
-    monkeypatch.delenv("RECET_RESEARCH_ROOT")
-    assert paths._research_root() is None                                   # nothing configured
-    paths.save_config(research_root=str(checkout))
-    assert paths._research_root() == checkout                               # ... or the config file
-
-
-def test_ref_path_prefers_the_folder_then_the_checkout(tmp_path, monkeypatch):
+def test_ref_path_reads_the_reference_folder(tmp_path, monkeypatch):
     files = _fake_ref(tmp_path, monkeypatch)
-    assert paths.ref_path("impact_hourly") == files["impact_hourly"].dev                       # only the checkout has it
+    assert paths.ref_path("impact_hourly") == files["impact_hourly"]
     folder = tmp_path / "ref"
     (folder / "impact_profiles").mkdir(parents=True)
     (folder / "impact_profiles" / "hourly.parquet").write_bytes(b"x")
     paths.set_reference_dir(folder)
-    assert paths.ref_path("impact_hourly") == folder / "impact_profiles" / "hourly.parquet"    # the folder wins once it has the file
-    assert paths.ref_path("acc_electric_2024") == files["acc_electric_2024"].dev
-    monkeypatch.setattr(paths, "REF_FILES", {**paths.REF_FILES, "gone": paths.RefFile("gone", "x/y", "nothing", None)})
+    assert paths.ref_path("impact_hourly") == folder / "impact_profiles" / "hourly.parquet"    # the current folder's copy
+    assert paths.ref_path("acc_electric_2024") is None                                          # not in this folder
+    monkeypatch.setattr(paths, "REF_FILES", {**paths.REF_FILES, "gone": paths.RefFile("gone", "x/y", "nothing")})
     assert paths.ref_path("gone") is None and "x/y" in paths.missing_required()
 
 
@@ -62,8 +52,8 @@ def test_build_verify_pack_unpack_roundtrip(tmp_path, monkeypatch):
     files = _fake_ref(tmp_path, monkeypatch)
     ref = datapack.build_reference_folder(tmp_path / "ref", log=lambda s: None)
     manifest = json.loads((ref / "manifest.json").read_text())
-    assert set(manifest["files"]) == {f.rel for f in files.values()}
-    assert manifest["files"]["impact_profiles/hourly.parquet"]["sha256"] == hashlib.sha256(files["impact_hourly"].dev.read_bytes()).hexdigest()
+    assert set(manifest["files"]) == {paths.REF_FILES[k].rel for k in files}
+    assert manifest["files"]["impact_profiles/hourly.parquet"]["sha256"] == hashlib.sha256(files["impact_hourly"].read_bytes()).hexdigest()
     assert datapack.verify(ref, full=True, log=lambda s: None)
 
     parts = datapack.pack(ref, tmp_path / "parts", part_gb=2e-5, log=lambda s: None)              # 20 kB parts -> several of them

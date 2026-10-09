@@ -7,7 +7,7 @@ reproduces CEDARS' own quarterly ground truth to an exact match (5,965,764
 comparison rows) via the correct day-of-week-shift methodology (see that
 project's `pipeline.py`).
 
-This replaces pipeline/real_avoided_cost_full.py's approach (extracting
+This replaces the first proof of concept's real_avoided_cost_full.py (now in the CEDARS review research repository's poc/research_lib), whose approach was (extracting
 components from the raw 84MB Electric Model .xlsb and reconstructing
 generation-capacity/transmission/distribution by reusing ONE shared hourly
 allocation shape across all three) with the ACC's OWN real per-hour,
@@ -15,16 +15,15 @@ per-climate-zone, per-year totals -- no allocation-shape approximation, no
 flat annual-average GHG rate. real_avoided_cost_full.py's README-documented
 ~20% overshoot on the large/diverse dataset was traced to exactly those
 approximations; this module exists to test whether removing them closes
-that gap. Kept as a separate module (not a rewrite of real_avoided_cost_
-full.py) so both remain runnable and comparable via run_poc.py's --acc-mode.
+that gap. The older module and its run_poc.py --acc-mode comparison have since moved
+to the research repository.
 
 `total_avoided_cost` in that extraction already IS energy + generation
 capacity + transmission + distribution + GHG adders + losses + methane
 leakage, summed by the extraction itself (confirmed: exactly equals
 summing every individual component column, to float noise) -- no manual
 stacking needed here. Divided by 1000 to match this POC's existing $/kWh-
-per-unit-of-normalized-profile convention (pipeline/real_avoided_cost.py,
-engine.py) -- the same /1000 CEDARS QAC Validation/pipeline.py uses, and
+per-unit-of-normalized-profile convention (engine.py) -- the same /1000 CEDARS QAC Validation/pipeline.py uses, and
 for the same reason: the extraction's dollar columns are $/MWh-denominated.
 
 Electric ACC covers PG&E/SCE/SDG&E only (confirmed: no SCG rows in the
@@ -61,11 +60,10 @@ E3AvoidedCostElecCO2Seq2026`), and SCG's real data is NOT a scaled copy
 of PG&E's: direct comparison at the same (target sector, end use,
 climate zone, quarter) key shows a real, distinct SEASONAL pattern (Q3
 higher than PG&E, Q2 much lower), not a flat ratio. `run_real_hourly()`
-in run_poc.py now routes any SCG measure this real table covers through
-`pipeline/scg_electric_avoided_cost.py` and
-`engine.price_scg_electric_quarterly()` instead -- see that module's
-docstring for the full story and validated result (ratio 1.0015, matching
-every other IOU's normal residual band). This module's own PG&E fallback
+in run_poc.py then routed any SCG measure that table covers through CET's
+quarterly SCG table (validated ratio 1.0015). That route was retired on
+2026-10-02 (every measure is priced on the 8,760 path) and its code removed
+from ReCET on 2026-10-09; SCG is priced on the hourly ACC as described below. This module's own PG&E fallback
 for SCG remains in place as a safety net for any SCG (sector, end use,
 zone) combo the real table doesn't cover.
 

@@ -464,7 +464,7 @@ class App:
         if missing:
             txt = "✗  Missing from the reference folder: " + ", ".join(missing) + "  (see `recet data status`; a run using the built-in ACC or profile library needs them)"
         else:
-            txt = "✓  All required reference files found" + (f"  ({paths.reference_dir_source()})" if paths.reference_dir() else "  (using the research checkout's files)")
+            txt = "✓  All required reference files found" + (f"  ({paths.reference_dir_source()})" if paths.reference_dir() else "")
         self.data_status.config(text=txt, foreground=BAD_COLOR if missing else OK_COLOR)
 
     def _save_data_dir(self) -> None:

@@ -144,7 +144,7 @@ If you define a new version but supply only one fuel, the other fuel uses the ne
 
 | Control | What it does |
 |---|---|
-| **Folder** | Where the large files live (`acc/2024/electric_hourly.parquet`, `acc/2026/electric_hourly.parquet`, `impact_profiles/catalog.parquet`, `impact_profiles/hourly.parquet`, optional `cet_tables/scg_electric_ac_2026.parquet`). Applies to this run. |
+| **Folder** | Where the large files live (`acc/2024/electric_hourly.parquet`, `acc/2026/electric_hourly.parquet`, `impact_profiles/catalog.parquet`, `impact_profiles/hourly.parquet`). Applies to this run. |
 | **Save as default** | Remembers the folder for every future run on this machine (writes `~/.recet/config.json`). |
 | status line | Green: every required file was found (and from where). Red: lists what is missing. It refreshes when you browse, save, load settings or save a template. A run that uses the built-in ACC or profile library needs these files; a run entirely on supplied files does not. |
 
@@ -264,7 +264,7 @@ result.files        # every file written
 ## Reference data, moving to another machine
 
 The two electric ACC files (~1 GB each) and the CEDARS 8,760-hour profile library (~9 GB) are too large for GitHub, so they are kept in a *reference data folder* outside the package. The folder can be anywhere and can be changed at any time:
-the window's box, `recet data set-dir PATH`, the environment variable `RECET_DATA`, or `--data-dir` on a command (first match wins in that order of specificity). On a development machine that also has the CEDARS review research checkout, `RECET_RESEARCH_ROOT` (or `"research_root"` in `~/.recet/config.json`) names it: files missing from the folder are then taken from where the research scripts wrote them, and the research scripts find their own datasets.
+the window's box, `recet data set-dir PATH`, the environment variable `RECET_DATA`, or `--data-dir` on a command (first match wins in that order of specificity).
 `recet data status` shows what is present. To move it: `data pack` writes the folder as parts of at most 4 GB with checksums; `data unpack` rebuilds it; `data verify --full` checks sizes and SHA-256 against `manifest.json`.
 
 ---------------------------------------------------------------------------------------------------------------------------------

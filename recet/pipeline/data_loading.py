@@ -1,42 +1,14 @@
 """
-Loads real CET Measure input data (copied into poc/data/) and derives the
-fields the pricing engine needs: an avoided-cost subset key, a load-shape
-key, and each measure's annual net kWh savings.
-
-Two real example datasets are bundled:
-  - Measure_real_sample.csv     -- the public CET source-of-truth spec's own
-    5-measure example input, deliberately exercising WEN/FuelSub/NC-AE
-    special-case flags (see poc/README.md for the real-CET-output
-    comparison this produced).
-  - Measure_SW_PGE_Led.csv      -- a real, larger (~5,000 measure) statewide
-    PGE-led program filing, covering far more real diversity: 17 climate
-    zones, 4 IOU territories (PGE/SCE/SDGE/SCG), 7 sectors, 7 MeasImpactType
-    variants, 38 named load shapes.
-
-Real fields used directly from Measure.csv (not invented): NumUnits,
-UnitkW1stBaseline, UnitkWh1stBaseline, UnitkW2ndBaseline, UnitkWh2ndBaseline,
-NTGRkWh, EUL_Yrs, E3ClimateZone, E3MeaElecEndUseShape, Sector,
-IOU_AC_Territory.
-
-Simplifications, stated plainly:
-  - Annual net kWh savings = NumUnits * (UnitkWh1stBaseline - UnitkWh2ndBaseline)
-    * NTGRkWh. Real CalcCE applies additional factors (realization rate,
-    installation rate, GSIA) and WEN/FuelSub/NC-AE-specific branches this
-    POC does not reproduce -- the point of this POC is to test the
-    *hourly pricing architecture*, not to byte-for-byte reimplement CalcCE.
-  - EUL_Yrs is rounded to the nearest whole year (real data includes
-    fractional values like 4.969198677, presumably a weighted average
-    across a combo measure ID) -- this POC prices whole measure-years.
+Loads a CET Measure.csv (pipe delimited) and derives the fields the pricing engine needs (_derive_fields): net kWh / kW / therms per baseline,
+EUL and RUL in exact years, the claim year and quarter, the load-shape and avoided-cost keys, the NTG / installation / realization rates, the
+fuel-substitution flag and the water-energy terms. load_measures_from_csv can first split statewide programs across the IOUs
+(pipeline/statewide_allocation.py).
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 import pandas as pd
-
-from .. import paths
-DATA_DIR = paths.DEV_DATA_DIR   # legacy demo datasets (poc/data), not used by the package runs
-
 
 def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
     """Generic loader: any real CET Measure.csv (pipe-delimited) in, derived-fields DataFrame out.
@@ -52,37 +24,6 @@ def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = Fa
         df, report = allocate_measure_inputs(df)
         warn_unmatched(report, "Measure.csv")
     return _derive_fields(df)
-
-
-def load_real_sample_measures() -> pd.DataFrame:
-    """The original tiny 5-measure public CET spec example input."""
-    return load_measures_from_csv(DATA_DIR / "Measure_real_sample.csv")
-
-
-def load_sw_pge_led_measures() -> pd.DataFrame:
-    """A real, larger (~5,000-measure) statewide PGE-led program filing -- much more
-    representative diversity (climate zones, IOU territories, sectors, measure types)
-    than the tiny public spec example."""
-    return load_measures_from_csv(DATA_DIR / "Measure_SW_PGE_Led.csv")
-
-
-def load_real_shape_matched_measures() -> pd.DataFrame:
-    """The 2,378-measure subset of Measure_SW_PGE_Led.csv that got a REAL matched
-    CEDARS impact-profile shape under --acc-mode real_hourly (see
-    poc/build_real_shape_matched_batch.py, which derives this file, and
-    poc/README.md's "4." section for why this subset is worth its own CET run:
-    isolating the residual avoided-cost gap from synthetic-shape noise)."""
-    return load_measures_from_csv(DATA_DIR / "Measure_real_shape_matched.csv")
-
-
-def load_swwh025_measures() -> pd.DataFrame:
-    """Real 73,024-measure statewide heat-pump-water-heater (SWWH025) filing,
-    2026-09-16 -- Jake supplied this as a live parallel-test input: he runs
-    it through the real CET at the same time this POC prices it, for a
-    fresh, independent comparison. All fuel-substitution (gas storage water
-    heater -> electric HPWH), single claim quarter (2026Q3), single program,
-    spans PGE/SCE/SCG/SDGE and 16 climate zones."""
-    return load_measures_from_csv(DATA_DIR / "Measure_SWWH025.csv")
 
 
 def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
@@ -139,13 +80,9 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     # RUL_Yrs==0 is a real, common, meaningful value here, not a data gap.
     df["rul_years_exact"] = df["RUL_Yrs"].fillna(0.0).clip(lower=0.0)
 
-    # Avoided-cost subset key: climate zone + sector is the real driver of which
-    # avoided-cost-by-hour curve applies in SYNTHETIC mode. In REAL-ACC mode
-    # (run_poc.py/compare_to_cet.py default), this gets overwritten with the
-    # real NP-15/SP-15 hub derived from IOU_AC_Territory instead -- see
-    # real_avoided_cost.subset_key_to_hub().
+    # Avoided-cost subset key (climate zone + sector): a grouping label only; the hourly ACC series is chosen by PA and climate zone.
     df["subset_key"] = "CZ" + df["E3ClimateZone"].astype(str) + "_" + df["Sector"].astype(str)
-    df["climate_zone"] = df["E3ClimateZone"].astype(str)  # real field, needed by real_avoided_cost_full's zone-level distribution lookup
+    df["climate_zone"] = df["E3ClimateZone"].astype(str)  # real field: the zone whose profile and ACC series price the measure
     df["target_sector"] = df["E3TargetSector"].astype(str)  # real field, needed by real_impact_profiles' catalog match key
 
     # Load-shape key: E3MeaElecEndUseShape is CET's own real field naming which
@@ -158,13 +95,12 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     # fractional in real data (e.g. 3.3), and CET prorates the final partial
     # quarter by that fraction rather than rounding (confirmed in the vendor
     # SQL: `(eulq1 - FLOOR(eulq1)) * benefit`). Kept as its own column,
-    # unrounded, for price_real_hourly's quarter-precise discounting --
-    # eul_years above (rounded to whole years) is unchanged for the older
-    # energy/full/synthetic modes, which never had quarter granularity.
+    # unrounded, for price_real_hourly's quarter-precise discounting
+    # (eul_years above is the whole-year version).
     df["eul_years_exact"] = df["EUL_Yrs"].clip(lower=0.25)
 
     # shape_scale/shape_scale_2nd are what load_shapes[shape_key] (a
-    # NORMALIZED, sums-to-1 or sums-to-0 pattern -- see synthetic_curves.py)
+    # NORMALIZED 8,760 profile summing to 1 -- see real_impact_profiles.py)
     # gets multiplied by at pricing time, for the pre-RUL and post-RUL
     # phases respectively (see engine._phased_scale()). Kept as their own
     # columns, not just aliases of annual_net_kwh_1st/_2nd, so a
@@ -277,43 +213,5 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     ]
     if "IOU_AC_Territory" in df.columns:
         df["PA"] = df["IOU_AC_Territory"]  # real field, direct on every Measure.csv this POC has seen
-        cols.append("PA")  # used for real-ACC hub mapping (real_avoided_cost.subset_key_to_hub)
+        cols.append("PA")  # the IOU whose avoided costs, profiles and discount rate price the measure
     return df[cols]
-
-
-def replicate_for_scale_test(df: pd.DataFrame, target_count: int, seed: int = 42) -> pd.DataFrame:
-    """
-    Synthesize a larger measure set for batching/throughput testing by
-    replicating the real sample with jitter on the savings magnitude and a
-    round-robin reassignment of subset/shape keys (to keep cardinality
-    realistic -- every measure does NOT get its own unique subset, only its
-    own unique load shape, matching the eTRM finding this POC is built to
-    test against).
-
-    This is for SCALE testing only, not correctness testing -- correctness
-    should be checked against a real sample via compare_to_cet.py.
-    """
-    import numpy as np
-
-    rng = np.random.default_rng(seed)
-    base = df.reset_index(drop=True)
-    reps = int(np.ceil(target_count / len(base)))
-    rows = []
-    for i in range(reps * len(base)):
-        if len(rows) >= target_count:
-            break
-        src = base.iloc[i % len(base)].to_dict()
-        jitter = rng.uniform(0.7, 1.3)
-        src["measure_id"] = f"{src['measure_id']}_synth{i}"
-        src["annual_net_kwh"] = src["annual_net_kwh"] * jitter
-        src["annual_net_kwh_1st"] = src["annual_net_kwh_1st"] * jitter
-        src["annual_net_kwh_2nd"] = src["annual_net_kwh_2nd"] * jitter
-        src["annual_net_kw"] = src["annual_net_kw"] * jitter
-        src["shape_scale"] = src["annual_net_kwh_1st"]
-        src["shape_scale_2nd"] = src["annual_net_kwh_2nd"]
-        # Each synthetic measure gets its OWN shape key (high load-shape
-        # cardinality, per the eTRM finding), but reuses one of a small set
-        # of avoided-cost subsets (low cardinality, still cacheable).
-        src["shape_key"] = f"{src['shape_key']}__u{i}"
-        rows.append(src)
-    return pd.DataFrame(rows)

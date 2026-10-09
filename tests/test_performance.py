@@ -209,16 +209,16 @@ def test_discount_settings_lookups_are_cached_but_safe():
 
 def test_per_route_helper_equals_the_row_by_row_apply():
     from recet import run_poc
-    df = pd.DataFrame({"measure_id": ["a", "b", "c", "DEMO_x", "DEMO_y", "e"], "shape_key": ["s1", "s1", "s2", "s1", "s1", "s2"], "PA": ["PGE"] * 6,
-                       "target_sector": ["R", "R", "R", "R", "R", "C"], "climate_zone": ["13", "13", "13", "13", "13", "13"]})
+    df = pd.DataFrame({"measure_id": ["a", "b", "c", "d", "e"], "shape_key": ["s1", "s1", "s2", "s1", "s2"], "PA": ["PGE"] * 5,
+                       "target_sector": ["R", "R", "R", "R", "C"], "climate_zone": ["13", "13", "13", "13", "13"]})
     calls = []
 
     def fn(m):
         calls.append(m["measure_id"])
-        return m["shape_key"] == "s1" or str(m["measure_id"]).startswith("DEMO_")
+        return m["shape_key"] == "s1"
 
     got = run_poc._per_route(df, run_poc.ROUTE_COLUMNS, fn)
-    assert len(calls) == 5                                                          # one call per route (a, b share one; c; DEMO_x; DEMO_y; e), not one per row
+    assert len(calls) == 3                                                          # one call per route (a, b, d share one; c; e), not one per row
     assert got.tolist() == df.apply(fn, axis=1).tolist()
 
 

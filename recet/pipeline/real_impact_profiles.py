@@ -2,9 +2,8 @@
 Real per-measure hourly load shapes, pulled from the merged CEDARS Impact
 Profile Library (poc/merge_all_ious.py's output covering all 4 IOUs,
 19,374 real profiles x their real hourly shape per real climate zone),
-replacing pipeline/synthetic_curves.py's randomly-generated placeholder
-shapes -- the one row in poc/README.md's "What's real vs. synthetic" table
-that was still synthetic.
+replacing the first proof of concept's randomly-generated placeholder
+shapes (synthetic_curves, now in the CEDARS review research repository's poc/research_lib).
 
 MATCHING a CET Measure.csv row to a real CEDARS impact profile: CET's own
 E3MeaElecEndUseShape field ("28 = Res. New Const. Lighting", "DEER:HVAC_Eff_AC",
@@ -26,8 +25,8 @@ match_profile_id()'s return value, never silent.
 
 Once matched, the profile's raw `impact` column (real per-hour data,
 NORMALIZED -- sums to ~1.0 per climate zone, confirmed empirically) is
-exactly the same shape contract pipeline/synthetic_curves.load_shape()
-already promises the pricing engine: a length-8760 array summing to ~1.0,
+exactly the same shape contract the synthetic placeholder shapes
+promised the pricing engine: a length-8760 array summing to ~1.0,
 meant to be scaled by the measure's own annual_net_kwh at pricing time --
 nothing in engine.py needs to know the data source changed, only which
 functions build the (shape, represents_year) pair per measure.

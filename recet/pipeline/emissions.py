@@ -4,14 +4,11 @@ stored procedure (CET_v25.1_documentation_extracted.txt:17484-19100).
 
 ELECTRIC CO2 SOURCE (2026-09-18, Jake): by default computed from the ACC's
   own hourly emission rate x the real impact profile, NOT from CET's table
-  (see price_emissions' co2_source). Validated against CET's `CO2` column at
+  Validated against CET's `CO2` column at
   ~0.03% aggregate (up to ~1% per quarter). NOx/PM10 have no ACC source and
   still come from CET's `E3Emissions`.
 
 DATA (real CET tables, exported by Jake 2026-09-17/09-18):
-  - `E3AvoidedCostElecCO2Seq2026`'s `CO2` column (co2_source="cet" only): a QUARTERLY electric CO2
-    rate per (PA, TS, EU, CZ, Qtr), extracted for all PAs to
-    `data/cet_backup_tables_2026-09-17/e3_co2_quarterly.parquet`.
   - `E3Emissions`: flat NOx and PM10 rates per (PA, TS, EU, CZ). NOx/PM10
     are joined to the quarterly CO2 rows by CET's `E3EmissionsSourcevw`, so
     a key missing from E3Emissions gets NOx = PM10 = 0 (e.g. every SCE and
@@ -43,7 +40,6 @@ from __future__ import annotations
 
 import math
 from functools import lru_cache
-from pathlib import Path
 
 import pandas as pd
 
@@ -52,25 +48,8 @@ from . import discount_settings, real_avoided_cost_v2, real_impact_profiles, sys
 from .engine import QUARTER_BOUNDS
 
 DATA_DIR = paths.package_data("e3_tables")
-# CET's own quarterly CO2 table is a COMPARISON input (co2_source="cet") only; it is not shipped with the package.
-CET_CO2_TABLE = paths.DEV_DATA_DIR / "cet_backup_tables_2026-09-17" / "e3_co2_quarterly.parquet"
-
-
 def is_available() -> bool:
     return all((DATA_DIR / f).exists() for f in ("e3_emissions.parquet", "e3_combustion_type.parquet"))
-
-
-@lru_cache(maxsize=1)
-def _co2_index() -> dict[tuple[str, str, str, str], list[tuple[int, float]]]:
-    """(PA, TS, EU, CZ) -> [(Qidx, CO2), ...] sorted by quarter, CO2 summed
-    across duplicate (kW+kWh) rows for the same quarter."""
-    d = pd.read_parquet(CET_CO2_TABLE, columns=["PA", "TS", "EU", "CZ", "Qtr", "CO2"])
-    d["qidx"] = d["Qtr"].str[:4].astype(int) * 4 + d["Qtr"].str[-1].astype(int)
-    d = d.groupby(["PA", "TS", "EU", "CZ", "qidx"], sort=True)["CO2"].sum().reset_index()
-    out: dict[tuple[str, str, str, str], list[tuple[int, float]]] = {}
-    for key, sub in d.groupby(["PA", "TS", "EU", "CZ"], sort=False):
-        out[key] = list(zip(sub["qidx"].tolist(), sub["CO2"].tolist()))
-    return out
 
 
 @lru_cache(maxsize=4)
@@ -155,20 +134,15 @@ def _gas_lifecycle(thm1: float, thm2: float, rul: float, eul: float) -> float:
     return 0.0
 
 
-def price_emissions(measures: pd.DataFrame, acc_version: int = 2026, market_effects_bens: float = 0.0,
-                    co2_source: str = "hourly") -> pd.DataFrame:
+def price_emissions(measures: pd.DataFrame, acc_version: int = 2026, market_effects_bens: float = 0.0) -> pd.DataFrame:
     """One row per measure with CET's emissions output columns (Net/Gross x
     Elec/Gas x CO2/NOx, PM10, each First-year and Lifecycle).
 
-    co2_source="hourly" (default): electric CO2 from the ACC's own hourly
-    emission rate x the measure's real impact profile (see
-    _hourly_co2_quarters). This POC replaces CET, so CET's tables are a
-    comparison point, not an input. co2_source="cet" reads CET's quarterly
-    `CO2` column instead (matches real CET to ~1e-15; kept for comparison).
+    Electric CO2 comes from the ACC's own hourly emission rate x the
+    measure's real impact profile (see _hourly_co2_quarters), not from CET's
+    quarterly CO2 table.
     NOx/PM10 still come from `E3Emissions` -- the ACC has no electric NOx/
     PM10 rates, so this remains a CET-table dependency (see module docstring)."""
-    # CET's quarterly CO2 table is only read for the comparison option co2_source="cet"; the default computes CO2 from the ACC's hourly emission rate
-    co2_idx = _co2_index() if co2_source == "cet" else {}
     nox_idx, comb = _nox_pm10_index(acc_version), _combustion_nox()
     rows: list[dict] = []
     for m in measures.itertuples(index=False):
@@ -183,9 +157,7 @@ def price_emissions(measures: pd.DataFrame, acc_version: int = 2026, market_effe
         rulq, eulq = rul * 4.0, eul * 4.0
         install_q = int(m.claim_year) * 4 + int(m.claim_quarter)
 
-        key = (m.PA, m.target_sector, m.shape_key, str(m.climate_zone))
-        quarters = (_hourly_co2_quarters(m.PA, m.target_sector, m.shape_key, str(m.climate_zone))
-                    if co2_source == "hourly" else co2_idx.get(key))
+        quarters = _hourly_co2_quarters(m.PA, m.target_sector, m.shape_key, str(m.climate_zone))
         nox_rate, pm10_rate = nox_idx.get((m.PA, str(m.target_sector).upper(), m.shape_key, str(m.climate_zone).upper()), (0.0, 0.0))
         fy = {"co2": 0.0, "nox": 0.0, "pm": 0.0}
         lc = {"co2": 0.0, "nox": 0.0, "pm": 0.0}

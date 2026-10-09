@@ -2,7 +2,7 @@
 
 Two kinds of data:
 
-* **Package data** -- small tables that ship inside the package (`recet/data/`): E3 settings and tables, TOU maps and factors, the gas monthly
+* **Package data** -- small tables that ship inside the package (`recet/data/`): E3 settings and tables, the gas monthly
   profile library, statewide-allocation factors, and the two gas ACC extractions. Always found via `package_data()`.
 * **Reference data** -- the large files that cannot live on GitHub (the 2024 and 2026 electric ACC hourly parquets, ~1 GB each, and the CEDARS
   impact-profile library, ~9 GB). They live in a *reference data folder* you can point anywhere (another drive, a network share, another machine).
@@ -12,10 +12,7 @@ The reference data folder is resolved, first match wins:
   1. `set_reference_dir()` for this process (the GUI's "Reference data folder" box and `--data-dir` do this),
   2. the environment variable `RECET_DATA`,
   3. the saved setting in `~/.recet/config.json` (`recet data set-dir PATH` or the GUI's "Save as default"; the config folder itself can be
-     moved with `RECET_HOME`),
-  4. the files where the CEDARS review research scripts wrote them, when a *research checkout* is configured (development machines only):
-     the environment variable `RECET_RESEARCH_ROOT`, or `"research_root"` in `~/.recet/config.json`, naming the CEDARS-Review checkout.
-     The research scripts' own datasets (`poc/data`, `DEV_DATA_DIR`) are found the same way.
+     moved with `RECET_HOME`).
 
 Layout of the reference folder (`recet data status` lists what is present; `manifest.json` carries sizes and checksums):
 
@@ -23,7 +20,6 @@ Layout of the reference folder (`recet data status` lists what is present; `mani
   acc/2026/electric_hourly.parquet          draft 2026 ACC hourly electric avoided costs (CET Version 2027)
   impact_profiles/catalog.parquet           CEDARS impact-profile catalog
   impact_profiles/hourly.parquet            CEDARS 8,760-hour impact profiles, all IOUs
-  cet_tables/scg_electric_ac_2026.parquet   OPTIONAL: CET's quarterly SCG electric table (2024 ACC / Version 2026 only)
 
 The ACC files actually used in a run are chosen at run time (`configure_runtime`), so one process can run several ACC versions; the older
 environment variables `POC_ACC_ELEC_PARQUET` / `POC_ACC_GAS_PARQUET` still work as a default when nothing is configured.
@@ -37,26 +33,6 @@ from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PKG_DATA = PACKAGE_DIR / "data"
-ENV_RESEARCH = "RECET_RESEARCH_ROOT"
-
-
-def _research_root() -> Path | None:
-    """The CEDARS-Review research checkout, if this machine has one configured (env RECET_RESEARCH_ROOT, else "research_root" in the config
-    file). Read once at import; None on an ordinary install."""
-    p = os.environ.get(ENV_RESEARCH)
-    if not p:
-        try:
-            cfg = Path(os.environ.get("RECET_HOME") or (Path.home() / ".recet")) / "config.json"
-            p = json.loads(cfg.read_text(encoding="utf-8")).get("research_root")
-        except (OSError, ValueError):
-            p = None
-    root = Path(p).expanduser() if p else None
-    return root if root is not None and (root / "2024 ACC Extraction").exists() else None
-
-
-DEV_ROOT: Path | None = _research_root()                                                        # None on an ordinary install
-DEV_DATA_DIR = DEV_ROOT / "poc" / "data" if DEV_ROOT else PACKAGE_DIR.parent / "data"           # the research scripts' datasets
-
 ENV_DATA = "RECET_DATA"
 
 
@@ -124,7 +100,7 @@ def reference_dir_source() -> str:
         return f"environment variable {ENV_DATA}"
     if read_config().get("data_dir"):
         return f"saved default ({config_path()})"
-    return "not set" + (f" (using the research checkout's files: {DEV_ROOT})" if DEV_ROOT else "")
+    return "not set"
 
 
 @dataclass(frozen=True)
@@ -132,35 +108,23 @@ class RefFile:
     key: str
     rel: str                 # path inside the reference folder
     what: str
-    dev: Path | None         # where a source checkout keeps it
     required: bool = True
 
 
-def _dev(*parts: str) -> Path | None:
-    return DEV_ROOT.joinpath(*parts) if DEV_ROOT else None
-
-
-_PROFILES_DEV = DEV_DATA_DIR / "impact_profiles_all_iou_full_2026-09-14"
 REF_FILES: dict[str, RefFile] = {r.key: r for r in (
-    RefFile("acc_electric_2024", "acc/2024/electric_hourly.parquet", "2024 ACC hourly electric avoided costs (CET Version 2026)",
-            _dev("2024 ACC Extraction", "output", "ACC2024_electric_avoided_costs_hourly.parquet")),
-    RefFile("acc_electric_2026", "acc/2026/electric_hourly.parquet", "draft 2026 ACC hourly electric avoided costs (CET Version 2027)",
-            _dev("2026 ACC Extraction", "output", "ACC2026_electric_avoided_costs_hourly.parquet")),
-    RefFile("impact_catalog", "impact_profiles/catalog.parquet", "CEDARS impact-profile catalog", _PROFILES_DEV / "cedars_all_iou_catalog.parquet"),
-    RefFile("impact_hourly", "impact_profiles/hourly.parquet", "CEDARS 8,760-hour impact profiles (all IOUs)", _PROFILES_DEV / "impact_profiles_hourly.parquet"),
-    RefFile("scg_cet_table", "cet_tables/scg_electric_ac_2026.parquet", "CET quarterly SCG electric avoided-cost table (optional, 2024 ACC only)",
-            DEV_DATA_DIR / "elec_ac_scg_real" / "scg_electric_ac_2026.parquet", required=False),
+    RefFile("acc_electric_2024", "acc/2024/electric_hourly.parquet", "2024 ACC hourly electric avoided costs (CET Version 2026)"),
+    RefFile("acc_electric_2026", "acc/2026/electric_hourly.parquet", "draft 2026 ACC hourly electric avoided costs (CET Version 2027)"),
+    RefFile("impact_catalog", "impact_profiles/catalog.parquet", "CEDARS impact-profile catalog"),
+    RefFile("impact_hourly", "impact_profiles/hourly.parquet", "CEDARS 8,760-hour impact profiles (all IOUs)"),
 )}
 
 
 def ref_path(key: str) -> Path | None:
-    """The file for `key`: the reference folder's copy if it exists, else the source checkout's, else None."""
+    """The file for `key` in the reference folder, or None if it is not there."""
     rf = REF_FILES[key]
     ref = reference_dir()
     if ref is not None and (ref / rf.rel).exists():
         return ref / rf.rel
-    if rf.dev is not None and rf.dev.exists():
-        return rf.dev
     return None
 
 
@@ -178,12 +142,11 @@ def missing_required() -> list[str]:
 
 
 # ------------------------------------------------------------------------------------------------------------------- run-time ACC selection
-_runtime: dict[str, Path | None] = {"acc_electric": None, "acc_gas": None, "scg_table": None}
+_runtime: dict[str, Path | None] = {"acc_electric": None, "acc_gas": None}
 
 
-def configure_runtime(*, acc_electric: Path | None = None, acc_gas: Path | None = None, scg_table: Path | None = None) -> None:
-    _runtime.update(acc_electric=Path(acc_electric) if acc_electric else None, acc_gas=Path(acc_gas) if acc_gas else None,
-                    scg_table=Path(scg_table) if scg_table else None)
+def configure_runtime(*, acc_electric: Path | None = None, acc_gas: Path | None = None) -> None:
+    _runtime.update(acc_electric=Path(acc_electric) if acc_electric else None, acc_gas=Path(acc_gas) if acc_gas else None)
 
 
 def _env_path(name: str) -> Path | None:
@@ -197,7 +160,3 @@ def current_acc_electric() -> Path | None:
 def current_acc_gas() -> Path | None:
     p = _runtime["acc_gas"] or _env_path("POC_ACC_GAS_PARQUET") or package_data("acc", "2024", "gas_components.parquet")
     return p if p and p.exists() else None
-
-
-def current_scg_table() -> Path | None:
-    return _runtime["scg_table"] or ref_path("scg_cet_table")
