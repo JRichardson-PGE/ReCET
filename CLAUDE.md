@@ -15,8 +15,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
 - Reproduce CET's real behaviour unless a deliberate, documented exception says otherwise (e.g. SCB/SCH priced on the real SCT rows, not CET's TRC copy).
 - Large files are never in git: the two electric ACC parquets and the ~9 GB impact-profile library live in the *reference data folder*
   (`recet data status`, `RECET_DATA`, `~/.recet/config.json`). Small tables ship in `recet/data/`.
-- Do not import the legacy demo modules (`real_avoided_cost`, `real_avoided_cost_full`, `synthetic_curves`, `data_loading`) at module level; they need
-  research-only files. Several pipeline modules (`tou_profiles`, `scg_electric_avoided_cost`, the TOU/SCG quarterly pricers in `engine`) are no longer
-  used by runs and are candidates for removal.
+- Research-only code does not belong here. On 2026-10-09 the first proof of concept's pieces (synthetic shapes and pricers, the first-generation ACC
+  loaders, the TOU quarterly profiles, the research datasets, the old `run_poc` command line) moved to the research repo's `poc/research_lib`, and
+  the retired TOU/SCG quarterly routes, the CET-CO2 comparison option and the research-checkout file fallback were removed. Research scripts in
+  CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.

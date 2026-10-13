@@ -213,7 +213,7 @@ measure's `E3GasSavProfile` contains `FuelSub` (a residential gas-to-electric fu
 
 **C3.3 E3 tables and run parameters.** Discount rates, `CO2Gas`, NOx/PM10 factors and retail rate schedules come from CET's E3 tables, keyed by their `Version`. The
 discount rates, base year and `CO2Gas` (CET's `E3Settings`) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. The built-in ACC `2024` uses Version 2026, the
-draft `2026` ACC uses Version 2027 (identical values), and a new ACC label borrows the Version you name (default: the newest). The primary rate is `DiscountRateAnnual` (PG&E
+`2026` ACC uses Version 2027 (identical values), and a new ACC label borrows the Version you name (default: the newest). The primary rate is `DiscountRateAnnual` (PG&E
 7.66%, SCE 7.65%, SCG 7.38%, SDG&E 7.36%); the societal rate `DiscountRateAnnual_SCT` is 5.03% for every utility.
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -237,7 +237,7 @@ uses as 8,760s built from their Gen-based energy shares: each TOU period's share
 `hourly_source = TOU H-factor 8,760`.
 
 **C4.2 Calendar alignment.** A profile is drawn on the weekdays of the year it represents (`represents_year`; 2009, the DEER reference year, when blank; 2025 for the TOU
-8,760s). The ACC's hourly avoided costs follow **2018's weekdays in every forecast year** (hour 1 is a Monday; in both the 2024 and the draft 2026 ACC the weekly low in
+8,760s). The ACC's hourly avoided costs follow **2018's weekdays in every forecast year** (hour 1 is a Monday; in both the 2024 and the 2026 ACC the weekly low in
 distribution and transmission value falls on days 6-7 of every week of every year), so every profile is rotated **once**, onto 2018, and the same aligned shape prices
 every year. With Monday = 0:
 
@@ -716,7 +716,7 @@ Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (media
 * SCG electric is priced on the SCG routing of C3.1: one utility's whole bundle per zone, SCE unless SCE has no data for the zone (then PG&E). This matches CEDARS'
   DEER-path SCG values in zones 4, 5 (PG&E) and 13 (SCE); CEDARS' own SCG hourly files instead pair SCE generation with PG&E T&D in zones 4, 5 and 13, so the POC
   differs from them there. CET's quarterly SCG table is not used.
-* Not validated against CET, because the real runs contain none: **market effects at 5%**, **`WaterEnergyCost`** and second-baseline water, the **draft 2026 ACC** (there is no CET run for Version 2027), and statewide allocation of program costs.
+* Not validated against CET, because the real runs contain none: **market effects at 5%**, **`WaterEnergyCost`** and second-baseline water, the **2026 ACC** (there is no CET run for Version 2027), and statewide allocation of program costs.
   These paths are covered by the hand-computed tests in `tests`.
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
 * Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from CET's `E3Emissions`, which covers only part of the keys.
@@ -730,7 +730,7 @@ Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (media
 
 One measure, priced against constant (flat) avoided costs and a flat profile so that every step can be checked with a calculator. The job is exactly the one in `tests/test_docs.py`, which re-runs it and checks the numbers below.
 
-**Inputs.** A PG&E residential measure, climate zone 13, claimed in **2028Q3**, First Year 2028, draft-2026-ACC E3 tables (Version 2027: `DiscountRateQtr` = 0.01915, `DiscountRateAnnual` = 0.0766, societal 0.012575 / 0.0503).
+**Inputs.** A PG&E residential measure, climate zone 13, claimed in **2028Q3**, First Year 2028, 2026-ACC E3 tables (Version 2027: `DiscountRateQtr` = 0.01915, `DiscountRateAnnual` = 0.0766, societal 0.012575 / 0.0503).
 
 | `Measure.csv` field | Value | `Measure.csv` field | Value |
 |---|---|---|---|

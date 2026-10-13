@@ -6,8 +6,8 @@ counterpart to `real_impact_profiles.py`'s electric shapes, but monthly
 shift at all: "Because it is monthly there is no need for date shifting."
 
 Each named profile's 12 monthly `Impact` values are NORMALIZED (sum to
-1.0), matching every other shape contract in this POC (`synthetic_curves.
-load_shape()`, `real_impact_profiles.get_shape()`) -- multiply by a
+1.0), the same shape contract as the electric profiles
+(`real_impact_profiles.get_shape()`) -- multiply by a
 measure's own annual_net_therms at pricing time, don't bake magnitude in
 here.
 

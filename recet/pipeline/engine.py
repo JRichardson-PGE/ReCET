@@ -1,22 +1,17 @@
 """
-The core comparison this whole POC exists to run: price a set of measures
-two ways --
+The pricing engine behind every ReCET run.
 
-  legacy_net_then_shape()  -- what CET does today: net the measure's annual
-      kWh savings to a single number FIRST, then (conceptually) apply a
-      shape/rate. A load-shifting measure with zero net annual savings has
-      nothing left to shape, so it prices at $0 regardless of its real
-      hour-to-hour avoided-cost value. This mirrors CET Modernization
-      Review Section 1.2, item #4.
+  price_real_hourly        electric benefit, hour by hour: each measure's 8,760 impact profile (aligned to the ACC calendar) times that year's hourly
+                           avoided cost, summed within the ACC quarters and discounted quarterly at the PA's rate. Pricing each hour BEFORE summing is
+                           what lets a load-shifting measure (zero net annual kWh) show its real value; CET nets annual savings first and prices it at $0.
+                           price_real_hourly_per_measure is its per-measure reference (the tests require the two to agree).
+  price_gas_benefit        gas benefit on monthly profiles and the monthly gas ACC (price_gas_benefit_per_measure is its reference).
+  price_bill_impact        RIM bill reductions/increases, as CalcCE computes them.
+  price_participant_cost   participant / measure costs.
+  price_other_ben_cost     the other benefits and costs (refrigerant, gas infrastructure, misc., tax credits).
 
-  price_batched_hourly()  -- the proposed architecture: multiply the
-      measure's own hourly array by its subset's cached avoided-cost array
-      BEFORE summing, processed in bounded batches so memory/compute never
-      depends on holding all measures' hourly arrays at once. This is
-      Section 5's batched per-measure pricing layer.
-
-Both operate on the same real per-measure inputs; only the order of
-operations differs. That's the entire architectural claim being tested.
+The research-era pricers that used to live here (synthetic batched pricing, the "legacy net-then-shape" comparison, the TOU and SCG quarterly
+routes) were moved to the CEDARS review research repository (poc/research_lib) or removed on 2026-10-09.
 """
 from __future__ import annotations
 
@@ -27,17 +22,11 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from .synthetic_curves import HOURS_PER_YEAR
-
-DISCOUNT_RATE = 0.03  # matches the discount_factor term in the review's layer-4 formula
-
+HOURS_PER_YEAR = 8760
 
 @dataclass
 class BatchedPricingResult:
-    # Schema depends on which function produced this: price_batched_hourly()
-    # returns (measure_id, year, annual_value) rows; price_batched_hourly_
-    # vectorized() returns (measure_id, lifetime_value) rows (closed-form
-    # summed, not exploded per year -- see that function's docstring).
+    # one row per priced (measure_id, year, quarter), the discounted value in annual_value
     measure_year: pd.DataFrame
     portfolio_hourly: np.ndarray        # length HOURS_PER_YEAR, this run's aggregate
     n_batches: int
@@ -53,149 +42,6 @@ class BatchedPricingResult:
     unmatched_measure_ids: list = field(default_factory=list)  # populated by price_real_hourly() when fallback_shape is None
     # measure_id -> how run_poc.run_real_hourly routed it ("hourly profile | <profile source>"); reporting only.
     route: dict = field(default_factory=dict)
-
-
-def price_batched_hourly(
-    measures: pd.DataFrame,
-    load_shapes: dict[str, np.ndarray],
-    avoided_cost: dict[str, np.ndarray],
-    batch_size: int = 500,
-) -> BatchedPricingResult:
-    """
-    Process `measures` in chunks of `batch_size`. Each batch is priced
-    in-memory (vectorized numpy, no persistence of the (measure x hour)
-    grain past the batch) and immediately reduced into:
-      (a) a (measure_id, year) row appended to the measure-year output, and
-      (b) an add into the running, fixed-size portfolio_hourly accumulator.
-
-    Memory footprint per batch is O(batch_size x 8760), never
-    O(all_measures x 8760) -- this is the whole point.
-    """
-    start = time.perf_counter()
-    portfolio_hourly = np.zeros(HOURS_PER_YEAR)
-    measure_year_rows: list[dict] = []
-    n_batches = 0
-
-    for batch_start in range(0, len(measures), batch_size):
-        batch = measures.iloc[batch_start:batch_start + batch_size]
-        n_batches += 1
-
-        for _, m in batch.iterrows():
-            shape = load_shapes[m["shape_key"]] * m["shape_scale"]  # normalized pattern -> this measure's own magnitude
-            ac = avoided_cost[m["subset_key"]]
-            hourly_value = shape * ac  # the vectorized per-measure dot-product, elementwise
-            annual_value_year1 = float(hourly_value.sum())
-
-            portfolio_hourly += hourly_value  # fixed-size accumulator, never grows
-
-            for year in range(1, m["eul_years"] + 1):
-                discount_factor = 1.0 / ((1 + DISCOUNT_RATE) ** (year - 1))
-                measure_year_rows.append({
-                    "measure_id": m["measure_id"],
-                    "year": year,
-                    "annual_value": annual_value_year1 * discount_factor,
-                })
-
-    elapsed = time.perf_counter() - start
-    return BatchedPricingResult(
-        measure_year=pd.DataFrame(measure_year_rows),
-        portfolio_hourly=portfolio_hourly,
-        n_batches=n_batches,
-        elapsed_seconds=elapsed,
-        batch_size=batch_size,
-    )
-
-
-def price_batched_hourly_vectorized(
-    measures: pd.DataFrame,
-    avoided_cost: dict[str, np.ndarray],
-    batch_size: int,
-    rng: np.random.Generator,
-) -> BatchedPricingResult:
-    """
-    Same architecture as price_batched_hourly(), but for real-scale
-    benchmarking: load shapes are generated FRESH per batch (via
-    synthetic_curves.load_shape_batch, fully vectorized) and discarded once
-    that batch is priced -- never held for all measures at once. This is
-    the actual memory-bounded behavior the batching claim depends on;
-    price_batched_hourly()'s pre-built load_shapes dict is fine for a
-    handful of real measures but would not scale, which is exactly why this
-    separate path exists for the benchmark.
-
-    Per-batch work is grouped by avoided-cost subset so the (few) avoided-
-    cost arrays are never broadcast out to a full (batch_size x 8760)
-    matrix -- only the batch's own (already-necessary) shape matrix is that
-    large.
-    """
-    from .synthetic_curves import load_shape_batch  # local import: benchmark-only path
-
-    start = time.perf_counter()
-    portfolio_hourly = np.zeros(HOURS_PER_YEAR)
-    lifetime_rows: list[dict] = []
-    n_batches = 0
-
-    for batch_start in range(0, len(measures), batch_size):
-        batch = measures.iloc[batch_start:batch_start + batch_size].reset_index(drop=True)
-        n_batches += 1
-
-        shapes = load_shape_batch(batch["annual_net_kwh"].to_numpy(), rng)  # (len(batch), HOURS_PER_YEAR)
-        hourly_value = np.empty_like(shapes)
-
-        for subset_key, group in batch.groupby("subset_key"):
-            idx = group.index.to_numpy()
-            hourly_value[idx] = shapes[idx] * avoided_cost[subset_key]  # broadcasts (H,) against (k,H)
-
-        annual_value_year1 = hourly_value.sum(axis=1)
-        portfolio_hourly += hourly_value.sum(axis=0)
-
-        eul = batch["eul_years"].to_numpy()
-        # Closed-form sum of a discounted geometric series over each measure's
-        # EUL, instead of materializing one row per (measure, year) -- avoids
-        # a second source of unnecessary memory growth at real scale.
-        r = DISCOUNT_RATE
-        lifetime_value = annual_value_year1 * (1 - (1 / (1 + r)) ** eul) / (1 - 1 / (1 + r))
-
-        lifetime_rows.append(pd.DataFrame({
-            "measure_id": batch["measure_id"].to_numpy(),
-            "lifetime_value": lifetime_value,
-        }))
-
-    elapsed = time.perf_counter() - start
-    return BatchedPricingResult(
-        measure_year=pd.concat(lifetime_rows, ignore_index=True),
-        portfolio_hourly=portfolio_hourly,
-        n_batches=n_batches,
-        elapsed_seconds=elapsed,
-        batch_size=batch_size,
-    )
-
-
-def legacy_net_then_shape(
-    measures: pd.DataFrame,
-    load_shapes: dict[str, np.ndarray],
-    avoided_cost: dict[str, np.ndarray],
-) -> pd.DataFrame:
-    """
-    Simulates CET's current calculation order: net the measure's annual kWh
-    savings to one number first (== load_shapes[shape_key].sum() * shape_scale,
-    which is ~0 for a load-shifting measure by construction since its
-    normalized pattern sums to 0), THEN multiply by a single blended
-    avoided-cost rate for that subset. No hourly join, no per-hour
-    dimension -- matches the real gap: quarterized/annual aggregation
-    happens before CalcCE ever sees hourly values.
-    """
-    rows = []
-    for _, m in measures.iterrows():
-        net_annual_kwh = float(load_shapes[m["shape_key"]].sum()) * m["shape_scale"]
-        blended_rate = float(avoided_cost[m["subset_key"]].mean())
-        for year in range(1, m["eul_years"] + 1):
-            discount_factor = 1.0 / ((1 + DISCOUNT_RATE) ** (year - 1))
-            rows.append({
-                "measure_id": m["measure_id"],
-                "year": year,
-                "annual_value": net_annual_kwh * blended_rate * discount_factor,
-            })
-    return pd.DataFrame(rows)
 
 
 # Real 2018 (non-leap) calendar quarter boundaries, in 0-based hour-of-year --
@@ -256,7 +102,7 @@ def price_real_hourly_per_measure(
     1. Real avoided costs vary substantially year to year (GHG price alone:
        ~$24/tonne in 2025 vs. ~$214/tonne in 2031 -- see README), so pricing
        every EUL-year off one static representative-year curve (as
-       price_batched_hourly does) silently mis-prices any measure whose EUL
+       the first proof of concept's batched pricer did) silently mis-prices any measure whose EUL
        spans years with materially different avoided costs. This prices
        EACH measure-quarter against ITS year's real avoided-cost array, and
        re-aligns the measure's own real impact-profile shape onto that
@@ -309,7 +155,7 @@ def price_real_hourly_per_measure(
     quarterly discount rate (DiscountRateQtr, already a flat rate, not
     derived from the annual one -- see discount_settings.py).
 
-    Not vectorized/batched like price_batched_hourly_vectorized -- this is
+    Not vectorized like the first proof of concept's scale benchmark -- this is
     a correctness-focused real-data run (thousands, not millions, of
     measures), so a straightforward per-measure Python loop keeps the
     methodology easy to line up against CEDARS QAC Validation's own code
@@ -512,82 +358,6 @@ def price_real_hourly(
                                 batch_size=n, n_real_shape=int(matched.sum()), n_fallback_shape=0, unmatched_measure_ids=unmatched_ids)
 
 
-def price_real_hourly_legacy(
-    measures: pd.DataFrame,
-    get_shape: Callable[[pd.Series], tuple[np.ndarray, int] | None],
-    get_acc_years: Callable[[pd.Series], dict[int, np.ndarray]],
-    get_discount_rate_qtr: Callable[[pd.Series], float],
-    base_year: int,
-    fallback_shape: Callable[[pd.Series], np.ndarray] | None = None,
-) -> pd.DataFrame:
-    """
-    legacy_net_then_shape()'s real-data counterpart, using the same real
-    shape/avoided-cost/discount-rate sources as price_real_hourly() so the
-    two are an apples-to-apples comparison: net the measure's annual kWh
-    first (from its real profile, at its OWN claim year's calendar --
-    there's no hourly join to misalign in this branch, so no shift is
-    needed for the netting step itself), then multiply by ONE blended
-    avoided-cost rate for its claim year, applied across every EUL quarter
-    (still real quarter-precise discounting -- that part of the fix applies
-    regardless of calculation order, it's not what this comparison is
-    testing). This mirrors legacy_net_then_shape's real limitation: no
-    year-varying rate, no hourly dimension at all -- just done with real
-    inputs instead of synthetic ones.
-
-    The net annual kWh itself still applies the real RUL-based dual-
-    baseline phase (see engine._phased_scale()) -- that's a real fact about
-    what the measure saves each year, not part of the "calculation order"
-    flaw this function exists to isolate, so both branches of the
-    comparison get it right and only the ORDER of operations differs.
-    """
-    rows = []
-    for _, m in measures.iterrows():
-        shape_result = get_shape(m)
-        if shape_result is not None:
-            shape, _represents_year = shape_result
-        elif fallback_shape is not None:
-            shape = fallback_shape(m)
-        else:
-            continue
-
-        claim_year = int(m["claim_year"])
-        claim_quarter = int(m["claim_quarter"])
-        shape_sum = float(shape.sum())
-        rul_quarters = float(m["rul_years_exact"]) * 4.0
-        scale_1st = float(m["shape_scale"])
-        scale_2nd = float(m["shape_scale_2nd"])
-        rqf = 1.0 + get_discount_rate_qtr(m)
-
-        acc_years = get_acc_years(m)
-        acc_year = min(acc_years, key=lambda y: abs(y - claim_year))
-        blended_rate = float(acc_years[acc_year].mean())
-
-        eul_quarters = float(m["eul_years_exact"]) * 4.0
-        full_quarters = int(eul_quarters)
-        frac_remainder = eul_quarters - full_quarters
-        n_billed_quarters = full_quarters + (1 if frac_remainder > 1e-9 else 0)
-
-        for k in range(n_billed_quarters):
-            abs_quarter = (claim_quarter - 1) + k
-            target_year = claim_year + abs_quarter // 4
-            quarter_idx = abs_quarter % 4
-            is_last = k == n_billed_quarters - 1
-            frac = frac_remainder if (is_last and frac_remainder > 1e-9) else 1.0
-
-            scale = _phased_scale(k, rul_quarters, scale_1st, scale_2nd)
-            net_quarterly_value = shape_sum * scale * blended_rate / 4.0
-
-            qac = (target_year - base_year) * 4 + quarter_idx
-            discount_factor = 1.0 / (rqf ** qac)
-            rows.append({
-                "measure_id": m["measure_id"],
-                "year": target_year,
-                "quarter": quarter_idx + 1,
-                "annual_value": net_quarterly_value * frac * discount_factor,
-            })
-    return pd.DataFrame(rows)
-
-
 # Real calendar quarters as 0-based [start, end) MONTH slices (Jan..Dec == indices 0..11) --
 # the gas counterpart to QUARTER_BOUNDS above, which is in hours instead.
 GAS_QUARTER_MONTHS = [(0, 3), (3, 6), (6, 9), (9, 12)]
@@ -753,134 +523,6 @@ def price_gas_benefit(
 
     value = scale * weight * discount * unit[g_row, year - y0, quarter]
     return pd.DataFrame({"measure_id": measures["measure_id"].to_numpy()[priced][m_idx], "year": year, "quarter": quarter + 1, "gas_benefit": value})
-
-
-def price_scg_electric_quarterly(   # NOT USED by the POC since 2026-10-02 (8,760 path only); kept for research scripts
-    measures: pd.DataFrame,
-    get_quarterly_rates: Callable[[pd.Series], dict[tuple[int, int], float]],
-    get_discount_rate_qtr: Callable[[pd.Series], float],
-    base_year: int,
-) -> pd.DataFrame:
-    """
-    Real electric benefit for SCG-attributed measures, using CET's own
-    real quarterly avoided-cost impact combination table directly (see
-    pipeline/scg_electric_avoided_cost.py's docstring for the full
-    real-world evidence this replaces an earlier PG&E-substitution
-    approach that never fully closed a real ~7-10% gap). Unlike
-    price_real_hourly, there's no hourly shape/shift/aggregation step
-    here: get_quarterly_rates already returns the impact-profile-weighted
-    $/kWh-equivalent rate per (year, quarter) directly, so this just
-    multiplies by the measure's own (RUL-phased) annual net kWh and
-    discounts -- structurally identical to price_gas_benefit, since both
-    real data sources are quarterly-native, not hourly.
-
-    Same dual-baseline RUL phasing as price_real_hourly/price_gas_benefit
-    (see engine._phased_scale()).
-    """
-    rows: list[dict] = []
-
-    for _, m in measures.iterrows():
-        rates = get_quarterly_rates(m)
-        irr = float(m["ir_kwh"]) * float(m["rr_kwh"])  # CalcCE's IRkWh x RRkWh
-        scale_1st = float(m["annual_net_kwh_1st"]) * irr
-        scale_2nd = float(m["annual_net_kwh_2nd"]) * irr
-        rul_quarters = float(m["rul_years_exact"]) * 4.0
-
-        claim_year = int(m["claim_year"])
-        claim_quarter = int(m["claim_quarter"])
-        rqf = 1.0 + get_discount_rate_qtr(m)
-
-        eul_quarters = float(m["eul_years_exact"]) * 4.0
-        full_quarters = int(eul_quarters)
-        frac_remainder = eul_quarters - full_quarters
-        n_billed_quarters = full_quarters + (1 if frac_remainder > 1e-9 else 0)
-
-        for k in range(n_billed_quarters):
-            abs_quarter = (claim_quarter - 1) + k
-            target_year = claim_year + abs_quarter // 4
-            quarter_idx = abs_quarter % 4
-            is_last = k == n_billed_quarters - 1
-            frac = frac_remainder if (is_last and frac_remainder > 1e-9) else 1.0
-
-            rate = rates.get((target_year, quarter_idx + 1))
-            if rate is None:
-                continue  # outside the source table's real 2024-2054 coverage
-
-            scale = _phased_scale(k, rul_quarters, scale_1st, scale_2nd)
-            qac = (target_year - base_year) * 4 + quarter_idx
-            discount_factor = 1.0 / (rqf ** qac)
-
-            rows.append({
-                "measure_id": m["measure_id"],
-                "year": target_year,
-                "quarter": quarter_idx + 1,
-                "annual_value": scale * rate * frac * discount_factor,
-            })
-
-    return pd.DataFrame(rows)
-
-
-def price_tou_electric(   # NOT USED by the POC since 2026-10-02 (8,760 path only); kept for research scripts
-    measures: pd.DataFrame,
-    get_tou_rates: Callable[[pd.Series], dict | None],
-    get_discount_rate_qtr: Callable[[pd.Series], float],
-    base_year: int,
-    market_effects_bens: float = 0.0,
-) -> tuple[pd.DataFrame, list]:
-    """
-    Electric benefit for measures whose impact profile is a TOU (H-factor) profile -- quarterly-native, like the SCG path,
-    but with CalcCE's TWO-TERM electric benefit (CET_v25.1_documentation_extracted.txt:13415-13450):
-
-        ElecBen = Qty * [ (NTGRkWh+MEBens) * IRkWh * RRkWh * (kWh1*Gen_1 + kWh2*Gen_2)
-                        + (NTGRkW +MEBens) * IRkW  * RRkW  * (DS1 *TD_1  + DS2 *TD_2 ) ]
-
-    where DS = the measure's kW savings when the avoided-cost row's DSType is 'kW' (PG&E commercial/industrial/agricultural
-    TOU, all SCE TOU) and its kWh savings when DSType is 'kWh' (PG&E residential TOU). The rate table's TD column therefore
-    means "$ per kW" for kW rows and "$ per kWh" for kWh rows (pipeline/tou_profiles.py). The older bundled (Gen+TD) x kWh
-    pricing is only correct for kWh rows.
-
-    get_tou_rates(measure) -> tou_profiles.quarterly_rates() dict, or None if the measure isn't a supported TOU profile
-    (its id is returned in the second element so the caller can flag it -- never priced from a synthetic shape).
-    Same dual-baseline RUL phasing, fractional last quarter and quarterly discounting as price_real_hourly.
-    """
-    rows: list[dict] = []
-    unmatched: list = []
-    for _, m in measures.iterrows():
-        tou = get_tou_rates(m)
-        if tou is None:
-            unmatched.append(m["measure_id"])
-            continue
-        years = {y: i for i, y in enumerate(tou["years"])}
-        qty = float(m["num_units"])
-        is_kw = tou["ds_type"] == "kW"
-        kwh1, kwh2 = float(m["unit_kwh_1st"]), float(m["unit_kwh_2nd"])
-        kw1, kw2 = float(m["unit_kw_1st"]), float(m["unit_kw_2nd"])
-        ds1, ds2 = (kw1, kw2) if is_kw else (kwh1, kwh2)
-        f_kwh = qty * (float(m["ntgr_kwh"]) + market_effects_bens) * float(m["ir_kwh"]) * float(m["rr_kwh"])
-        f_kw = qty * (float(m["ntgr_kw"]) + market_effects_bens) * float(m["ir_kw"]) * float(m["rr_kw"])
-        gen_1, gen_2 = f_kwh * kwh1, f_kwh * kwh2
-        td_1, td_2 = f_kw * ds1, f_kw * ds2
-        rul_quarters = float(m["rul_years_exact"]) * 4.0
-        claim_year, claim_quarter = int(m["claim_year"]), int(m["claim_quarter"])
-        rqf = 1.0 + get_discount_rate_qtr(m)
-        eul_quarters = float(m["eul_years_exact"]) * 4.0
-        full_quarters = int(eul_quarters)
-        frac_remainder = eul_quarters - full_quarters
-        n_billed = full_quarters + (1 if frac_remainder > 1e-9 else 0)
-        for k in range(n_billed):
-            abs_quarter = (claim_quarter - 1) + k
-            target_year = claim_year + abs_quarter // 4
-            quarter_idx = abs_quarter % 4
-            yi = years.get(target_year)
-            if yi is None:
-                continue  # outside the ACC's 2024-2054 coverage
-            frac = frac_remainder if (k == n_billed - 1 and frac_remainder > 1e-9) else 1.0
-            value = (_phased_scale(k, rul_quarters, gen_1, gen_2) * tou["gen"][yi, quarter_idx]
-                     + _phased_scale(k, rul_quarters, td_1, td_2) * tou["td"][yi, quarter_idx])
-            qac = (target_year - base_year) * 4 + quarter_idx
-            rows.append({"measure_id": m["measure_id"], "year": target_year, "quarter": quarter_idx + 1,
-                         "annual_value": value * frac / (rqf ** qac)})
-    return pd.DataFrame(rows, columns=["measure_id", "year", "quarter", "annual_value"]), unmatched
 
 
 def price_bill_impact(

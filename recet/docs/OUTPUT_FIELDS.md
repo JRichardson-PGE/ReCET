@@ -47,7 +47,7 @@ or cannot be computed.
   benefits and `MEC` the adder on costs: both 0.05 when "Apply 5% market effects (benefits and costs)" is on, both 0 otherwise.
 * **Territory and discount rates.** `PA` is `IOU_AC_Territory`. The rates come from CET's E3 settings for `PA` and the ACC version's E3 Version: `DiscountRateAnnual`,
   `DiscountRateQtr` (the annual rate divided by 4), and the societal `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`. For PG&E (both E3 Version 2026, the built-in 2024 ACC, and
-  Version 2027, the draft 2026 ACC): 0.0766, 0.01915, 0.0503 and 0.012575.
+  Version 2027, the 2026 ACC): 0.0766, 0.01915, 0.0503 and 0.012575.
 
 ```text
 Rqf = 1 + DiscountRateQtr          Rqf_sct = 1 + DiscountRateQtr_SCT          the quarterly growth factors
@@ -186,7 +186,7 @@ came from), added by the export script `poc/tou/export_measure_level.py`, not by
 
 Which ACC version the row was priced against. Text.
 
-**Formula:** the run's ACC label: `2024 ACC (CET Version 2026)` for the built-in 2024 ACC, `Draft 2026 ACC (CET Version 2027)` for the draft 2026 ACC, `Custom ACC '<label>' (CET Version <v>)`
+**Formula:** the run's ACC label: `2024 ACC (CET Version 2026)` for the built-in 2024 ACC, `2026 ACC (CET Version 2027)` for the 2026 ACC, `Custom ACC '<label>' (CET Version <v>)`
 for a supplied one. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
@@ -1504,7 +1504,7 @@ Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of a
 Both are one-measure jobs on flat avoided costs and flat 8,760 load shapes, so every step can be checked with a calculator. Both are re-run by the test-suite (`tests/doc_examples.py`,
 `tests/test_output_docs.py`), which compares every number below and in the `Example` lines of sections 1 and 2 with what the tool gives, and checks the arithmetic written on each line.
 
-Common to both: PG&E, climate zone 13, the draft 2026 ACC (E3 Version 2027: `DiscountRateQtr` 0.01915, `DiscountRateAnnual` 0.0766, societal 0.012575 and 0.0503), First Year 2028, every ACC hour of a
+Common to both: PG&E, climate zone 13, the 2026 ACC (E3 Version 2027: `DiscountRateQtr` 0.01915, `DiscountRateAnnual` 0.0766, societal 0.012575 and 0.0503), First Year 2028, every ACC hour of a
 year priced alike. Electric avoided costs, in dollars per MWh: `TRC` = energy 70 + transmission 5 + distribution 5 = 80 (so `AC` = 0.080 per kWh and `Gen` = 0.070 per kWh); `SCT Base` 88 (Gen 78); `SCT High` 96 (Gen 86);
 the ACC's `emission_rate_tonnes_per_kwh` is 0.0002 in every hour. Gas avoided costs, in dollars per therm and the same in every month: `td` 0.20, `nox` 0.05, `upstream_methane` 0.03, `air_quality_adder` 0.02,
 `behind_meter_methane` 0, `co2` 0.10 (`TRC`), 0.30 (`SCT` Base), 0.50 (`SCT` High), and `market` 0.60 for the Residential class and 0.50 for the Commercial class.
@@ -1605,7 +1605,7 @@ refer to.
 <!-- oa-all:start -->
 | Field | Example A | Example B |
 |---|---|---|
-| `POC_ACC` | Draft 2026 ACC (CET Version 2027) | Draft 2026 ACC (CET Version 2027) |
+| `POC_ACC` | 2026 ACC (CET Version 2027) | 2026 ACC (CET Version 2027) |
 | `poc_subset_key` | CZ13_Res | CZ13_Com |
 | `poc_shape_key` | W_SHAPE | 3 = Commercial HVAC |
 | `poc_annual_net_kwh` | 40000 | -30000 |

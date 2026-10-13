@@ -1,33 +1,10 @@
 """
-Local proof-of-concept: prices real CET example-input measures two ways --
-the way CET does it today (net annual savings, then shape) and the way the
-proposed architecture does it (batched, per-measure, hourly-native) -- and
-prints both side by side, plus a synthetic zero-net load-shifting measure
-that makes the difference between the two approaches concrete.
-
-Two real datasets are available:
-  --dataset small  5 measures, the public CET spec's own example input
-                   (deliberately exercises WEN/FuelSub/NC-AE edge cases --
-                   see compare_to_cet.py and README.md for the real-CET
-                   ground-truth comparison this produced)
-  --dataset large  ~5,000 measures, a real statewide PGE-led filing --
-                   far more realistic diversity (17 climate zones, 4 IOU
-                   territories, 7 sectors, 38 load shapes)
-
-By default this uses REAL hourly avoided-cost data from the actual 2024 ACC
-(the version CET has implemented today -- see pipeline/real_avoided_cost.py
-and CLAUDE.md's "Terminology gotcha" note on why 2024, not the "2026" label
-CET's own UI shows). Load shapes are still synthetic placeholders. Pass
---synthetic to use the old fully-synthetic avoided-cost curve instead.
-
-Run: python run_poc.py
-     python run_poc.py --dataset large
-     python run_poc.py --year 2026
-     python run_poc.py --synthetic
+Job-level orchestration (the module keeps its proof-of-concept name): load_job reads a CET job, the run_* functions wire each pricing step to
+its data (electric 8,760, gas, water energy, bill impacts, participant costs, other benefits/costs), and run_full_cost_effectiveness puts them
+together into CET's output columns and cost tests. recet.jobs calls it for every run.
 """
 from __future__ import annotations
 
-import argparse
 import re
 from pathlib import Path
 
@@ -37,7 +14,6 @@ import pandas as pd
 from .pipeline import (
     cost_tests,
     discount_settings,
-    emissions,
     gas_avoided_cost,
     gas_savings_profiles,
     rate_schedules,
@@ -46,112 +22,14 @@ from .pipeline import (
     system_zones,
 )
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
-from .pipeline.data_loading import (
-    DATA_DIR,
-    load_real_sample_measures,
-    load_real_shape_matched_measures,
-    load_sw_pge_led_measures,
-    load_swwh025_measures,
-)
 from .pipeline.engine import (
     BatchedPricingResult,
-    legacy_net_then_shape,
-    price_batched_hourly,
     price_bill_impact,
     price_gas_benefit,
     price_other_ben_cost,
     price_participant_cost,
     price_real_hourly,
-    price_real_hourly_legacy,
 )
-from .pipeline.synthetic_curves import avoided_cost_curve, load_shape, load_shifting_shape
-
-DATASETS = {
-    "small": ("5 real measures (public CET spec example input)", load_real_sample_measures),
-    "large": ("~5,000 real measures (statewide PGE-led filing)", load_sw_pge_led_measures),
-    "real_shape_matched": (
-        "2,378 real measures (large filing, restricted to real-matched CEDARS impact-profile shapes)",
-        load_real_shape_matched_measures,
-    ),
-    "swwh025": (
-        "73,024 real measures (statewide HPWH fuel-substitution filing, 2026-09-16 parallel test)",
-        load_swwh025_measures,
-    ),
-}
-ACC_MODES = ["energy", "full", "real_hourly", "synthetic"]
-
-
-def build_caches(measures: pd.DataFrame, acc_mode: str, acc_year: int) -> tuple[dict, dict, pd.DataFrame]:
-    """
-    Returns (avoided_cost, load_shapes, measures) -- measures is returned
-    because subset_key is overwritten in place:
-      acc_mode="energy"    -- real NP-15/SP-15 energy-only $/kWh (subset_key = hub)
-      acc_mode="full"       -- energy + capacity + transmission + distribution
-                               + GHG stacked (subset_key = PA__climate_zone,
-                               see pipeline/real_avoided_cost_full.py)
-      acc_mode="synthetic"  -- old fully-synthetic placeholder curve
-    """
-    from .pipeline import real_avoided_cost, real_avoided_cost_full   # legacy demo modes only: they need openpyxl and the raw 2024 ACC workbooks
-    measures = measures.copy()
-
-    if acc_mode == "energy":
-        real_curves = real_avoided_cost.load_2024_acc_hourly(acc_year)  # {"NP15": ..., "SP15": ...}
-        measures["subset_key"] = measures["PA"].apply(real_avoided_cost.subset_key_to_hub)
-        avoided_cost = {hub: real_curves[hub] for hub in measures["subset_key"].unique()}
-    elif acc_mode == "full":
-        real_curves = real_avoided_cost.load_2024_acc_hourly(acc_year)
-        hub_by_pa = {pa: real_curves[real_avoided_cost.subset_key_to_hub(pa)] for pa in measures["PA"].unique()}
-        measures["subset_key"] = measures["PA"] + "__" + measures["climate_zone"]
-        avoided_cost = {}
-        for (pa, cz), subset_key in measures.groupby(["PA", "climate_zone"])["subset_key"].first().items():
-            avoided_cost[subset_key] = real_avoided_cost_full.build_full_avoided_cost(
-                pa, cz, hub_by_pa[pa], acc_year
-            )
-    else:
-        avoided_cost = {k: avoided_cost_curve(k) for k in measures["subset_key"].unique()}
-
-    # Keyed by shape_key, not measure_id: these are NORMALIZED patterns
-    # (sum to 1.0) that legitimately get shared across measures using the
-    # same named shape -- see synthetic_curves.load_shape()'s docstring for
-    # why baking a specific measure's kWh into this dict would be a bug.
-    load_shapes = {key: load_shape(key) for key in measures["shape_key"].unique()}
-
-    return avoided_cost, load_shapes, measures
-
-
-def add_load_shifting_demo(measures: pd.DataFrame, load_shapes: dict, avoided_cost: dict) -> pd.DataFrame:
-    """Append one synthetic measure that shifts 5,000 kWh/year from peak to
-    off-peak with zero net annual savings -- the exact case CET's calculation
-    order cannot value."""
-    demo_subset = measures["subset_key"].iloc[0]
-    demo_shape_key = "DEMO_load_shift_zero_net"
-    load_shapes[demo_shape_key] = load_shifting_shape()  # normalized: sums to 0, scaled by shape_scale below
-
-    first = measures.iloc[0]
-    demo_row = pd.DataFrame([{
-        "measure_id": "DEMO_LoadShift1",
-        "MeasDescription": "Synthetic demo: shifts 5,000 kWh/yr from peak to off-peak, zero net savings",
-        "subset_key": demo_subset,
-        "shape_key": demo_shape_key,
-        "annual_net_kwh": 0.0,
-        "annual_net_kw": 0.0,
-        "eul_years": 10,
-        "eul_years_exact": 10.0,
-        "rul_years_exact": 0.0,  # not an early-replacement measure -- no dual-baseline phase
-        "NTGRkWh": 1.0,
-        "shape_scale": 5000.0,  # kWh/year shifted -- annual_net_kwh is legitimately 0, this isn't
-        "shape_scale_2nd": 5000.0,  # rul_years_exact=0 means this is never actually used, but keep it defined
-        # Borrowed from the dataset's first real measure -- only real_hourly
-        # mode needs these (its get_acc_years() closure keys off PA/climate_zone),
-        # and the demo measure's whole point is its load *shape*, not its location.
-        "PA": first.get("PA", "PGE"),
-        "climate_zone": first.get("climate_zone", "1"),
-        "target_sector": first.get("target_sector", ""),
-        "claim_year": first.get("claim_year", 2025),
-        "claim_quarter": first.get("claim_quarter", 1),
-    }])
-    return pd.concat([measures, demo_row], ignore_index=True)
-
 
 def _ids_in(df: pd.DataFrame | None) -> set:
     """The measure_ids present in a pricing result; empty when nothing was priced (such a frame has no columns at all)."""
@@ -162,9 +40,8 @@ ROUTE_COLUMNS = ["shape_key", "PA", "target_sector", "climate_zone"]   # what de
 
 
 def _route_keys(df: pd.DataFrame, cols: list[str]) -> list[tuple]:
-    """One hashable per row: the values of `cols`, plus the measure's own id for the synthetic demo measure (which has a shape of its own)."""
-    ids = df["measure_id"].astype(str)
-    return list(zip(*[df[c].astype(str).to_numpy() for c in cols], np.where(ids.str.startswith("DEMO_").to_numpy(), ids.to_numpy(), "")))
+    """One hashable per row: the values of `cols`."""
+    return list(zip(*[df[c].astype(str).to_numpy() for c in cols]))
 
 
 def _per_route(df: pd.DataFrame, cols: list[str], fn) -> pd.Series:
@@ -211,10 +88,10 @@ def _apply_market_effects_gas(measures: pd.DataFrame, meb: float) -> pd.DataFram
 
 
 def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2026,
-                     base_year: int | None = None, include_demo: bool = False,
+                     base_year: int | None = None,
                      discount_rate_fn=discount_settings.get_discount_rate_qtr,
                      market_effects_bens: float = 0.0, component: str | None = None,
-                     compute_legacy: bool = True, gen_only: bool = False):
+                     gen_only: bool = False):
     """
     ONE ROUTE ONLY (2026-10-02, Jake): every electric measure is priced on the 8,760 path -- its impact profile (user-supplied, or the library's, which now
     includes the Gen-based TOU H-factor 8,760s) re-aligned to the ACC's 2018 weekdays (real_impact_profiles.shift_for_year), times the hourly ACC, summed
@@ -244,24 +121,13 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     that doesn't (e.g. spans multiple claim years) once its real receipt's
     First Year is known.
 
-    include_demo=False by default (2026-09-16, Jake's direction): the
-    synthetic zero-net load-shifting demo measure used to be added to
-    every run unconditionally, which was confusing when comparing this
-    POC's output against a real parallel CET run on real data (it showed
-    up looking like a 74th/5,050th/etc. real measure that "failed to
-    match" a profile). Pass include_demo=True to opt back in for the
-    original demonstration (see "The point of this POC" in main()).
 
     NO SYNTHETIC SHAPE FALLBACK for real measures (2026-09-16, Jake's
     direction, replacing the old always-on placeholder substitution): a
     measure with no real 8760-hour CEDARS profile match is now FLAGGED
     (collected into the returned BatchedPricingResult's
     `unmatched_measure_ids`) and excluded from pricing, never priced
-    against a fabricated shape. The demo measure (when include_demo=True)
-    still gets its own deliberately-synthetic shape, but through get_shape
-    directly, not this mechanism -- it was never a real measure to begin
-    with, so it isn't something the "no more synthetic fallback" rule is
-    about.
+    against a fabricated shape.
 
     discount_rate_fn (2026-09-17, for SCB/SCH): defaults to the primary
     quarterly rate, but the real societal cost tests discount their own
@@ -270,14 +136,11 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     cost_test is "SCT Base"/"SCT High" so this function's discounting
     matches which cost test it's actually pricing.
 
-    Returns (batched_result, legacy_df).
+    Returns the BatchedPricingResult.
     """
     measures = _apply_market_effects_electric(measures, market_effects_bens)
     if base_year is None:
         base_year = int(measures["claim_year"].min())
-    load_shapes: dict[str, np.ndarray] = {}
-    if include_demo:
-        measures = add_load_shifting_demo(measures, load_shapes, avoided_cost={})
 
     other_measures = measures.reset_index(drop=True)
     # E3ClimateZone = System is priced in the profile's System zone (pipeline/system_zones.py): its shape AND its prices come from that real zone
@@ -287,8 +150,6 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     match_cache: dict[tuple, tuple | None] = {}   # (shape key, PA, sector, zone) -> (shape, represents_year, source) or None: one library / user-profile lookup per route
 
     def get_shape(m):
-        if str(m["measure_id"]).startswith("DEMO_"):
-            return load_shapes[m["shape_key"]], real_impact_profiles.ACC_CALENDAR_YEAR  # demo's own synthetic shape, drawn on the ACC calendar (no shift)
         key = (m["shape_key"], m["PA"], m["target_sector"], m["price_zone"])
         if key not in match_cache:
             match_cache[key] = real_impact_profiles.resolve_shape(m["shape_key"], m["PA"], m["target_sector"], m["price_zone"])   # (shape, year, source)
@@ -321,16 +182,12 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
         other_measures, get_shape, get_acc_years, real_impact_profiles.shift_for_year,
         get_discount_rate_qtr, base_year,
         route_key=_route_keys(other_measures, ROUTE_COLUMNS),                # shape / ACC series / rate are looked up once per route, not once per measure
-        need_portfolio_hourly=compute_legacy or include_demo,                # the 8,760 portfolio accumulator (demo output only) needs every measure's hourly array
     )
-    # the "legacy" net-then-shape pricing is only a comparison output (--acc-mode demo); the cost tests never use it, so they pass compute_legacy=False
-    legacy = (price_real_hourly_legacy(other_measures, get_shape, get_acc_years, get_discount_rate_qtr, base_year)
-              if compute_legacy else pd.DataFrame(columns=["measure_id", "year", "quarter", "annual_value"]))
 
     hourly_source = [(match_cache.get(k) or (None, None, ""))[2] for k in zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"],
                                                                           other_measures["price_zone"])]      # where each measure's 8,760 shape came from (user profile / library ...)
     batched.route = {mid: f"hourly profile | {src}" for mid, src in zip(other_measures["measure_id"], hourly_source)}
-    return batched, legacy
+    return batched
 
 
 def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2026, base_year: int | None = None,
@@ -436,12 +293,6 @@ def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2026):
                              settings_base_year=discount_settings.get_settings("PGE", acc_version)["settings_base_year"])
 
 
-def run_emissions(measures: pd.DataFrame, acc_version: int = 2026):
-    """CO2/NOx/PM10 outputs (Net/Gross x Elec/Gas x First-year/Lifecycle) via
-    pipeline/emissions.py -- see its docstring. One row per measure."""
-    return emissions.price_emissions(measures, acc_version=acc_version)
-
-
 def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2026, base_year: int | None = None,
                           discount_rate_fn=discount_settings.get_discount_rate_qtr, market_effects_cost: float = 0.0):
     """Wires up engine.price_participant_cost -- see its docstring for the
@@ -497,8 +348,8 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
             elapsed_seconds=0.0, batch_size=0)
     w = w.reset_index(drop=True).copy()
     w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
-    batched, _ = run_real_hourly(w, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_fn,
-                                 market_effects_bens=market_effects_bens, compute_legacy=False, gen_only=True)
+    batched = run_real_hourly(w, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_fn,
+                                 market_effects_bens=market_effects_bens, gen_only=True)
     return _sum_by_measure(batched.measure_year, "annual_value", "water_value"), batched
 
 
@@ -551,8 +402,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2026, base
     if base_year is None:
         base_year = int(measures["claim_year"].min())
 
-    batched, _legacy = run_real_hourly(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens,
-                                       compute_legacy=False)
+    batched = run_real_hourly(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
     elec_value = _sum_by_measure(batched.measure_year, "annual_value", "elec_value")
 
     gas_result, _n_gas, _n_matched = run_gas_benefit(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
@@ -684,8 +534,8 @@ def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2
     sct_rate = discount_settings.get_discount_rate_qtr_sct
 
     def elec_value_for(cost_test):
-        b, _ = run_real_hourly(measures.reset_index(drop=True), cost_test=cost_test, acc_version=acc_version, base_year=base_year,
-                               discount_rate_fn=sct_rate, market_effects_bens=market_effects_bens, compute_legacy=False)
+        b = run_real_hourly(measures.reset_index(drop=True), cost_test=cost_test, acc_version=acc_version, base_year=base_year,
+                               discount_rate_fn=sct_rate, market_effects_bens=market_effects_bens)
         return _sum_by_measure(b.measure_year, "annual_value", "elec_value")
 
     def gas_value_for(scc):
@@ -845,194 +695,3 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
         if gap["measure_programs_without_costs"] or gap["program_costs_without_measures"]:
             raise ValueError(f"PrgIDs do not line up between the measure and program-cost files: {gap}")
     return measures, program
-
-
-def main():
-    from .pipeline import real_avoided_cost, real_avoided_cost_full   # legacy demo modes only
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", choices=DATASETS.keys(), default="small")
-    parser.add_argument("--acc-mode", choices=ACC_MODES, default="energy",
-                         help="energy = real energy-only $/kWh; full = energy+capacity+transmission+distribution+GHG stacked; synthetic = old placeholder curve")
-    parser.add_argument("--synthetic", action="store_true", help="shorthand for --acc-mode synthetic")
-    parser.add_argument("--year", type=int, default=None,
-                         help="ACC vintage year to price against (real modes only; defaults to the dataset's own ClaimYearQuarter year)")
-    parser.add_argument("--include-demo", action="store_true",
-                         help="add the synthetic zero-net load-shifting demo measure (off by default as of "
-                              "2026-09-16 -- it used to be added unconditionally, which was confusing when "
-                              "comparing this POC's output against a real parallel CET run)")
-    args = parser.parse_args()
-
-    acc_mode = "synthetic" if args.synthetic else args.acc_mode
-    real_hourly_ready = (
-        real_impact_profiles.is_available() and real_avoided_cost_v2.is_available() and discount_settings.is_available()
-    )
-    if acc_mode == "real_hourly" and not real_hourly_ready:
-        print("real_hourly mode needs the merged CEDARS impact-profile library "
-              "(poc/data/impact_profiles_all_iou_full_2026-09-14/), the ACC2024 hourly "
-              "extraction ('2024 ACC Extraction/output/ACC2024_electric_avoided_costs_hourly.parquet'), "
-              "and the real discount-rate settings (poc/data/avoided_cost_settings.csv) -- falling back to full.\n")
-        acc_mode = "full"
-    if acc_mode not in ("synthetic", "real_hourly") and not real_avoided_cost.is_available():
-        print("Real 2024 ACC data not found under reference-docs/2024_acc/ -- falling back to synthetic.\n")
-        acc_mode = "synthetic"
-    if acc_mode == "full" and not real_avoided_cost_full.is_available():
-        print("Extracted full-ACC component CSVs not found under reference-docs/2024_acc/extracted/ -- falling back to energy-only.\n")
-        acc_mode = "energy"
-
-    label, loader = DATASETS[args.dataset]
-    measures = loader()
-    acc_year = args.year if args.year is not None else int(measures["claim_year"].mode().iloc[0])
-
-    if acc_mode == "real_hourly":
-        if args.year is not None:
-            print("NOTE: --year is ignored in real_hourly mode -- each measure is priced against "
-                  "its OWN real ClaimYearQuarter through its own EUL, using that specific year's "
-                  "real avoided cost every year (not one fixed vintage year repeated), which is the "
-                  "whole point of this mode. Drop --year, or use --acc-mode energy/full to pick one.\n")
-        n_real = len(measures)
-        base_year = int(measures["claim_year"].min())
-        batched, legacy = run_real_hourly(measures, base_year=base_year, include_demo=args.include_demo)
-        n_total = n_real + (1 if args.include_demo else 0)
-        print(f"Dataset: {label}")
-        print(f"Avoided-cost source: REAL 2024 ACC hourly extraction (all years 2024-2054, "
-              f"TRC cost test, re-aligned per measure-quarter via the validated day-of-week shift)")
-        print(f"Load-shape source: REAL CEDARS impact-profile library "
-              f"({batched.n_real_shape} of {n_total} measures matched a real profile; "
-              f"{len(batched.unmatched_measure_ids)} flagged -- no real 8,760-hour profile match, "
-              f"excluded from pricing rather than substituted with a synthetic placeholder)")
-        print(f"Discounting: REAL per-IOU quarterly rate (pipeline/discount_settings.py), "
-              f"base year (CET's 'First Year') = {base_year}\n")
-
-        if batched.unmatched_measure_ids:
-            flagged_path = DATA_DIR / f"flagged_no_hourly_profile_{args.dataset}.csv"
-            pd.DataFrame({"measure_id": batched.unmatched_measure_ids}).to_csv(flagged_path, index=False)
-            sample = ", ".join(str(x) for x in batched.unmatched_measure_ids[:10])
-            more = f" (+{len(batched.unmatched_measure_ids) - 10} more)" if len(batched.unmatched_measure_ids) > 10 else ""
-            print(f"Flagged measure_ids written to {flagged_path}: {sample}{more}\n")
-
-        if batched.measure_year.empty:
-            print("No measures had a real 8,760-hour profile match -- nothing to price "
-                  "(see the flagged list above).")
-            return
-
-        batched_lifetime = batched.measure_year.groupby("measure_id")["annual_value"].sum().rename("batched_hourly_$")
-        legacy_lifetime = legacy.groupby("measure_id")["annual_value"].sum().rename("legacy_net_then_shape_$")
-        comparison = pd.concat([legacy_lifetime, batched_lifetime], axis=1)
-        comparison["difference_$"] = comparison["batched_hourly_$"] - comparison["legacy_net_then_shape_$"]
-        comparison = comparison.round(2)
-
-        pd.set_option("display.width", 120)
-        demo_rows = comparison.drop(index="DEMO_LoadShift1") if args.include_demo else comparison
-        if len(demo_rows) <= 15:
-            print("Lifetime discounted $ value per measure, both calculation orders:\n")
-            print(demo_rows.to_string())
-        else:
-            print(f"Lifetime discounted $ value, {len(demo_rows)} measures (showing summary, not every row):\n")
-            print(demo_rows.describe().to_string())
-
-        if args.include_demo:
-            print("\nDEMO_LoadShift1 (shown separately, it's the outlier by construction):")
-            print(comparison.loc[["DEMO_LoadShift1"]].to_string())
-            print("\n--- The point of this POC ---")
-            print("DEMO_LoadShift1 is the case CET's calculation order cannot value:")
-            print(f"  legacy_net_then_shape prices it at ${comparison.loc['DEMO_LoadShift1', 'legacy_net_then_shape_$']:.2f}"
-                  f" (nets to ~0 kWh before pricing, so there is nothing to price)")
-            print(f"  batched_hourly prices it at ${comparison.loc['DEMO_LoadShift1', 'batched_hourly_$']:.2f}"
-                  f" (prices each hour before summing, so shifting load to cheaper hours shows real value)")
-
-        print(f"\nPortfolio 8,760-hour accumulator: sum = {batched.portfolio_hourly.sum():.2f}, "
-              f"peak hour value = {batched.portfolio_hourly.max():.4f}, "
-              f"{len(batched.measure_year):,} measure-year rows priced (one per real avoided-cost "
-              f"year across each measure's EUL, not one flat rate), {batched.elapsed_seconds*1000:.1f} ms.")
-
-        gas_ready = gas_avoided_cost.is_available() and gas_savings_profiles.is_available()
-        if gas_ready:
-            gas_result, n_gas_measures, n_gas_matched = run_gas_benefit(measures, base_year=base_year)
-            print(f"\n--- Gas benefit (new, 2026-09-15) ---")
-            print(f"Gas ACC source: REAL 2024 Gas ACC monthly extraction, per-year rates 2024-2054 "
-                  f"(TRC cost test, no day-of-week shift needed -- see 2024 Gas ACC Extraction/README)")
-            print(f"Gas shape source: REAL CEDARS gas savings profiles "
-                  f"({n_gas_matched} of {n_gas_measures} measures with real therm savings matched a real "
-                  f"monthly shape)")
-            if gas_result.empty:
-                print("No gas benefit priced for this dataset (no measure had both a nonzero "
-                      "annual_net_therms and a matched gas shape).")
-            else:
-                gas_lifetime = gas_result.groupby("measure_id")["gas_benefit"].sum().rename("gas_benefit_$").round(2)
-                if len(gas_lifetime) <= 15:
-                    print("\nLifetime discounted gas $ value per measure:\n")
-                    print(gas_lifetime.to_string())
-                else:
-                    print(f"\nLifetime discounted gas $ value, {len(gas_lifetime)} measures with real gas "
-                          f"savings (showing summary):\n")
-                    print(gas_lifetime.describe().to_string())
-                print(f"\nTotal portfolio gas benefit: ${gas_lifetime.sum():,.2f} across "
-                      f"{len(gas_lifetime)} measures, {len(gas_result):,} measure-quarter rows priced.")
-        else:
-            print("\n(Gas benefit skipped -- run '2024 Gas ACC Extraction/code/extract_gas.py' and "
-                  "ensure poc/data/gas_savings_profiles.csv exists to enable it.)")
-
-        print("\nNOTE: this is the fully-real mode -- real per-measure kWh/therms, real CEDARS "
-              "impact-profile and gas-savings shapes, and real hourly/monthly ACC data. "
-              f"See compare_to_cet.py --dataset {args.dataset} --acc-mode real_hourly to check the "
-              "electric numbers against real CET ElecBen (gas ground truth not yet wired in).")
-        return
-
-    avoided_cost, load_shapes, measures = build_caches(measures, acc_mode, acc_year)
-    n_real = len(measures)
-    if args.include_demo:
-        measures = add_load_shifting_demo(measures, load_shapes, avoided_cost)
-
-    acc_label = {
-        "energy": f"REAL 2024 ACC energy-only $/kWh (year {acc_year})",
-        "full": f"REAL 2024 ACC FULL (energy+capacity+transmission+distribution+GHG) (year {acc_year})",
-        "synthetic": "SYNTHETIC placeholder curve",
-    }[acc_mode]
-    demo_note = " + 1 synthetic load-shifting demo measure" if args.include_demo else ""
-    print(f"Dataset: {label}")
-    print(f"Avoided-cost source: {acc_label}")
-    print(f"Loaded {n_real} real measures{demo_note}. "
-          f"Avoided-cost subsets: {len(avoided_cost)}. Load shapes: {len(load_shapes)}.\n")
-
-    batched = price_batched_hourly(measures, load_shapes, avoided_cost, batch_size=500)
-    legacy = legacy_net_then_shape(measures, load_shapes, avoided_cost)
-
-    batched_lifetime = batched.measure_year.groupby("measure_id")["annual_value"].sum().rename("batched_hourly_$")
-    legacy_lifetime = legacy.groupby("measure_id")["annual_value"].sum().rename("legacy_net_then_shape_$")
-
-    comparison = pd.concat([legacy_lifetime, batched_lifetime], axis=1)
-    comparison["difference_$"] = comparison["batched_hourly_$"] - comparison["legacy_net_then_shape_$"]
-    comparison = comparison.round(2)
-
-    pd.set_option("display.width", 120)
-    demo_rows = comparison.drop(index="DEMO_LoadShift1") if args.include_demo else comparison
-    if len(demo_rows) <= 15:
-        print("Lifetime discounted $ value per measure, both calculation orders:\n")
-        print(demo_rows.to_string())
-    else:
-        print(f"Lifetime discounted $ value, {len(demo_rows)} measures (showing summary, not every row):\n")
-        print(demo_rows.describe().to_string())
-
-    if args.include_demo:
-        print("\nDEMO_LoadShift1 (shown separately, it's the outlier by construction):")
-        print(comparison.loc[["DEMO_LoadShift1"]].to_string())
-        print("\n--- The point of this POC ---")
-        print("DEMO_LoadShift1 is the case CET's calculation order cannot value:")
-        print(f"  legacy_net_then_shape prices it at ${comparison.loc['DEMO_LoadShift1', 'legacy_net_then_shape_$']:.2f}"
-              f" (nets to ~0 kWh before pricing, so there is nothing to price)")
-        print(f"  batched_hourly prices it at ${comparison.loc['DEMO_LoadShift1', 'batched_hourly_$']:.2f}"
-              f" (prices each hour before summing, so shifting load to cheaper hours shows real value)")
-
-    print(f"\nPortfolio 8,760-hour accumulator: sum = {batched.portfolio_hourly.sum():.2f}, "
-          f"peak hour value = {batched.portfolio_hourly.max():.4f}, "
-          f"processed in {batched.n_batches} batch(es) of up to {batched.batch_size} measures, "
-          f"{batched.elapsed_seconds*1000:.1f} ms.")
-
-    print(f"\nNOTE: annual_net_kwh/kW use real fields from real CET input data. Avoided-cost source: {acc_label}.")
-    print("Load shapes are still a synthetic placeholder (see pipeline/synthetic_curves.py for how")
-    print(f"to swap in real eTRM data). See compare_to_cet.py --dataset {args.dataset} to check these")
-    print("numbers against real CET ElecBen (ground truth available for both datasets).")
-
-
-if __name__ == "__main__":
-    main()

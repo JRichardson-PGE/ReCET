@@ -3,7 +3,7 @@
 Two versions ship with the package:
 
   key "2024"  2024 ACC             CET "Version 2026"   electric: reference folder acc/2024/electric_hourly.parquet   gas: packaged
-  key "2026"  draft 2026 ACC       CET "Version 2027"   electric: reference folder acc/2026/electric_hourly.parquet   gas: packaged
+  key "2026"  2026 ACC (final v1b) CET "Version 2027"   electric: reference folder acc/2026/electric_hourly.parquet   gas: packaged
 
 A run names a version key. Files supplied with the run REPLACE the shipped file for that fuel (matching label -> the supplied file is used in place
 of the built-in one). A label the package does not have ("2028", "2026-final" ...) is a NEW version made entirely of the supplied files; any fuel not
@@ -30,7 +30,7 @@ class AccVersion:
 
 BUILTIN: dict[str, AccVersion] = {v.key: v for v in (
     AccVersion("2024", "2024 ACC (CET Version 2026)", 2026, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
-    AccVersion("2026", "Draft 2026 ACC (CET Version 2027)", 2027, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
+    AccVersion("2026", "2026 ACC (CET Version 2027)", 2027, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
 )}
 NEWEST_BUILTIN = "2026"
 

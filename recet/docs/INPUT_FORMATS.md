@@ -48,7 +48,7 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
 4. **TOU (H-factor) end uses are priced from 8,760s.** CEDARS has no hourly data for them; the library holds Gen-based 8,760s built from their H-factors on the ACC's
    own TOU map (a 2025 calendar), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
    replaces the library's.
-5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are keyed by CET *Version*. The draft 2026 ACC runs on Version 2027, which is
+5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are keyed by CET *Version*. The 2026 ACC runs on Version 2027, which is
    identical to 2026; a new ACC label borrows a version you choose (default: the newest).
 6. **The 2026 ACC covers 2026-2055, the 2024 ACC 2024-2054.** Years outside an ACC's range are priced with its nearest year; the preflight counts the measures affected.
 7. **SCG electric** has no ACC of its own. In each zone SCG is priced entirely by one utility: SCE where the ACC has SCE data for the zone, otherwise PG&E (on the

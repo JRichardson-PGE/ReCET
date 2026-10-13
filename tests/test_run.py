@@ -28,7 +28,7 @@ def test_supplied_acc_and_profile_drive_the_result(tmp_path):
     assert f["ElecPricingStatus"] == "priced: hourly profile" and f["ProfileSource"] == "user profile"
     assert f["ElecBen"] == pytest.approx(expected_flat_value(1000, 0.100, _rate()), rel=1e-12)      # $100/MWh x 1,000 kWh, discounted by quarter
     assert f["TotalSystemBenefit"] == pytest.approx(f["ElecBen"])
-    assert f["POC_ACC"].startswith("Draft 2026")
+    assert f["POC_ACC"].startswith("2026 ACC")
     assert (r.run_dir / "run_settings.json").exists() and (r.run_dir / "preflight.txt").exists()
 
 

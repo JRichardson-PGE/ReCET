@@ -30,7 +30,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--out", dest="out_dir", help="output folder (a run sub-folder is created inside it)")
     g.add_argument("--name", dest="run_name", help="run folder name prefix (default: a timestamp)")
     g = ap.add_argument_group("ACC version and supplied files")
-    g.add_argument("--acc", dest="acc_version", help="ACC version: 2024 (CET Version 2026), 2026 (draft, CET Version 2027), or a new label defined by the files below")
+    g.add_argument("--acc", dest="acc_version", help="ACC version: 2024 (CET Version 2026), 2026 (2026 ACC, final v1b, CET Version 2027), or a new label defined by the files below")
     g.add_argument("--acc-electric-file", help="electric ACC file: replaces the built-in one for --acc (or defines a new version)")
     g.add_argument("--acc-gas-file", help="gas ACC file: same")
     g.add_argument("--e3-version", type=int, help="built-in run-parameter (E3 table) version for a NEW ACC label (default: newest)")

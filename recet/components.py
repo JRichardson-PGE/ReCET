@@ -5,7 +5,7 @@ routes as the totals (the 8,760 hourly profile; gas monthly profile), so the col
 
   ElecValue_<component>   for every component column in the electric ACC (2024 ACC: energy, generation_capacity, avoided_as_procurement, losses,
                           methane_leakage, ghg_cap_and_trade, ghg_adder, ghg_portfolio_rebalancing, air_quality_adder, transmission, distribution;
-                          draft 2026 ACC: ghg_cap_and_invest instead of cap_and_trade / portfolio_rebalancing)
+                          2026 ACC: ghg_cap_and_invest instead of cap_and_trade / portfolio_rebalancing)
   GasValue_<component>    market, td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder
 
 Values are the discounted lifetime $ of TRC pricing, SIGNED, before the Ben / SupplyCost split:  sum(ElecValue_*) = ElecBen - ElecSupplyCost  and
@@ -33,8 +33,8 @@ def price_components(measures: pd.DataFrame, *, acc_version: int, base_year: int
     elec = real_avoided_cost_v2.available_components()
     for i, c in enumerate(elec, 1):
         log(f"  electric component {i}/{len(elec)}: {c}")
-        b, _ = run_poc.run_real_hourly(measures, cost_test="TRC", acc_version=acc_version, base_year=base_year,
-                                       market_effects_bens=market_effects_bens, component=c, compute_legacy=False)
+        b = run_poc.run_real_hourly(measures, cost_test="TRC", acc_version=acc_version, base_year=base_year,
+                                       market_effects_bens=market_effects_bens, component=c)
         s = b.measure_year.groupby("measure_id")["annual_value"].sum() if len(b.measure_year) else pd.Series(dtype=float)
         out[f"ElecValue_{c}"] = s.reindex(out.index).fillna(0.0)
     for i, c in enumerate(GAS_COMPONENTS, 1):
