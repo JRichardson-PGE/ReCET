@@ -165,7 +165,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `workbook` | Job workbook (.xlsx) | `--workbook` | none | An Excel job workbook (section 4.7) used instead of the separate files; each of its data sheets supplies the matching input. A file given separately wins over its sheet. |
 | `out_dir` | Output folder | `--out` | `recet_results` (GUI: `~/recet_results`) | Folder in which the run's folder is created. |
 | `run_name` | Run name | `--name` | a timestamp | Prefix of the run folder name. |
-| `acc_version` | Run against | `--acc` | `2024` | `2024` (2024 ACC, CET Version 2026), `2026` (draft 2026 ACC, Version 2027) or a new label defined by supplied ACC files. |
+| `acc_version` | Run against | `--acc` | `2024` | `2024` (2024 ACC, CET Version 2026), `2026` (2026 ACC, final v1b, Version 2027) or a new label defined by supplied ACC files. |
 | `acc_electric_file`, `acc_gas_file` | Electric ACC file, Gas ACC file | `--acc-electric-file`, `--acc-gas-file` | none | Supplied ACC file(s); replace the built-in file of `acc_version`, or define a new version. |
 | `e3_version` | Run-parameters version for a NEW ACC label | `--e3-version` | newest in the tables | Which version of the built-in run parameters and other E3 tables (discount rates, emissions, rate schedules) a *new* ACC label uses. Ignored for `2024` / `2026`. |
 | `run_parameters_file` | Run parameters | `--run-parameters` | none | Run parameters per PA (section 4.5): a listed PA's discount rates, base year and gas CO2 replace the built-in values for this run. |
@@ -321,7 +321,7 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 | File in the folder | Size | Contents |
 |---|---|---|
 | `acc/2024/electric_hourly.parquet` | ~1 GB | The 2024 ACC's hourly electric avoided costs; the layout of section 4.3. |
-| `acc/2026/electric_hourly.parquet` | ~1 GB | The draft 2026 ACC's, same layout. |
+| `acc/2026/electric_hourly.parquet` | ~1 GB | The 2026 ACC's (final, v1b), same layout. |
 | `impact_profiles/catalog.parquet` | small | The CEDARS impact-profile catalog: one row per profile. Columns used: `id` (profile ID), `end_use_name` (= `E3MeaElecEndUseShape`), `iou_ac_territory` (`PGE`...), `target_sector`, `year_represented` (the calendar year the shape follows; blank = 2009). Other columns (`pa` long name, `climate_zones`, `start_year`, `explicit_end_year`, `description`, `source_impact_type`, `ac_version`) are informational. |
 | `impact_profiles/hourly.parquet` | ~9 GB | The 8,760-hour profiles: `impact_profile_id` (matches `id`), `climate_zone` (a zone or `System`), `hour_of_year` (1-8760), `impact` (fraction of annual savings in that hour; each (profile, zone) sums to 1). One row group per profile. |
 

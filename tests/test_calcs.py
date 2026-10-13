@@ -17,7 +17,7 @@ from recet import templates, versions
 from recet.jobs import RunConfig, run_job
 from recet.pipeline.engine import price_bill_impact
 
-E3_VERSION = versions.BUILTIN["2026"].cet_version           # the draft 2026 ACC runs on E3 tables Version 2027
+E3_VERSION = versions.BUILTIN["2026"].cet_version           # the 2026 ACC runs on E3 tables Version 2027
 YEARS = (2028, 2029)                                           # shorter than the longest measure life on purpose: later years use the last one
 I = np.arange(8760)
 HOD, DOY = I % 24, I // 24

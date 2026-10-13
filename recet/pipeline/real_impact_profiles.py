@@ -329,7 +329,7 @@ def profile_meta(profile_id: int) -> dict:
 
 
 ACC_CALENDAR_YEAR = 2018
-"""The weekday calendar of the ACC's hourly data. Every forecast year of both the 2024 and the draft 2026 Electric ACC uses 2018's weekdays (hour 1 = a
+"""The weekday calendar of the ACC's hourly data. Every forecast year of both the 2024 and the 2026 Electric ACC (draft and final) uses 2018's weekdays (hour 1 = a
 Monday): checked 2026-10-02 on the data itself -- distribution/transmission avoided cost falls on days 6-7 of every week in every year, and the 2026 ACC's
 generation capacity is zero on exactly those days. So a profile is aligned to 2018 once, and the same aligned shape prices every forecast year."""
 

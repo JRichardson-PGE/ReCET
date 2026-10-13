@@ -16,7 +16,7 @@ import pandas as pd
 import test_calcs as tc
 from recet.jobs import RunConfig, run_job
 
-E3 = 2027                                                       # the Version of the E3 tables the draft 2026 ACC uses
+E3 = 2027                                                       # the Version of the E3 tables the 2026 ACC uses
 FLAT = np.arange(8760)
 ENERGY = {"TRC": 70.0, "SCT Base": 78.0, "SCT High": 86.0}      # $/MWh; transmission 5 and distribution 5 are added to every row (total 80 / 88 / 96)
 GAS_CO2 = {("TRC", ""): 0.10, ("SCT", "Base"): 0.30, ("SCT", "High"): 0.50}

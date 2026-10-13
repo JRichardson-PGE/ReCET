@@ -5,7 +5,7 @@ routes as the totals (the 8,760 hourly profile; gas monthly profile), so the col
 
   ElecValue_<component>   for every component column in the electric ACC (2024 ACC: energy, generation_capacity, avoided_as_procurement, losses,
                           methane_leakage, ghg_cap_and_trade, ghg_adder, ghg_portfolio_rebalancing, air_quality_adder, transmission, distribution;
-                          draft 2026 ACC: ghg_cap_and_invest instead of cap_and_trade / portfolio_rebalancing)
+                          2026 ACC: ghg_cap_and_invest instead of cap_and_trade / portfolio_rebalancing)
   GasValue_<component>    market, td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder
 
 Values are the discounted lifetime $ of TRC pricing, SIGNED, before the Ben / SupplyCost split:  sum(ElecValue_*) = ElecBen - ElecSupplyCost  and

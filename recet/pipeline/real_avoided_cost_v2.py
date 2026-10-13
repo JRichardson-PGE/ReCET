@@ -151,8 +151,8 @@ from . import acc_store
 
 HOURS_PER_YEAR = 8760
 
-# Which ACC extraction to read is chosen at run time (paths.configure_runtime / recet.runtime.configure): the 2024 ACC by default, the draft 2026
-# ACC, or a user-supplied file with the same layout. Changing it requires clearing this module's caches (runtime.clear_caches does).
+# Which ACC extraction to read is chosen at run time (paths.configure_runtime / recet.runtime.configure): the 2024 ACC by default, the 2026
+# ACC (final, v1b), or a user-supplied file with the same layout. Changing it requires clearing this module's caches (runtime.clear_caches does).
 
 
 def _pq() -> Path:

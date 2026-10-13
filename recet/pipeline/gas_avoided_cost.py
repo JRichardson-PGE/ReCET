@@ -78,7 +78,7 @@ import pandas as pd
 from .. import paths
 
 # Which gas ACC extraction is used is chosen at run time (paths.configure_runtime / recet.runtime.configure): the 2024 Gas ACC by default, the
-# draft 2026 one (packaged as recet/data/acc/2026/gas_components.parquet, 2026-2055; see poc/README.md 9d and 9e), or a user-supplied file with
+# 2026 one (packaged as recet/data/acc/2026/gas_components.parquet, 2026-2055; the final v1b Gas Model is unchanged from the draft, so the file is too), or a user-supplied file with
 # the same layout. The covered years are read from the table, so a different extraction can start and end in different years.
 
 
@@ -110,7 +110,7 @@ def _table() -> pd.DataFrame:
 
 
 def year_range() -> tuple[int, int]:
-    """First and last year the loaded extraction covers (2024-2054 for the 2024 Gas ACC, 2026-2055 for the draft 2026 one); years outside clamp to it."""
+    """First and last year the loaded extraction covers (2024-2054 for the 2024 Gas ACC, 2026-2055 for the 2026 one); years outside clamp to it."""
     years = _table()["year"]
     return int(years.min()), int(years.max())
 

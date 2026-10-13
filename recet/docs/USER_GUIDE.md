@@ -25,7 +25,7 @@ that the tool can calculate: benefits, supply costs, participant and bill-impact
 | Version key | Avoided-cost data | CET "Version" used for discount rates, emissions and retail rates |
 |---|---|---|
 | `2024` | the 2024 ACC | 2026 |
-| `2026` | the draft 2026 ACC | 2027 |
+| `2026` | the 2026 ACC (final, v1b) | 2027 |
 
 You can replace 8,760-hour load profiles, gas monthly profiles and the ACC files themselves with your own; a supplied item that **matches** a built-in one replaces it, one that matches nothing is added. CET's own tables are used
 only as a comparison, never in the calculation.
@@ -91,7 +91,7 @@ A file box takes a typed or pasted path, or **Browse...**.
 
 | Control | What it does |
 |---|---|
-| **Run against** | Which avoided-cost version to price on. Choose **2024** (the 2024 ACC, CET Version 2026) or **2026** (the draft 2026 ACC, CET Version 2027) from the list, or type a **new label** (one word, no spaces, e.g. `2030-draft`) and give its files in section 3. A built-in version's electric ACC comes from the reference data folder; its gas ACC ships in the package. Everything derived from the version - discount rates, emission factors, retail rates - follows it (C3.3). |
+| **Run against** | Which avoided-cost version to price on. Choose **2024** (the 2024 ACC, CET Version 2026) or **2026** (the 2026 ACC, final v1b, CET Version 2027) from the list, or type a **new label** (one word, no spaces, e.g. `2030-draft`) and give its files in section 3. A built-in version's electric ACC comes from the reference data folder; its gas ACC ships in the package. Everything derived from the version - discount rates, emission factors, retail rates - follows it (C3.3). |
 | **First Year (blank = earliest claim year)** | CET's *First Year*: the reference point of all discounting (C2.5). Blank uses the earliest `ClaimYearQuarter` year in the job. Set it to the value on the CET run you are matching - it is on the run form, not in the input files. A whole number such as `2028`. |
 
 ### 2b. Edit inputs tab: edit a small job cell by cell
@@ -221,7 +221,7 @@ off until you load one version's run folder.
 
 **Price a job on one ACC.** Choose the files, pick `2024` or `2026`, leave the modes at their defaults, Run. Open `measure_level_acc<version>.csv`; check `ElecPricingStatus`, `GasPricingStatus` and `WaterPricingStatus` for `UNPRICED` rows first.
 
-**Compare the 2024 and draft 2026 ACC.** Tick *Also run another ACC version...*, pick the other version. `comparison_acc2024_vs_acc2026.csv` holds each measure's value under both, the change and percent change.
+**Compare the 2024 and 2026 ACC.** Tick *Also run another ACC version...*, pick the other version. `comparison_acc2024_vs_acc2026.csv` holds each measure's value under both, the change and percent change.
 
 **Replace an 8,760 profile.** *Templates > Export a library 8,760 profile to edit...*, edit the `impact` column (each zone must still sum to 1), choose the file under *8,760 electric profiles*. Measures matching that (end use, IOU, sector) now report `ProfileSource = user profile`.
 
