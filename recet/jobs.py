@@ -8,6 +8,7 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   measure_level_<acc>.csv        (or .xlsx / .parquet, per output_format) one row per measure: the raw input columns, the derived poc_* fields, pricing status, every output (see outputs.py)
   portfolio_summary_<acc>.csv    totals and ratios overall, by IOU territory, by credited IOU and by program segment
   preflight.txt                  the input check that ran first
+  preflight.json                 the same check as JSON (ok, stats, issues), read by the web app's Validate inputs panel
   run_settings.json              everything needed to reproduce the run (options, resolved ACC files, supplied files with sizes, package version, timings)
   components_summary_<acc>.csv   (components mode) portfolio value of each ACC component, with the sum-check against the totals
   portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh; portfolio_8760_unshaped_<acc>.csv lists measures left out
@@ -194,6 +195,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
                                  apply_exclude_from_ce=cfg.apply_exclude_from_ce)
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
+    (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
     result.files["preflight"] = run_dir / "preflight.txt"
     log(rep.text())
     if not rep.ok:

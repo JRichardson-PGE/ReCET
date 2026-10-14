@@ -81,17 +81,22 @@ class Runner:
         return self.s.runs_dir / run_id
 
     def position(self, run_id: str) -> int | None:
-        """1 = next to start. None if the run is not queued."""
-        row = self.db.one("SELECT created_at, status FROM runs WHERE id = ?", (run_id,))
+        """1 = next to start. None if the run is not queued. Input checks (preflight-only runs) go ahead of full runs (see claim)."""
+        row = self.db.one("SELECT created_at, status, preflight_only FROM runs WHERE id = ?", (run_id,))
         if row is None or row["status"] != "queued":
             return None
-        return self.db.one("SELECT COUNT(*) n FROM runs WHERE status = 'queued' AND created_at <= ?", (row["created_at"],))["n"]
+        if row["preflight_only"]:
+            sql = "SELECT COUNT(*) n FROM runs WHERE status = 'queued' AND preflight_only = 1 AND created_at <= ?"
+        else:
+            sql = "SELECT COUNT(*) n FROM runs WHERE status = 'queued' AND (preflight_only = 1 OR created_at <= ?)"
+        return self.db.one(sql, (row["created_at"],))["n"]
 
     def claim(self):
-        """Take the oldest queued run (atomically) and mark it running."""
+        """Take the next queued run (atomically) and mark it running: input checks (preflight-only runs, a few seconds each) first, then the oldest run,
+        so checking a job's inputs never waits behind a queue of full runs (it still waits for a run that has already started)."""
         with self.db.connect() as c:
             c.execute("BEGIN IMMEDIATE")
-            row = c.execute("SELECT * FROM runs WHERE status = 'queued' ORDER BY created_at LIMIT 1").fetchone()
+            row = c.execute("SELECT * FROM runs WHERE status = 'queued' ORDER BY preflight_only DESC, created_at LIMIT 1").fetchone()
             if row is None:
                 c.execute("COMMIT")
                 return None
