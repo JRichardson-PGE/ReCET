@@ -161,3 +161,7 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .tabulator-edit-list .tabulator-edit-list-item.active, .tabulator-edit-list .tabulator-edit-list-item:hover { background: var(--accent); color: var(--accent-fg); }
 .tabulator-edit-list { font-size: .85rem; }
 .issues li.info { color: var(--muted); }
+/* Tabulator's popups (header tooltips, dropdown lists) are appended to <body> with a fixed white background; the page's
+   text colour made them light-on-white in dark mode. Tooltips are drawn inverted so they stand out in both themes. */
+.tabulator-popup-container { background: var(--card); color: var(--fg); border-color: var(--line); }
+.tabulator-popup-container.tabulator-tooltip { background: var(--fg); color: var(--bg); border-color: var(--fg); font-size: .82rem; line-height: 1.4; padding: .35rem .55rem; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
