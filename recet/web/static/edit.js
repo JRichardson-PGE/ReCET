@@ -12,7 +12,7 @@
   var TABLES = ["Measure", "ProgramCost"];
   var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, E3MeaElecEndUseShape: 240, E3GasSavProfile: 200 };
   var st = {
-    rev: null, layout: null, columns: {}, choices: {}, issues: { Measure: {}, ProgramCost: {} }, grids: {}, current: "Measure",
+    rev: null, layout: null, columns: {}, choices: {}, issues: { Measure: {}, ProgramCost: {} }, checkMarks: { Measure: {}, ProgramCost: {} }, grids: {}, current: "Measure",
     timer: null, saving: false, pending: false, dirty: false, conflict: false, nextRid: 1, endUses: {}, maxRows: 500, newMeasure: null, pcLike: []
   };
 
@@ -70,17 +70,32 @@
   }
 
   // ------------------------------------------------------------------------------------------------------------ columns
-  // colours a cell by its check result; touches only the cell's class and title, so an open editor in it survives
+  // colours a cell by its check results (the cell checks of the last save, and the last Validate inputs check); touches only the cell's class and title,
+  // so an open editor in it survives
+  var RANK = { error: 3, warning: 2, info: 1 };
   function markIssue(t, cell) {
-    var e = cell.getElement();
-    var issue = (st.issues[t][cell.getRow().getData()._rid] || {})[cell.getField()];
+    var e = cell.getElement(), rid = cell.getRow().getData()._rid, f = cell.getField();
+    var found = [(st.issues[t][rid] || {})[f], (st.checkMarks[t][rid] || {})[f]].filter(Boolean);
     e.classList.remove("issue-error", "issue-warning", "issue-info");
-    if (issue) {
-      e.classList.add("issue-" + issue.severity);
-      e.title = issue.messages.join("\n");
+    if (found.length) {
+      var sev = found.reduce(function (s, x) { return RANK[x.severity] > RANK[s] ? x.severity : s; }, "info");
+      e.classList.add("issue-" + sev);
+      e.title = found.map(function (x) { return x.messages.join("\n"); }).join("\n");
     } else {
       e.removeAttribute("title");
     }
+  }
+
+  // redraws the marks of these rows ({table: Set of rid strings}); rows deleted since have nothing to redraw
+  function remark(touched) {
+    TABLES.forEach(function (t) {
+      if (!touched[t] || !touched[t].size) return;
+      var live = new Map(rowsOf(t).map(function (r) { return [String(r.getData()._rid), r]; }));
+      touched[t].forEach(function (rid) {
+        var row = live.get(String(rid));
+        if (row) row.getCells().forEach(function (c) { markIssue(t, c); });   // not reformat(): that would close an open editor
+      });
+    });
   }
 
   function formatter(t, col, numeric, list) {
@@ -145,6 +160,12 @@
     });
     ["cellEdited", "clipboardPasted", "rowAdded", "rowDeleted", "historyUndo", "historyRedo", "dataChanged"].forEach(function (ev) {
       g.on(ev, function () { changed(t); });
+    });
+    // a cell changed since the last Validate inputs check loses that check's mark (the next check says whether it is fixed)
+    g.on("cellEdited", function (cell) { clearCheckMark(t, cell.getRow().getData()._rid, [cell.getField()]); });
+    g.on("clipboardPasted", function (_text, rowData, rows) {
+      var fields = Object.keys((rowData && rowData[0]) || {});
+      (rows || []).forEach(function (r) { clearCheckMark(t, r.getData()._rid, fields); });
     });
     // A block pasted (Excel copy) while a cell's editor is open goes to the grid's paste, not into the one input.
     g.element.addEventListener("paste", function (e) {
@@ -233,6 +254,7 @@
       st.rev = res.j.rev;
       st.choices = res.j.choices || st.choices;
       applyIssues(res.j.issues || [], snap);
+      if (chk.info) staleNote();
       setStatus(st.dirty ? "Unsaved changes…" : "Saved " + new Date().toLocaleTimeString(), st.dirty ? "muted" : "ok");
       return true;
     }).catch(function (e) {
@@ -264,13 +286,7 @@
       touched[i.table].add(String(rid));
       st.issueList.push({ table: i.table, rid: rid, column: i.column, severity: i.severity, message: i.message });
     });
-    TABLES.forEach(function (t) {
-      var live = new Map(rowsOf(t).map(function (r) { return [String(r.getData()._rid), r]; }));   // rows deleted since the save have no row to redraw
-      touched[t].forEach(function (rid) {
-        var row = live.get(rid);
-        if (row) row.getCells().forEach(function (c) { markIssue(t, c); });   // not reformat(): that would close an open editor
-      });
-    });
+    remark(touched);
     renderIssues();
   }
 
@@ -402,6 +418,230 @@
     });
   });
 
+  // ------------------------------------------------------------------------------------------------------------ Validate inputs
+  // Saves the draft, queues a preflight-only run of it (POST API/check), then polls the run's /check until it ends, lists what the check found and marks
+  // the cells it names. The report names rows of the checked files; chk.info.row_map turns those into grid positions at the checked revision, and chk.snap
+  // (the rows' _rids at that revision, taken when the check started or when the page loaded that revision) into rows, so the marks follow later edits.
+  var chk = { info: null, timer: null, started: 0, busy: false, snap: null, snapRun: null };
+  var chkBtn = document.getElementById("check-btn"), chkAcc = document.getElementById("check-acc"), chkSw = document.getElementById("check-sw");
+  var chkOut = document.getElementById("check-result");
+
+  function checkDefaults(d) {
+    var def = d.check_defaults || { acc_versions: [], acc_version: "" };
+    var c = d.check || {};
+    chkAcc.textContent = "";
+    def.acc_versions.forEach(function (a) { var o = el("option", null, a); o.value = a; chkAcc.appendChild(o); });
+    chkAcc.value = c.acc_version || def.acc_version;
+    chkSw.checked = c.run ? !!c.allocate_statewide : !!def.allocate_statewide;
+    chkBtn.disabled = false;
+    if (c.run) {
+      chk.info = c;
+      if (c.rev === d.rev) { chk.snap = ridSnapshot(); chk.snapRun = c.run; }   // the page holds the checked revision: its rows are the checked rows
+      poll(true);
+    }
+  }
+
+  function ridSnapshot() {
+    var snap = {};
+    TABLES.forEach(function (t) { snap[t] = rowsOf(t).map(function (r) { return r.getData()._rid; }); });
+    return snap;
+  }
+
+  // marks the cells the report names (rep null: clears them); each issue gets ._at, its cells as [table, rid, column]
+  function setCheckMarks(rep) {
+    var touched = {};
+    TABLES.forEach(function (t) { touched[t] = new Set(Object.keys(st.checkMarks[t])); });
+    st.checkMarks = { Measure: {}, ProgramCost: {} };
+    var rids = rep && chk.info && chk.snap && chk.snapRun === chk.info.run ? chk.snap : null;
+    if (rep) rep.issues.forEach(function (i) {
+      i._at = [];
+      if (!rids) return;
+      (i.cells || []).forEach(function (c) {
+        var t = c[0], map = (chk.info.row_map || {})[t], pos = map ? map[c[1]] : c[1];
+        var rid = rids[t] && rids[t][pos];
+        if (rid == null || !st.checkMarks[t]) return;
+        var byCol = st.checkMarks[t][rid] = st.checkMarks[t][rid] || {};
+        var cur = byCol[c[2]] = byCol[c[2]] || { severity: i.severity, messages: [] };
+        if (RANK[i.severity] > RANK[cur.severity]) cur.severity = i.severity;
+        cur.messages.push("Validate inputs: " + i.message);
+        touched[t].add(String(rid));
+        i._at.push([t, rid, c[2]]);
+      });
+    });
+    remark(touched);
+  }
+
+  function clearCheckMark(t, rid, fields) {
+    var byCol = st.checkMarks[t][rid];
+    if (!byCol) return;
+    fields.forEach(function (f) { delete byCol[f]; });
+    if (!Object.keys(byCol).length) delete st.checkMarks[t][rid];
+    var touched = {};
+    touched[t] = new Set([String(rid)]);
+    remark(touched);
+  }
+
+  function checkHead(text, kind) {
+    var head = el("div", "check-head");
+    head.appendChild(el("span", "check-title " + (kind || ""), text));
+    if (chk.info && chk.info.run_url) {
+      var a = el("a", "small", "Run page and log");
+      a.href = chk.info.run_url;
+      head.appendChild(a);
+    }
+    return head;
+  }
+
+  function staleNote() {
+    var old = chkOut.querySelector(".check-stale");
+    if (old) old.remove();
+    if (!chk.info || chk.info.rev == null || chk.info.rev === st.rev) return;
+    chkOut.insertBefore(el("p", "check-stale", "These results are for the tables before your latest edits. Validate again to check the current version."),
+                        chkOut.children[1] || null);
+  }
+
+  function exampleTarget(v) {
+    var hit = null;
+    rowsOf("Measure").some(function (r) { if (r.getData().CEInputID === v) { hit = ["Measure", r.getData()._rid, "CEInputID"]; } return hit; });
+    if (!hit) rowsOf("ProgramCost").some(function (r) { if (r.getData().PrgID === v) { hit = ["ProgramCost", r.getData()._rid, "PrgID"]; } return hit; });
+    if (!hit) rowsOf("Measure").some(function (r) { if (r.getData().PrgID === v) { hit = ["Measure", r.getData()._rid, "PrgID"]; } return hit; });
+    return hit;
+  }
+
+  function renderCheck(j) {
+    chkOut.hidden = false;
+    chkOut.textContent = "";
+    if (j.status === "queued" || j.status === "running") {
+      var wait = j.status === "running" ? "Checking the inputs…"
+        : (j.position && j.position > 1 ? "Waiting to start (" + (j.position - 1) + " ahead in the queue)…" : "Waiting for the run in progress to finish…");
+      chkOut.appendChild(checkHead(wait, "muted"));
+      return;
+    }
+    var rep = j.report;
+    setCheckMarks(rep);
+    if (!rep) {
+      chkOut.appendChild(checkHead(j.status === "cancelled" ? "The check was stopped." : "The check could not run.", "bad"));
+      if (j.message) chkOut.appendChild(el("p", "small", j.message));
+      if (j.log_tail) chkOut.appendChild(el("pre", "check-log", j.log_tail));
+      staleNote();
+      return;
+    }
+    var n = { error: 0, warning: 0, info: 0 };
+    rep.issues.forEach(function (i) { n[i.severity] = (n[i.severity] || 0) + 1; });
+    var title = n.error ? n.error + (n.error === 1 ? " problem stops" : " problems stop") + " the run"
+      : (n.warning ? "The run can start; " + n.warning + (n.warning === 1 ? " warning" : " warnings") + " to look at"
+        : "No problems found: the run can start");
+    chkOut.appendChild(checkHead(title + " (" + j.acc_version + " ACC)", n.error ? "bad" : (n.warning ? "warn" : "ok")));
+    var stats = Object.keys(rep.stats || {}).map(function (k) { return k + ": " + rep.stats[k]; });
+    if (stats.length) chkOut.appendChild(el("p", "check-stats", stats.join(" · ")));
+    if (rep.issues.length) {
+      var ul = el("ul", "check-issues"), rank = { error: 0, warning: 1, info: 2 };
+      rep.issues.slice().sort(function (a, b) { return rank[a.severity] - rank[b.severity]; }).forEach(function (i) {
+        var li = el("li", i.severity);
+        li.appendChild(el("span", "sev", i.severity === "error" ? "stops run" : i.severity));
+        li.appendChild(document.createTextNode(i.message + (i.count ? " (" + i.count.toLocaleString() + ")" : "") + " "));
+        li.appendChild(el("span", "code", i.code));
+        if (i._at.length) {                                              // steps through the cells it marked
+          var k = 0, show = el("button", "link check-show", "Show in table" + (i._at.length > 1 ? " (" + i._at.length + " cells)" : ""));
+          show.type = "button";
+          show.addEventListener("click", function () {
+            var live = i._at.filter(function (a) { return st.grids[a[0]].getRow(a[1]); });
+            if (!live.length) return;
+            var a = live[k % live.length];
+            if (live.length > 1) show.textContent = "Show next (" + (k % live.length + 1) + " of " + live.length + ")";
+            k++;
+            goTo(a[0], a[1], a[2]);
+          });
+          li.appendChild(document.createTextNode(" "));
+          li.appendChild(show);
+        }
+        if (i.examples && i.examples.length) {
+          var eg = el("span", "eg", " e.g. ");
+          i.examples.forEach(function (v, k) {
+            if (k) eg.appendChild(document.createTextNode(", "));
+            var target = exampleTarget(v);
+            if (target) {
+              var b = el("button", "link", v);
+              b.type = "button";
+              b.title = "Show this row";
+              b.addEventListener("click", function () { goTo(target[0], target[1], target[2]); });
+              eg.appendChild(b);
+            } else {
+              eg.appendChild(document.createTextNode(v));
+            }
+          });
+          li.appendChild(eg);
+        }
+        ul.appendChild(li);
+      });
+      chkOut.appendChild(ul);
+    }
+    staleNote();
+  }
+
+  function poll(first) {
+    clearTimeout(chk.timer);
+    if (!chk.info) return;
+    if (first) chk.started = Date.now();
+    fetch(chk.info.status_url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (j) {
+        renderCheck(j);
+        if (j.status === "queued" || j.status === "running") {
+          chk.timer = setTimeout(poll, Date.now() - chk.started > 60000 ? 4000 : 1500);
+        } else {
+          chk.busy = false;
+          chkBtn.disabled = false;
+        }
+      })
+      .catch(function () {
+        if (Date.now() - chk.started < 600000) chk.timer = setTimeout(poll, 5000);   // a dropped connection: keep trying for a while
+        else { chk.busy = false; chkBtn.disabled = false; }
+      });
+  }
+
+  function runCheck() {
+    if (chk.busy || !st.loaded) return;
+    chk.busy = true;
+    chkBtn.disabled = true;
+    chkOut.hidden = false;
+    chkOut.textContent = "";
+    chkOut.appendChild(checkHead("Saving and starting the check…", "muted"));
+    setCheckMarks(null);
+    var ready = (st.dirty || st.saving) ? Promise.resolve(save()) : Promise.resolve(true), snap = null;
+    ready.then(function (ok) {
+      if (!ok) throw new Error("the draft could not be saved (see the message at the top)");
+      snap = ridSnapshot();                                // the rows as saved: the check reads this revision
+      return fetch(API + "/check", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+        body: JSON.stringify({ rev: st.rev, acc_version: chkAcc.value, allocate_statewide: chkSw.checked })
+      });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+    }).then(function (res) {
+      if (!res.ok) {
+        chk.busy = false;
+        chkBtn.disabled = false;
+        chkOut.textContent = "";
+        chk.info = null;
+        chkOut.appendChild(checkHead(res.status === 401 ? "Signed out: reload the page and sign in again." : "The check did not start.", "bad"));
+        chkOut.appendChild(el("p", "small", res.j.error || res.j.detail || ("Error " + res.status)));
+        return;
+      }
+      chk.info = res.j;
+      chk.snap = snap;
+      chk.snapRun = res.j.run;
+      poll(true);
+    }).catch(function (e) {
+      chk.busy = false;
+      chkBtn.disabled = false;
+      chkOut.textContent = "";
+      chkOut.appendChild(checkHead("The check did not start: " + e.message, "bad"));
+    });
+  }
+  chkBtn.addEventListener("click", runCheck);
+
   // Run: save first, then open the New run page for this draft
   document.getElementById("run-link").addEventListener("click", function (e) {
     if (!st.dirty && !st.saving) return;
@@ -437,6 +677,7 @@
           st.dirty = false;
           st.loaded = true;
           setStatus("Saved", "ok");
+          checkDefaults(d);
         });
       });
     })
