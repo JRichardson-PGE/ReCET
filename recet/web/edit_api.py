@@ -4,12 +4,15 @@ A draft belongs to one user and lives in `<state>/drafts/<id>/`:
 
     draft.json   {"rev": n, "tables": {"Measure": {"columns": [...], "rows": [[...], ...]}, "ProgramCost": {...}}}
     base.xlsx    the job workbook the draft came from, if any: its other sheets (RunParameters, Programs ...) still apply when the draft is run
+    rerun.json   for a draft made from a run ("Edit inputs and rerun"): {"run": id, "settings": New run form values, "supplied": {RunConfig field: file name}}
+    supplied/    that run's supplied files (profiles, run parameters ...), offered again on the New run page
 
 The editing rules are the desktop window's (`recet.editor`): the same column order, dropdown values, 500-measure limit and cell checks. Every save re-checks the
 tables and returns the problems; a draft with an error (a problem that would stop the run) cannot be started. Drafts untouched for `Settings.draft_days` are
 deleted by the run queue's cleanup.
 
 Pages (forms carry the CSRF token): GET /edit (list, or the grid with ?draft=), POST /edit (new draft), POST /edit/{id}/delete, GET /edit/{id}/download.zip|.xlsx.
+A finished (or failed) run's inputs become a draft with POST /runs/{id}/edit (in app.py, through `draft_from_run`).
 JSON (X-CSRF-Token header on writes): GET /edit/api/{id}, PUT /edit/api/{id}, GET /edit/api/end-uses?iou=&sector=.
 """
 from __future__ import annotations
@@ -153,6 +156,86 @@ def _parse_tables(body: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 # ------------------------------------------------------------------------------------------------------------------------- run support
+# RunConfig fields of the supplied files a run can carry over to a rerun (the New run page's optional uploads)
+CARRY_FIELDS = ("profiles_8760_file", "profiles_gas_file", "run_parameters_file", "sw_factors_file", "programs_file", "cet_outputs")
+SETTING_FLAGS = ("components", "portfolio_8760", "allocate_statewide", "apply_exclude_from_ce", "preflight_only", "include_societal", "emissions")
+
+
+def load_rerun(ctx, draft_id: str) -> dict | None:
+    """What a draft made from a run carries: {"run", "settings", "supplied"}, or None for an ordinary draft."""
+    p = _folder(ctx, draft_id) / "rerun.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+def supplied_path(ctx, draft_id: str, name: str) -> Path | None:
+    p = (_folder(ctx, draft_id) / "supplied" / name).resolve()
+    return p if p.is_file() and p.is_relative_to((_folder(ctx, draft_id) / "supplied").resolve()) else None
+
+
+def _run_settings(cfg: dict, label: str) -> dict:
+    """A run's options as New run form values, so a rerun starts from the same settings."""
+    out = {"acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
+           "base_year": str(cfg.get("base_year") or ""), "market_effects": "0.05" if float(cfg.get("market_effects") or 0) > 0 else "0",
+           "output_format": str(cfg.get("output_format") or "csv"), "label": (f"{label} (edited)" if label else "")[:120],
+           "profile_years": " ".join(str(y) for y in cfg.get("profile_years") or [])}
+    for f in SETTING_FLAGS:
+        if cfg.get(f):
+            out[f] = "on"
+    return out
+
+
+def draft_from_run(ctx, run, user) -> str:
+    """A new draft (owned by `user`) holding the Measure and ProgramCost tables a run used, its job workbook (whose other sheets still apply), its supplied
+    files and its settings. Raises editor.EditorError when the run's files are gone or the job is too big for the editor."""
+    run_folder = ctx.runner.folder(run["id"])
+    inputs = (run_folder / "inputs").resolve()
+    cfg_path = run_folder / "config.json"
+    if not cfg_path.exists():
+        raise editor.EditorError("this run's files have been deleted, so its inputs cannot be edited")
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+
+    def own(field: str) -> Path | None:
+        """The run's file for a field, only if it is one of the run's own inputs (not a server default)."""
+        v = cfg.get(field)
+        if not v:
+            return None
+        p = Path(v).resolve()
+        return p if p.is_file() and p.is_relative_to(inputs) else None
+
+    n = ctx.db.one("SELECT COUNT(*) n FROM drafts WHERE user_id = ?", (user["id"],))["n"]
+    if n >= MAX_DRAFTS_PER_USER:
+        raise editor.EditorError(f"you have {n} drafts; delete some on the Edit inputs page first (the limit is {MAX_DRAFTS_PER_USER})")
+    wb, meas, pcost = own("workbook"), own("measures"), own("programcost")
+    if wb is None and meas is None:
+        raise editor.EditorError("this run's input files are missing")
+    job = editor.load_tables(str(meas) if meas else None, str(pcost) if pcost else None, str(wb) if wb else None)
+    draft_id = secrets.token_hex(8)
+    folder = _folder(ctx, draft_id)
+    try:
+        folder.mkdir(parents=True)
+        if wb is not None:
+            shutil.copyfile(wb, folder / "base.xlsx")
+        supplied = {}
+        for f in CARRY_FIELDS:
+            p = own(f)
+            if p is not None:
+                (folder / "supplied").mkdir(exist_ok=True)
+                name = f"{f}{p.suffix.lower()}"
+                shutil.copyfile(p, folder / "supplied" / name)
+                supplied[f] = name
+        label = run["label"] or ""
+        (folder / "rerun.json").write_text(json.dumps({"run": run["id"], "settings": _run_settings(cfg, label), "supplied": supplied}), encoding="utf-8")
+        _write(folder, 1, job.measures, job.programcost)
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    title = label or f"Run {run['id']}"
+    now = time.time()
+    ctx.db.run("INSERT INTO drafts (id, user_id, name, source, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+               (draft_id, user["id"], f"{title} (edited)"[:120], f"inputs of run {title}"[:500], now, now))
+    return draft_id
+
+
 def prepare_draft_run(ctx, draft, run_folder: Path, given: dict) -> tuple[str | None, dict]:
     """(problem, RunConfig updates) for running a draft. A problem (the cells that would stop the run) means no run."""
     _data, m, pc, base = load_draft(ctx, draft["id"])
