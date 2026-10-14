@@ -758,6 +758,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             fixed = s.prefix + path[len(s.prefix):]           # /recet/runs -> /ReCET/runs: cookies are scoped to the exact casing
             q = f"?{request.url.query}" if request.url.query else ""
             return RedirectResponse(fixed + q, status_code=301)
+        if s.prefix and path == s.prefix:                     # /ReCET -> /ReCET/ as a relative redirect (the mount's own would name http://host)
+            q = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(s.prefix + "/" + q, status_code=307)
         resp = await call_next(request)
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("X-Frame-Options", "DENY")

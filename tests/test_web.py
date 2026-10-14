@@ -72,6 +72,7 @@ def test_root_and_case_redirects(web):
     r = c.get("/recet/runs?all=1")
     assert r.status_code == 301 and r.headers["location"] == f"{P}/runs?all=1"
     assert c.get("/RECET").headers["location"] == P
+    assert c.get(P).headers["location"] == f"{P}/"            # relative, so it keeps https and the host
     r = c.get(f"{P}/runs")
     assert r.status_code == 303 and r.headers["location"] == f"{P}/login?next={P}/runs"
     assert c.get(f"{P}/healthz").text == "ok"
