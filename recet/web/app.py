@@ -22,6 +22,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -405,13 +406,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                           + ("" if everyone else "WHERE r.user_id = ? ") + "ORDER BY r.created_at DESC LIMIT 200", () if everyone else (u["id"],))
         return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days)
 
+    field_label = {fld: label for fld, _ext, label in UPLOADS.values()}
+
     def new_run_page(request: Request, status_code=200, **kw):
         from .. import editor
+        from . import edit_api
         draft = kw.pop("draft", None)
+        rerun = edit_api.load_rerun(ctx, draft["id"]) if draft is not None else None
         kw.setdefault("error", "")
-        kw.setdefault("form", {})
+        kw.setdefault("form", dict(rerun["settings"]) if rerun else {})
+        carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
+        source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, uploads=UPLOADS, templates_=TEMPLATE_FILES,
-                          max_mb=s.max_upload_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, **kw)
+                          max_mb=s.max_upload_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
 
     @app.get("/runs/new", response_class=HTMLResponse)
     async def new_run(request: Request, draft: str = ""):
@@ -505,6 +512,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 names.append(f"{UPLOADS[k][2]}: {Path(up.filename).name}")
             if draft is not None:
                 from . import edit_api
+                rerun = edit_api.load_rerun(ctx, draft["id"]) or {}
+                for fld, name in rerun.get("supplied", {}).items():          # the earlier run's supplied files, unless replaced or unticked
+                    src = edit_api.supplied_path(ctx, draft["id"], name)
+                    if src is None or cfg.get(fld) or form.get(f"keep_{fld}") != "on":
+                        continue
+                    dest = folder / "inputs" / f"carried_{name}"
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(src, dest)
+                    cfg[fld] = str(dest)
+                    names.append(f"{field_label.get(fld, fld)}: from the earlier run")
                 problem, updates = edit_api.prepare_draft_run(ctx, draft, folder, {f: cfg.get(f) for f in ("run_parameters_file", "sw_factors_file",
                                                                                                               "profiles_gas_file", "programs_file",
                                                                                                               "profiles_8760_file")})
@@ -530,10 +547,47 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx.db.audit("run queued", u, detail=f"{run_id}: ACC {acc}{' vs ' + cmp_ if cmp_ else ''}; {inputs_text}", ip=ctx.ip(request))
         return ctx.redirect(f"/runs/{run_id}")
 
+    def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
+        has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
+        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), files=_files(run),
+                          retention=s.retention_days, has_inputs=has_inputs, error=error)
+
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
     async def run_page(request: Request, run_id: str):
+        return run_page_for(request, ctx.run_for(request, run_id))
+
+    @app.post("/runs/{run_id}/edit")
+    async def run_edit_inputs(request: Request, run_id: str):
+        """Edit inputs and rerun: the run's tables, workbook, supplied files and settings become a new draft of the signed-in user."""
+        from .. import editor
+        from . import edit_api
         run = ctx.run_for(request, run_id)
-        return ctx.render(request, "run.html", run=run, position=ctx.runner.position(run_id), files=_files(run), retention=s.retention_days)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        u = ctx.need_user(request)
+        try:
+            draft_id = await run_in_threadpool(edit_api.draft_from_run, ctx, run, u)
+        except (editor.EditorError, ValueError) as exc:
+            msg = str(exc)
+            if "editor is for jobs" in msg:
+                msg += " Download the inputs below, edit them in Excel, and start a new run with them."
+            return run_page_for(request, run, 400, msg[:1].upper() + msg[1:])
+        ctx.db.audit("draft created", u, detail=f"{draft_id}: from run {run_id}", ip=ctx.ip(request))
+        return ctx.redirect(f"/edit?draft={draft_id}")
+
+    @app.get("/runs/{run_id}/inputs.zip")
+    async def run_inputs_zip(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id)
+        base = ctx.runner.folder(run_id) / "inputs"
+        if run["status"] == "expired" or not base.is_dir():
+            raise HTTPException(404)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for f in sorted(base.rglob("*")):
+                if f.is_file():
+                    z.write(f, str(f.relative_to(base)))
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="recet_{run_id}_inputs.zip"'})
 
     def _files(run) -> list[tuple[str, int]]:
         p = ctx.result_path(run)

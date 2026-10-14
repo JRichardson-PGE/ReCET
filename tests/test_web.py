@@ -292,6 +292,70 @@ def test_draft_runs_and_downloads(web, tmp_path):
     assert list(ctx.runner.folder(run_id).glob("inputs/_edited_inputs/*/Measure.csv"))
 
 
+def test_edit_inputs_of_a_finished_run_and_rerun(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "q@example.com")
+    _user(ctx, "r@example.com")
+    c = _login(app, "q@example.com")
+    data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0.05", "output_format": "csv", "label": "base case",
+            "emissions": "on"}
+    files = {"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv"),
+             "profiles_8760": ("shapes.csv", make_flat_profile_csv(tmp_path / "shapes.csv").read_bytes(), "text/csv")}
+    run_id = c.post(f"{P}/runs", data=data, files=files).headers["location"].rsplit("/", 1)[-1]
+    assert ctx.runner.work_once()
+    page = c.get(f"{P}/runs/{run_id}")
+    assert "Edit inputs and rerun" in page.text
+    assert "measures.csv" in zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/inputs.zip").content)).namelist()
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    # another user can neither see nor copy the run
+    assert _login(app, "r@example.com").post(f"{P}/runs/{run_id}/edit", data={"csrf": csrf}).status_code == 404
+    r = c.post(f"{P}/runs/{run_id}/edit", data={"csrf": csrf})
+    assert r.status_code == 303, r.text
+    draft = r.headers["location"].split("draft=")[1]
+    d = c.get(f"{P}/edit/api/{draft}").json()
+    m = d["tables"]["Measure"]
+    assert d["name"] == "base case (edited)" and m["rows"][0][m["columns"].index("CEInputID")] == "T1"
+    # change a cell, then the New run page starts from the run's settings and offers its supplied file
+    m["rows"][0][m["columns"].index("UnitkWh1stBaseline")] = "2000"
+    edit_csrf = re.search(r'data-csrf="([^"]+)"', c.get(f"{P}/edit?draft={draft}").text).group(1)
+    assert c.put(f"{P}/edit/api/{draft}", json={"rev": d["rev"], "tables": {"Measure": m, "ProgramCost": d["tables"]["ProgramCost"]}},
+                 headers={"X-CSRF-Token": edit_csrf}).status_code == 200
+    new = c.get(f"{P}/runs/new?draft={draft}").text
+    assert 'value="0.05" selected' in new and 'value="base case (edited)"' in new and 'name="keep_profiles_8760_file" checked' in new
+    assert 'name="components" >' in new and 'name="emissions" checked' in new and 'name="include_societal" >' in new
+    csrf = re.search(r'name="csrf" value="([^"]+)"', new).group(1)
+    r = c.post(f"{P}/runs", data={"csrf": csrf, "draft": draft, "acc_version": "2026", "market_effects": "0.05", "output_format": "csv",
+                                  "keep_profiles_8760_file": "on"})
+    assert r.status_code == 303, r.text
+    rerun = r.headers["location"].rsplit("/", 1)[-1]
+    assert ctx.runner.work_once()
+    assert ctx.db.one("SELECT status FROM runs WHERE id = ?", (rerun,))["status"] == "finished", c.get(f"{P}/runs/{rerun}/log").json()["text"]
+    cfg = json.loads((ctx.runner.folder(rerun) / "config.json").read_text())
+    assert cfg["profiles_8760_file"].startswith(str(ctx.runner.folder(rerun) / "inputs")) and cfg["market_effects"] == 0.05
+    edited = (ctx.runner.folder(rerun) / "inputs").glob("_edited_inputs/*/Measure.csv")
+    assert "2000" in next(edited).read_text()
+    # a run whose files are gone, and a job too big for the editor, say why on the run page
+    big = tmp_path / "big.csv"
+    lines = make_measure_csv(tmp_path / "one.csv").read_text().splitlines()
+    i = lines[0].split("|").index("CEInputID")
+    rows = []
+    for k in range(501):
+        v = lines[1].split("|")
+        v[i] = f"T{k}"
+        rows.append("|".join(v))
+    big.write_text("\n".join([lines[0], *rows]) + "\n")
+    big_run = c.post(f"{P}/runs", data={"csrf": csrf, "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv",
+                                        "preflight_only": "on"},
+                     files={"measures": ("Measure.csv", big.read_bytes(), "text/csv")}).headers["location"].rsplit("/", 1)[-1]
+    r = c.post(f"{P}/runs/{big_run}/edit", data={"csrf": csrf})
+    assert r.status_code == 400 and "up to 500" in r.text and "Download the inputs" in r.text
+    import time
+    ctx.runner.work_once()
+    ctx.runner.cleanup(now=time.time() + 8 * 86400)
+    assert "Edit inputs and rerun" not in c.get(f"{P}/runs/{run_id}").text
+    assert c.post(f"{P}/runs/{run_id}/edit", data={"csrf": csrf}).status_code == 400
+
+
 def test_drafts_are_private(web):
     app, ctx = web
     _user(ctx, "m@example.com")

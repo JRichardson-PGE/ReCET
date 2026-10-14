@@ -58,7 +58,8 @@ In the package (`recet/docs`, and **Help > Documentation** in the window): `USER
 ## Web app (example.org/ReCET)
 
 `recet/web` is the same tool as a password-protected web app: New run (upload a workbook or CET files), Runs (queue, log, results tables,
-downloads), Edit inputs (the window's grid editor, up to 500 measures, saved as you type) and Docs. Accounts are by invitation only.
+downloads, and "Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
+measures, saved as you type) and Docs. Accounts are by invitation only.
 
     pip install -e ".[web]"
     recet-web create-admin you@example.com      # prints a one-time link to choose a password
