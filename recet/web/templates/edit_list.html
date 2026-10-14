@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Edit inputs{% endblock %}
+{% block content %}
+<h1>Edit inputs</h1>
+<p class="muted">Build or change a small job (up to {{ max_rows }} measures) cell by cell, with CET's dropdown values and the same checks as a run, then run it.
+Larger jobs are edited offline (Excel) and run from <a href="{{ u('/runs/new') }}">New run</a>. Drafts are kept {{ draft_days }} days after their last change.</p>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <h2>Your drafts</h2>
+  {% if drafts %}
+  <ul class="draft-list">
+    {% for d in drafts %}
+    <li>
+      <a href="{{ u('/edit?draft=' + d.id) }}"><strong>{{ d.name }}</strong></a>
+      <span class="muted small">{{ d.source }} · saved {{ fmt_time(d.updated_at) }}</span>
+      <a class="small" href="{{ u('/runs/new?draft=' + d.id) }}">Run</a>
+      <form method="post" action="{{ u('/edit/' + d.id + '/delete') }}" class="confirm" data-confirm="Delete the draft {{ d.name }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">Delete</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No drafts yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Start a draft</h2>
+  <form method="post" action="{{ u('/edit') }}" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="new">
+    <label>Name <input type="text" name="name" maxlength="120" placeholder="New job"></label>
+    <button class="button">New job from the template</button>
+  </form>
+  <p class="muted small">Starts with the template's example measure and program-cost row.</p>
+  <form method="post" action="{{ u('/edit') }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="upload">
+    <label>Name <input type="text" name="name" maxlength="120" placeholder="the file name"></label>
+    <label class="file">Job workbook <input type="file" name="workbook" accept=".xlsx,.xlsm"></label>
+    <p class="muted small">or</p>
+    <label class="file">Measure.csv <input type="file" name="measures" accept=".csv,.txt"></label>
+    <label class="file">ProgramCost.csv <span class="muted">(optional)</span> <input type="file" name="programcost" accept=".csv,.txt"></label>
+    <p class="muted small">A Measure.csv or ProgramCost.csv given with a workbook replaces that sheet. A workbook's other sheets (run parameters, profiles,
+      programs ...) are kept and used when the draft runs. Up to {{ max_mb }} MB per file.</p>
+    <button class="button primary">Upload and edit</button>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

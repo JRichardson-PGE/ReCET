@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Your account{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<h1>Your account</h1>
+<p>{{ user.email }} · {{ user.role }}</p>
+{% if done %}<p class="ok">Password changed. Your other sessions were signed out.</p>{% endif %}
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+<h2>Change password</h2>
+<form method="post" action="{{ u('/account') }}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="username" value="{{ user.email }}" autocomplete="username">
+  <label>Current password <input type="password" name="current" autocomplete="current-password" required></label>
+  <label>New password <input type="password" name="password" autocomplete="new-password" minlength="10" required></label>
+  <label>Again <input type="password" name="password2" autocomplete="new-password" minlength="10" required></label>
+  <button class="primary">Change password</button>
+</form>
+{% endblock %}
