@@ -5,8 +5,8 @@ total electric avoided cost over the full length of the avoided cost data:
 
     total(z) = sum over every year y in the ACC file of  sum over hours h of  shape_z[h] x total_avoided_cost(PA, z, TRC, y, h)
 
-where shape_z is the profile's own normalized 8,760 for zone z (it sums to 1, so this is $ per annual kWh), re-aligned once to the ACC's 2018 weekdays exactly as
-the pricing does (real_impact_profiles.shift_to_acc), and total_avoided_cost is the ACC's Gen + T&D for the measure's PA in zone z, resolved by the same rules
+where shape_z is the profile's own normalized 8,760 for zone z (it sums to 1, so this is $ per annual kWh), re-aligned once to the ACC's weekdays (2018, or
+2020 for the 2021/2022 ACCs) exactly as the pricing does (real_impact_profiles.shift_to_acc), and total_avoided_cost is the ACC's Gen + T&D for the measure's PA in zone z, resolved by the same rules
 every other price lookup uses (real_avoided_cost_v2.get_acc_series: SCG routing, the documented SCE CZ5 / SDG&E CZ6 / CZ8 stand-ins). Undiscounted. The TRC
 cost test decides the zone and that zone is then used for every cost test and component, so a measure's SCT and component values are priced in the same zone
 as its TRC value. A zone whose prices the ACC cannot supply (the old blended fallback) is not an option. Ties go to the first zone in natural order (1, 2, 3A,
@@ -82,15 +82,16 @@ def priceable_zones(pa: str) -> list[str]:
     return sorted((z for z in cands if price_sum(pa, z) is not None), key=zone_sort_key)
 
 
-def zone_totals(pa: str, shapes: dict[str, np.ndarray], represents_year: int, sums=None) -> dict[str, float]:
-    """{zone: total} for every option: the profile's real zones (System excluded) that the ACC can price. `sums` (zone -> price sum) is only passed by the
-    catalog build, which holds two ACC versions at once; otherwise the current ACC is read through price_sum()."""
+def zone_totals(pa: str, shapes: dict[str, np.ndarray], represents_year: int, sums=None, acc_year: int | None = None) -> dict[str, float]:
+    """{zone: total} for every option: the profile's real zones (System excluded) that the ACC can price. `sums` (zone -> price sum) and `acc_year` (that
+    ACC's calendar) are only passed by the catalog build, which holds several ACC versions at once; otherwise the current ACC is read through price_sum() and
+    its calendar through real_impact_profiles.acc_calendar_year()."""
     out: dict[str, float] = {}
     for z in sorted((z for z in shapes if not is_system(z)), key=zone_sort_key):
         s = sums.get(z) if sums is not None else price_sum(pa, z)
         if s is None:
             continue
-        out[z] = float(rip.shift_to_acc(shapes[z], represents_year) @ s)
+        out[z] = float(rip.shift_to_acc(shapes[z], represents_year, acc_year) @ s)
     return out
 
 
@@ -206,6 +207,7 @@ def build_catalog(out_dir: Path | None = None, version_keys: tuple[str, ...] | N
         raise FileNotFoundError("profile library not found: set the reference data folder")
 
     sums: dict[str, dict[tuple[str, str], np.ndarray]] = {}
+    calendars: dict[str, int] = {}
     info = {"library_bytes": lib.stat().st_size, "deciding_cost_test": DECIDING_COST_TEST, "acc": {}}
     saved = paths._runtime["acc_electric"]
     try:
@@ -217,7 +219,8 @@ def build_catalog(out_dir: Path | None = None, version_keys: tuple[str, ...] | N
             runtime.clear_caches()
             sums[k] = {(pa, z): price_sum(pa, z) for pa in PAS for z in priceable_zones(pa)}
             years = sorted(acc.get_acc_series("PGE", "1", DECIDING_COST_TEST)[0])
-            info["acc"][k] = {"electric_bytes": f.stat().st_size, "years": [years[0], years[-1]]}
+            calendars[k] = rip.acc_calendar_year()                      # 2018 for 2024/2026, 2020 for 2021/2022: the profiles are aligned to it below
+            info["acc"][k] = {"electric_bytes": f.stat().st_size, "years": [years[0], years[-1]], "calendar_year": calendars[k]}
             log(f"ACC {k}: price sums for {len(sums[k])} PA x zone options, years {years[0]}-{years[-1]}")
     finally:
         paths.configure_runtime(acc_electric=saved)
@@ -239,7 +242,7 @@ def build_catalog(out_dir: Path | None = None, version_keys: tuple[str, ...] | N
         ry = int(meta["represents_year"])
         for k in keys:
             s = {z: sums[k].get((pa, z)) for z in shapes}
-            totals = zone_totals(pa, shapes, ry, sums=s)
+            totals = zone_totals(pa, shapes, ry, sums=s, acc_year=calendars[k])
             zone = pick(totals)
             ranked = sorted(totals, key=lambda z: (totals[z], zone_sort_key(z)))
             rows.append(dict(acc_version=k, profile_id=int(pid), pa=pa, target_sector=meta["target_sector"], end_use_name=meta["end_use_name"],

@@ -112,11 +112,17 @@ def test_unknown_template_kind():
 # ------------------------------------------------------------------------------------------------------------------ versions
 def test_builtin_versions_and_replacement(tmp_path):
     a = versions.resolve_acc("2024")
-    assert a.cet_version == 2026 and a.gas.name == "gas_components.parquet" and a.gas_source == "built-in"
+    assert a.settings_acc == 2024 and a.label == "2024 ACC" and a.gas.name == "gas_components.parquet" and a.gas_source == "built-in"
     b = versions.resolve_acc("2026", electric_file=tmp_path / "mine.parquet", gas_file=tmp_path / "g.parquet")
-    assert b.cet_version == 2027 and "replaces the built-in 2026" in b.electric_source and b.gas == tmp_path / "g.parquet"
-    c = versions.resolve_acc("2030", electric_file=tmp_path / "e.parquet", e3_version=2026)
-    assert c.cet_version == 2026 and c.label == "Custom ACC '2030'" and any("no gas ACC supplied" in n for n in c.notes)
+    assert b.settings_acc == 2026 and b.label == "2026 ACC" and "replaces the built-in 2026" in b.electric_source and b.gas == tmp_path / "g.parquet"
+    c = versions.resolve_acc("2030", electric_file=tmp_path / "e.parquet", settings_from=2024)
+    assert c.settings_acc == 2024 and c.label == "Custom ACC '2030'" and any("no gas ACC supplied" in n for n in c.notes)
+    d = versions.resolve_acc("2031", electric_file=tmp_path / "e.parquet")
+    assert d.settings_acc == 2026                                         # a new version borrows the newest built-in ACC's settings
+    for key, acc in (("2021", 2021), ("2022", 2022)):
+        v = versions.resolve_acc(key)
+        assert v.settings_acc == acc and v.label == f"{acc} ACC" and v.gas.exists()
+    assert all("CET" not in label for _k, label in versions.choices())   # labels name the ACC only
 
 
 # ------------------------------------------------------------------------------------------------------------------ CLI
@@ -162,12 +168,12 @@ def test_gui_config_roundtrip():
         from recet.jobs import RunConfig
         app = App(root)
         cfg = RunConfig(measures="C:/m/Measure.csv", programcost="C:/m/ProgramCost.csv", out_dir="C:/out", run_name="x", acc_version="2026", base_year=2028,
-                        profiles_8760_file="C:/p.csv", acc_electric_file="C:/a.parquet", e3_version=2027, components=True, portfolio_8760=True, profile_years=[2028, 2030],
+                        profiles_8760_file="C:/p.csv", acc_electric_file="C:/a.parquet", settings_from=2026, components=True, portfolio_8760=True, profile_years=[2028, 2030],
                         market_effects=0.05, include_societal=False, emissions=False, allocate_statewide=True, compare_with="2024",
                         cet_outputs="C:/cet.csv", output_format="parquet")
         app.apply_config(cfg)
         back = app.to_config()
-        for field in ("measures", "programcost", "out_dir", "run_name", "acc_version", "base_year", "profiles_8760_file", "acc_electric_file", "e3_version", "components",
+        for field in ("measures", "programcost", "out_dir", "run_name", "acc_version", "base_year", "profiles_8760_file", "acc_electric_file", "settings_from", "components",
                       "portfolio_8760", "profile_years", "market_effects", "include_societal", "emissions", "allocate_statewide", "compare_with",
                       "cet_outputs", "output_format"):
             assert getattr(back, field) == getattr(cfg, field), field

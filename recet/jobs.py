@@ -42,7 +42,7 @@ class RunConfig:
     acc_version: str = "2024"                # "2024", "2026", or a new label defined by the supplied files
     acc_electric_file: str | None = None     # replaces the built-in electric ACC for acc_version (or defines a new version)
     acc_gas_file: str | None = None
-    e3_version: int | None = None            # built-in run-parameter / E3 table version for a NEW acc label (default: newest); ignored for the built-in versions
+    settings_from: int | None = None         # the ACC version whose run parameters / E3 tables a NEW acc label uses (default: the newest built-in)
     # --- supplied profiles
     profiles_8760_file: str | None = None
     profiles_gas_file: str | None = None
@@ -72,6 +72,11 @@ class RunConfig:
     @classmethod
     def from_dict(cls, d: dict) -> "RunConfig":
         names = {f.name for f in fields(cls)}
+        d = dict(d)
+        legacy = d.pop("e3_version", None)            # configs saved before 0.1.17 named the E3 tables by CET's version number
+        if legacy is not None and d.get("settings_from") is None:
+            from .versions import acc_of_cet_version
+            d["settings_from"] = acc_of_cet_version(legacy)
         return cls(**{k: v for k, v in d.items() if k in names})
 
     def to_json(self) -> str:
@@ -129,7 +134,7 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
         log(chk.text())
         chk.raise_if_bad("supplied gas ACC file")
         gas = overrides.prepare_gas_acc(cfg.acc_gas_file, work)
-    acc = versions.resolve_acc(cfg.acc_version, elec, gas, cfg.e3_version)
+    acc = versions.resolve_acc(cfg.acc_version, elec, gas, cfg.settings_from)
     for n in acc.notes:
         log(f"note: {n}")
     log(acc.describe())
@@ -209,19 +214,29 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     mec = meb                                               # one setting: the same adder on benefits (MEBens) and on costs (MECost)
     log(f"{len(measures):,} measures, First Year {base_year}, market effects {meb:.0%} on benefits and costs")
 
-    log("\n== pricing (TRC" + (", SCB, SCH" if cfg.include_societal else "") + ", PAC, RIM, bill impacts) ==")
+    societal = cfg.include_societal
+    if societal:
+        from .pipeline import gas_avoided_cost, real_avoided_cost_v2
+        e_tests, g_tests = real_avoided_cost_v2.available_cost_tests(), gas_avoided_cost.available_cost_tests()
+        if not {"SCT Base", "SCT High"} <= set(e_tests) or "SCT" not in g_tests:
+            societal = False
+            note = (f"the {acc.label} has no Societal Cost Test avoided costs (electric: {', '.join(e_tests)}; gas: {', '.join(g_tests)}): "
+                    f"the SCT Base / SCT High columns (SB, SH, SCB, SCH) are left blank")
+            result.notes.append(note)
+            log(f"note: {note}")
+    log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
     t0 = time.time()
-    res = run_poc.run_full_cost_effectiveness(measures, program_costs=program, acc_version=acc.cet_version, base_year=base_year,
-                                              market_effects_bens=meb, market_effects_cost=mec, include_societal=cfg.include_societal)
+    res = run_poc.run_full_cost_effectiveness(measures, program_costs=program, acc_version=acc.settings_acc, base_year=base_year,
+                                              market_effects_bens=meb, market_effects_cost=mec, include_societal=societal)
     log(f"priced in {time.time() - t0:.0f}s")
     if cfg.emissions:
         log("\n== emissions ==")
-        res = res.merge(emissions.price_emissions(measures, acc_version=acc.cet_version, market_effects_bens=meb), on="measure_id", how="left")
+        res = res.merge(emissions.price_emissions(measures, acc_version=acc.settings_acc, market_effects_bens=meb), on="measure_id", how="left")
 
     comps = None
     if cfg.components:
         log("\n== ACC components (each priced separately) ==")
-        comps = comp_mod.price_components(measures, acc_version=acc.cet_version, base_year=base_year, market_effects_bens=meb, log=log)
+        comps = comp_mod.price_components(measures, acc_version=acc.settings_acc, base_year=base_year, market_effects_bens=meb, log=log)
         chk = comp_mod.check_sums(res, comps)
         for fuel, r in chk.items():
             log(f"  {fuel}: {r['components']} components; sum of components vs total: portfolio {r['portfolio_sum_of_components']:,.0f} vs {r['portfolio_total']:,.0f}, "
@@ -271,7 +286,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     settings = {
         "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
         "config": asdict(cfg),
-        "acc": {"key": acc.key, "label": acc.label, "e3_tables_version": acc.cet_version, "electric": str(acc.electric), "electric_source": acc.electric_source,
+        "acc": {"key": acc.key, "label": acc.label, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
                 "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
         "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source(), "files": ref},
         "supplied_files": {k: {"path": v, "size": _size(v)} for k, v in (("workbook", cfg.workbook), ("profiles_8760", cfg.profiles_8760_file),

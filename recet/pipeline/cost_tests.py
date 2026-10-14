@@ -88,7 +88,7 @@ def check_program_alignment(measures: pd.DataFrame, program: pd.DataFrame | None
     return {"program_costs_without_measures": sorted(p_ids - m_ids), "measure_programs_without_costs": sorted(m_ids - p_ids)}
 
 
-def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version: int = 2026) -> pd.DataFrame:
+def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version: int = 2024) -> pd.DataFrame:
     """Per PrgID: SumCosts (nominal), SumCostsNPV (Raf), SumCostsNPV_SCT (Raf_SCT)."""
     if program is None or program.empty:
         return pd.DataFrame(columns=["PrgID", "SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"])

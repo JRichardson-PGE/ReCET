@@ -144,7 +144,7 @@ w(k)       = rem   if k = n-1 and rem > 1e-9     (the last, partial quarter of a
 
 A claim in Q3 therefore delivers two quarters in its first calendar year, and a life of 2.4 years (9.6 quarters) is ten quarters, the last weighted 0.6.
 
-**C2.2 Hours in a quarter.** Electric prices are hourly on the ACC's 2018 calendar (hour 1 = 1 January 00:00, 8,760 hours). The quarters are hours
+**C2.2 Hours in a quarter.** Electric prices are hourly, 8,760 hours a year, on the ACC's own calendar (C4.2). The quarters are hours
 `1-2160` (Q1), `2161-4344` (Q2), `4345-6552` (Q3), `6553-8760` (Q4): 2160, 2184, 2208 and 2208 hours.
 
 **C2.3 Baseline phasing.** With `RQ = 4 * RUL` (RUL is counted from the claim quarter), a quantity that differs between baselines, `a` (1st) and `b` (2nd), is
@@ -157,9 +157,9 @@ phased(k; a, b) = a                                     if RQ <= 0  or  k + 1 <=
 
 `RUL = 0` (the normal case) means a single baseline: the 1st-baseline value applies for the whole life and the 2nd-baseline fields are ignored.
 
-**C2.4 Discounting.** The discount rates come from the run parameters for the measure's `PA` and the ACC version's E3 Version (C3.3), or from a supplied
+**C2.4 Discounting.** The discount rates come from the run parameters for the measure's `PA` and the ACC version (C3.3), or from a supplied
 run-parameters file for that PA. `DiscountRateQtr` is the nominal
-annual rate divided by four (for PG&E Version 2026/2027: 0.0766 / 4 = 0.01915).
+annual rate divided by four (for PG&E, every built-in ACC: 0.0766 / 4 = 0.01915).
 
 ```text
 Rqf  = 1 + DiscountRateQtr(PA)          Rqf_sct = 1 + DiscountRateQtr_SCT(PA)          Raf = 1 + DiscountRateAnnual(PA)          Raf_sct = 1 + DiscountRateAnnual_SCT(PA)
@@ -211,10 +211,22 @@ ACg(y, m) = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder  
 `market` and `td` vary by month; the other components are one annual value used in every month. `behind_meter_methane` is included **only** when the class is Residential and the
 measure's `E3GasSavProfile` contains `FuelSub` (a residential gas-to-electric fuel-substitution profile).
 
-**C3.3 E3 tables and run parameters.** Discount rates, `CO2Gas`, NOx/PM10 factors and retail rate schedules come from CET's E3 tables, keyed by their `Version`. The
-discount rates, base year and `CO2Gas` (CET's `E3Settings`) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. The built-in ACC `2024` uses Version 2026, the
-`2026` ACC uses Version 2027 (identical values), and a new ACC label borrows the Version you name (default: the newest). The primary rate is `DiscountRateAnnual` (PG&E
-7.66%, SCE 7.65%, SCG 7.38%, SDG&E 7.36%); the societal rate `DiscountRateAnnual_SCT` is 5.03% for every utility.
+**C3.3 E3 tables and run parameters.** Discount rates, `CO2Gas`, NOx/PM10 factors and retail rate schedules come from CET's E3 tables and are picked by **ACC
+version**. The packaged tables are CET exports, whose `Version` column uses CET's own numbering; each is mapped to the ACC it holds when the table is read:
+
+| CET Version | 2022 | 2024 | 2026 | 2027 |
+|---|---|---|---|---|
+| ACC | 2021 | 2022 | 2024 | 2026 |
+
+(from each version's release date in `E3Settings.AvoidedCostVersion`; the older versions 2018-2021 map to the 2017-2020 ACCs). The discount rates, base year and
+`CO2Gas` (CET's `E3Settings`) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. A built-in ACC uses its own tables, and a new
+ACC label borrows the tables of the ACC version you name (default: the newest built-in). The primary rate is `DiscountRateAnnual` (PG&E 7.66%, SCE 7.65%, SCG 7.38%,
+SDG&E 7.36%, the same in every built-in ACC); the societal rate `DiscountRateAnnual_SCT` is 5.03% for every utility. `BaseYear`: 2021 (2021 ACC), 2022 (2022 ACC),
+2024 (2024 and 2026 ACCs). The rate schedules have no SCG rows for the 2021 and 2022 ACCs, so SCG bill impacts are not priced on those versions.
+
+**C3.4 TRC-only ACCs.** The 2021 and 2022 ACCs have no Societal Cost Test avoided costs (no SCT rows in either file, and no air quality adder). A run on them prices
+TRC, PAC and RIM as usual and leaves every SCT Base / SCT High column (`*_SB`, `*_SH`, `SCB*`, `SCH*`) blank, with a note in the log and `run_settings.json`. The same
+applies to any supplied ACC file without SCT rows.
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -237,17 +249,21 @@ uses as 8,760s built from their Gen-based energy shares: each TOU period's share
 `hourly_source = TOU H-factor 8,760`.
 
 **C4.2 Calendar alignment.** A profile is drawn on the weekdays of the year it represents (`represents_year`; 2009, the DEER reference year, when blank; 2025 for the TOU
-8,760s). The ACC's hourly avoided costs follow **2018's weekdays in every forecast year** (hour 1 is a Monday; in both the 2024 and the 2026 ACC the weekly low in
-distribution and transmission value falls on days 6-7 of every week of every year), so every profile is rotated **once**, onto 2018, and the same aligned shape prices
-every year. With Monday = 0:
+8,760s). An ACC's hourly avoided costs follow **one calendar's weekdays in every forecast year**: **2018** for the 2024 and 2026 ACCs (hour 1 is a Monday; the weekly
+low in distribution and transmission value falls on days 6-7 of every week of every year) and **2020** for the 2021 and 2022 ACCs (hour 1 is Wednesday 1 January
+2020). The calendar year `A` is read from the ACC file's hour stamps (2018 when a supplied file has none). Every profile is rotated **once**, onto `A`, and the same
+aligned shape prices every year. With Monday = 0:
 
 ```text
-d0         = (weekday(1 January 2018) - weekday(1 January of represents_year)) mod 7
+d0         = (weekday(1 January A) - weekday(1 January of represents_year)) mod 7
 d          = d0 if d0 <= 3, else d0 - 7                         (the short way round: -3 ... +3 days)
 shape_y(i) = shape( (i + 24 * d) mod 8760 )                     i = 0 ... 8759, the same for every year y
 ```
 
-Example: a 2025 profile (1 January a Wednesday) has `d = -2`, so its 1 January lands on ACC day 3, a Wednesday. This is **not** CEDARS' rule: CEDARS aligns the profile to each
+Example: a 2025 profile (1 January a Wednesday) has `d = -2` on the 2024/2026 ACCs, so its 1 January lands on ACC day 3, a Wednesday; on the 2021/2022 ACCs `d = 0`.
+The TOU 8,760s are drawn on the TOU-period map that the 2021, 2022 and 2024 ACCs share (identical in all 8,760 hours), so on the 2020 calendar they line up with the
+ACC's own map. Leap years: an ACC year always has 8,760 hours (the last day of a leap year is dropped, so the 2020 calendar includes 29 February and ends on
+30 December); hour `i` is the same position in every year, and only weekdays are aligned. This is **not** CEDARS' rule: CEDARS aligns the profile to each
 forecast year's own 1 January weekday (although the ACC data do not follow those calendars) and rotates one day too far when the offset is negative. Gas is monthly and is not shifted.
 
 **C4.3 Gas monthly shape.** `E3GasSavProfile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
@@ -651,7 +667,7 @@ weight_m(Y) = overlap( [Y, Y+1), 1st-baseline period ) * S1e + overlap( [Y, Y+1)
    start = Y0 + (q0 - 1)/4     end = start + EUL     1st-baseline period = [start, start + RUL) (or [start, end) if RUL = 0 or RUL >= EUL)     2nd = [start + RUL, end)     overlap in years
 ```
 
-`S1e`, `S2e` are `poc_shape_scale*` (net, with IR and RR, without market effects). Each measure's 8,760 profile (supplied or library) is aligned to the ACC's 2018 weekdays (C4.2), and the `datetime` column labels the hours on 2018; a measure with no shape is left out and listed in `portfolio_8760_unshaped_*`. Positive = savings, negative = added load. `net_kwh_<Y>` sums all IOUs, `net_kwh_<Y>_<PA>` by
+`S1e`, `S2e` are `poc_shape_scale*` (net, with IR and RR, without market effects). Each measure's 8,760 profile (supplied or library) is aligned to the ACC's weekdays (C4.2), and the `datetime` column labels the hours on the ACC's calendar (2018 or 2020); a measure with no shape is left out and listed in `portfolio_8760_unshaped_*`. Positive = savings, negative = added load. `net_kwh_<Y>` sums all IOUs, `net_kwh_<Y>_<PA>` by
 territory.
 
 **C16.3 Portfolio summary.** `portfolio_summary_*` has one row for all measures, one per `IOU_AC_Territory` (`poc_PA`), one per `CreditedIOU` and one per program segment (`Prg_ProgramSegment`, from the program metadata), with the sum of each of: `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`,
@@ -716,7 +732,7 @@ Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (media
 * SCG electric is priced on the SCG routing of C3.1: one utility's whole bundle per zone, SCE unless SCE has no data for the zone (then PG&E). This matches CEDARS'
   DEER-path SCG values in zones 4, 5 (PG&E) and 13 (SCE); CEDARS' own SCG hourly files instead pair SCE generation with PG&E T&D in zones 4, 5 and 13, so the POC
   differs from them there. CET's quarterly SCG table is not used.
-* Not validated against CET, because the real runs contain none: **market effects at 5%**, **`WaterEnergyCost`** and second-baseline water, the **2026 ACC** (there is no CET run for Version 2027), and statewide allocation of program costs.
+* Not validated against CET, because the real runs contain none: **market effects at 5%**, **`WaterEnergyCost`** and second-baseline water, the **2021, 2022 and 2026 ACCs** (no CET run has used them), and statewide allocation of program costs.
   These paths are covered by the hand-computed tests in `tests`.
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
 * Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from CET's `E3Emissions`, which covers only part of the keys.
@@ -730,7 +746,7 @@ Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (media
 
 One measure, priced against constant (flat) avoided costs and a flat profile so that every step can be checked with a calculator. The job is exactly the one in `tests/test_docs.py`, which re-runs it and checks the numbers below.
 
-**Inputs.** A PG&E residential measure, climate zone 13, claimed in **2028Q3**, First Year 2028, 2026-ACC E3 tables (Version 2027: `DiscountRateQtr` = 0.01915, `DiscountRateAnnual` = 0.0766, societal 0.012575 / 0.0503).
+**Inputs.** A PG&E residential measure, climate zone 13, claimed in **2028Q3**, First Year 2028, 2026-ACC run parameters (`DiscountRateQtr` = 0.01915, `DiscountRateAnnual` = 0.0766, societal 0.012575 / 0.0503).
 
 | `Measure.csv` field | Value | `Measure.csv` field | Value |
 |---|---|---|---|

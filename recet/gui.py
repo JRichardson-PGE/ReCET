@@ -297,8 +297,8 @@ class App:
         self._file_row(f, 4, "Program metadata", "programs_file", template="programs", types=[("Programs", "*.csv *.xlsx"), ("All files", "*.*")])
         self._file_row(f, 5, "Electric ACC file", "acc_electric_file", template="acc-electric", types=[("ACC", "*.parquet *.csv"), ("All files", "*.*")])
         self._file_row(f, 6, "Gas ACC file", "acc_gas_file", template="acc-gas", types=[("ACC", "*.parquet *.csv"), ("All files", "*.*")])
-        ttk.Label(f, text="Run-parameters version for a NEW ACC label").grid(row=7, column=0, sticky="w", padx=(12, 8), pady=4)
-        ttk.Entry(f, textvariable=self._var("e3_version"), width=8).grid(row=7, column=1, sticky="w", pady=4)
+        ttk.Label(f, text="Run parameters of ACC version (for a NEW ACC label)").grid(row=7, column=0, sticky="w", padx=(12, 8), pady=4)
+        ttk.Entry(f, textvariable=self._var("settings_from"), width=8).grid(row=7, column=1, sticky="w", pady=4)
         ttk.Label(tabs["inputs"], text="Each file is checked when you choose it: click its status to see the details.", style="Hint.TLabel").pack(anchor="w", padx=18,
                                                                                                                                               pady=(4, 0))
 
@@ -383,7 +383,7 @@ class App:
             workbook=blank(g("workbook")) if excel else None,
             out_dir=str(g("out_dir")).strip() or "recet_results", run_name=str(g("run_name")).strip(),
             acc_version=acc_text.split()[0] if acc_text else "2024",
-            acc_electric_file=blank(g("acc_electric_file")), acc_gas_file=blank(g("acc_gas_file")), e3_version=int_or_none(g("e3_version")),
+            acc_electric_file=blank(g("acc_electric_file")), acc_gas_file=blank(g("acc_gas_file")), settings_from=int_or_none(g("settings_from")),
             profiles_8760_file=blank(g("profiles_8760_file")), profiles_gas_file=blank(g("profiles_gas_file")), reference_dir=blank(g("reference_dir")),
             run_parameters_file=blank(g("run_parameters_file")), sw_factors_file=blank(g("sw_factors_file")), programs_file=blank(g("programs_file")),
             components=bool(g("components")), portfolio_8760=bool(g("portfolio_8760")), profile_years=years,
@@ -407,7 +407,7 @@ class App:
         s("run_name", c.run_name)
         label = dict(versions.choices()).get(c.acc_version)
         s("acc_version", f"{c.acc_version}  -  {label}" if label else c.acc_version)
-        s("base_year", c.base_year), s("acc_electric_file", c.acc_electric_file), s("acc_gas_file", c.acc_gas_file), s("e3_version", c.e3_version)
+        s("base_year", c.base_year), s("acc_electric_file", c.acc_electric_file), s("acc_gas_file", c.acc_gas_file), s("settings_from", c.settings_from)
         s("profiles_8760_file", c.profiles_8760_file), s("profiles_gas_file", c.profiles_gas_file), s("reference_dir", c.reference_dir)
         s("run_parameters_file", c.run_parameters_file), s("sw_factors_file", c.sw_factors_file), s("programs_file", c.programs_file)
         s("components", c.components), s("portfolio_8760", c.portfolio_8760), s("profile_years", " ".join(map(str, c.profile_years)))

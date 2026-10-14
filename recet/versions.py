@@ -1,15 +1,22 @@
-"""ACC versions: which electric and gas avoided-cost files a run prices against, and which E3 tables (discount rates, emissions, rate schedules) go with it.
+"""ACC versions: which electric and gas avoided-cost files a run prices against, and which run parameters and E3 tables (discount rates, emissions, rate
+schedules) go with it.
 
-Two versions ship with the package:
+Four versions ship with the package, each named by its ACC:
 
-  key "2024"  2024 ACC             CET "Version 2026"   electric: reference folder acc/2024/electric_hourly.parquet   gas: packaged
-  key "2026"  2026 ACC (final v1b) CET "Version 2027"   electric: reference folder acc/2026/electric_hourly.parquet   gas: packaged
+  key "2021"  2021 ACC   electric: reference folder acc/2021/electric_hourly.parquet   gas: packaged   TRC only, 2020 hourly calendar
+  key "2022"  2022 ACC   electric: reference folder acc/2022/electric_hourly.parquet   gas: packaged   TRC only, 2020 hourly calendar
+  key "2024"  2024 ACC   electric: reference folder acc/2024/electric_hourly.parquet   gas: packaged   TRC, SCT Base, SCT High; 2018 calendar
+  key "2026"  2026 ACC   electric: reference folder acc/2026/electric_hourly.parquet   gas: packaged   TRC, SCT Base, SCT High; 2018 calendar
+                         (the final v1b release)
 
 A run names a version key. Files supplied with the run REPLACE the shipped file for that fuel (matching label -> the supplied file is used in place
-of the built-in one). A label the package does not have ("2028", "2026-final" ...) is a NEW version made entirely of the supplied files; any fuel not
-supplied falls back to the newest built-in version's file, with a note. The E3 tables (E3Settings, E3Emissions, rate schedules) carry their own
-`Version` column: the built-in versions use their CET version, and a new version borrows `e3_version` (default: the newest in the tables), since
-the tables for a brand-new ACC do not exist yet.
+of the built-in one). A label the package does not have ("2028", "2026-draft" ...) is a NEW version made entirely of the supplied files; any fuel not
+supplied falls back to the newest built-in version's file, with a note.
+
+Run parameters and E3 tables are picked by ACC version too. CET numbers its avoided-cost versions differently (its "Version 2026" holds the 2024 ACC),
+so the packaged tables, which are CET exports, are mapped onto ACC versions when they are read (CET_VERSION_TO_ACC, from each version's release date in
+E3Settings.AvoidedCostVersion). A new version borrows the tables of `settings_from` (an ACC version; default: the newest built-in), since the tables
+for a brand-new ACC do not exist yet.
 """
 from __future__ import annotations
 
@@ -18,19 +25,34 @@ from pathlib import Path
 
 from . import paths
 
+# CET avoided-cost version -> the ACC it holds. Release dates (E3Settings.AvoidedCostVersion): 2018 = 9/1/2017, 2019 = 6/28/2018, 2020 = 9/15/2019,
+# 2021 = 6/24/2020, 2022 = 8/28/2021, 2024 = 9/26/2022, 2026 = 12/12/2024, 2027 = 5/25/2026 (the draft 2026 ACC; the final v1b uses the same tables).
+# Confirmed by Jake for 2022, 2024, 2026 and 2027. CET versions 2013 and 2017 both carry 2011 dates and are not mapped (not selectable).
+CET_VERSION_TO_ACC = {2018: 2017, 2019: 2018, 2020: 2019, 2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
+
+
+def acc_of_cet_version(cet_version) -> int | None:
+    """The ACC a CET avoided-cost version number holds, or None if it is not mapped."""
+    try:
+        return CET_VERSION_TO_ACC.get(int(cet_version))
+    except (TypeError, ValueError):
+        return None
+
 
 @dataclass(frozen=True)
 class AccVersion:
     key: str
     label: str
-    cet_version: int            # the E3 tables' Version column
+    acc: int                    # the ACC year: picks the run parameters and E3 tables
     electric_key: str           # paths.REF_FILES key
     gas_rel: tuple[str, ...]    # inside the package data folder
 
 
 BUILTIN: dict[str, AccVersion] = {v.key: v for v in (
-    AccVersion("2024", "2024 ACC (CET Version 2026)", 2026, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
-    AccVersion("2026", "2026 ACC (CET Version 2027)", 2027, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
+    AccVersion("2021", "2021 ACC", 2021, "acc_electric_2021", ("acc", "2021", "gas_components.parquet")),
+    AccVersion("2022", "2022 ACC", 2022, "acc_electric_2022", ("acc", "2022", "gas_components.parquet")),
+    AccVersion("2024", "2024 ACC", 2024, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
+    AccVersion("2026", "2026 ACC", 2026, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
 )}
 NEWEST_BUILTIN = "2026"
 
@@ -39,7 +61,7 @@ NEWEST_BUILTIN = "2026"
 class ResolvedAcc:
     key: str
     label: str
-    cet_version: int
+    settings_acc: int           # the ACC whose run parameters and E3 tables the run uses
     electric: Path | None
     gas: Path | None
     electric_source: str = ""
@@ -52,7 +74,7 @@ class ResolvedAcc:
 
     def describe(self) -> str:
         return (f"ACC version {self.key!r} ({self.label}); electric: {self.electric_source} [{self.electric}]; gas: {self.gas_source} [{self.gas}]; "
-                f"E3 tables Version {self.cet_version}")
+                f"run parameters and E3 tables of the {self.settings_acc} ACC")
 
 
 def known_keys() -> list[str]:
@@ -64,13 +86,14 @@ def choices() -> list[tuple[str, str]]:
     return [(v.key, v.label) for v in BUILTIN.values()]
 
 
-def _e3_versions() -> list[int]:
+def _settings_accs() -> list[int]:
     from .pipeline import discount_settings
     return discount_settings.known_versions()
 
 
-def resolve_acc(key: str, electric_file: str | Path | None = None, gas_file: str | Path | None = None, e3_version: int | None = None) -> ResolvedAcc:
-    """Decide the files for a run. `electric_file` / `gas_file` are already-prepared parquet paths (overrides.prepare_*), or None."""
+def resolve_acc(key: str, electric_file: str | Path | None = None, gas_file: str | Path | None = None, settings_from: int | None = None) -> ResolvedAcc:
+    """Decide the files for a run. `electric_file` / `gas_file` are already-prepared parquet paths (overrides.prepare_*), or None. `settings_from` (an ACC
+    version) overrides whose run parameters and E3 tables are used."""
     key = str(key).strip()
     if not key:
         raise ValueError("no ACC version given")
@@ -86,12 +109,12 @@ def resolve_acc(key: str, electric_file: str | Path | None = None, gas_file: str
             gas, gsrc = gas_file, f"supplied file replaces the built-in {key} gas ACC"
         else:
             gas, gsrc = paths.package_data(*known.gas_rel), "built-in"
-        return ResolvedAcc(key, known.label, e3_version or known.cet_version, electric, gas, esrc, gsrc, notes)
+        return ResolvedAcc(key, known.label, int(settings_from or known.acc), electric, gas, esrc, gsrc, notes)
 
     if electric_file is None and gas_file is None:
         raise ValueError(f"ACC version {key!r} is not one the package ships ({', '.join(BUILTIN)}); supply an electric and/or gas ACC file to define it")
     base = BUILTIN[NEWEST_BUILTIN]
-    e3 = e3_version or max(_e3_versions())
+    settings = int(settings_from or base.acc)
     if electric_file is not None:
         electric, esrc = Path(electric_file), f"supplied file (new version {key})"
     else:
@@ -102,5 +125,5 @@ def resolve_acc(key: str, electric_file: str | Path | None = None, gas_file: str
     else:
         gas, gsrc = paths.package_data(*base.gas_rel), f"built-in {base.key} (no gas file supplied for {key})"
         notes.append(f"no gas ACC supplied for new version {key!r}: using the built-in {base.key} gas ACC")
-    notes.append(f"new ACC version {key!r} uses the E3 tables' Version {e3} (discount rates, emissions, rate schedules)")
-    return ResolvedAcc(key, f"Custom ACC '{key}'", e3, electric, gas, esrc, gsrc, notes)
+    notes.append(f"new ACC version {key!r} uses the run parameters and E3 tables of the {settings} ACC (discount rates, emissions, rate schedules)")
+    return ResolvedAcc(key, f"Custom ACC '{key}'", settings, electric, gas, esrc, gsrc, notes)

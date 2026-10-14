@@ -45,9 +45,9 @@ or cannot be computed.
   `floor(x)` rounds down.
 * **Run settings.** `F` is the run's **First Year** (the "First Year" box or `--base-year`; blank = the earliest claim year in the job). `MEB` is the market-effects adder on
   benefits and `MEC` the adder on costs: both 0.05 when "Apply 5% market effects (benefits and costs)" is on, both 0 otherwise.
-* **Territory and discount rates.** `PA` is `IOU_AC_Territory`. The rates come from CET's E3 settings for `PA` and the ACC version's E3 Version: `DiscountRateAnnual`,
-  `DiscountRateQtr` (the annual rate divided by 4), and the societal `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`. For PG&E (both E3 Version 2026, the built-in 2024 ACC, and
-  Version 2027, the 2026 ACC): 0.0766, 0.01915, 0.0503 and 0.012575.
+* **Territory and discount rates.** `PA` is `IOU_AC_Territory`. The rates come from CET's E3 settings for `PA` and the ACC version: `DiscountRateAnnual`,
+  `DiscountRateQtr` (the annual rate divided by 4), and the societal `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`. For PG&E (every built-in ACC):
+  0.0766, 0.01915, 0.0503 and 0.012575.
 
 ```text
 Rqf = 1 + DiscountRateQtr          Rqf_sct = 1 + DiscountRateQtr_SCT          the quarterly growth factors
@@ -135,7 +135,7 @@ Wat(k)  = phased( k ;  poc_water_scale_1st * (NTGRkWh + MEB) / NTGRkWh ,
 
 ```text
 shape(i)  = the measure's 8,760-hour load shape: the share of its annual kWh falling in hour i of the year (the shares sum to 1).
-            The profile used is reported in `ProfileSource`; it is rotated once so its weekdays line up with the ACC's, which follow 2018 in every
+            The profile used is reported in `ProfileSource`; it is rotated once so its weekdays line up with the ACC's, which follow one calendar (2018, or 2020 for the 2021/2022 ACCs) in every
             forecast year (CALCULATIONS C4.1, C4.2).
 AC(y, i)  = total_avoided_cost of the ACC row (utility of PA, "CZ" + E3ClimateZone, cost-test row, year y, hour i) / 1000
 Gen(y, i) = AC(y, i) - (transmission + distribution)(y, i) / 1000
@@ -186,8 +186,8 @@ came from), added by the export script `poc/tou/export_measure_level.py`, not by
 
 Which ACC version the row was priced against. Text.
 
-**Formula:** the run's ACC label: `2024 ACC (CET Version 2026)` for the built-in 2024 ACC, `2026 ACC (CET Version 2027)` for the 2026 ACC, `Custom ACC '<label>' (CET Version <v>)`
-for a supplied one. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
+**Formula:** the run's ACC label: `2021 ACC`, `2022 ACC`, `2024 ACC` or `2026 ACC` for a built-in version, `Custom ACC '<label>'` for a new version defined by
+supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
@@ -1404,7 +1404,7 @@ The portfolio's net electric savings hour by hour, for each requested calendar y
 | Field | Meaning and unit | Formula |
 |---|---|---|
 | `hour_of_year` | The ACC hour index, 1 = 1 January 00:00. 1-8760. | `1 ... 8760` |
-| `datetime` | That index laid on the ACC's calendar, 2018 (every ACC forecast year follows 2018's weekdays, and the shapes are aligned to it). Timestamp. | `2018-01-01 00:00 plus (hour_of_year - 1) hours` |
+| `datetime` | That index laid on the ACC's calendar `A`: 2018 for the 2024/2026 ACCs, 2020 for the 2021/2022 ACCs (every forecast year of an ACC follows one calendar's weekdays, and the shapes are aligned to it; a 2020 calendar includes 29 February and ends on 30 December). Timestamp. | `A-01-01 00:00 plus (hour_of_year - 1) hours` |
 | `net_kwh_<Y>` | The portfolio's net kWh in that hour of calendar year `Y`, all IOUs. Positive = savings, negative = added load. kWh. | `SUM over measures m of weight_m(Y) * shape_m,Y(i)`, `i` = `hour_of_year` |
 | `net_kwh_<Y>_<PA>` | The same for the measures of one IOU territory `PA`. kWh. | the same sum over the measures with `IOU_AC_Territory` = `PA` |
 
@@ -1421,7 +1421,7 @@ if 0 < RUL_Yrs < EUL_Yrs:
 otherwise:
    weight_m(Y) = overlap( [Y, Y+1), [start_m, end_m) ) * poc_shape_scale
 
-shape_m,Y(i) = the measure's 8,760 shape for hour i, rotated onto the ACC's (2018's) weekdays (0.6); the same in every year Y
+shape_m,Y(i) = the measure's 8,760 shape for hour i, rotated onto the ACC's weekdays (0.6); the same in every year Y
 ```
 
 `poc_shape_scale` and `poc_shape_scale_2nd` are the net kWh with installation and realization rates and without market effects (market effects are an accounting adder, not physical savings, so they are
@@ -1476,7 +1476,7 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `not_pipe_delimited`, `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
-`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_e3_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
 Errors stop the run; warnings and info do not.
@@ -1489,7 +1489,7 @@ Everything needed to reproduce the run.
 |---|---|
 | `package_version`, `finished`, `seconds` | The `recet` version, the completion time, and the run time in seconds. |
 | `config` | Every run setting (the keys of INPUT_FIELDS.md section 3), exactly as used. |
-| `acc` | The resolved ACC: `key`, `label`, `e3_tables_version`, the electric and gas file paths with their `_source` (`built-in`, or that a supplied file replaced it) and `electric_size`, and any `notes` (for example that a new label borrowed a built-in file). |
+| `acc` | The resolved ACC: `key`, `label`, `settings_acc_version` (the ACC whose run parameters and E3 tables were used), the electric and gas file paths with their `_source` (`built-in`, or that a supplied file replaced it) and `electric_size`, and any `notes` (for example that a new label borrowed a built-in file). |
 | `reference_dir` | The reference data folder used, how it was chosen, and the status (found / size) of each large file. |
 | `supplied_files` | Each supplied profile / ACC file with its path and size. |
 | `inputs` | The measure and program-cost paths, the number of measures priced, and the First Year used. |
@@ -1504,7 +1504,7 @@ Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of a
 Both are one-measure jobs on flat avoided costs and flat 8,760 load shapes, so every step can be checked with a calculator. Both are re-run by the test-suite (`tests/doc_examples.py`,
 `tests/test_output_docs.py`), which compares every number below and in the `Example` lines of sections 1 and 2 with what the tool gives, and checks the arithmetic written on each line.
 
-Common to both: PG&E, climate zone 13, the 2026 ACC (E3 Version 2027: `DiscountRateQtr` 0.01915, `DiscountRateAnnual` 0.0766, societal 0.012575 and 0.0503), First Year 2028, every ACC hour of a
+Common to both: PG&E, climate zone 13, the 2026 ACC (run parameters: `DiscountRateQtr` 0.01915, `DiscountRateAnnual` 0.0766, societal 0.012575 and 0.0503), First Year 2028, every ACC hour of a
 year priced alike. Electric avoided costs, in dollars per MWh: `TRC` = energy 70 + transmission 5 + distribution 5 = 80 (so `AC` = 0.080 per kWh and `Gen` = 0.070 per kWh); `SCT Base` 88 (Gen 78); `SCT High` 96 (Gen 86);
 the ACC's `emission_rate_tonnes_per_kwh` is 0.0002 in every hour. Gas avoided costs, in dollars per therm and the same in every month: `td` 0.20, `nox` 0.05, `upstream_methane` 0.03, `air_quality_adder` 0.02,
 `behind_meter_methane` 0, `co2` 0.10 (`TRC`), 0.30 (`SCT` Base), 0.50 (`SCT` High), and `market` 0.60 for the Residential class and 0.50 for the Commercial class.
@@ -1605,7 +1605,7 @@ refer to.
 <!-- oa-all:start -->
 | Field | Example A | Example B |
 |---|---|---|
-| `POC_ACC` | 2026 ACC (CET Version 2027) | 2026 ACC (CET Version 2027) |
+| `POC_ACC` | 2026 ACC | 2026 ACC |
 | `poc_subset_key` | CZ13_Res | CZ13_Com |
 | `poc_shape_key` | W_SHAPE | 3 = Commercial HVAC |
 | `poc_annual_net_kwh` | 40000 | -30000 |

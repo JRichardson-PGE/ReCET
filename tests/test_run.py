@@ -19,7 +19,7 @@ def _cfg(tmp_path, **kw):
 
 def _rate(acc_key="2026"):
     from recet.pipeline import discount_settings
-    return discount_settings.get_discount_rate_qtr("PGE", versions.BUILTIN[acc_key].cet_version)
+    return discount_settings.get_discount_rate_qtr("PGE", versions.BUILTIN[acc_key].acc)
 
 
 def test_supplied_acc_and_profile_drive_the_result(tmp_path):

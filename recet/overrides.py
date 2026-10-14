@@ -405,7 +405,8 @@ def prepare_electric_acc(path: str | Path, work_dir: str | Path) -> Path:
 # ======================================================================================================================================
 GAS_ACC_MONTHS = _MONTHS
 GAS_ACC_COLUMNS = (["utility", "class", "cost_test", "scc", "year"] + [f"market_{m}" for m in _MONTHS] + [f"td_{m}" for m in _MONTHS]
-                   + ["nox", "co2", "upstream_methane", "behind_meter_methane", "air_quality_adder"])
+                   + ["nox", "co2", "upstream_methane", "behind_meter_methane"])
+GAS_ACC_OPTIONAL = ("air_quality_adder",)   # SCT-only component; the 2021/2022 Gas ACCs have none (priced as zero when missing)
 _GAS_UTILITY_ALIASES = {"PG&E": "PG&E", "PGE": "PG&E", "SOCAL GAS": "Socal Gas", "SOCALGAS": "Socal Gas", "SCG": "Socal Gas", "SDG&E": "SDG&E", "SDGE": "SDG&E"}
 _GAS_CLASSES = {"Residential", "Commercial", "Total Core"}
 
@@ -423,7 +424,9 @@ def check_gas_acc(path: str | Path) -> AccCheck:
     missing = [c for c in GAS_ACC_COLUMNS if c not in df.columns]
     if missing:
         return AccCheck(ok=False, errors=[f"missing column(s) {missing}"])
-    num = [c for c in GAS_ACC_COLUMNS if c not in ("utility", "class", "cost_test", "scc")]
+    if "air_quality_adder" not in df.columns:
+        chk.warnings.append("no air_quality_adder column: priced as zero (as in the 2021 and 2022 Gas ACCs)")
+    num = [c for c in GAS_ACC_COLUMNS + [c for c in GAS_ACC_OPTIONAL if c in df.columns] if c not in ("utility", "class", "cost_test", "scc")]
     if df[num].isna().any().any():
         chk.errors.append("blank/NaN in a numeric column (year, monthly market/td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder)")
     util = df["utility"].astype(str).str.strip().str.upper().map(_GAS_UTILITY_ALIASES)
@@ -464,12 +467,12 @@ def prepare_gas_acc(path: str | Path, work_dir: str | Path) -> Path:
     df["scc"] = df["scc"].astype(str).str.strip().str.capitalize().where(df["cost_test"] == "SCT", np.nan)
     df["class"] = df["class"].astype(str).str.strip()
     df["year"] = df["year"].astype(int)
-    for c in GAS_ACC_COLUMNS:
+    for c in GAS_ACC_COLUMNS + [c for c in GAS_ACC_OPTIONAL if c in df.columns]:
         if c not in ("utility", "class", "cost_test", "scc"):
             df[c] = df[c].astype(float) if c != "year" else df[c]
     out = Path(work_dir) / f"{p.stem}_acc_gas.parquet"
     Path(work_dir).mkdir(parents=True, exist_ok=True)
-    df[GAS_ACC_COLUMNS].to_parquet(out, index=False)
+    df[GAS_ACC_COLUMNS + [c for c in GAS_ACC_OPTIONAL if c in df.columns]].to_parquet(out, index=False)
     return out
 
 

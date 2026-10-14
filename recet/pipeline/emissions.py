@@ -43,7 +43,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from .. import paths
+from .. import paths, versions
 from . import discount_settings, real_avoided_cost_v2, real_impact_profiles, system_zones
 from .engine import QUARTER_BOUNDS
 
@@ -53,9 +53,10 @@ def is_available() -> bool:
 
 
 @lru_cache(maxsize=4)
-def _nox_pm10_index(acc_version: int = 2026) -> dict[tuple[str, str, str, str], tuple[float, float]]:
+def _nox_pm10_index(acc_version: int = 2024) -> dict[tuple[str, str, str, str], tuple[float, float]]:
     e = pd.read_parquet(DATA_DIR / "e3_emissions.parquet")
-    e = e[e["Version"] == acc_version].drop_duplicates(subset=["PA", "TS", "EU", "CZ"])
+    # E3Emissions' Version is CET's numbering: keep the rows of the version that holds this ACC.
+    e = e[e["Version"].map(versions.acc_of_cet_version) == acc_version].drop_duplicates(subset=["PA", "TS", "EU", "CZ"])
     # TS upper-cased: CET's join is case-insensitive (SQL_Latin1_General_CP1_CI_AS) but Measure.csv spells some sectors
     # 'Commercial' where E3Emissions has 'COMMERCIAL' (PG&E numbered TOU end uses), and 'System' vs 'SYSTEM' for the zone.
     return {(r.PA, str(r.TS).upper(), r.EU, str(r.CZ).upper()): (float(r.NOx), float(r.PM10)) for r in e.itertuples()}
@@ -134,7 +135,7 @@ def _gas_lifecycle(thm1: float, thm2: float, rul: float, eul: float) -> float:
     return 0.0
 
 
-def price_emissions(measures: pd.DataFrame, acc_version: int = 2026, market_effects_bens: float = 0.0) -> pd.DataFrame:
+def price_emissions(measures: pd.DataFrame, acc_version: int = 2024, market_effects_bens: float = 0.0) -> pd.DataFrame:
     """One row per measure with CET's emissions output columns (Net/Gross x
     Elec/Gas x CO2/NOx, PM10, each First-year and Lifecycle).
 

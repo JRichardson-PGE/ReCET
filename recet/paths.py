@@ -3,8 +3,8 @@
 Two kinds of data:
 
 * **Package data** -- small tables that ship inside the package (`recet/data/`): E3 settings and tables, the gas monthly
-  profile library, statewide-allocation factors, and the two gas ACC extractions. Always found via `package_data()`.
-* **Reference data** -- the large files that cannot live on GitHub (the 2024 and 2026 electric ACC hourly parquets, ~1 GB each, and the CEDARS
+  profile library, statewide-allocation factors, and the gas ACC extractions. Always found via `package_data()`.
+* **Reference data** -- the large files that cannot live on GitHub (the electric ACC hourly parquets, 0.2-1 GB each, and the CEDARS
   impact-profile library, ~9 GB). They live in a *reference data folder* you can point anywhere (another drive, a network share, another machine).
 
 The reference data folder is resolved, first match wins:
@@ -16,8 +16,10 @@ The reference data folder is resolved, first match wins:
 
 Layout of the reference folder (`recet data status` lists what is present; `manifest.json` carries sizes and checksums):
 
-  acc/2024/electric_hourly.parquet          2024 ACC hourly electric avoided costs (CET Version 2026)
-  acc/2026/electric_hourly.parquet          2026 ACC (final, v1b) hourly electric avoided costs (CET Version 2027)
+  acc/2021/electric_hourly.parquet          2021 ACC hourly electric avoided costs (2020-2050, TRC only)
+  acc/2022/electric_hourly.parquet          2022 ACC hourly electric avoided costs (2022-2052, TRC only)
+  acc/2024/electric_hourly.parquet          2024 ACC hourly electric avoided costs
+  acc/2026/electric_hourly.parquet          2026 ACC hourly electric avoided costs (the final v1b release)
   impact_profiles/catalog.parquet           CEDARS impact-profile catalog
   impact_profiles/hourly.parquet            CEDARS 8,760-hour impact profiles, all IOUs
 
@@ -112,8 +114,10 @@ class RefFile:
 
 
 REF_FILES: dict[str, RefFile] = {r.key: r for r in (
-    RefFile("acc_electric_2024", "acc/2024/electric_hourly.parquet", "2024 ACC hourly electric avoided costs (CET Version 2026)"),
-    RefFile("acc_electric_2026", "acc/2026/electric_hourly.parquet", "2026 ACC (final, v1b) hourly electric avoided costs (CET Version 2027)"),
+    RefFile("acc_electric_2021", "acc/2021/electric_hourly.parquet", "2021 ACC hourly electric avoided costs (TRC only)", required=False),
+    RefFile("acc_electric_2022", "acc/2022/electric_hourly.parquet", "2022 ACC hourly electric avoided costs (TRC only)", required=False),
+    RefFile("acc_electric_2024", "acc/2024/electric_hourly.parquet", "2024 ACC hourly electric avoided costs"),
+    RefFile("acc_electric_2026", "acc/2026/electric_hourly.parquet", "2026 ACC hourly electric avoided costs (final v1b)"),
     RefFile("impact_catalog", "impact_profiles/catalog.parquet", "CEDARS impact-profile catalog"),
     RefFile("impact_hourly", "impact_profiles/hourly.parquet", "CEDARS 8,760-hour impact profiles (all IOUs)"),
 )}

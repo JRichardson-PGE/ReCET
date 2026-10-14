@@ -278,11 +278,12 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     if len(bad_gs):
         rep.add("error", "bad_gas_sector", f"E3GasSector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["gas_sector"].unique())
 
-    # --- ACC horizon and E3 version
+    # --- ACC horizon and run-parameter version
     if acc is not None:
         from .pipeline import discount_settings, gas_avoided_cost, real_avoided_cost_v2
-        if acc.cet_version not in discount_settings.known_versions():
-            rep.add("error", "unknown_e3_version", f"E3 tables have no Version {acc.cet_version} (known: {discount_settings.known_versions()})")
+        if acc.settings_acc not in discount_settings.known_versions():
+            rep.add("error", "unknown_settings_version", f"no built-in run parameters / E3 tables for the {acc.settings_acc} ACC "
+                    f"(known: {discount_settings.known_versions()})")
         try:
             import pyarrow.parquet as pq
             yrs = pq.read_table(str(real_avoided_cost_v2._pq()), columns=["year"]).column("year").to_numpy()

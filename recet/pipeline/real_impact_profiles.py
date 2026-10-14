@@ -32,9 +32,11 @@ nothing in engine.py needs to know the data source changed, only which
 functions build the (shape, represents_year) pair per measure.
 
 DAY-OF-WEEK SHIFT (2026-10-02, Jake: the 8,760 path with the correct shift, not CEDARS' errors). A profile is drawn on its own represents_year's calendar
-(the catalog's `year_represented`; 2009, the DEER reference year, when blank; 2025 for the TOU H-factor 8,760s), while the ACC's hourly data follow 2018's
-weekdays in every forecast year (ACC_CALENDAR_YEAR). shift_for_year() therefore rotates every profile once, by the signed weekday difference to 2018 taken
-the short way round (-3..+3 days), and the same aligned shape prices every year. CEDARS instead aligns each forecast year to that year's real Jan-1 weekday
+(the catalog's `year_represented`; 2009, the DEER reference year, when blank; 2025 for the TOU H-factor 8,760s), while the ACC's hourly data follow one
+calendar's weekdays in every forecast year: 2018 for the 2024 and 2026 ACCs, 2020 for the 2021 and 2022 ACCs (acc_calendar_year(), read from the ACC file's
+hour stamps). shift_for_year() therefore rotates every profile once, by the signed weekday difference to that calendar taken the short way round (-3..+3
+days), and the same aligned shape prices every year. The TOU 8,760s (2025, a Wednesday start) need no rotation on the 2020 calendar (also a Wednesday
+start): the 2021, 2022 and 2024 ACCs share one TOU-period map, which is drawn on that chronology. CEDARS instead aligns each forecast year to that year's real Jan-1 weekday
 and rotates one day too far for negative offsets; that rule reproduces CEDARS' published quarterly values exactly (kept as cedars_shift_for_year, reference
 only) but is not what the POC prices with.
 
@@ -329,19 +331,44 @@ def profile_meta(profile_id: int) -> dict:
 
 
 ACC_CALENDAR_YEAR = 2018
-"""The weekday calendar of the ACC's hourly data. Every forecast year of both the 2024 and the 2026 Electric ACC (draft and final) uses 2018's weekdays (hour 1 = a
-Monday): checked 2026-10-02 on the data itself -- distribution/transmission avoided cost falls on days 6-7 of every week in every year, and the 2026 ACC's
-generation capacity is zero on exactly those days. So a profile is aligned to 2018 once, and the same aligned shape prices every forecast year."""
+"""The default weekday calendar of an ACC's hourly data, used when the ACC file has no hour stamps. Every forecast year of the 2024 and 2026 Electric ACCs uses
+2018's weekdays (hour 1 = a Monday): checked 2026-10-02 on the data itself -- distribution/transmission avoided cost falls on days 6-7 of every week in every
+year, and the 2026 ACC's generation capacity is zero on exactly those days. The 2021 and 2022 ACCs use 2020's (hour 1 = Wednesday 1 January 2020); see
+acc_calendar_year(). Either way a profile is aligned to the ACC's calendar once, and the same aligned shape prices every forecast year."""
 
 
-def alignment_offset_days(represents_year: int, acc_year: int = ACC_CALENDAR_YEAR) -> int:
+def acc_calendar_year() -> int:
+    """The calendar year of the loaded electric ACC's hour stamps: the year of its earliest `datetime` (2018 for the 2024/2026 ACCs, 2020 for 2021/2022), or
+    ACC_CALENDAR_YEAR when the file has no `datetime` column (a supplied file may leave it out).
+
+    Leap years: the ACC keeps 8,760 hours by dropping the last day of the year, so a 2020 calendar includes 29 February and ends on 30 December. Hour n is the
+    same position in every ACC year; only weekdays are aligned (the hours run continuously, so weekday alignment holds all year)."""
+    p = paths.current_acc_electric()
+    if p is None or not Path(p).exists():
+        return ACC_CALENDAR_YEAR
+    st = Path(p).stat()
+    return _calendar_year_of(str(p), st.st_size, st.st_mtime_ns)
+
+
+@lru_cache(maxsize=8)
+def _calendar_year_of(path: str, size: int, mtime_ns: int) -> int:
+    pf = pq.ParquetFile(path)
+    if "datetime" not in pf.schema_arrow.names:
+        return ACC_CALENDAR_YEAR
+    col = pf.read_row_group(0, columns=["datetime"]).column("datetime").to_pandas()
+    first = pd.to_datetime(col).min()
+    return ACC_CALENDAR_YEAR if pd.isna(first) else int(first.year)
+
+
+def alignment_offset_days(represents_year: int, acc_year: int | None = None) -> int:
     """Days to rotate a profile drawn on `represents_year`'s calendar so its weekdays land on the ACC's (2018's): the signed weekday difference, taken as the
-    shorter way round the week (-3..+3), so a profile's seasons move at most three days."""
+    shorter way round the week (-3..+3), so a profile's seasons move at most three days. `acc_year` defaults to the loaded ACC's calendar."""
+    acc_year = acc_calendar_year() if acc_year is None else acc_year
     d = (datetime.date(acc_year, 1, 1).weekday() - datetime.date(represents_year, 1, 1).weekday()) % 7
     return d - 7 if d > 3 else d
 
 
-def shift_to_acc(shape: np.ndarray, represents_year: int, acc_year: int = ACC_CALENDAR_YEAR) -> np.ndarray:
+def shift_to_acc(shape: np.ndarray, represents_year: int, acc_year: int | None = None) -> np.ndarray:
     """`shape` re-aligned onto the ACC's weekdays: shifted[i] = shape[(i + 24 d) mod 8760], d = alignment_offset_days(). Exactly d days, either sign; the days that
     run off one end of the year wrap to the other. Example: a 2025 profile (1 Jan = Wednesday) gets d = -2, so its 1 Jan lands on ACC day 3, a Wednesday."""
     d = alignment_offset_days(represents_year, acc_year)
@@ -352,7 +379,8 @@ def shift_to_acc(shape: np.ndarray, represents_year: int, acc_year: int = ACC_CA
 
 def shift_for_year(shape: np.ndarray, target_year: int, represents_year: int) -> np.ndarray:
     """The shift every pricing path uses (engine.price_real_hourly, emissions, profile8760). `target_year` is accepted for the callers' signature and ignored:
-    the ACC's hourly data follows 2018's weekdays in every forecast year, so the correct shift does not depend on the year being priced (shift_to_acc)."""
+    the ACC's hourly data follow one calendar's weekdays in every forecast year (acc_calendar_year), so the correct shift does not depend on the year being
+    priced (shift_to_acc)."""
     return shift_to_acc(shape, represents_year)
 
 

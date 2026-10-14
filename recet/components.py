@@ -6,7 +6,7 @@ routes as the totals (the 8,760 hourly profile; gas monthly profile), so the col
   ElecValue_<component>   for every component column in the electric ACC (2024 ACC: energy, generation_capacity, avoided_as_procurement, losses,
                           methane_leakage, ghg_cap_and_trade, ghg_adder, ghg_portfolio_rebalancing, air_quality_adder, transmission, distribution;
                           2026 ACC: ghg_cap_and_invest instead of cap_and_trade / portfolio_rebalancing)
-  GasValue_<component>    market, td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder
+  GasValue_<component>    market, td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder (each one the loaded gas ACC has)
 
 Values are the discounted lifetime $ of TRC pricing, SIGNED, before the Ben / SupplyCost split:  sum(ElecValue_*) = ElecBen - ElecSupplyCost  and
 sum(GasValue_*) = GasBen - GasSupplyCost.  (The split books a negative value of a fuel-substitution measure as a supply cost; a single component of such a measure
@@ -37,8 +37,9 @@ def price_components(measures: pd.DataFrame, *, acc_version: int, base_year: int
                                        market_effects_bens=market_effects_bens, component=c)
         s = b.measure_year.groupby("measure_id")["annual_value"].sum() if len(b.measure_year) else pd.Series(dtype=float)
         out[f"ElecValue_{c}"] = s.reindex(out.index).fillna(0.0)
-    for i, c in enumerate(GAS_COMPONENTS, 1):
-        log(f"  gas component {i}/{len(GAS_COMPONENTS)}: {c}")
+    gas = gas_avoided_cost.available_components()          # the 2021/2022 Gas ACCs have no air quality adder: no column for it
+    for i, c in enumerate(gas, 1):
+        log(f"  gas component {i}/{len(gas)}: {c}")
         g, _n, _m = run_poc.run_gas_benefit(measures, cost_test="TRC", acc_version=acc_version, base_year=base_year,
                                             market_effects_bens=market_effects_bens, component=c)
         s = g.groupby("measure_id")["gas_benefit"].sum() if len(g) else pd.Series(dtype=float)

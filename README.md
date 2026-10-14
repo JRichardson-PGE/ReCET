@@ -4,7 +4,8 @@
 quarterly avoided costs, and runs the same cost tests as the CET (TRC, PAC, RIM, SCT Base/High, TSB). It started as the proof of concept in the CEDARS
 review research repository and was moved here on its own.
 
-It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`) on the **2024 ACC** (CET Version 2026) or the **2026 ACC** (final, v1b; CET Version 2027) and writes one row per
+It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`) on the **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
+2022 ACCs are TRC only) and writes one row per
 measure with every input column and every output, from a graphical interface or the command line.
 
 ## Install and run

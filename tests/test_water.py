@@ -27,8 +27,8 @@ def _run(tmp_path, **kw):
     return run_job(_cfg(tmp_path, **kw), log=lambda s: None).frame.iloc[0]
 
 
-RATE = discount_settings.get_discount_rate_qtr("PGE", versions.BUILTIN["2026"].cet_version)
-RATE_SCT = discount_settings.get_discount_rate_qtr_sct("PGE", versions.BUILTIN["2026"].cet_version)
+RATE = discount_settings.get_discount_rate_qtr("PGE", versions.BUILTIN["2026"].acc)
+RATE_SCT = discount_settings.get_discount_rate_qtr_sct("PGE", versions.BUILTIN["2026"].acc)
 
 
 def test_water_benefit_is_priced_on_the_gen_term_only(tmp_path):

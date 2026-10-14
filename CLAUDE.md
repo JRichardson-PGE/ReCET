@@ -13,7 +13,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
 - Pricing arithmetic exists twice: the grouped versions (`engine.price_real_hourly`, `price_gas_benefit`) and the per-measure references
   (`..._per_measure`). Change both; the tests compare them.
 - Reproduce CET's real behaviour unless a deliberate, documented exception says otherwise (e.g. SCB/SCH priced on the real SCT rows, not CET's TRC copy).
-- Large files are never in git: the two electric ACC parquets and the ~9 GB impact-profile library live in the *reference data folder*
+- Large files are never in git: the electric ACC parquets (2021, 2022, 2024, 2026) and the ~9 GB impact-profile library live in the *reference data folder*
   (`recet data status`, `RECET_DATA`, `~/.recet/config.json`). Small tables ship in `recet/data/`.
 - Research-only code does not belong here. On 2026-10-09 the first proof of concept's pieces (synthetic shapes and pricers, the first-generation ACC
   loaders, the TOU quarterly profiles, the research datasets, the old `run_poc` command line) moved to the research repo's `poc/research_lib`, and
@@ -21,3 +21,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
+- ACC versions are named by ACC year (2021, 2022, 2024, 2026) everywhere a user sees them, and run parameters / E3 tables are picked by ACC version. CET's own
+  version numbers (its "Version 2026" holds the 2024 ACC) appear only inside the packaged CET exports and are mapped on read (`versions.CET_VERSION_TO_ACC`).
+- Each ACC's hourly data follow one calendar's weekdays: 2018 for 2024/2026, 2020 for 2021/2022 (read from the file's hour stamps,
+  `real_impact_profiles.acc_calendar_year`). An ACC year always has 8,760 hours (the last day of a leap year is dropped); never add leap-day handling.
+- The 2021 and 2022 ACCs are TRC only: SCT columns are left blank. ReCET keeps its own behind-the-meter methane rule (Residential fuel-substitution
+  profiles only) on every vintage, although CET's Version 2024 adds it to all Residential gas and Version 2022 never does.

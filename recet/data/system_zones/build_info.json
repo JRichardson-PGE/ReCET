@@ -2,19 +2,37 @@
   "library_bytes": 8959269276,
   "deciding_cost_test": "TRC",
   "acc": {
+    "2021": {
+      "electric_bytes": 242635864,
+      "years": [
+        2020,
+        2050
+      ],
+      "calendar_year": 2020
+    },
+    "2022": {
+      "electric_bytes": 349616260,
+      "years": [
+        2022,
+        2052
+      ],
+      "calendar_year": 2020
+    },
     "2024": {
       "electric_bytes": 844174873,
       "years": [
         2024,
         2054
-      ]
+      ],
+      "calendar_year": 2018
     },
     "2026": {
       "electric_bytes": 828138741,
       "years": [
         2026,
         2055
-      ]
+      ],
+      "calendar_year": 2018
     }
   },
   "profiles": 20497

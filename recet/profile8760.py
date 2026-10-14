@@ -95,7 +95,7 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
                 acc[(y, key[1])] += wy[y] * shape
 
     df = pd.DataFrame({"hour_of_year": np.arange(1, HOURS + 1)})
-    df.insert(1, "datetime", pd.date_range(f"{real_impact_profiles.ACC_CALENDAR_YEAR}-01-01", periods=HOURS, freq="h"))
+    df.insert(1, "datetime", pd.date_range(f"{real_impact_profiles.acc_calendar_year()}-01-01", periods=HOURS, freq="h"))
     for y in years:
         df[f"net_kwh_{y}"] = sum(acc[(y, pa)] for pa in pas)
         for pa in pas:

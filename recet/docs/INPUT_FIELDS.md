@@ -165,9 +165,9 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `workbook` | Job workbook (.xlsx) | `--workbook` | none | An Excel job workbook (section 4.7) used instead of the separate files; each of its data sheets supplies the matching input. A file given separately wins over its sheet. |
 | `out_dir` | Output folder | `--out` | `recet_results` (GUI: `~/recet_results`) | Folder in which the run's folder is created. |
 | `run_name` | Run name | `--name` | a timestamp | Prefix of the run folder name. |
-| `acc_version` | Run against | `--acc` | `2024` | `2024` (2024 ACC, CET Version 2026), `2026` (2026 ACC, final v1b, Version 2027) or a new label defined by supplied ACC files. |
+| `acc_version` | Run against | `--acc` | `2024` | `2021`, `2022`, `2024` or `2026` (the ACC of that year; 2021 and 2022 are TRC only), or a new label defined by supplied ACC files. |
 | `acc_electric_file`, `acc_gas_file` | Electric ACC file, Gas ACC file | `--acc-electric-file`, `--acc-gas-file` | none | Supplied ACC file(s); replace the built-in file of `acc_version`, or define a new version. |
-| `e3_version` | Run-parameters version for a NEW ACC label | `--e3-version` | newest in the tables | Which version of the built-in run parameters and other E3 tables (discount rates, emissions, rate schedules) a *new* ACC label uses. Ignored for `2024` / `2026`. |
+| `settings_from` | Run parameters of ACC version (for a NEW ACC label) | `--settings-from` | `2026` | The ACC version whose built-in run parameters and other E3 tables (discount rates, emissions, rate schedules) a *new* ACC label uses. A built-in version uses its own unless this is set. Saved configurations from before 0.1.17 with `e3_version` (CET's numbering) are converted. |
 | `run_parameters_file` | Run parameters | `--run-parameters` | none | Run parameters per PA (section 4.5): a listed PA's discount rates, base year and gas CO2 replace the built-in values for this run. |
 | `programs_file` | Program metadata | `--programs` | none | Program metadata in the CEDARS Programs list layout (section 4.8): a `PrgID` replaces the built-in row, a new one is added. |
 | `sw_factors_file` | SW allocation factors | `--sw-factors` | none | Statewide allocation factors (section 4.6): a (`Year`, `ProgramID`) row replaces the built-in row, a new one is added. Used only with `allocate_statewide`. |
@@ -205,7 +205,7 @@ Templates for each: GUI **Template...** buttons or `recet template ...`. Matchin
 | `climate_zone` | `1`..`16`, `3A`, `3B`; `System` or `ALL` = every zone without its own rows | yes | The measure's `E3ClimateZone`. |
 | `hour_of_year` | integer 1-8760 | yes | The hour, exactly once per (profile, zone). Hour 1 is 00:00 on 1 January of `represents_year`. |
 | `impact` | fraction of the measure's annual net kWh | yes | The share of the year's savings that falls in the hour; each zone's 8,760 values should sum to 1 (a shape summing to about 0, i.e. pure load shifting, cannot be rescaled and is rejected). |
-| `represents_year` | calendar year | optional | The year whose weekdays the shape follows (same on every row of a profile); default 2009. The shape is rotated once onto the ACC's 2018 weekdays (C4.2). |
+| `represents_year` | calendar year | optional | The year whose weekdays the shape follows (same on every row of a profile); default 2009. The shape is rotated once onto the ACC's weekdays (2018 or 2020, C4.2). |
 
 ### 4.2 Gas monthly profiles (CSV or Parquet)
 
@@ -331,7 +331,7 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 
 | File (`recet/data/...`) | Columns used | Role |
 |---|---|---|
-| `E3Settings.csv` | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and E3 Version (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
+| `E3Settings.csv` | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
 | `e3_tables/e3_emissions.parquet` | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
 | `e3_tables/e3_combustion_type.parquet` | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
 | `e3_tables/e3_rate_schedule_elec.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |

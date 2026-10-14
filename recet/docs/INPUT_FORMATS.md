@@ -48,12 +48,13 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
 4. **TOU (H-factor) end uses are priced from 8,760s.** CEDARS has no hourly data for them; the library holds Gen-based 8,760s built from their H-factors on the ACC's
    own TOU map (a 2025 calendar), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
    replaces the library's.
-5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are keyed by CET *Version*. The 2026 ACC runs on Version 2027, which is
-   identical to 2026; a new ACC label borrows a version you choose (default: the newest).
-6. **The 2026 ACC covers 2026-2055, the 2024 ACC 2024-2054.** Years outside an ACC's range are priced with its nearest year; the preflight counts the measures affected.
+5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are picked by ACC version (C3.3); a new ACC label borrows the tables of an
+   ACC version you choose (default: the newest built-in).
+6. **Years covered:** 2021 ACC 2020-2050, 2022 ACC 2022-2052, 2024 ACC 2024-2054, 2026 ACC 2026-2055 (gas: 2020-2050, 2022-2052, 2024-2054, 2026-2055). The 2021 and
+   2022 ACCs are TRC only (C3.4) and use the 2020 hourly calendar (C4.2). Years outside an ACC's range are priced with its nearest year; the preflight counts the measures affected.
 7. **SCG electric** has no ACC of its own. In each zone SCG is priced entirely by one utility: SCE where the ACC has SCE data for the zone, otherwise PG&E (on the
    built-in ACCs, PG&E in CZ 1, 2, 3A, 3B, 4, 5, 11, 12). Generation, T&D and emission rate always come from the same utility. CET's quarterly SCG table is not used.
-8. **Bill impacts / RIM** use the E3 rate schedules chosen by (PA, `E3TargetSector`); the 2026 ACC uses the same rate tables as the 2024 ACC (Version 2027 = 2026).
+8. **Bill impacts / RIM** use the E3 rate schedules chosen by (PA, `E3TargetSector`); the 2026 ACC uses the same rate tables as the 2024 ACC.
 9. **Market Effects** is one option: 5% on benefits (`NTGR + 0.05`) and on costs (CET's `MECost`) together. It has not been checked against a CET run made
    with a non-zero setting.
 
@@ -80,7 +81,7 @@ CSV or Parquet, **long format**, one row per (profile, climate zone, hour):
   lowest total avoided cost over the ACC (CALCULATIONS C4.4); a file's own `System` rows are not used for it.
 * **Sum:** within 0.1% of 1 the values are used as given; otherwise they are rescaled to sum to 1 and the run says so (`--no-normalize-profiles` makes it an error).
   A shape that sums to ~0 (pure load shifting) cannot be rescaled and is rejected - give it as a share of a non-zero annual total.
-* **Calendar:** like the library, the shape is rotated once from `represents_year`'s weekdays onto the ACC's (2018's), the short way round (at most 3 days).
+* **Calendar:** like the library, the shape is rotated once from `represents_year`'s weekdays onto the ACC's (2018 or 2020), the short way round (at most 3 days).
 * **Start from an existing profile:** `recet template export-profile --end-use "..." --pa PGE --sector Residential --out shape.csv` writes the library profile for editing.
 
 Every measure's output row says where its shape came from in `ProfileSource` (`user profile`, `library`, `library (sector-loose match)`,
