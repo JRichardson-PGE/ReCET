@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1>Users</h1>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if link %}
+<div class="card ok-card">
+  <p><strong>Setup link for {{ link_for }}</strong> (works once, for {{ link_hours }} hours). Send it to them yourself; it is not shown again.</p>
+  <p><input type="text" readonly value="{{ link }}" class="copy" id="setup-link"> <button type="button" data-copy="setup-link">Copy</button></p>
+</div>
+{% endif %}
+<section class="card">
+  <h2>Add a person</h2>
+  <form method="post" action="{{ u('/admin/users') }}" class="row-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Email <input type="email" name="email" required></label>
+    <label>Name <input type="text" name="name"></label>
+    <label>Role <select name="role"><option value="user">user</option><option value="admin">admin</option></select></label>
+    <button class="primary">Add and make a setup link</button>
+  </form>
+</section>
+<table class="list">
+  <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Runs</th><th></th></tr></thead>
+  <tbody>
+  {% for x in users %}
+  <tr class="{% if x.disabled %}dim{% endif %}">
+    <td>{{ x.email }}</td><td>{{ x.name }}</td><td>{{ x.role }}</td>
+    <td>{% if x.disabled %}disabled{% elif not x.password_hash %}waiting for setup{% else %}active{% endif %}</td>
+    <td class="nowrap">{{ fmt_time(x.last_login) }}</td><td>{{ x.n_runs }}</td>
+    <td class="actions-cell">
+      <form method="post" action="{{ u('/admin/users/' ~ x.id ~ '/reset') }}" class="confirm" data-confirm="Make a new setup link for {{ x.email }}? Their current password stops working."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">New setup link</button></form>
+      <form method="post" action="{{ u('/admin/users/' ~ x.id ~ '/role') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="role" value="{{ 'user' if x.role == 'admin' else 'admin' }}"><button class="link">Make {{ 'user' if x.role == 'admin' else 'admin' }}</button></form>
+      {% if x.disabled %}
+      <form method="post" action="{{ u('/admin/users/' ~ x.id ~ '/enable') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Enable</button></form>
+      {% else %}
+      <form method="post" action="{{ u('/admin/users/' ~ x.id ~ '/disable') }}" class="confirm" data-confirm="Disable {{ x.email }}? They are signed out at once."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">Disable</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}
