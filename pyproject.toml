@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "recet"
 dynamic = ["version"]
 description = "ReCET, the rebuilt CEDARS Cost Effectiveness Tool: price CET-format inputs hour by hour on the 2024 or draft 2026 ACC, with a graphical interface"
-readme = "PACKAGE_README.md"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.26",
@@ -18,11 +18,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "httpx>=0.27"]
+# the web app (jakemoto.com/ReCET): pip install ".[web]"
+web = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.18",
+    "argon2-cffi>=23.1",
+    "markdown>=3.6",
+]
 excel = ["openpyxl>=3.1"]
 
 [project.scripts]
 recet = "recet.cli:main"
+recet-web = "recet.web.cli:main"
 
 [project.gui-scripts]
 recet-gui = "recet.gui:launch"
@@ -34,7 +44,7 @@ version = { attr = "recet.__version__" }
 include = ["recet*"]
 
 [tool.setuptools.package-data]
-recet = ["data/**/*", "docs/*.md"]
+recet = ["data/**/*", "docs/*.md", "web/templates/*.html", "web/static/*", "web/static/vendor/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
