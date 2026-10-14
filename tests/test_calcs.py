@@ -17,7 +17,9 @@ from recet import templates, versions
 from recet.jobs import RunConfig, run_job
 from recet.pipeline.engine import price_bill_impact
 
-E3_VERSION = versions.BUILTIN["2026"].cet_version           # the 2026 ACC runs on E3 tables Version 2027
+E3_VERSION = 2027   # the raw CET export rows (Version 2027) the 2026 ACC's settings come from; reference_calc reads them directly, so this also checks
+                    # the tool's ACC -> CET version mapping
+assert versions.CET_VERSION_TO_ACC[E3_VERSION] == versions.BUILTIN["2026"].acc
 YEARS = (2028, 2029)                                           # shorter than the longest measure life on purpose: later years use the last one
 I = np.arange(8760)
 HOD, DOY = I % 24, I // 24

@@ -198,11 +198,15 @@ def test_gas_component_index_matches_the_row_filter_it_replaced():
 
 
 def test_discount_settings_lookups_are_cached_but_safe():
-    s = discount_settings.get_settings("PGE", 2027)
+    s = discount_settings.get_settings("PGE", 2026)                                 # keyed by ACC version (the 2026 ACC = CET Version 2027)
     s["discount_rate_qtr"] = 99.0                                                   # a caller changing its copy...
-    assert discount_settings.get_settings("PGE", 2027)["discount_rate_qtr"] == pytest.approx(0.01915)   # ...does not change the next call's
-    assert discount_settings.get_co2_gas("PGE", 2027) == pytest.approx(0.00531)
-    assert discount_settings.get_co2_gas("pge", 2027) == discount_settings.get_co2_gas("PGE", 2027)
+    assert discount_settings.get_settings("PGE", 2026)["discount_rate_qtr"] == pytest.approx(0.01915)   # ...does not change the next call's
+    assert discount_settings.get_co2_gas("PGE", 2026) == pytest.approx(0.00531)
+    assert discount_settings.get_co2_gas("pge", 2026) == discount_settings.get_co2_gas("PGE", 2026)
+    assert discount_settings.get_settings("PGE", 2022)["settings_base_year"] == 2022   # CET Version 2024
+    assert discount_settings.get_settings("PGE", 2021)["settings_base_year"] == 2021   # CET Version 2022
+    with pytest.raises(KeyError):
+        discount_settings.get_settings("PGE", 2027)                                 # no 2027 ACC
     with pytest.raises(KeyError):
         discount_settings.get_settings("PGE", 1999)
 

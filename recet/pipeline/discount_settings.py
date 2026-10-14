@@ -48,7 +48,7 @@ import pandas as pd
 
 # The full dbo.E3Settings export (every ACC Version 2013-2027, one row per PA), supplied by Jake 2026-09-20. It replaces the earlier 20-row
 # avoided_cost_settings.csv, which had no Version 2027 (the 2026 ACC's version, AvoidedCostVersion 5/25/2026).
-from .. import paths
+from .. import paths, versions
 SETTINGS_CSV = paths.package_data("E3Settings.csv")
 
 PA_ALIASES = {"PGE": "PGE", "SCE": "SCE", "SCG": "SCG", "SDGE": "SDGE"}
@@ -62,16 +62,20 @@ def is_available() -> bool:
 def _table() -> pd.DataFrame:
     df = pd.read_csv(SETTINGS_CSV)
     df["PA"] = df["PA"].str.strip()
-    df = df.rename(columns={"Version": "ACC Version"})          # the callers below use the older column name
-    return df.drop_duplicates(subset=["PA", "ACC Version"], keep="first").reset_index(drop=True)   # SJCE 2022 appears twice in the export
+    # The export's Version column is CET's numbering; rows are looked up by the ACC each version holds (versions.CET_VERSION_TO_ACC). Unmapped versions
+    # (2013, 2017) are dropped.
+    df = df.rename(columns={"Version": "CETVersion"})
+    df["ACC"] = df["CETVersion"].map(versions.acc_of_cet_version)
+    df = df[df["ACC"].notna()].astype({"ACC": int})
+    return df.drop_duplicates(subset=["PA", "ACC"], keep="first").reset_index(drop=True)   # SJCE 2022 appears twice in the export
 
 
 def known_versions() -> list[int]:
-    """ACC versions that have settings rows (2013-2027)."""
-    return sorted(int(v) for v in _table()["ACC Version"].unique())
+    """ACC versions that have settings rows (the 2017-2026 ACCs)."""
+    return sorted(int(v) for v in _table()["ACC"].unique())
 
 
-def get_settings(pa: str, acc_version: int = 2026) -> dict:
+def get_settings(pa: str, acc_version: int = 2024) -> dict:
     """Returns the real E3Settings row for (pa, acc_version) as a dict:
     discount_rate_annual, discount_rate_qtr (and the _sct variants, unused
     here but kept for completeness -- Jake confirmed SCT uses a DIFFERENT,
@@ -102,18 +106,18 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
     """(the settings dict, CO2Gas) of one (PA, Version) row, looked up in the table once (callers ask per measure, and a pandas filter per call dominated the
     emissions time). A user-supplied run-parameters row for the PA wins; its blank BaseYear takes the built-in value for this version."""
     table = _table()
-    row = table[(table["PA"] == pa_key) & (table["ACC Version"] == acc_version)]
+    row = table[(table["PA"] == pa_key) & (table["ACC"] == acc_version)]
     if _USER is not None and pa_key in _USER.index:
         u = _USER.loc[pa_key]
         base = u["BaseYear"]
         if pd.isna(base):
-            same_version = table[table["ACC Version"] == acc_version]
+            same_version = table[table["ACC"] == acc_version]
             if not row.empty:
                 base = row.iloc[0]["BaseYear"]
             elif not same_version.empty:
                 base = same_version["BaseYear"].mode().iloc[0]
             else:
-                raise KeyError(f"run parameters for PA={pa_key!r} give no BaseYear and E3 version {acc_version} has no built-in rows to take it from")
+                raise KeyError(f"run parameters for PA={pa_key!r} give no BaseYear and the {acc_version} ACC has no built-in rows to take it from")
         return ({
             "discount_rate_annual": float(u["DiscountRateAnnual"]),
             "discount_rate_qtr": float(u["DiscountRateQtr"]),
@@ -122,7 +126,7 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
             "settings_base_year": int(base),
         }, float(u["CO2Gas"]))
     if row.empty:
-        raise KeyError(f"No run parameters (E3Settings) for PA={pa_key!r}, version={acc_version!r}: supply them in a run-parameters file")
+        raise KeyError(f"No run parameters (E3Settings) for PA={pa_key!r}, ACC version {acc_version!r}: supply them in a run-parameters file")
     row = row.iloc[0]
     return ({
         "discount_rate_annual": float(row["DiscountRateAnnual"]),
@@ -133,7 +137,7 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
     }, float(row["CO2Gas"]))
 
 
-def get_discount_rate_qtr(pa: str, acc_version: int = 2026) -> float:
+def get_discount_rate_qtr(pa: str, acc_version: int = 2024) -> float:
     """SCG has no electric ACC (see real_avoided_cost_v2.PA_TO_IOU_LABEL) but
     DOES have its own real discount rate row here -- CET still discounts an
     SCG-territory electric measure's (SCE-fallback-priced) benefit stream at
@@ -143,7 +147,7 @@ def get_discount_rate_qtr(pa: str, acc_version: int = 2026) -> float:
     return get_settings(pa, acc_version)["discount_rate_qtr"]
 
 
-def get_discount_rate_annual(pa: str, acc_version: int = 2026) -> float:
+def get_discount_rate_annual(pa: str, acc_version: int = 2024) -> float:
     """Annual (not quarterly) discount rate -- for the few real CalcCE
     streams that discount annually instead of quarterly, e.g. the RIM
     test's bill-impact PV sum (engine.price_bill_impact; real retail rate
@@ -152,7 +156,7 @@ def get_discount_rate_annual(pa: str, acc_version: int = 2026) -> float:
     return get_settings(pa, acc_version)["discount_rate_annual"]
 
 
-def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2026) -> float:
+def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2024) -> float:
     """The SEPARATE, real SOCIETAL quarterly discount rate (`Rqf_SCT` in
     the real SQL) -- used for the societal cost tests (SCB/SCH), confirmed
     genuinely lower than the primary TRC/PAC/RIM rate `get_discount_rate_
@@ -163,7 +167,7 @@ def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2026) -> float:
     return get_settings(pa, acc_version)["discount_rate_qtr_sct"]
 
 
-def get_co2_gas(pa: str, acc_version: int = 2026) -> float:
+def get_co2_gas(pa: str, acc_version: int = 2024) -> float:
     """`E3Settings.CO2Gas` (Settingsvw.CO2Gas): metric tons CO2 per therm of gas
     saved, used by CalcEmissions for NetGasCO2/GrossGasCO2. 0.00531 for
     Version 2026 (older versions differ, e.g. 0.00585 for 2020)."""

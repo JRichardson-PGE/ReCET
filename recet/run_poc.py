@@ -87,7 +87,7 @@ def _apply_market_effects_gas(measures: pd.DataFrame, meb: float) -> pd.DataFram
     return m
 
 
-def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2026,
+def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024,
                      base_year: int | None = None,
                      discount_rate_fn=discount_settings.get_discount_rate_qtr,
                      market_effects_bens: float = 0.0, component: str | None = None,
@@ -190,7 +190,7 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     return batched
 
 
-def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2026, base_year: int | None = None,
+def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024, base_year: int | None = None,
                      scc: str = "", discount_rate_fn=discount_settings.get_discount_rate_qtr,
                      market_effects_bens: float = 0.0, component: str | None = None):
     """
@@ -253,7 +253,7 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     return result, n_gas_measures, n_matched_shape
 
 
-def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2026):
+def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2024):
     """
     Wires up the real CET retail rate schedules (pipeline/rate_schedules.py)
     for the RIM test's bill-impact columns -- see engine.price_bill_impact's
@@ -293,7 +293,7 @@ def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2026):
                              settings_base_year=discount_settings.get_settings("PGE", acc_version)["settings_base_year"])
 
 
-def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2026, base_year: int | None = None,
+def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                           discount_rate_fn=discount_settings.get_discount_rate_qtr, market_effects_cost: float = 0.0):
     """Wires up engine.price_participant_cost -- see its docstring for the
     full mechanics and documented scope limits (no ProgramCost.csv, no
@@ -334,7 +334,7 @@ def _split_ben_supply(value: pd.Series, is_fuel_sub: pd.Series) -> tuple[pd.Seri
     return ben, supply
 
 
-def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2026, base_year: int | None = None,
+def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024, base_year: int | None = None,
                      discount_rate_fn=discount_settings.get_discount_rate_qtr, market_effects_bens: float = 0.0):
     """Lifetime PV of the WATER ENERGY of every measure that has any (UnitkWhIOUWater1st/2ndBaseline != 0): the IOU-supplied energy embedded in the water a measure
     saves (positive) or uses (negative), priced exactly like the electric benefit but with kWhWater1/2 in place of kWh1/2 and the Gen term only (CalcCE's
@@ -359,7 +359,7 @@ def _split_water(value: pd.Series, kwh_water_1st: pd.Series) -> tuple[pd.Series,
     return value.where(kwh_water_1st > 0, 0.0), (-value).where(kwh_water_1st < 0, 0.0)
 
 
-def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2026, base_year: int | None = None,
+def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                            market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
     """
     Wires up TRCCost/PACCost/TRCRatio/PACRatio (and the ElecBen/
@@ -477,7 +477,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2026, base
                "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
 
 
-def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2026, base_year: int | None = None,
+def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                                     market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
     """
     Wires up SCBCost/SCHCost/SCBRatio/SCHRatio (the societal cost tests --
@@ -632,7 +632,7 @@ def first_year_net_savings(measures: pd.DataFrame, market_effects_bens: float = 
 
 
 def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFrame | None = None,
-                                acc_version: int = 2026, base_year: int | None = None,
+                                acc_version: int = 2024, base_year: int | None = None,
                                 market_effects_bens: float = 0.0, market_effects_cost: float = 0.0, include_societal: bool = True):
     """
     market_effects_bens / market_effects_cost: CET's run-level Market Effects (MarketEffectBens / MarketEffectCost, 0 or 0.05). Benefits use

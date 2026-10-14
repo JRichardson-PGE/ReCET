@@ -58,8 +58,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from .. import paths
+from .. import paths, versions
 DATA_DIR = paths.package_data("e3_tables")
+
+
+def _read(name: str) -> pd.DataFrame:
+    """One CET rate-schedule export with its Version column (CET's numbering) replaced by the ACC that version holds (versions.CET_VERSION_TO_ACC); rows of
+    unmapped versions (2013, 2017) are dropped. The rest of this module keys on that ACC year, still under the column name "Version"."""
+    df = pd.read_parquet(DATA_DIR / name)
+    df["Version"] = df["Version"].map(versions.acc_of_cet_version)
+    return df[df["Version"].notna()].astype({"Version": int}).reset_index(drop=True)
 
 _FILES = [
     "e3_rate_schedule_elec.parquet",
@@ -75,22 +83,22 @@ def is_available() -> bool:
 
 @lru_cache(maxsize=1)
 def _elec_rates() -> pd.DataFrame:
-    return pd.read_parquet(DATA_DIR / "e3_rate_schedule_elec.parquet")
+    return _read("e3_rate_schedule_elec.parquet")
 
 
 @lru_cache(maxsize=1)
 def _elec_mapping() -> pd.DataFrame:
-    return pd.read_parquet(DATA_DIR / "e3_rate_schedule_elec_mapping.parquet")
+    return _read("e3_rate_schedule_elec_mapping.parquet")
 
 
 @lru_cache(maxsize=1)
 def _gas_rates() -> pd.DataFrame:
-    return pd.read_parquet(DATA_DIR / "e3_rate_schedule_gas.parquet")
+    return _read("e3_rate_schedule_gas.parquet")
 
 
 @lru_cache(maxsize=1)
 def _gas_mapping() -> pd.DataFrame:
-    return pd.read_parquet(DATA_DIR / "e3_rate_schedule_gas_mapping.parquet")
+    return _read("e3_rate_schedule_gas_mapping.parquet")
 
 
 @lru_cache(maxsize=1)

@@ -47,17 +47,22 @@ def make_measure_csv(path, **overrides):
     return path
 
 
-def make_electric_acc(path, energy=60.0, ghg=40.0, years=(2027, 2028, 2029), transmission=0.0, distribution=0.0):
-    """A synthetic electric ACC ($/MWh): PG&E CZ13 (and SCE CZ9, SDG&E CZ7 so every IOU is present), all three cost tests, constant in time."""
+def make_electric_acc(path, energy=60.0, ghg=40.0, years=(2027, 2028, 2029), transmission=0.0, distribution=0.0, tests=("TRC", "SCT Base", "SCT High"),
+                      calendar_year=None):
+    """A synthetic electric ACC ($/MWh): PG&E CZ13 (and SCE CZ9, SDG&E CZ7 so every IOU is present), the given cost tests (default all three), constant in
+    time. `calendar_year` adds the extraction's `datetime` hour stamps on that year's calendar (8,760 hours from 1 January)."""
     frames = []
     for iou, cz in (("PG&E", "CZ13"), ("SCE", "CZ9"), ("SDG&E", "CZ7")):
-        for test in ("TRC", "SCT Base", "SCT High"):
+        for test in tests:
             for y in years:
                 frames.append(pd.DataFrame({"iou": iou, "climate_zone": cz, "cost_test": test, "year": y, "hour_of_year": np.arange(1, 8761),
                                             "energy": energy, "ghg_adder": ghg, "generation_capacity": 0.0, "transmission": transmission, "distribution": distribution,
                                             "avoided_as_procurement": 0.0, "losses": 0.0, "methane_leakage": 0.0, "air_quality_adder": 0.0,
                                             "ghg_cap_and_invest": 0.0, "total_avoided_cost": energy + ghg + transmission + distribution, "emission_rate_tonnes_per_kwh": 0.0}))
-    pd.concat(frames, ignore_index=True).to_parquet(path, index=False)
+    df = pd.concat(frames, ignore_index=True)
+    if calendar_year is not None:
+        df["datetime"] = pd.Timestamp(f"{calendar_year}-01-01") + pd.to_timedelta(df["hour_of_year"] - 1, unit="h")
+    df.to_parquet(path, index=False)
     return path
 
 

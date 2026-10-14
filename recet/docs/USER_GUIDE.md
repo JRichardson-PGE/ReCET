@@ -91,7 +91,7 @@ A file box takes a typed or pasted path, or **Browse...**.
 
 | Control | What it does |
 |---|---|
-| **Run against** | Which avoided-cost version to price on. Choose **2024** (the 2024 ACC, CET Version 2026) or **2026** (the 2026 ACC, final v1b, CET Version 2027) from the list, or type a **new label** (one word, no spaces, e.g. `2030-draft`) and give its files in section 3. A built-in version's electric ACC comes from the reference data folder; its gas ACC ships in the package. Everything derived from the version - discount rates, emission factors, retail rates - follows it (C3.3). |
+| **Run against** | Which avoided-cost version to price on. Choose **2021**, **2022**, **2024** or **2026** (the ACC of that year; the 2021 and 2022 ACCs are TRC only, so their SCT columns stay blank) from the list, or type a **new label** (one word, no spaces, e.g. `2030-draft`) and give its files in section 3. A built-in version's electric ACC comes from the reference data folder; its gas ACC ships in the package. Everything derived from the version - discount rates, emission factors, retail rates - follows it (C3.3). |
 | **First Year (blank = earliest claim year)** | CET's *First Year*: the reference point of all discounting (C2.5). Blank uses the earliest `ClaimYearQuarter` year in the job. Set it to the value on the CET run you are matching - it is on the run form, not in the input files. A whole number such as `2028`. |
 
 ### 2b. Edit inputs tab: edit a small job cell by cell
@@ -136,7 +136,7 @@ Supplied files are validated before the run; a problem stops the run with the fi
 | **SW allocation factors** | Each IOU's share of each statewide program, by year. A (`Year`, `ProgramID`) row replaces the built-in one and a new row is added. Used only when **Allocate statewide programs** is ticked. **Template...** saves the whole built-in table. |
 | **Gas ACC file** | The same for gas monthly avoided costs. |
 | **Program metadata** | The CEDARS Programs list layout (PA, PrgID, name, status, segment, sectors, implementer, years, flags). A `PrgID` replaces the built-in row (CEDARS' list of 2026-10-03) and a new one is added. Each measure gets its program's row as `Prg_` columns, the summary gains one row per program segment, and the preflight reports unknown and closed programs. No priced value changes. **Template...** saves the whole built-in table. |
-| **Run-parameters version for a NEW ACC label** | Run parameters, emission factors and retail rates are keyed by CET's `Version`, and a brand-new ACC has no rows of its own. Type the existing Version to borrow (for example `2027`). Blank = the newest. Ignored for the built-in `2024` / `2026`. |
+| **Run parameters of ACC version (for a NEW ACC label)** | Run parameters, emission factors and retail rates are picked by ACC version, and a brand-new ACC has none of its own. Type the built-in ACC version to borrow (for example `2026`). Blank = the newest built-in. Ignored for the built-in versions, which use their own. |
 
 If you define a new version but supply only one fuel, the other fuel uses the newest built-in ACC, and the log says so.
 
@@ -155,7 +155,7 @@ The left box (**Modes**) holds the pricing switches; the right box (**Comparison
 | Control | What it does | Details |
 |---|---|---|
 | **Calculate ACC components separately** | Prices each component of the avoided cost (energy, capacity, T&D, GHG, ... and gas market, T&D, CO2, ...) on its own through the same route as the total, and adds an `ElecValue_<component>` / `GasValue_<component>` column for each. They always add up to `ElecBen - ElecSupplyCost` / `GasBen - GasSupplyCost`; the log reports the check and `components_summary_*` totals them over the portfolio. Costs about one extra pricing pass per component (10 or 11 electric depending on the ACC vintage, 7 gas). | C16.1 |
-| **Produce combined 8760 electric load profile** | Writes `portfolio_8760_*`: the portfolio's net kWh in each of the 8,760 hours, in total and by IOU. Uses each measure's own 8,760 aligned to the ACC's 2018 weekdays (the `datetime` column is on 2018); measures with no shape are listed in `portfolio_8760_unshaped_*`. Positive = savings, negative = added load; market effects are not included. | C16.2 |
+| **Produce combined 8760 electric load profile** | Writes `portfolio_8760_*`: the portfolio's net kWh in each of the 8,760 hours, in total and by IOU. Uses each measure's own 8,760 aligned to the ACC's weekdays (the `datetime` column is on the ACC's calendar, 2018 or 2020); measures with no shape are listed in `portfolio_8760_unshaped_*`. Positive = savings, negative = added load; market effects are not included. | C16.2 |
 | &nbsp;&nbsp;**Year(s)** | The calendar year(s) of the profile, separated by spaces or commas (`2028 2029 2030`). Blank = the First Year. One `net_kwh_<year>` column per year. Each year counts only the measures still in service that year, weighted by the fraction of the year (a Q3 claim delivers half of its first year). | |
 | **Apply 5% market effects (benefits and costs)** | Turns on CET's *Market Effects* for benefits and costs together (CET's `MEBens` and `MECost`). Benefits: the net-to-gross of electric, gas, water-energy, other benefits and tax credits becomes `NTG + 0.05` (and the emissions "Net" columns); the Gross columns divide by `NTG + 0.05` as well. Costs: `OtherCost` uses `NTGRkWh + 0.05` and the participant cost gains `0.05 x (GrossMeasCostPV + ExcessIncentivesPV)` (inside `NetParticipantCostPV`). The electric, gas and water supply costs follow the benefit side, as in CET. Off = 0% on both. **Not yet validated** against a CET run made with 5%. | C7, C8, C13 |
 | **Include societal cost tests (SCB / SCH)** | On by default. Prices the societal Base and High tests: two more complete pricing passes on the `SCT` rows at the societal discount rate. Turn it off for a run about three times faster; every `_SB` / `_SH` / `SCB...` / `SCH...` column is then blank. | C5.6, C12 |
@@ -211,7 +211,7 @@ off until you load one version's run folder.
    point the pricing at these files. No CET-derived table is read.
 2. **Preflight.** Read `Measure.csv` (and `ProgramCost.csv`), report format problems and what will be priced, write `preflight.txt`. A blocking problem stops the run here; *Preflight only* stops here either way.
 3. **Load.** Derive the `poc_*` pricing fields (C1); with statewide allocation, split the statewide programs first.
-4. **Price.** Electric (every measure on its 8,760 profile, aligned once to the ACC's 2018 weekdays), gas and water energy for the TRC rows, then for `SCT Base` and `SCT High`; participant costs; bill impacts; other benefits and costs; program costs; the cost tests and ratios (C5-C12). Then emissions.
+4. **Price.** Electric (every measure on its 8,760 profile, aligned once to the ACC's weekdays), gas and water energy for the TRC rows, then for `SCT Base` and `SCT High` when the ACC has them; participant costs; bill impacts; other benefits and costs; program costs; the cost tests and ratios (C5-C12). Then emissions.
 5. **Components** (if on), then **assemble and write** the measure-level table, the portfolio summary and any optional files; **combined 8760 profile** and **CET comparison** if requested.
 6. **Record.** `run_settings.json` lists the exact settings, files and timings.
 
@@ -225,7 +225,7 @@ off until you load one version's run folder.
 
 **Replace an 8,760 profile.** *Templates > Export a library 8,760 profile to edit...*, edit the `impact` column (each zone must still sum to 1), choose the file under *8,760 electric profiles*. Measures matching that (end use, IOU, sector) now report `ProfileSource = user profile`.
 
-**Try a new ACC.** Type a new label under *Run against*, supply the electric and/or gas ACC file (use the **Template...** buttons for the layout), and name an existing E3 Version to borrow. Run a Preflight first: it reports the ACC's year range and how many measures run past it.
+**Try a new ACC.** Type a new label under *Run against*, supply the electric and/or gas ACC file (use the **Template...** buttons for the layout), and name the built-in ACC version whose run parameters and E3 tables it borrows (default: the newest). Run a Preflight first: it reports the ACC's year range and how many measures run past it.
 
 **See what drives a value.** Tick *Calculate ACC components separately*; each `ElecValue_*` / `GasValue_*` column is the dollars from one component.
 
