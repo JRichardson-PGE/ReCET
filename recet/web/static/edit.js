@@ -70,19 +70,31 @@
   }
 
   // ------------------------------------------------------------------------------------------------------------ columns
-  function formatter(t, col, numeric) {
+  // colours a cell by its check result; touches only the cell's class and title, so an open editor in it survives
+  function markIssue(t, cell) {
+    var e = cell.getElement();
+    var issue = (st.issues[t][cell.getRow().getData()._rid] || {})[cell.getField()];
+    e.classList.remove("issue-error", "issue-warning", "issue-info");
+    if (issue) {
+      e.classList.add("issue-" + issue.severity);
+      e.title = issue.messages.join("\n");
+    } else {
+      e.removeAttribute("title");
+    }
+  }
+
+  function formatter(t, col, numeric, list) {
     return function (cell) {
-      var e = cell.getElement();
-      var issue = (st.issues[t][cell.getRow().getData()._rid] || {})[col];
-      e.classList.remove("issue-error", "issue-warning", "issue-info");
-      if (issue) {
-        e.classList.add("issue-" + issue.severity);
-        e.title = issue.messages.join("\n");
-      } else {
-        e.removeAttribute("title");
-      }
-      var v = cell.getValue();
-      return el("span", null, numeric ? displayNumber(v) : (v == null ? "" : String(v)));
+      markIssue(t, cell);
+      var v = cell.getValue(), text = numeric ? displayNumber(v) : (v == null ? "" : String(v));
+      if (!list) return el("span", null, text);
+      // a value-list column shows an arrow, like a dropdown, so it reads as "pick from a list"
+      var w = el("span", "list-cell");
+      w.appendChild(el("span", "list-val", text));
+      var a = el("span", "list-arrow", "\u25BE");
+      a.setAttribute("aria-hidden", "true");
+      w.appendChild(a);
+      return w;
     };
   }
 
@@ -99,12 +111,13 @@
   function columnDefs(t) {
     var L = st.layout[t], noEffect = new Set(L.no_effect), numeric = new Set(L.numeric);
     return L.pinned.concat(L.scroll).map(function (col) {
+      var endUse = t === "Measure" && col === "E3MeaElecEndUseShape", list = endUse || !!(st.choices[t] || {})[col];
       var d = {
         title: col, field: col, frozen: L.pinned.indexOf(col) >= 0, cssClass: noEffect.has(col) ? "noeff" : "calc",
-        headerTooltip: L.tooltips[col] || "", formatter: formatter(t, col, numeric.has(col)), hozAlign: numeric.has(col) ? "right" : "left",
-        width: WIDTHS[col] || Math.min(240, Math.max(84, col.length * 7 + 26)), editor: "input"
+        headerTooltip: L.tooltips[col] || "", formatter: formatter(t, col, numeric.has(col), list), hozAlign: numeric.has(col) ? "right" : "left",
+        width: WIDTHS[col] || Math.min(240, Math.max(84, col.length * 7 + 26)), editor: "input", editorParams: { selectContents: true }
       };
-      if (t === "Measure" && col === "E3MeaElecEndUseShape") {
+      if (endUse) {
         d.editor = "list";
         d.editorParams = { valuesLookup: endUseLookup, autocomplete: true, freetext: true, allowEmpty: true, listOnEmpty: true, filterDelay: 150 };
       } else if ((st.choices[t] || {})[col]) {
@@ -133,7 +146,34 @@
     ["cellEdited", "clipboardPasted", "rowAdded", "rowDeleted", "historyUndo", "historyRedo", "dataChanged"].forEach(function (ev) {
       g.on(ev, function () { changed(t); });
     });
-    g.on("cellClick", function (_e, cell) { showHelp(t, cell.getField()); });
+    // A block pasted (Excel copy) while a cell's editor is open goes to the grid's paste, not into the one input.
+    g.element.addEventListener("paste", function (e) {
+      var text = e.clipboardData && e.clipboardData.getData("text/plain");
+      if (!text || e.target.tagName !== "INPUT" || !/[\t\n]/.test(text.replace(/\r?\n$/, ""))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var editing = g.element.querySelector(".tabulator-cell.tabulator-editing");
+      var cell = editing && g.getRows("active").reduce(function (hit, r) {
+        return hit || r.getCells().find(function (c) { return c.getElement() === editing; });
+      }, null);
+      if (cell) cell.cancelEdit();
+      var dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      g.element.querySelector(".tabulator-tableholder").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, true);
+    // One click opens the editor. Shift / Ctrl / Cmd clicks are left to the range selection, and a click inside a cell that is
+    // already being edited (placing the caret) is left alone. Double-click still works too. The edit waits a tick because the
+    // range selection moves focus to the grid on the same click, which would close an editor opened straight away.
+    g.on("cellClick", function (e, cell) {
+      var col = cell.getField(), elm = cell.getElement();
+      showHelp(t, col);
+      if (!col || e.shiftKey || e.ctrlKey || e.metaKey || elm.classList.contains("tabulator-editing")) return;
+      setTimeout(function () {
+        if (elm.classList.contains("tabulator-editing") || !elm.isConnected) return;
+        elm.focus({ preventScroll: true });
+        cell.edit();
+      }, 0);
+    });
     st.grids[t] = g;
   }
 
@@ -228,7 +268,7 @@
       var live = new Map(rowsOf(t).map(function (r) { return [String(r.getData()._rid), r]; }));   // rows deleted since the save have no row to redraw
       touched[t].forEach(function (rid) {
         var row = live.get(rid);
-        if (row) row.reformat();
+        if (row) row.getCells().forEach(function (c) { markIssue(t, c); });   // not reformat(): that would close an open editor
       });
     });
     renderIssues();
