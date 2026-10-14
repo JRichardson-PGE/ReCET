@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}New run{% endblock %}
+{% block content %}
+<h1>New run</h1>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{{ u('/runs') }}" enctype="multipart/form-data" class="run-form" id="run-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{% set f = form %}
+<section class="card">
+  <h2>Inputs</h2>
+  {% if draft %}
+  <input type="hidden" name="draft" value="{{ draft.id }}">
+  <p>Runs the edited tables of <strong>{{ draft.name }}</strong> (last saved {{ fmt_time(draft.updated_at) }}). <a href="{{ u('/edit?draft=' + draft.id) }}">Back to Edit inputs</a></p>
+  <p class="muted small">If the draft came from a job workbook, that workbook's other sheets (run parameters, profiles, programs ...) are used too, unless you upload a file for them below.</p>
+  {% else %}
+  <div class="radios" id="input-mode">
+    <label><input type="radio" name="input_mode" value="workbook" {% if f.get('input_mode', 'workbook') == 'workbook' %}checked{% endif %}> Job workbook (.xlsx)</label>
+    <label><input type="radio" name="input_mode" value="files" {% if f.get('input_mode') == 'files' %}checked{% endif %}> CET files (Measure.csv, ProgramCost.csv)</label>
+  </div>
+  <div class="mode-workbook">
+    <label class="file">Job workbook <input type="file" name="workbook" accept=".xlsx,.xlsm"></label>
+    <p class="muted small">Sheets: Measure (required), ProgramCost, and the optional RunParameters, SWAllocation, GasProfiles, Profiles8760 and Programs.</p>
+  </div>
+  <div class="mode-files">
+    <label class="file">Measure.csv <input type="file" name="measures" accept=".csv,.txt"></label>
+    <label class="file">ProgramCost.csv <span class="muted">(optional)</span> <input type="file" name="programcost" accept=".csv,.txt"></label>
+    <p class="muted small">CET's pipe-delimited format.</p>
+  </div>
+  {% endif %}
+  <details>
+    <summary>Optional supplied files</summary>
+    <p class="muted small">Each replaces the matching built-in rows for this run only. A file chosen here wins over the workbook's sheet.</p>
+    {% for k in ('profiles_8760', 'profiles_gas', 'run_parameters', 'sw_factors', 'programs', 'cet_outputs') %}
+    <label class="file">{{ uploads[k][2] }} <input type="file" name="{{ k }}" accept="{{ uploads[k][1]|join(',') }}"></label>
+    {% endfor %}
+  </details>
+  <p class="muted small">Up to {{ max_mb }} MB per file. Templates:
+    {% for k, t in templates_.items() %}<a href="{{ u('/templates/' + k) }}">{{ t[1] }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+</section>
+
+<section class="card">
+  <h2>Settings</h2>
+  <div class="grid2">
+    <label>ACC version
+      <select name="acc_version">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ a }} ACC</option>{% endfor %}</select></label>
+    <label>Compare with
+      <select name="compare_with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ a }} ACC</option>{% endfor %}</select></label>
+    <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
+    <label>Market effects
+      <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
+    <label>Output format
+      <select name="output_format">{% for o, t in (('csv', 'CSV'), ('xlsx', 'Excel (one file per table)'), ('parquet', 'Parquet')) %}<option value="{{ o }}" {% if f.get('output_format') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Name <span class="muted">(optional)</span> <input type="text" name="label" maxlength="120" value="{{ f.get('label', '') }}"></label>
+  </div>
+  {% set fresh = not f %}
+  <div class="checks">
+    <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about two thirds of the run time)</label>
+    <label><input type="checkbox" name="emissions" {% if fresh or f.get('emissions') %}checked{% endif %}> Emissions (CO2, NOx, PM10)</label>
+    <label><input type="checkbox" name="components" {% if f.get('components') %}checked{% endif %}> Price each ACC component separately</label>
+    <label><input type="checkbox" name="allocate_statewide" {% if f.get('allocate_statewide') %}checked{% endif %}> Split statewide (SW_) programs across the IOUs</label>
+    <label><input type="checkbox" name="apply_exclude_from_ce" {% if f.get('apply_exclude_from_ce') %}checked{% endif %}> Leave Exclude_From_CE programs out of the portfolio summary</label>
+    <label><input type="checkbox" name="portfolio_8760" {% if f.get('portfolio_8760') %}checked{% endif %}> Combined 8,760 electric load profile for years
+      <input type="text" name="profile_years" class="short" placeholder="First Year" value="{{ f.get('profile_years', '') }}"></label>
+    <label><input type="checkbox" name="preflight_only" {% if f.get('preflight_only') %}checked{% endif %}> Preflight only (check the inputs, price nothing)</label>
+  </div>
+</section>
+<p><button class="primary big">Start run</button> <span class="muted small">Runs go through a queue, one at a time.</span></p>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}
