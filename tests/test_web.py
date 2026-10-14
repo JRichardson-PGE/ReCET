@@ -356,6 +356,65 @@ def test_edit_inputs_of_a_finished_run_and_rerun(web, tmp_path):
     assert c.post(f"{P}/runs/{run_id}/edit", data={"csrf": csrf}).status_code == 400
 
 
+def test_validate_inputs_from_the_editor(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "v@example.com")
+    _user(ctx, "w@example.com")
+    c = _login(app, "v@example.com")
+    r = c.post(f"{P}/edit", data={"csrf": _csrf(c, f"{P}/edit"), "mode": "upload", "name": "check me"},
+               files={"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")})
+    draft = r.headers["location"].split("draft=")[1]
+    csrf = re.search(r'data-csrf="([^"]+)"', c.get(f"{P}/edit?draft={draft}").text).group(1)
+    d = c.get(f"{P}/edit/api/{draft}").json()
+    assert d["check"] is None and d["check_defaults"]["acc_version"] in d["check_defaults"]["acc_versions"]
+    body = {"rev": d["rev"], "acc_version": "2026", "allocate_statewide": False}
+    assert c.post(f"{P}/edit/api/{draft}/check", json=body).status_code == 400                       # no CSRF header
+    assert c.post(f"{P}/edit/api/{draft}/check", json={**body, "acc_version": "1999"}, headers={"X-CSRF-Token": csrf}).status_code == 400
+    assert c.post(f"{P}/edit/api/{draft}/check", json={**body, "rev": d["rev"] + 5}, headers={"X-CSRF-Token": csrf}).status_code == 409
+    # a full run already waiting: the check still goes first
+    full = _start_run(c, tmp_path)
+    r = c.post(f"{P}/edit/api/{draft}/check", json=body, headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200, r.text
+    chk = r.json()
+    assert chk["rev"] == d["rev"] and chk["status_url"].endswith(f"/runs/{chk['run']}/check")
+    assert ctx.runner.position(chk["run"]) == 1 and ctx.runner.position(full) == 2
+    st = c.get(chk["status_url"]).json()
+    assert st["status"] == "queued" and st["report"] is None
+    assert _login(app, "w@example.com").get(chk["status_url"]).status_code == 404                     # another user's check
+    assert ctx.runner.work_once()
+    assert ctx.db.one("SELECT status FROM runs WHERE id = ?", (full,))["status"] == "queued"
+    st = c.get(chk["status_url"]).json()
+    assert st["status"] == "finished", st
+    rep = st["report"]
+    assert rep["ok"] is True and rep["errors"] == 0 and isinstance(rep["issues"], list) and rep["stats"]
+    row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (chk["run"],))
+    assert row["preflight_only"] == 1 and row["label"] == "Input check: check me" and "Edited inputs: check me" in row["inputs"]
+    # the page remembers the latest check, with the revision it checked
+    d2 = c.get(f"{P}/edit/api/{draft}").json()
+    assert d2["check"]["run"] == chk["run"] and d2["check"]["rev"] == d["rev"]
+    # cell errors are reported without queueing anything
+    m = d2["tables"]["Measure"]
+    m["rows"][0][m["columns"].index("NumUnits")] = ""
+    saved = c.put(f"{P}/edit/api/{draft}", json={"rev": d2["rev"], "tables": {"Measure": m, "ProgramCost": d2["tables"]["ProgramCost"]}},
+                  headers={"X-CSRF-Token": csrf}).json()
+    n = ctx.db.one("SELECT COUNT(*) n FROM runs")["n"]
+    r = c.post(f"{P}/edit/api/{draft}/check", json={**body, "rev": saved["rev"]}, headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 400 and "NumUnits" in r.json()["error"] and "marked in red" in r.json()["error"]
+    assert ctx.db.one("SELECT COUNT(*) n FROM runs")["n"] == n
+    # the report names file rows; row_map turns them into grid rows (the blank grid row is not written to the file)
+    m["rows"][0][m["columns"].index("NumUnits")] = "1"
+    m["rows"][0][m["columns"].index("NTGRkWh")] = "2"
+    m["rows"].insert(0, [""] * len(m["columns"]))
+    saved = c.put(f"{P}/edit/api/{draft}", json={"rev": saved["rev"], "tables": {"Measure": m, "ProgramCost": d2["tables"]["ProgramCost"]}},
+                  headers={"X-CSRF-Token": csrf}).json()
+    chk = c.post(f"{P}/edit/api/{draft}/check", json={**body, "rev": saved["rev"]}, headers={"X-CSRF-Token": csrf}).json()
+    assert chk["row_map"] == {"Measure": [1], "ProgramCost": []}
+    assert ctx.runner.work_once()
+    rep = c.get(chk["status_url"]).json()["report"]
+    assert ["Measure", 0, "NTGRkWh"] in [cell for i in rep["issues"] if i["code"] == "outside_cet_range" for cell in i["cells"]]
+    assert c.get(f"{P}/edit/api/{draft}").json()["check"]["row_map"] == chk["row_map"]
+
+
 def test_drafts_are_private(web):
     app, ctx = web
     _user(ctx, "m@example.com")

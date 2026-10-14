@@ -13,7 +13,8 @@ deleted by the run queue's cleanup.
 
 Pages (forms carry the CSRF token): GET /edit (list, or the grid with ?draft=), POST /edit (new draft), POST /edit/{id}/delete, GET /edit/{id}/download.zip|.xlsx.
 A finished (or failed) run's inputs become a draft with POST /runs/{id}/edit (in app.py, through `draft_from_run`).
-JSON (X-CSRF-Token header on writes): GET /edit/api/{id}, PUT /edit/api/{id}, GET /edit/api/end-uses?iou=&sector=.
+JSON (X-CSRF-Token header on writes): GET /edit/api/{id}, PUT /edit/api/{id}, GET /edit/api/end-uses?iou=&sector=, and POST /edit/api/{id}/check
+(Validate inputs: queues a preflight-only run of the draft; the page polls GET /runs/{run}/check, and check.json in the draft folder names the latest one).
 """
 from __future__ import annotations
 
@@ -236,6 +237,51 @@ def draft_from_run(ctx, run, user) -> str:
     return draft_id
 
 
+def carry_supplied(ctx, draft_id: str, run_folder: Path, cfg: dict, labels: dict, keep) -> list[str]:
+    """Copy the earlier run's supplied files (a draft made from a run) into a new run's inputs and point `cfg` at them, except a field already given in
+    `cfg` (a file chosen again) or one `keep(field)` turns down. Returns the input-list lines for the copied files."""
+    names = []
+    for fld, name in (load_rerun(ctx, draft_id) or {}).get("supplied", {}).items():
+        src = supplied_path(ctx, draft_id, name)
+        if src is None or cfg.get(fld) or not keep(fld):
+            continue
+        dest = run_folder / "inputs" / f"carried_{name}"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        cfg[fld] = str(dest)
+        names.append(f"{labels.get(fld, fld)}: from the earlier run")
+    return names
+
+
+def given_files(cfg: dict) -> dict:
+    """The supplied files that win over the draft's workbook sheets (see editor.prepare_run_inputs)."""
+    return {f: cfg.get(f) for f in ("run_parameters_file", "sw_factors_file", "profiles_gas_file", "programs_file", "profiles_8760_file")}
+
+
+def check_defaults(ctx, draft_id: str) -> dict:
+    """The Validate inputs panel's starting options: the earlier run's (a draft made from a run), else the New run page's defaults."""
+    accs = list(ctx.s.acc_versions)
+    settings = (load_rerun(ctx, draft_id) or {}).get("settings", {})
+    acc = settings.get("acc_version") if settings.get("acc_version") in accs else accs[-1]
+    return {"acc_versions": accs, "acc_version": acc, "allocate_statewide": bool(settings.get("allocate_statewide"))}
+
+
+def last_check(ctx, draft_id: str) -> dict | None:
+    """The draft's latest Validate inputs check: {"run", "rev", "acc_version", "allocate_statewide", "row_map", "status_url", "run_url"}, while its run still
+    exists. row_map[table][i] is the grid row (position in the draft) of row i of the checked file."""
+    p = _folder(ctx, draft_id) / "check.json"
+    if not p.exists():
+        return None
+    try:
+        c = json.loads(p.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+    row = ctx.db.one("SELECT status FROM runs WHERE id = ?", (c.get("run", ""),))
+    if row is None or row["status"] == "expired":
+        return None
+    return {**c, "status_url": ctx.u(f"/runs/{c['run']}/check"), "run_url": ctx.u(f"/runs/{c['run']}")}
+
+
 def prepare_draft_run(ctx, draft, run_folder: Path, given: dict) -> tuple[str | None, dict]:
     """(problem, RunConfig updates) for running a draft. A problem (the cells that would stop the run) means no run."""
     _data, m, pc, base = load_draft(ctx, draft["id"])
@@ -373,6 +419,7 @@ def register(app, ctx) -> None:
                 "tables": {t: _table(frames[t]) for t in TABLES}, "layout": layout,
                 "choices": _column_choices(m, {t: list(frames[t].columns) for t in TABLES}),
                 "issues": _issues(m, pc), "profiles_note": c.catalog_note, "max_rows": editor.MAX_EDIT_ROWS,
+                "check": last_check(ctx, draft_id), "check_defaults": check_defaults(ctx, draft_id),
                 "new_measure": {"defaults": editor.NEW_MEASURE_DEFAULTS,
                                 "like": ["PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3GasSector", "Sector", "Version"]},
                 "new_programcost_like": ["PrgID", "PrgYear", "ClaimYearQuarter", "PA"]}
@@ -401,6 +448,65 @@ def register(app, ctx) -> None:
         issues = await run_in_threadpool(_issues, m, pc)
         ch = await run_in_threadpool(_column_choices, m, {"Measure": list(m.columns), "ProgramCost": list(pc.columns)})
         return {"rev": rev + 1, "issues": issues, "choices": ch, "saved_at": time.time()}
+
+    @app.post("/edit/api/{draft_id}/check")
+    async def check_draft(request: Request, draft_id: str):
+        """Validate inputs: queue a preflight-only run of the saved draft (the full check a run makes before pricing: profiles, programs, ACC years ...)
+        with the earlier run's supplied files and settings (a draft made from a run), and the ACC and statewide option chosen on the page. The queue runs
+        input checks before full runs. Poll GET /runs/{id}/check for the result."""
+        from .app import UPLOADS, new_run_id
+        u, row = _draft_for(ctx, request, draft_id)
+        need_api_csrf(request)
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except ValueError:
+            raise HTTPException(400, "not JSON")
+        if not isinstance(body, dict):
+            raise HTTPException(400, "not JSON")
+        acc = str(body.get("acc_version", ""))
+        if acc not in s.acc_versions:
+            return JSONResponse({"error": "Choose an ACC version."}, status_code=400)
+        settings = (load_rerun(ctx, draft_id) or {}).get("settings", {})
+        cfg: dict = {"acc_version": acc, "preflight_only": True, "allocate_statewide": bool(body.get("allocate_statewide")),
+                     "apply_exclude_from_ce": bool(settings.get("apply_exclude_from_ce"))}
+        by = str(settings.get("base_year") or "")
+        if by.isdigit():
+            cfg["base_year"] = int(by)
+        labels = {fld: label for fld, _ext, label in UPLOADS.values()}
+        run_id = new_run_id()
+        folder = ctx.runner.folder(run_id)
+
+        def prepare():
+            # under the draft's lock, so a save cannot land between the revision check and the copy of the tables
+            with _draft_lock(draft_id):
+                data, m, pc, _base = load_draft(ctx, draft_id)
+                rev = int(data.get("rev", 1))
+                if body.get("rev") is not None and int(body["rev"]) != rev:
+                    return rev, "This draft changed since the page saved it. Reload the page and try again.", 409, [], {}
+                names = carry_supplied(ctx, draft_id, folder, cfg, labels, lambda fld: fld != "cet_outputs")
+                problem, updates = prepare_draft_run(ctx, row, folder, given_files(cfg))
+                if problem:                                           # cell problems: the page already marks those cells in red
+                    return rev, problem.replace("Fix them on the Edit inputs page.", "They are marked in red in the table."), 400, [], {}
+                cfg.update(updates)
+                # the report's row numbers are rows of the written files, which leave out blank rows: the grid rows they came from
+                row_map = {"Measure": editor.kept_rows(m), "ProgramCost": editor.kept_rows(pc)}
+                return rev, None, 200, [f"Edited inputs: {row['name']}"] + names, row_map
+
+        try:
+            rev, problem, code, names, row_map = await run_in_threadpool(prepare)
+        except Exception as exc:
+            shutil.rmtree(folder, ignore_errors=True)
+            return JSONResponse({"error": f"Could not prepare the check: {exc}"}, status_code=400)
+        if problem:
+            shutil.rmtree(folder, ignore_errors=True)
+            return JSONResponse({"error": problem}, status_code=code)
+        prev = last_check(ctx, draft_id)                                  # a check of an older version still waiting: drop it
+        if prev and ctx.runner.position(prev["run"]) is not None:
+            ctx.runner.cancel(prev["run"])
+        ctx.queue_run(request, u, run_id, cfg, f"Input check: {row['name']}"[:120], names)
+        check = {"run": run_id, "rev": rev, "acc_version": acc, "allocate_statewide": cfg["allocate_statewide"], "row_map": row_map}
+        (_folder(ctx, draft_id) / "check.json").write_text(json.dumps(check), encoding="utf-8")
+        return {**check, "status_url": ctx.u(f"/runs/{run_id}/check"), "run_url": ctx.u(f"/runs/{run_id}")}
 
 
 _locks: dict[str, threading.Lock] = {}

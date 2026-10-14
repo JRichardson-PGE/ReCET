@@ -20,6 +20,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from . import paths, preflight, templates
@@ -321,6 +322,14 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     """Drop rows that are entirely blank (an empty row left in the grid) and strip stray whitespace around every value."""
     df = df.fillna("").astype(str).apply(lambda s: s.str.strip())
     return df[(df != "").any(axis=1)].reset_index(drop=True)
+
+
+def kept_rows(df: pd.DataFrame | None) -> list[int]:
+    """The positions of the rows write_cet_files keeps (all but the entirely blank ones): row i of the written file is row kept_rows(df)[i] of `df`."""
+    if df is None or df.empty:
+        return []
+    df = df.fillna("").astype(str).apply(lambda s: s.str.strip())
+    return [int(i) for i in np.flatnonzero((df != "").any(axis=1).to_numpy())]
 
 
 def write_cet_files(measures: pd.DataFrame, programcost: pd.DataFrame | None, folder: str | Path) -> dict[str, Path | None]:
