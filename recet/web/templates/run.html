@@ -11,6 +11,7 @@
 <p class="small">{{ run.inputs }}</p>
 <p id="run-position" class="muted">{% if position %}Waiting in the queue: number {{ position }}.{% endif %}</p>
 <p id="run-message" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
 
 <div class="actions">
   {% if run.status in ('queued', 'running') %}
@@ -18,6 +19,10 @@
   {% endif %}
   <a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>
   {% if run.result_dir %}<a class="button" href="{{ u('/runs/' + run.id + '/zip') }}">Download everything (.zip)</a>{% endif %}
+  {% if has_inputs %}
+  <form method="post" action="{{ u('/runs/' + run.id + '/edit') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button title="Opens this run's inputs in Edit inputs as a new draft, with this run's settings, to change and run again">Edit inputs and rerun</button></form>
+  <a class="button" href="{{ u('/runs/' + run.id + '/inputs.zip') }}">Download inputs (.zip)</a>
+  {% endif %}
   {% if run.status not in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/delete') }}" class="confirm" data-confirm="Delete this run and its files?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Delete</button></form>
   {% endif %}
