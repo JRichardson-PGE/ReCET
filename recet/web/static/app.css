@@ -156,12 +156,19 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .grid.tabulator .tabulator-row .tabulator-cell input, .grid.tabulator .tabulator-row .tabulator-cell select { color: var(--fg); background: var(--bg); }
 .grid.tabulator .tabulator-row .tabulator-cell.flash { background: color-mix(in srgb, var(--accent) 35%, var(--card)); }
 .grid.tabulator .tabulator-tableholder .tabulator-placeholder span { color: var(--muted); }
-.tabulator-edit-list { background: var(--card); color: var(--fg); border: 1px solid var(--line); }
-.tabulator-edit-list .tabulator-edit-list-item, .tabulator-edit-list .tabulator-edit-list-placeholder { color: var(--fg); }
-.tabulator-edit-list .tabulator-edit-list-item.active, .tabulator-edit-list .tabulator-edit-list-item:hover { background: var(--accent); color: var(--accent-fg); }
-.tabulator-edit-list { font-size: .85rem; }
+/* the vendor stylesheet loads after this one, so these popup rules carry an extra class to win over its fixed white */
+.tabulator-popup-container.tabulator-edit-list { background: var(--card); color: var(--fg); border: 1px solid var(--line); font-size: .85rem; }
+.tabulator-popup-container.tabulator-edit-list .tabulator-edit-list-item, .tabulator-popup-container.tabulator-edit-list .tabulator-edit-list-placeholder { color: var(--fg); }
+.tabulator-popup-container.tabulator-edit-list .tabulator-edit-list-item.active, .tabulator-popup-container.tabulator-edit-list .tabulator-edit-list-item:hover { background: var(--accent); color: var(--accent-fg); }
+.tabulator-popup-container.tabulator-edit-list .tabulator-edit-list-item.focused { outline: 1px solid var(--accent); }
+/* value-list cells: the value with a dropdown arrow on the right */
+.grid.tabulator .list-cell { display: flex; align-items: center; gap: .3rem; width: 100%; }
+.grid.tabulator .list-cell .list-val { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.grid.tabulator .list-cell .list-val::after { content: "\200b"; }   /* keeps a full line height in an empty cell, so its arrow lines up */
+.grid.tabulator .list-cell .list-arrow { flex: none; color: var(--muted); font-size: .8rem; line-height: 1; }
+.grid.tabulator .tabulator-cell:hover .list-arrow { color: var(--fg); }
 .issues li.info { color: var(--muted); }
 /* Tabulator's popups (header tooltips, dropdown lists) are appended to <body> with a fixed white background; the page's
    text colour made them light-on-white in dark mode. Tooltips are drawn inverted so they stand out in both themes. */
-.tabulator-popup-container { background: var(--card); color: var(--fg); border-color: var(--line); }
+div.tabulator-popup-container { background: var(--card); color: var(--fg); border-color: var(--line); }
 .tabulator-popup-container.tabulator-tooltip { background: var(--fg); color: var(--bg); border-color: var(--fg); font-size: .82rem; line-height: 1.4; padding: .35rem .55rem; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
