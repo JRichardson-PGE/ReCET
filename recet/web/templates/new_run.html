@@ -12,6 +12,15 @@
   <input type="hidden" name="draft" value="{{ draft.id }}">
   <p>Runs the edited tables of <strong>{{ draft.name }}</strong> (last saved {{ fmt_time(draft.updated_at) }}). <a href="{{ u('/edit?draft=' + draft.id) }}">Back to Edit inputs</a></p>
   <p class="muted small">If the draft came from a job workbook, that workbook's other sheets (run parameters, profiles, programs ...) are used too, unless you upload a file for them below.</p>
+  {% if source_run %}<p class="muted small">The settings below start from run <a href="{{ u('/runs/' + source_run.id) }}">{{ source_run.label or source_run.id }}</a>.</p>{% endif %}
+  {% if carried %}
+  <div class="checks">
+    <p class="small">Supplied files from the earlier run (an upload below replaces one):</p>
+    {% for fld, label in carried %}
+    <label><input type="checkbox" name="keep_{{ fld }}" {% if not f.get('csrf') or f.get('keep_' + fld) %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% else %}
   <div class="radios" id="input-mode">
     <label><input type="radio" name="input_mode" value="workbook" {% if f.get('input_mode', 'workbook') == 'workbook' %}checked{% endif %}> Job workbook (.xlsx)</label>
