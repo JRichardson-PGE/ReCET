@@ -100,8 +100,8 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .editor-bar .sep { width: 1px; height: 1.6rem; background: var(--line); margin: 0 .3rem; }
 .legend { display: inline-flex; gap: .8rem; font-size: .82rem; align-items: center; }
 .legend span { padding: .05rem .4rem; border-radius: 3px; }
-.legend .calc, .tabulator .tabulator-col.calc { background: var(--calc); color: var(--calc-fg); }
-.legend .noeff, .tabulator .tabulator-col.noeff { background: var(--noeff); color: var(--noeff-fg); }
+.legend .calc { background: var(--calc); color: var(--calc-fg); }
+.legend .noeff { background: var(--noeff); color: var(--noeff-fg); }
 #grid { border: 1px solid var(--line); border-radius: 6px; }
 .tabulator-cell.issue-error { outline: 2px solid var(--bad); outline-offset: -2px; }
 .tabulator-cell.issue-warning { outline: 2px solid var(--warn); outline-offset: -2px; }
@@ -132,14 +132,32 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .legend .sw-error { outline: 2px solid var(--bad); outline-offset: -2px; }
 .legend .sw-warning { outline: 2px solid var(--warn); outline-offset: -2px; }
 .grid { border: 1px solid var(--line); font-size: .85rem; }
-.grid .tabulator { background: var(--card); color: var(--fg); border: none; }
-.grid .tabulator .tabulator-header .tabulator-col { color: inherit; }
-.grid .tabulator .tabulator-header .tabulator-col.calc { background: var(--calc); color: var(--calc-fg); }
-.grid .tabulator .tabulator-header .tabulator-col.noeff { background: var(--noeff); color: var(--noeff-fg); }
-.grid .tabulator-row, .grid .tabulator-row.tabulator-row-even { background: var(--card); color: var(--fg); }
-.grid .tabulator-row .tabulator-cell { border-right-color: var(--line); }
-.grid .tabulator-row .tabulator-cell.tabulator-range-selected:not(.tabulator-range-only-cell-selected) { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.grid .tabulator-row .tabulator-cell input { color: var(--fg); background: var(--bg); }
+/* The grid element is itself the .tabulator, so these rules use .grid.tabulator; they replace the vendor theme's fixed
+   white/grey colours, which left light text on white headers in dark mode. */
+.grid.tabulator, .grid.tabulator .tabulator-tableholder, .grid.tabulator .tabulator-tableholder .tabulator-table { background: var(--card); color: var(--fg); }
+.grid.tabulator .tabulator-header { background: var(--card); color: var(--fg); border-bottom: 1px solid var(--line); }
+.grid.tabulator .tabulator-header .tabulator-col { background: var(--card); color: var(--fg); border-right-color: var(--line); }
+.grid.tabulator .tabulator-header .tabulator-col.calc { background: var(--calc); color: var(--calc-fg); }
+.grid.tabulator .tabulator-header .tabulator-col.noeff { background: var(--noeff); color: var(--noeff-fg); }
+.grid.tabulator .tabulator-header .tabulator-col.tabulator-range-highlight { box-shadow: inset 0 -3px 0 var(--accent); }
+.grid.tabulator .tabulator-header .tabulator-col.tabulator-range-selected { background: var(--accent); color: var(--accent-fg); }
+.grid.tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover { background: var(--line); color: var(--fg); }
+.grid.tabulator .tabulator-row, .grid.tabulator .tabulator-row.tabulator-row-even { background: var(--card); color: var(--fg); }
+.grid.tabulator .tabulator-row:hover { background: var(--card); }
+.grid.tabulator .tabulator-row .tabulator-cell { border-right-color: var(--line); }
+.grid.tabulator .tabulator-row { border-bottom-color: var(--line); }
+.grid.tabulator .tabulator-header .tabulator-frozen.tabulator-frozen-left,
+.grid.tabulator .tabulator-row .tabulator-cell.tabulator-frozen.tabulator-frozen-left { border-right-color: var(--muted); }
+.grid.tabulator .tabulator-row .tabulator-cell.tabulator-row-header { background: var(--bg); color: var(--muted); border-right-color: var(--line); border-bottom-color: var(--line); }
+.grid.tabulator .tabulator-row.tabulator-range-highlight .tabulator-cell.tabulator-range-row-header { background: var(--line); color: var(--fg); }
+.grid.tabulator .tabulator-row.tabulator-range-selected .tabulator-cell.tabulator-range-row-header { background: var(--accent); color: var(--accent-fg); }
+.grid.tabulator .tabulator-row .tabulator-cell.tabulator-range-selected:not(.tabulator-range-only-cell-selected):not(.tabulator-range-row-header) { background: color-mix(in srgb, var(--accent) 22%, var(--card)); color: var(--fg); }
+.grid.tabulator .tabulator-row .tabulator-cell.tabulator-editing { background: var(--bg); }
+.grid.tabulator .tabulator-row .tabulator-cell input, .grid.tabulator .tabulator-row .tabulator-cell select { color: var(--fg); background: var(--bg); }
+.grid.tabulator .tabulator-row .tabulator-cell.flash { background: color-mix(in srgb, var(--accent) 35%, var(--card)); }
+.grid.tabulator .tabulator-tableholder .tabulator-placeholder span { color: var(--muted); }
+.tabulator-edit-list { background: var(--card); color: var(--fg); border: 1px solid var(--line); }
+.tabulator-edit-list .tabulator-edit-list-item, .tabulator-edit-list .tabulator-edit-list-placeholder { color: var(--fg); }
+.tabulator-edit-list .tabulator-edit-list-item.active, .tabulator-edit-list .tabulator-edit-list-item:hover { background: var(--accent); color: var(--accent-fg); }
 .tabulator-edit-list { font-size: .85rem; }
 .issues li.info { color: var(--muted); }
-.grid .tabulator-row .tabulator-cell.flash { background: color-mix(in srgb, var(--accent) 35%, transparent); }
