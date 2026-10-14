@@ -131,6 +131,34 @@ class Ctx:
             raise HTTPException(404)
         return row
 
+    def queue_run(self, request: Request, u, run_id: str, cfg: dict, label: str, names: list[str]) -> None:
+        """Write a run's config.json and log header (its inputs are already in its folder), add it to the queue and the audit log."""
+        from .. import jobs
+        folder = self.runner.folder(run_id)
+        acc, cmp_ = cfg["acc_version"], cfg.get("compare_with") or ""
+        known = {f.name for f in dc_fields(jobs.RunConfig)}
+        full = {k: v for k, v in {**self.s.run_defaults, **cfg}.items() if k in known}
+        full.update(out_dir=str(folder / "out"), run_name="run")
+        folder.mkdir(parents=True, exist_ok=True)
+        write_config(folder, jobs.RunConfig.from_dict(full).__dict__)
+        (folder / "log.txt").write_text(f"recet {__version__}  -  {'preflight' if cfg.get('preflight_only') else 'run'}  -  ACC {acc}"
+                                        + (f" vs {cmp_}" if cmp_ else "") + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
+        inputs_text = "; ".join(names)
+        self.db.run("INSERT INTO runs (id, user_id, label, status, acc_version, compare_with, preflight_only, inputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (run_id, u["id"], label, "queued", acc, cmp_ or None, int(bool(cfg.get("preflight_only"))), inputs_text, time.time()))
+        self.db.audit("run queued", u, detail=f"{run_id}: ACC {acc}{' vs ' + cmp_ if cmp_ else ''}; {inputs_text}", ip=self.ip(request))
+
+    def preflight_report(self, run) -> dict | None:
+        """The input check a run wrote (preflight.json), or None if it has not got that far."""
+        out = self.runner.folder(run["id"]) / "out"
+        hits = sorted(out.rglob("preflight.json")) if out.exists() else []
+        if not hits:
+            return None
+        try:
+            return json.loads(hits[0].read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
     def result_path(self, run, sub: str = "") -> Path | None:
         if not run["result_dir"]:
             return None
@@ -432,7 +460,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/runs")
     async def create_run(request: Request):
-        from .. import jobs
         u = ctx.need_user(request)
         form = await request.form(max_files=20, max_fields=200, max_part_size=s.max_upload_bytes + 1024)
         ctx.check_csrf(request, str(form.get("csrf", "")))
@@ -512,19 +539,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 names.append(f"{UPLOADS[k][2]}: {Path(up.filename).name}")
             if draft is not None:
                 from . import edit_api
-                rerun = edit_api.load_rerun(ctx, draft["id"]) or {}
-                for fld, name in rerun.get("supplied", {}).items():          # the earlier run's supplied files, unless replaced or unticked
-                    src = edit_api.supplied_path(ctx, draft["id"], name)
-                    if src is None or cfg.get(fld) or form.get(f"keep_{fld}") != "on":
-                        continue
-                    dest = folder / "inputs" / f"carried_{name}"
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(src, dest)
-                    cfg[fld] = str(dest)
-                    names.append(f"{field_label.get(fld, fld)}: from the earlier run")
-                problem, updates = edit_api.prepare_draft_run(ctx, draft, folder, {f: cfg.get(f) for f in ("run_parameters_file", "sw_factors_file",
-                                                                                                              "profiles_gas_file", "programs_file",
-                                                                                                              "profiles_8760_file")})
+                names += edit_api.carry_supplied(ctx, draft["id"], folder, cfg, field_label, lambda fld: form.get(f"keep_{fld}") == "on")
+                problem, updates = edit_api.prepare_draft_run(ctx, draft, folder, edit_api.given_files(cfg))
                 if problem:
                     shutil.rmtree(folder, ignore_errors=True)
                     return fail(problem)
@@ -534,17 +550,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             shutil.rmtree(folder, ignore_errors=True)
             return fail(str(exc))
 
-        known = {f.name for f in dc_fields(jobs.RunConfig)}
-        full = {k: v for k, v in {**s.run_defaults, **cfg}.items() if k in known}
-        full.update(out_dir=str(folder / "out"), run_name="run")
-        folder.mkdir(parents=True, exist_ok=True)
-        write_config(folder, jobs.RunConfig.from_dict(full).__dict__)
-        (folder / "log.txt").write_text(f"recet {__version__}  -  {'preflight' if cfg['preflight_only'] else 'run'}  -  ACC {acc}"
-                                        + (f" vs {cmp_}" if cmp_ else "") + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
-        inputs_text = "; ".join(names)
-        ctx.db.run("INSERT INTO runs (id, user_id, label, status, acc_version, compare_with, preflight_only, inputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                   (run_id, u["id"], label, "queued", acc, cmp_ or None, int(cfg["preflight_only"]), inputs_text, time.time()))
-        ctx.db.audit("run queued", u, detail=f"{run_id}: ACC {acc}{' vs ' + cmp_ if cmp_ else ''}; {inputs_text}", ip=ctx.ip(request))
+        ctx.queue_run(request, u, run_id, cfg, label, names)
         return ctx.redirect(f"/runs/{run_id}")
 
     def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
@@ -611,6 +617,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             text, end = data.decode("utf-8", errors="replace"), max(0, offset) + len(data)
         return JSONResponse({"text": text, "offset": end, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]),
                              "position": ctx.runner.position(run_id), "message": run["message"], "has_results": bool(run["result_dir"])})
+
+    @app.get("/runs/{run_id}/check")
+    def run_check(request: Request, run_id: str):
+        """A run's progress and its input check (preflight) as JSON, for the Edit inputs page's Validate inputs panel."""
+        run = ctx.run_for(request, run_id)
+        report = ctx.preflight_report(run) if run["status"] not in ("queued", "expired") else None
+        tail = ""
+        if run["status"] in ("failed", "cancelled") and report is None:          # stopped before the check could report: the log says why
+            log = ctx.runner.folder(run_id) / "log.txt"
+            if log.exists():
+                tail = "\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-25:])
+        return {"id": run_id, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]), "position": ctx.runner.position(run_id),
+                "message": run["message"] or "", "acc_version": run["acc_version"], "created_at": run["created_at"], "report": report, "log_tail": tail,
+                "url": ctx.u(f"/runs/{run_id}")}
 
     @app.post("/runs/{run_id}/cancel")
     async def run_cancel(request: Request, run_id: str):

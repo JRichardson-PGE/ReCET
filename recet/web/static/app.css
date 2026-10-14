@@ -103,9 +103,9 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .legend .calc { background: var(--calc); color: var(--calc-fg); }
 .legend .noeff { background: var(--noeff); color: var(--noeff-fg); }
 #grid { border: 1px solid var(--line); border-radius: 6px; }
-.tabulator-cell.issue-error { outline: 2px solid var(--bad); outline-offset: -2px; }
-.tabulator-cell.issue-warning { outline: 2px solid var(--warn); outline-offset: -2px; }
-.tabulator-cell.issue-info { outline: 1px dashed var(--muted); outline-offset: -2px; }
+.grid.tabulator .tabulator-row .tabulator-cell.issue-error { outline: 2px solid var(--bad); outline-offset: -2px; }
+.grid.tabulator .tabulator-row .tabulator-cell.issue-warning { outline: 2px solid var(--warn); outline-offset: -2px; }
+.grid.tabulator .tabulator-row .tabulator-cell.issue-info { outline: 1px dashed var(--muted); outline-offset: -2px; }
 .issue-line { min-height: 1.5rem; font-size: .88rem; }
 .issue-line.error { color: var(--bad); }
 .issue-line.warning { color: var(--warn); }
@@ -172,3 +172,29 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
    text colour made them light-on-white in dark mode. Tooltips are drawn inverted so they stand out in both themes. */
 div.tabulator-popup-container { background: var(--card); color: var(--fg); border-color: var(--line); }
 .tabulator-popup-container.tabulator-tooltip { background: var(--fg); color: var(--bg); border-color: var(--fg); font-size: .82rem; line-height: 1.4; padding: .35rem .55rem; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+
+/* Edit inputs: Validate inputs panel */
+.check-panel { border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: .55rem .8rem; margin: .6rem 0; }
+.check-bar { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: center; }
+.check-bar select { margin: 0 .2rem; }
+.check-about { margin: .35rem 0 0; }
+.check-result { border-top: 1px solid var(--line); margin-top: .55rem; padding-top: .5rem; }
+.check-head { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: baseline; }
+.check-title { font-weight: 600; }
+.check-title.ok { color: var(--ok); }
+.check-title.bad { color: var(--bad); }
+.check-title.warn { color: var(--warn); }
+.check-stale { color: var(--warn); font-size: .85rem; margin: .3rem 0 0; }
+.check-stats { font-size: .8rem; color: var(--muted); margin: .3rem 0 0; }
+.check-issues { list-style: none; padding: 0; margin: .4rem 0 0; font-size: .85rem; max-height: 18rem; overflow: auto; }
+.check-issues li { padding: .3rem 0; border-top: 1px solid var(--line); }
+.check-issues li:first-child { border-top: 0; }
+.check-issues .sev { display: inline-block; min-width: 4.6rem; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+.check-issues li.error .sev { color: var(--bad); }
+.check-issues li.warning .sev { color: var(--warn); }
+.check-issues li.info .sev { color: var(--muted); }
+.check-issues .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; color: var(--muted); }
+.check-issues .eg { color: var(--muted); }
+.check-issues .eg button.link { font-size: inherit; }
+.check-log { font-size: .75rem; max-height: 14rem; overflow: auto; white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line);
+             border-radius: 6px; padding: .5rem; margin: .4rem 0 0; }
