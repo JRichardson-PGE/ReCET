@@ -499,6 +499,12 @@ def test_value_list_pages_and_admin_changes(web):
     assert editor.code_status("sector", "Com", 2028) is None
     assert post(boss, act="undo|Com").status_code == 303
     assert "retired" in editor.code_status("sector", "Com", 2028)
+    page = boss.get(f"{P}/docs/value-lists/sector").text                     # the "Unretire a code" form offers the retired codes
+    assert "Unretire a code" in page and '<option value="Com">' in page and '<option value="Commercial">' not in page
+    assert post(boss, act="unretire", code="Com").status_code == 303
+    assert editor.code_status("sector", "Com", 2028) is None
+    assert post(boss, act="unretire", code="Com").status_code == 400          # no longer retired
+    assert post(boss, act="undo|Com").status_code == 303
 
     assert post(boss, act="undo|Zzz").status_code == 303
     assert editor.code_status("sector", "Zzz", 2028) == "not in CET's value list"
