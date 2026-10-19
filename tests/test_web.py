@@ -444,3 +444,16 @@ def test_web_cli_create_admin_prints_a_link(tmp_path, monkeypatch, capsys):
     assert cli.main(["users"]) == 0
     assert "jake@example.com" in capsys.readouterr().out
     assert cli.main(["reset-link", "nobody@example.com"]) == 1
+
+
+def test_docs_pages_render(web):
+    app, ctx = web
+    _user(ctx, "docs@example.com")
+    c = _login(app, "docs@example.com")
+    r = c.get(f"{P}/docs")
+    assert r.status_code == 200, r.text
+    for name in ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
+        r = c.get(f"{P}/docs/{name}")
+        assert r.status_code == 200, name
+        assert f'href="{P}/docs/{name}" class="on"' in r.text, name
+    assert c.get(f"{P}/docs/missing.md").status_code == 404
