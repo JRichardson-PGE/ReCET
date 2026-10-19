@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main_class %}page docs-layout{% endblock %}
+{% block content %}
+{% include "_docnav.html" %}
+<article class="doc">
+<h1>Value lists</h1>
+<p>The Edit inputs fields that have a dropdown, and the values each one offers. The lists are CET's own{% if source_note %} ({{ source_note }}){% endif %},
+with any changes made by ReCET admins on top. This page is built from the lists the editor uses, so it is always current.</p>
+<p>A code is offered for a claim year from its first valid year through its last valid year (blank means no limit). Edit inputs warns about a code that is not
+in the list or not valid for the measure's claim year, because CET would reject that upload. No calculation reads these lists.</p>
+<table class="list">
+  <thead><tr><th>Field</th><th>Table</th><th>List</th><th>Active codes</th><th>All codes</th><th>Admin changes</th></tr></thead>
+  <tbody>
+  {% for x in index %}
+  <tr>
+    <td>{% for t, f in x.fields %}<a href="{{ u('/docs/value-lists/' + x.name) }}">{{ f }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+    <td>{{ x.fields|map('first')|unique|join(', ') }}</td>
+    <td><code>{{ x.name }}</code></td><td>{{ '{:,}'.format(x.active) }}</td><td>{{ '{:,}'.format(x.n) }}</td><td>{{ x.changed or '' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2>Other dropdowns</h2>
+<table class="list">
+  <thead><tr><th>Field</th><th>Table</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+  {% for x in fixed %}<tr><td>{{ x.field }}</td><td>{{ x.table }}</td><td>{{ x['values']|join(', ') }}</td><td>{{ x.note }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</article>
+{% endblock %}

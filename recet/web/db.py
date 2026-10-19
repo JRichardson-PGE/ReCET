@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS views (
     keys TEXT NOT NULL,                           -- JSON list of column keys
     PRIMARY KEY (user_id, name)
 );
+CREATE TABLE IF NOT EXISTS value_list_changes (     -- admin changes over the shipped CET value lists (recet/web/value_lists.py)
+    list TEXT NOT NULL,
+    code TEXT NOT NULL,
+    kind TEXT NOT NULL,                           -- added | retired | reinstated
+    start_year INTEGER,
+    end_year INTEGER,
+    description TEXT NOT NULL DEFAULT '',
+    user_id INTEGER,
+    email TEXT NOT NULL DEFAULT '',
+    at REAL NOT NULL,
+    PRIMARY KEY (list, code)
+);
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY,
     at REAL NOT NULL,
