@@ -451,7 +451,7 @@ def test_docs_pages_render(web):
     _user(ctx, "docs@example.com")
     c = _login(app, "docs@example.com")
     r = c.get(f"{P}/docs")
-    assert r.status_code == 200, r.text
+    assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/README.md"
     for name in ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
         r = c.get(f"{P}/docs/{name}")
         assert r.status_code == 200, name

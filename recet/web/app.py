@@ -795,11 +795,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tmp.replace(out)
         return FileResponse(out, filename=out.name)
 
-    @app.get("/docs", response_class=HTMLResponse)
+    @app.get("/docs")
     async def docs_index(request: Request):
         ctx.need_user(request)
-        docs = [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
-        return ctx.render(request, "docs.html", docs=docs, html="", title="Documentation", current="")
+        return ctx.redirect("/docs/README.md")   # a redirect, not a render, so the README's relative links resolve under /docs/
 
     @app.get("/docs/{name}", response_class=HTMLResponse)
     async def doc(request: Request, name: str):
