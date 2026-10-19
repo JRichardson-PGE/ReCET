@@ -799,7 +799,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def docs_index(request: Request):
         ctx.need_user(request)
         docs = [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
-        return ctx.render(request, "docs.html", docs=docs, html="", title="Documentation", name="")
+        return ctx.render(request, "docs.html", docs=docs, html="", title="Documentation", current="")
 
     @app.get("/docs/{name}", response_class=HTMLResponse)
     async def doc(request: Request, name: str):
@@ -810,7 +810,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404)
         html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
         docs = [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(x.name for x in DOCS_DIR.glob("*.md") if x.name not in DOC_ORDER)
-        return ctx.render(request, "docs.html", docs=docs, html=html, title=name.removesuffix(".md").replace("_", " ").title(), name=name)
+        return ctx.render(request, "docs.html", docs=docs, html=html, title=name.removesuffix(".md").replace("_", " ").title(), current=name)
 
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz():
