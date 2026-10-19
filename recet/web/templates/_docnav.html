@@ -1,0 +1,8 @@
+<aside class="docnav">
+  <h3>Documentation</h3>
+  <ul>{% for d in docs %}<li><a href="{{ u('/docs/' + d) }}" class="{% if d == current %}on{% endif %}">{{ d.replace('.md', '').replace('_', ' ').title() }}</a></li>{% endfor %}</ul>
+  <h3>Reference</h3>
+  <ul><li><a href="{{ u('/docs/value-lists') }}" class="{% if current == 'value-lists' %}on{% endif %}">Value lists</a></li></ul>
+  <h3>Templates</h3>
+  <p class="small"><a href="{{ u('/runs/new') }}">On the New run page</a></p>
+</aside>
