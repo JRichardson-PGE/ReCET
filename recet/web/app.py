@@ -38,6 +38,12 @@ LOGIN_CSRF_COOKIE = "recet_login_csrf"
 DOCS_DIR = HERE.parent / "docs"
 DOC_ORDER = ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]
 
+
+def doc_names() -> list[str]:
+    """The Docs pages' documents, in reading order."""
+    return [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
+
+
 # Upload fields of the New run form: field -> (RunConfig field, accepted extensions, label)
 UPLOADS = {
     "workbook": ("workbook", (".xlsx", ".xlsm"), "Job workbook"),
@@ -110,11 +116,12 @@ class Ctx:
         if sess is None or not auth.csrf_ok(sess["csrf"], given):
             raise HTTPException(400, "The form expired. Go back, reload the page and try again.")
 
-    def render(self, request: Request, name: str, status_code: int = 200, **kw) -> HTMLResponse:
+    def render(self, request: Request, template: str, /, status_code: int = 200, **kw) -> HTMLResponse:
+        """Render a page. `request` and `template` are positional-only, so any keyword (`name=` included) is free for the template's own variables."""
         sess = getattr(request.state, "session", None)
         kw.setdefault("user", getattr(request.state, "user", None))
         kw.setdefault("csrf", sess["csrf"] if sess else "")
-        return self.templates.TemplateResponse(request, name, kw, status_code=status_code)
+        return self.templates.TemplateResponse(request, template, kw, status_code=status_code)
 
     def redirect(self, path: str) -> RedirectResponse:
         return RedirectResponse(self.u(path), status_code=303)
@@ -795,11 +802,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tmp.replace(out)
         return FileResponse(out, filename=out.name)
 
-    @app.get("/docs", response_class=HTMLResponse)
+    from . import value_lists
+    value_lists.register(app, ctx)                   # before /docs/{name}, which would otherwise take /docs/value-lists
+    value_lists.sync(ctx)
+
+    @app.get("/docs")
     async def docs_index(request: Request):
         ctx.need_user(request)
-        docs = [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
-        return ctx.render(request, "docs.html", docs=docs, html="", title="Documentation", current="")
+        return ctx.redirect("/docs/README.md")   # a redirect, not a render, so the README's relative links resolve under /docs/
 
     @app.get("/docs/{name}", response_class=HTMLResponse)
     async def doc(request: Request, name: str):
@@ -809,8 +819,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if p.suffix != ".md" or not p.is_file() or p.parent != DOCS_DIR.resolve():
             raise HTTPException(404)
         html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
-        docs = [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(x.name for x in DOCS_DIR.glob("*.md") if x.name not in DOC_ORDER)
-        return ctx.render(request, "docs.html", docs=docs, html=html, title=name.removesuffix(".md").replace("_", " ").title(), current=name)
+        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=name.removesuffix(".md").replace("_", " ").title(), current=name)
 
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz():

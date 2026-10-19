@@ -451,9 +451,62 @@ def test_docs_pages_render(web):
     _user(ctx, "docs@example.com")
     c = _login(app, "docs@example.com")
     r = c.get(f"{P}/docs")
-    assert r.status_code == 200, r.text
+    assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/README.md"
     for name in ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
         r = c.get(f"{P}/docs/{name}")
         assert r.status_code == 200, name
         assert f'href="{P}/docs/{name}" class="on"' in r.text, name
     assert c.get(f"{P}/docs/missing.md").status_code == 404
+
+
+def test_value_list_pages_and_admin_changes(web):
+    from recet import editor
+    app, ctx = web
+    _user(ctx, "boss@example.com", role="admin")
+    _user(ctx, "pat@example.com")
+    boss, pat = _login(app, "boss@example.com"), _login(app, "pat@example.com")
+
+    index = pat.get(f"{P}/docs/value-lists")
+    assert index.status_code == 200
+    for field in editor.VALUE_LISTS:                      # every mapped dropdown field is listed, from the editor's own mapping
+        assert f">{field}<" in index.text, field
+    assert "IOU_AC_Territory" in index.text
+    page = pat.get(f"{P}/docs/value-lists/sector")
+    assert page.status_code == 200 and "<code>Commercial</code>" in page.text and "Add a code" not in page.text
+    assert pat.get(f"{P}/docs/value-lists/nope").status_code == 404
+
+    def post(c, **form):
+        return c.post(f"{P}/docs/value-lists/sector", data={"csrf": _csrf(c, f"{P}/docs/value-lists/sector"), **form})
+
+    assert post(pat, act="add", code="Zzz").status_code == 404                 # admins only (others get "not found", like the admin pages)
+    assert "Add a code" in boss.get(f"{P}/docs/value-lists/sector").text
+    assert post(boss, act="add", code="Commercial").status_code == 400         # already active
+    assert post(boss, act="add", code="bad|code").status_code == 400
+
+    r = post(boss, act="add", code="Zzz", description="Test sector", start_year="2027")
+    assert r.status_code == 303
+    assert "Zzz" in editor.active_codes("sector", 2028) and "Zzz" not in editor.active_codes("sector", 2026)
+    assert editor.code_status("sector", "zzz", 2028) is None
+    assert "Added by admin" in boss.get(f"{P}/docs/value-lists/sector").text
+
+    assert post(boss, act="retire|Commercial", end_year="2026").status_code == 303
+    assert "Commercial" not in editor.active_codes("sector", 2028)
+    assert "retired by a ReCET admin after 2026" in editor.code_status("sector", "Commercial", 2028)
+    assert post(boss, act="reinstate|Commercial").status_code == 303
+    assert "Commercial" in editor.active_codes("sector", 2028)
+
+    assert post(boss, act="reinstate|Com").status_code == 303                  # CET retired it; an admin brings it back
+    assert editor.code_status("sector", "Com", 2028) is None
+    assert post(boss, act="undo|Com").status_code == 303
+    assert "retired" in editor.code_status("sector", "Com", 2028)
+
+    assert post(boss, act="undo|Zzz").status_code == 303
+    assert editor.code_status("sector", "Zzz", 2028) == "not in CET's value list"
+    events = [r["event"] for r in ctx.db.all("SELECT event FROM audit WHERE event LIKE 'value list%'")]
+    assert events.count("value list add") == 1 and "value list retire" in events
+
+    post(boss, act="add", code="Kept")                                        # survives a restart: loaded from the database at start-up
+    editor.set_value_list_changes({})
+    create_app(ctx.s)
+    assert "Kept" in editor.active_codes("sector", 2028)
+    editor.set_value_list_changes({})
