@@ -83,22 +83,39 @@
     };
     poll();
   }
-  // Docs > Value lists: find box and the "Show retired codes" switch.
+  // Docs > Value lists: find box, the "Show retired codes" switch and pages of codes (100 a page by default).
   var vlTable = document.getElementById("vl-table");
   if (vlTable) {
     var find = document.getElementById("vl-filter"), showRetired = document.getElementById("vl-retired"), count = document.getElementById("vl-count");
-    var rows = Array.prototype.slice.call(vlTable.tBodies[0].rows);
+    var size = document.getElementById("vl-size"), pager = document.getElementById("vl-pager"), pageLabel = document.getElementById("vl-page");
+    var prev = document.getElementById("vl-prev"), next = document.getElementById("vl-next");
+    var rows = Array.prototype.slice.call(vlTable.tBodies[0].rows), pageNo = 0;
+    var nRetired = rows.filter(function (r) { return r.dataset.retired === "1"; }).length;
     var apply = function () {
-      var q = find.value.trim().toLowerCase(), n = 0;
-      rows.forEach(function (r) {
-        var show = (showRetired.checked || r.dataset.retired !== "1") && (!q || r.textContent.toLowerCase().indexOf(q) >= 0);
-        r.classList.toggle("hidden", !show);
-        if (show) n += 1;
+      var q = find.value.trim().toLowerCase();
+      var matches = rows.filter(function (r) {
+        return (showRetired.checked || r.dataset.retired !== "1") && (!q || r.textContent.toLowerCase().indexOf(q) >= 0);
       });
-      count.textContent = n.toLocaleString() + " of " + rows.length.toLocaleString() + " codes shown";
+      var per = parseInt(size.value, 10) || matches.length || 1, pages = Math.max(1, Math.ceil(matches.length / per));
+      pageNo = Math.min(pageNo, pages - 1);
+      var first = pageNo * per, onPage = matches.slice(first, first + per);
+      rows.forEach(function (r) { r.classList.add("hidden"); });
+      onPage.forEach(function (r) { r.classList.remove("hidden"); });
+      var hidden = showRetired.checked ? 0 : nRetired;
+      count.textContent = matches.length.toLocaleString() + " of " + rows.length.toLocaleString() + " codes match" +
+        (hidden ? " (" + hidden.toLocaleString() + " retired " + (hidden === 1 ? "code" : "codes") + " hidden)" : "");
+      pager.classList.toggle("hidden", pages < 2);
+      pageLabel.textContent = "Page " + (pageNo + 1) + " of " + pages + ", codes " + (matches.length ? first + 1 : 0).toLocaleString() +
+        " to " + (first + onPage.length).toLocaleString();
+      prev.disabled = pageNo === 0;
+      next.disabled = pageNo >= pages - 1;
     };
-    find.addEventListener("input", apply);
-    showRetired.addEventListener("change", apply);
+    var restart = function () { pageNo = 0; apply(); };
+    find.addEventListener("input", restart);
+    showRetired.addEventListener("change", restart);
+    size.addEventListener("change", restart);
+    prev.addEventListener("click", function () { pageNo -= 1; apply(); vlTable.scrollIntoView({ block: "start" }); });
+    next.addEventListener("click", function () { pageNo += 1; apply(); vlTable.scrollIntoView({ block: "start" }); });
     apply();
   }
 })();

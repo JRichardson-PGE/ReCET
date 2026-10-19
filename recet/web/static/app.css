@@ -97,6 +97,8 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .vl-tools label, .vl-year label { flex-direction: row; align-items: center; gap: .4rem; }
 .vl-year input { width: 6rem; }
 #vl-table td button.link + button.link { margin-left: .6rem; }
+.vl-pager { display: flex; gap: .8rem; align-items: center; }
+.vl-tools select { width: auto; }
 @media (max-width: 760px) { .docs-layout { grid-template-columns: 1fr; } .files { columns: 1; } }
 
 /* Edit inputs */
