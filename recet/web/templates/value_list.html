@@ -20,12 +20,22 @@ A code is offered for a claim year from its first through its last valid year.{%
     <label>First valid claim year <input type="number" name="start_year" min="2000" max="2100" placeholder="any"></label>
     <button class="primary" name="act" value="add">Add</button>
   </form>
-  <p class="small">Adding a retired code reinstates it. Changes reach the Edit inputs dropdowns and checks at once and are kept in the audit log.</p>
+  {% set retired_rows = rows|selectattr('retired')|list %}
+  <h2>Unretire a code</h2>
+  {% if retired_rows %}
+  <form method="post" action="{{ u('/docs/value-lists/' + name) }}" class="row-form" id="vl-unretire">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Retired code <select name="code" required>{% for r in retired_rows %}<option value="{{ r.code }}">{{ r.code }}{% if r.description %} ({{ r.description }}){% endif %}, retired after {{ r.end }}</option>{% endfor %}</select></label>
+    <button class="primary" name="act" value="unretire">Unretire</button>
+  </form>
+  {% else %}<p class="small">No codes in this list are retired.</p>{% endif %}
+  <p class="small">Unretiring a code makes it valid again for every claim year from its first valid year on. Adding a retired code also unretires it. Changes reach the Edit inputs dropdowns and checks at once and are kept in the audit log.</p>
 </section>
 {% endif %}
 <p class="vl-tools">
   <label>Find <input type="search" id="vl-filter" placeholder="code or description"></label>
   <label><input type="checkbox" id="vl-retired"> Show retired codes</label>
+  <label>Per page <select id="vl-size"><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option><option value="500">500</option><option value="0">All</option></select></label>
   <span class="small" id="vl-count"></span>
 </p>
 {% if user.role == 'admin' %}
@@ -40,9 +50,9 @@ A code is offered for a claim year from its first through its last valid year.{%
   {% for r in rows %}
   <tr data-retired="{{ 1 if r.retired else 0 }}"{% if r.retired %} class="dim"{% endif %}>
     <td><code>{{ r.code }}</code></td><td>{{ r.description }}</td><td>{{ r.start or '' }}</td><td>{{ r.end or '' }}</td><td class="nowrap">{{ r.status }}</td>
-    <td class="nowrap">{% if r.source == 'CET' %}CET{% elif r.source == 'added' %}Added by admin{% elif r.source == 'retired' %}Retired by admin{% else %}Reinstated by admin{% endif %}</td>
+    <td class="nowrap">{% if r.source == 'CET' %}CET{% elif r.source == 'added' %}Added by admin{% elif r.source == 'retired' %}Retired by admin{% else %}Unretired by admin{% endif %}</td>
     {% if user.role == 'admin' %}<td class="nowrap">
-      {% if r.retired %}<button form="vl-act" name="act" value="reinstate|{{ r.code }}" class="link">Reinstate</button>
+      {% if r.retired %}<button form="vl-act" name="act" value="reinstate|{{ r.code }}" class="link">Unretire</button>
       {% else %}<button form="vl-act" name="act" value="retire|{{ r.code }}" class="link">Retire</button>{% endif %}
       {% if r.source != 'CET' %}<button form="vl-act" name="act" value="undo|{{ r.code }}" class="link">{{ 'Remove' if r.source == 'added' else 'Undo' }}</button>{% endif %}
     </td>{% endif %}
@@ -50,6 +60,7 @@ A code is offered for a claim year from its first through its last valid year.{%
   {% endfor %}
   </tbody>
 </table>
+<p class="vl-pager" id="vl-pager"><button type="button" id="vl-prev">&larr; Previous</button> <span class="small" id="vl-page"></span> <button type="button" id="vl-next">Next &rarr;</button></p>
 {% if changes %}
 <h2>Admin changes to this list</h2>
 <table class="list">
@@ -57,7 +68,7 @@ A code is offered for a claim year from its first through its last valid year.{%
   <tbody>
   {% for c in changes %}
   <tr><td><code>{{ c.code }}</code></td>
-    <td>{% if c.kind == 'added' %}added{% if c.start_year %}, valid from {{ c.start_year }}{% endif %}{% if c.end_year %}, retired after {{ c.end_year }}{% endif %}{% elif c.kind == 'retired' %}retired after {{ c.end_year }}{% else %}reinstated{% endif %}</td>
+    <td>{% if c.kind == 'added' %}added{% if c.start_year %}, valid from {{ c.start_year }}{% endif %}{% if c.end_year %}, retired after {{ c.end_year }}{% endif %}{% elif c.kind == 'retired' %}retired after {{ c.end_year }}{% else %}unretired{% endif %}</td>
     <td>{{ c.email }}</td><td class="nowrap">{{ fmt_time(c.at) }}</td></tr>
   {% endfor %}
   </tbody>

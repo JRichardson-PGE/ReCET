@@ -2,7 +2,7 @@
 
 The pages are built on each request from the value lists that ship with ReCET (`recet/data/value_lists/`, CET's own lists) with the admin changes stored in
 the app's database (`value_list_changes`) layered over them, so they always show what the editor offers and checks. Admins can add a code, retire one (it stays
-valid up to a last claim year, as CET retires codes) or reinstate one, and undo any of their changes. The changes reach the Edit inputs dropdowns and its
+valid up to a last claim year, as CET retires codes) or unretire one, and undo any of their changes. The changes reach the Edit inputs dropdowns and its
 "not an active CET value" warnings at once (`editor.set_value_list_changes`); they do not change any calculation, which never reads these lists.
 """
 from __future__ import annotations
@@ -116,7 +116,9 @@ def register(app, ctx) -> None:
             raise HTTPException(404)
         act = str(form.get("act", ""))
         action, _, code = act.partition("|")
-        if action == "add":
+        if action == "unretire":                       # the "Unretire a code" form names the code in a field, like "add"
+            action = "reinstate"
+        if action in ("add", "reinstate") and not code:
             code = str(form.get("code", ""))
         code = code.strip()
         try:
@@ -197,4 +199,4 @@ def _reinstate(ctx, name, code, cur, stored, put) -> str:
         ctx.db.run("DELETE FROM value_list_changes WHERE list = ? AND lower(code) = lower(?)", (name, code))
     else:
         put("reinstated", None, None)
-    return f"Reinstated '{code}'."
+    return f"Unretired '{code}': valid again for every claim year from its first valid year on."
