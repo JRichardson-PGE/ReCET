@@ -6,4 +6,4 @@
 
 See README.md at the repository root and `recet/docs/README.md`.
 """
-__version__ = "0.1.23"
+__version__ = "0.1.24"
