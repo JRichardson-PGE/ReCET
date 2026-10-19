@@ -83,4 +83,22 @@
     };
     poll();
   }
+  // Docs > Value lists: find box and the "Show retired codes" switch.
+  var vlTable = document.getElementById("vl-table");
+  if (vlTable) {
+    var find = document.getElementById("vl-filter"), showRetired = document.getElementById("vl-retired"), count = document.getElementById("vl-count");
+    var rows = Array.prototype.slice.call(vlTable.tBodies[0].rows);
+    var apply = function () {
+      var q = find.value.trim().toLowerCase(), n = 0;
+      rows.forEach(function (r) {
+        var show = (showRetired.checked || r.dataset.retired !== "1") && (!q || r.textContent.toLowerCase().indexOf(q) >= 0);
+        r.classList.toggle("hidden", !show);
+        if (show) n += 1;
+      });
+      count.textContent = n.toLocaleString() + " of " + rows.length.toLocaleString() + " codes shown";
+    };
+    find.addEventListener("input", apply);
+    showRetired.addEventListener("change", apply);
+    apply();
+  }
 })();

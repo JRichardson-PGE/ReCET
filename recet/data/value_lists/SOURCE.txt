@@ -1,3 +1,4 @@
 CET value lists, downloaded from https://cedars.cpuc.ca.gov/cet_ui/spec/download/ (copied from reference-docs/cet_valuelists/, 2026-09-11).
 Used only by the input editor (recet/editor.py) for dropdowns and "not an active CET value" warnings; no calculation reads them.
+The web app layers its admins' changes (Docs > Value lists, stored in its database) over these files; the files themselves are never changed.
 A code is active for a claim year when start_year <= year and end_year is blank or >= year. Left out: avoidedcostcombo (22 MB), prgid, semphase.

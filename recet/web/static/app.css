@@ -36,7 +36,7 @@ h2 { font-size: 1.1rem; margin: 1.2rem 0 .5rem; }
 .ok-card { border-color: var(--ok); }
 .stack { display: flex; flex-direction: column; gap: .8rem; }
 label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }
-input[type=text], input[type=email], input[type=password], select {
+input[type=text], input[type=email], input[type=password], input[type=number], input[type=search], select {
   font: inherit; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); }
 input.short { width: 8rem; display: inline-block; }
 input.copy { width: min(100%, 46rem); }
@@ -93,6 +93,10 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .doc th, .doc td { border: 1px solid var(--line); padding: .3rem .5rem; vertical-align: top; }
 .doc pre { background: var(--card); border: 1px solid var(--line); padding: .7rem; overflow-x: auto; }
 .doc code { font-size: .88em; }
+.vl-tools { display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; }
+.vl-tools label, .vl-year label { flex-direction: row; align-items: center; gap: .4rem; }
+.vl-year input { width: 6rem; }
+#vl-table td button.link + button.link { margin-left: .6rem; }
 @media (max-width: 760px) { .docs-layout { grid-template-columns: 1fr; } .files { columns: 1; } }
 
 /* Edit inputs */

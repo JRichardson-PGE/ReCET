@@ -2,16 +2,8 @@
 {% block title %}{{ title }}{% endblock %}
 {% block main_class %}page docs-layout{% endblock %}
 {% block content %}
-<aside class="docnav">
-  <h3>Documentation</h3>
-  <ul>{% for d in docs %}<li><a href="{{ u('/docs/' + d) }}" class="{% if d == current %}on{% endif %}">{{ d.replace('.md', '').replace('_', ' ').title() }}</a></li>{% endfor %}</ul>
-  <h3>Templates</h3>
-  <p class="small"><a href="{{ u('/runs/new') }}">On the New run page</a></p>
-</aside>
+{% include "_docnav.html" %}
 <article class="doc">
-{% if html %}{{ html|safe }}{% else %}
-<h1>Documentation</h1>
-<p>The same documents that ship with the ReCET package. Start with the user guide; the input and output field references and the calculation notes give every formula.</p>
-{% endif %}
+{{ html|safe }}
 </article>
 {% endblock %}
