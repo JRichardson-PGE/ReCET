@@ -244,11 +244,12 @@ applies to any supplied ACC file without SCT rows.
 
 A shape is 8,760 non-negative-or-negative shares that sum to 1 (a *fraction of the measure's annual net kWh* in each hour). A library or supplied profile is used for the measure's own
 zone (for `E3ClimateZone = System`, the profile's System zone, C4.4), else the profile's own `System` rows. Every electric measure is priced from an 8,760 shape (C5.1); there is no other electric route. The library includes CEDARS' TOU (H-factor) end
-uses as 8,760s built from their Gen-based energy shares: each TOU period's share spread evenly over that period's hours on the 2024 Electric ACC's own TOU map, which follows the
-2025 calendar (`represents_year` = 2025). SCE/SCG shares are rescaled to sum to 1 and SDG&E's winter on-peak share is the remainder to 1. Their catalog rows carry
-`hourly_source = TOU H-factor 8,760`.
+uses as 8,760s built from their Gen-based energy shares: each TOU period's share spread evenly over that period's hours on the TOU map of the 2026 Electric ACC v1b
+as re-issued on 2026-10-20, which is on the real 2018 calendar (`represents_year` = 2018; 2018 holidays and daylight-time dates). SCE/SCG shares are rescaled to sum
+to 1 and SDG&E's winter on-peak share is the remainder to 1. Their catalog rows carry `hourly_source = TOU H-factor 8,760`. (Before 0.1.18 they were drawn on the
+earlier ACC map, which followed the 2025 calendar, with `represents_year` = 2025.)
 
-**C4.2 Calendar alignment.** A profile is drawn on the weekdays of the year it represents (`represents_year`; 2009, the DEER reference year, when blank; 2025 for the TOU
+**C4.2 Calendar alignment.** A profile is drawn on the weekdays of the year it represents (`represents_year`; 2009, the DEER reference year, when blank; 2018 for the TOU
 8,760s). An ACC's hourly avoided costs follow **one calendar's weekdays in every forecast year**: **2018** for the 2024 and 2026 ACCs (hour 1 is a Monday; the weekly
 low in distribution and transmission value falls on days 6-7 of every week of every year) and **2020** for the 2021 and 2022 ACCs (hour 1 is Wednesday 1 January
 2020). The calendar year `A` is read from the ACC file's hour stamps (2018 when a supplied file has none). Every profile is rotated **once**, onto `A`, and the same
@@ -261,8 +262,8 @@ shape_y(i) = shape( (i + 24 * d) mod 8760 )                     i = 0 ... 8759, 
 ```
 
 Example: a 2025 profile (1 January a Wednesday) has `d = -2` on the 2024/2026 ACCs, so its 1 January lands on ACC day 3, a Wednesday; on the 2021/2022 ACCs `d = 0`.
-The TOU 8,760s are drawn on the TOU-period map that the 2021, 2022 and 2024 ACCs share (identical in all 8,760 hours), so on the 2020 calendar they line up with the
-ACC's own map. Leap years: an ACC year always has 8,760 hours (the last day of a leap year is dropped, so the 2020 calendar includes 29 February and ends on
+The TOU 8,760s (2018) need no rotation on the 2024/2026 ACCs; on the 2021/2022 ACCs they move `d = +2` days onto the 2020 weekdays, so their weekdays line up and
+their holidays and season boundaries are two days off 2020's. Leap years: an ACC year always has 8,760 hours (the last day of a leap year is dropped, so the 2020 calendar includes 29 February and ends on
 30 December); hour `i` is the same position in every year, and only weekdays are aligned. This is **not** CEDARS' rule: CEDARS aligns the profile to each
 forecast year's own 1 January weekday (although the ACC data do not follow those calendars) and rotates one day too far when the offset is negative. Gas is monthly and is not shifted.
 

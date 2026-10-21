@@ -32,11 +32,11 @@ nothing in engine.py needs to know the data source changed, only which
 functions build the (shape, represents_year) pair per measure.
 
 DAY-OF-WEEK SHIFT (2026-10-02, Jake: the 8,760 path with the correct shift, not CEDARS' errors). A profile is drawn on its own represents_year's calendar
-(the catalog's `year_represented`; 2009, the DEER reference year, when blank; 2025 for the TOU H-factor 8,760s), while the ACC's hourly data follow one
+(the catalog's `year_represented`; 2009, the DEER reference year, when blank; 2018 for the TOU H-factor 8,760s), while the ACC's hourly data follow one
 calendar's weekdays in every forecast year: 2018 for the 2024 and 2026 ACCs, 2020 for the 2021 and 2022 ACCs (acc_calendar_year(), read from the ACC file's
 hour stamps). shift_for_year() therefore rotates every profile once, by the signed weekday difference to that calendar taken the short way round (-3..+3
-days), and the same aligned shape prices every year. The TOU 8,760s (2025, a Wednesday start) need no rotation on the 2020 calendar (also a Wednesday
-start): the 2021, 2022 and 2024 ACCs share one TOU-period map, which is drawn on that chronology. CEDARS instead aligns each forecast year to that year's real Jan-1 weekday
+days), and the same aligned shape prices every year. The TOU 8,760s are drawn on the 2026 ACC's 2018-calendar TOU map (since 0.1.18; before, on the
+2025-chronology map of the 2021-2024 ACCs, with year_represented 2025), so they need no rotation on the 2024/2026 ACCs and move +2 days on the 2021/2022 ACCs. CEDARS instead aligns each forecast year to that year's real Jan-1 weekday
 and rotates one day too far for negative offsets; that rule reproduces CEDARS' published quarterly values exactly (kept as cedars_shift_for_year, reference
 only) but is not what the POC prices with.
 
