@@ -1,12 +1,14 @@
 # The ReCET web app on the example.org server, behind the edge nginx (edge-site deploy/edge), which routes /ReCET to recet:3000.
 #
 # Before the first start:
-#   - the reference data folder is at ~/recet-data (acc/2024, acc/2026 and impact_profiles/; check with
+#   - the reference data folder is at ~/recet-data (acc/2021, acc/2022, acc/2024, acc/2026 and impact_profiles/; check with
 #     `docker compose run --rm recet recet data status`)
 #   - the edge stack is running (it creates the "web" network)
 # Then:
 #   docker compose up -d --build
-#   docker compose exec recet recet-web warm-cache --acc 2024      # one ACC at a time, the first time only
+#   docker compose exec recet recet-web warm-cache --acc 2021      # one ACC at a time, the first time only
+#   docker compose exec recet recet-web warm-cache --acc 2022
+#   docker compose exec recet recet-web warm-cache --acc 2024
 #   docker compose exec recet recet-web warm-cache --acc 2026
 #   docker compose exec recet recet-web create-admin you@example.com
 #
@@ -23,7 +25,7 @@ services:
       RECET_WEB_SECURE_COOKIES: ${RECET_WEB_SECURE_COOKIES:-1}
       RECET_WEB_TRUST_PROXY: ${RECET_WEB_TRUST_PROXY:-1}
       RECET_WEB_WORKERS: "1"
-      RECET_WEB_ACC_VERSIONS: "2024,2026"
+      RECET_WEB_ACC_VERSIONS: "2021,2022,2024,2026"
     volumes:
       - ${RECET_DATA_DIR:-~/recet-data}:/data:ro
       - recet_state:/var/lib/recet            # accounts, runs, drafts and the ACC cache
