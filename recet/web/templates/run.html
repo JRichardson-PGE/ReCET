@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ run.label or run.id }}{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>{{ run.label or 'Run ' + run.id }}</h1>
+  <span class="status big s-{{ run.status }}" id="run-status">{{ status_text.get(run.status, run.status) }}</span>
+</div>
+<p class="muted">ACC {{ run.acc_version }}{% if run.compare_with %} vs {{ run.compare_with }}{% endif %}{% if run.preflight_only %} · preflight only{% endif %}
+ · started {{ fmt_time(run.created_at) }}{% if run.owner_email != user.email %} · by {{ run.owner_email }}{% endif %}
+ · deleted after {{ retention }} days</p>
+<p class="small">{{ run.inputs }}</p>
+<p id="run-position" class="muted">{% if position %}Waiting in the queue: number {{ position }}.{% endif %}</p>
+<p id="run-message" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+
+<div class="actions">
+  {% if run.status in ('queued', 'running') %}
+  <form method="post" action="{{ u('/runs/' + run.id + '/cancel') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Stop</button></form>
+  {% endif %}
+  <a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>
+  {% if run.result_dir %}<a class="button" href="{{ u('/runs/' + run.id + '/zip') }}">Download everything (.zip)</a>{% endif %}
+  {% if has_inputs %}
+  <form method="post" action="{{ u('/runs/' + run.id + '/edit') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button title="Opens this run's inputs in Edit inputs as a new draft, with this run's settings, to change and run again">Edit inputs and rerun</button></form>
+  <a class="button" href="{{ u('/runs/' + run.id + '/inputs.zip') }}">Download inputs (.zip)</a>
+  {% endif %}
+  {% if run.status not in ('queued', 'running') %}
+  <form method="post" action="{{ u('/runs/' + run.id + '/delete') }}" class="confirm" data-confirm="Delete this run and its files?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Delete</button></form>
+  {% endif %}
+</div>
+
+{% if files %}
+<details class="card" open>
+  <summary>Files</summary>
+  <ul class="files">
+  {% for name, size in files %}<li><a href="{{ u('/runs/' + run.id + '/files/' + name) }}">{{ name }}</a> <span class="muted">{{ fmt_size(size) }}</span></li>{% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+<h2>Log</h2>
+<pre id="log" class="log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if run.status in ('queued', 'running') else 0 }}"></pre>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

@@ -5,7 +5,8 @@ The editor is meant for small jobs, such as an implementer's project of a few me
 
 * `load_tables()` reads a job from the Job tab's inputs (a job workbook and/or the CET files; a CET file wins over its workbook sheet, as in a run) into two
   all-text DataFrames with every CET column, in CET's order.
-* `ChoiceSource` gives each column's dropdown values: the CET value lists shipped in `data/value_lists/` (codes active for the claim year), the IOUs the POC can
+* `ChoiceSource` gives each column's dropdown values: the CET value lists shipped in `data/value_lists/` (codes active for the claim year; in the web app with
+  its admins' changes on top, `set_value_list_changes`), the IOUs the POC can
   price, and, for `E3MeaElecEndUseShape` / `E3GasSavProfile`, the profiles that actually exist for the row's IOU and target sector (library and supplied files).
 * `check_tables()` returns one `CellIssue` per problem cell. It applies the preflight's own rules (`preflight.py`: required values, numbers, CET ranges, IOU,
   ClaimYearQuarter, duplicate IDs, the second baseline, gas sector, PrgID alignment), plus "not an active CET value" and "no profile, so not priced" warnings.
@@ -20,6 +21,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from . import paths, preflight, templates
@@ -323,6 +325,14 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     return df[(df != "").any(axis=1)].reset_index(drop=True)
 
 
+def kept_rows(df: pd.DataFrame | None) -> list[int]:
+    """The positions of the rows write_cet_files keeps (all but the entirely blank ones): row i of the written file is row kept_rows(df)[i] of `df`."""
+    if df is None or df.empty:
+        return []
+    df = df.fillna("").astype(str).apply(lambda s: s.str.strip())
+    return [int(i) for i in np.flatnonzero((df != "").any(axis=1).to_numpy())]
+
+
 def write_cet_files(measures: pd.DataFrame, programcost: pd.DataFrame | None, folder: str | Path) -> dict[str, Path | None]:
     """Measure.csv (and ProgramCost.csv if it has rows) in CET's pipe-delimited format. Returns {"measures": path, "programcost": path or None}."""
     out = Path(folder)
@@ -400,15 +410,53 @@ def prepare_run_inputs(measures: pd.DataFrame, programcost: pd.DataFrame | None,
 
 
 # ------------------------------------------------------------------------------------------------------------------------- dropdown values
+# Changes ReCET admins made to the shipped lists (the web app's Docs > Value lists page), layered over them by value_list():
+# {list name: {code: {"kind": "added" | "retired" | "reinstated", "start_year", "end_year", "description"}}}. Empty in the desktop tool.
+_VALUE_LIST_CHANGES: dict[str, dict[str, dict]] = {}
+
+
+def set_value_list_changes(changes: dict[str, dict[str, dict]]) -> None:
+    """Replace the admin changes layered over the shipped value lists (see `_VALUE_LIST_CHANGES`)."""
+    global _VALUE_LIST_CHANGES
+    _VALUE_LIST_CHANGES = {k: dict(v) for k, v in changes.items()}
+    value_list.cache_clear()
+
+
 @lru_cache(maxsize=None)
-def value_list(name: str) -> pd.DataFrame:
-    """A CET value list: code, start_year, end_year (years as numbers, NaN when blank)."""
+def cet_value_list(name: str) -> pd.DataFrame:
+    """A CET value list as shipped: code, start_year, end_year (years as numbers, NaN when blank), description ("" when the list has none)."""
     p = paths.package_data("value_lists", f"{name}.csv")
     df = pd.read_csv(p, dtype=str, keep_default_na=False)
     for c in ("start_year", "end_year"):
         df[c] = pd.to_numeric(df[c], errors="coerce") if c in df.columns else float("nan")
     df["code"] = df["code"].str.strip()
-    return df[["code", "start_year", "end_year"] + (["description"] if "description" in df.columns else [])]
+    if "description" not in df.columns:
+        df["description"] = ""
+    return df[["code", "start_year", "end_year", "description"]]
+
+
+@lru_cache(maxsize=None)
+def value_list(name: str) -> pd.DataFrame:
+    """The value list in use: the shipped CET list with any admin changes applied. Columns as `cet_value_list`, plus `source`
+    ("CET", or the kind of admin change: "added", "retired", "reinstated")."""
+    df = cet_value_list(name).copy()
+    df["source"] = "CET"
+    for code, ch in _VALUE_LIST_CHANGES.get(name, {}).items():
+        hit = df["code"].str.lower() == str(code).strip().lower()
+        kind = ch.get("kind")
+        if kind == "added" and not hit.any():
+            row = {"code": str(code).strip(), "start_year": ch.get("start_year"), "end_year": ch.get("end_year"),
+                   "description": ch.get("description") or "", "source": "added"}
+            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            continue
+        if kind in ("retired", "added"):
+            df.loc[hit, "end_year"] = ch.get("end_year")
+        elif kind == "reinstated":
+            df.loc[hit, "end_year"] = float("nan")
+        df.loc[hit, "source"] = kind
+    for c in ("start_year", "end_year"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df
 
 
 def active_codes(name: str, year: int | None = None) -> list[str]:
@@ -433,9 +481,12 @@ def code_status(name: str, value: str, year: int | None) -> str | None:
     if ok.any():
         return None
     r = hit.iloc[0]
+    whose = "the" if r["source"] == "added" else "CET's"
     if pd.notna(r["end_year"]) and r["end_year"] < year:
-        return f"retired in CET's value list after {int(r['end_year'])}"
-    return f"not valid in CET's value list before {int(r['start_year'])}"
+        if r["source"] == "retired":
+            return f"retired by a ReCET admin after {int(r['end_year'])}"
+        return f"retired in {whose} value list after {int(r['end_year'])}"
+    return f"not valid in {whose} value list before {int(r['start_year'])}"
 
 
 def _natural(s: str):
