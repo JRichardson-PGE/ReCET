@@ -46,7 +46,7 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
 3. **Profile names must match exactly.** `E3MeaElecEndUseShape` must equal a library profile's end-use name (or a supplied profile's `end_use_name`), else the measure
    is left **unpriced** (`ElecPricingStatus = UNPRICED`). `E3GasSavProfile` likewise; 36 measures in the 2028 job have therms but a blank profile, and CET prices those at $0 too.
 4. **TOU (H-factor) end uses are priced from 8,760s.** CEDARS has no hourly data for them; the library holds Gen-based 8,760s built from their H-factors on the ACC's
-   own TOU map (a 2025 calendar), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
+   2018-calendar TOU map (2026 ACC v1b, re-issued 2026-10-20), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
    replaces the library's.
 5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are picked by ACC version (C3.3); a new ACC label borrows the tables of an
    ACC version you choose (default: the newest built-in).
