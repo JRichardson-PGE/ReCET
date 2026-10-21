@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ draft.name }} · Edit inputs{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ u('/static/vendor/tabulator/tabulator_simple.min.css') }}?v={{ version }}">{% endblock %}
+{% block main_class %}page wide{% endblock %}
+{% block content %}
+<div id="editor" data-api="{{ u('/edit/api/' + draft.id) }}" data-end-uses="{{ u('/edit/api/end-uses') }}" data-csrf="{{ csrf }}"
+     data-run="{{ u('/runs/new?draft=' + draft.id) }}">
+<div class="head-row">
+  <form method="post" action="{{ u('/edit/' + draft.id + '/rename') }}" class="inline-form title-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="name" value="{{ draft.name }}" maxlength="120" aria-label="Draft name" class="title-input">
+    <button class="link small">Rename</button>
+  </form>
+  <div class="actions">
+    <span id="save-status" class="save-status muted small">Loading…</span>
+    <a class="button primary" id="run-link" href="{{ u('/runs/new?draft=' + draft.id) }}">Run these inputs</a>
+  </div>
+</div>
+<p class="muted small">{{ draft.source }} ·
+  Download <a href="{{ u('/edit/' + draft.id + '/download.xlsx') }}">job workbook</a> or <a href="{{ u('/edit/' + draft.id + '/download.zip') }}">CET files</a> ·
+  <a href="{{ u('/edit') }}">All drafts</a></p>
+
+<section class="check-panel" id="check" aria-labelledby="check-btn">
+  <div class="check-bar">
+    <button type="button" id="check-btn" disabled>Validate inputs</button>
+    <label class="small">against the <select id="check-acc" aria-label="ACC version to check against"></select> ACC</label>
+    <label class="small"><input type="checkbox" id="check-sw"> Split statewide (SW_) programs across the IOUs</label>
+  </div>
+  <p class="muted small check-about">Runs the same input check a run makes before pricing (files, programs, profiles, gas profiles, ACC years) on the saved
+    tables, so you see what would stop a run or leave measures unpriced. The cells it flags are outlined in the table, red for a problem that stops the run and
+    amber for a warning; editing a flagged cell clears its outline until the next check. Nothing is priced.</p>
+  <div id="check-result" class="check-result" hidden aria-live="polite"></div>
+</section>
+
+<div class="tabs" role="tablist">
+  <button type="button" class="tab active" data-table="Measure" role="tab">Measure <span class="count" data-count="Measure"></span></button>
+  <button type="button" class="tab" data-table="ProgramCost" role="tab">ProgramCost <span class="count" data-count="ProgramCost"></span></button>
+</div>
+<div class="editor-bar">
+  <button type="button" data-action="add">Add row</button>
+  <button type="button" data-action="duplicate">Duplicate rows</button>
+  <button type="button" data-action="delete">Delete rows</button>
+  <span class="sep"></span>
+  <button type="button" data-action="undo" title="Ctrl+Z">Undo</button>
+  <button type="button" data-action="redo" title="Ctrl+Y">Redo</button>
+  <span class="sep"></span>
+  <span class="legend"><span class="calc">changes results</span><span class="noeff">no effect</span>
+    <span class="sw-error">stops the run</span><span class="sw-warning">runs, but check it</span></span>
+</div>
+<p class="help-line" id="help">Click a cell to see what its column means; hover a header for what it changes. Click a cell (or type) to edit; a cell with ▾ has a list to pick from; select a block and copy or paste with Excel.</p>
+<div id="grid-Measure" class="grid"></div>
+<div id="grid-ProgramCost" class="grid" hidden></div>
+<p class="issue-line" id="issue-summary"></p>
+<ul class="issues" id="issues"></ul>
+<p class="muted small" id="profiles-note"></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ u('/static/vendor/tabulator/tabulator.min.js') }}?v={{ version }}"></script>
+<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>
+<script src="{{ u('/static/edit.js') }}?v={{ version }}"></script>
+{% endblock %}

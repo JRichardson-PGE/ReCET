@@ -55,6 +55,22 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 In the package (`recet/docs`, and **Help > Documentation** in the window): `USER_GUIDE.md` (every control, the command line, common jobs), `INPUT_FORMATS.md`, `INPUT_FIELDS.md` (every input field),
 `OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number) and `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example). Start with `docs/README.md`.
 
+## Web app (jakemoto.com/ReCET)
+
+`recet/web` is the same tool as a password-protected web app: New run (upload a workbook or CET files), Runs (queue, log, results tables,
+downloads, and "Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
+measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs (the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
+unretire codes there, and the changes reach Edit inputs' dropdowns and checks at once).
+Input checks (preflight-only runs) go ahead of full runs in the queue. Accounts are by invitation only.
+
+    pip install -e ".[web]"
+    recet-web create-admin you@example.com      # prints a one-time link to choose a password
+    recet-web serve                             # http://localhost:3000/ReCET (set RECET_WEB_SECURE_COOKIES=0 for plain http)
+
+On the server it runs in Docker (`Dockerfile`, `docker-compose.yml`) behind the jakemoto.com edge nginx, with the reference data folder mounted
+read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.py`). `recet-web warm-cache` builds the ACC caches ahead of the first run;
+`recet-web users` and `recet-web reset-link EMAIL` manage accounts from the command line (also on the Users page for admins).
+
 ## Command line
 
     recet run --measures Measure.csv --programcost ProgramCost.csv --acc 2026 --out results

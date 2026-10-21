@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>{% block title %}ReCET{% endblock %} · ReCET</title>
+<link rel="stylesheet" href="{{ u('/static/app.css') }}?v={{ version }}">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<header class="top">
+  <a class="brand" href="{{ u('/') }}">ReCET</a>
+  {% if user %}
+  <nav>
+    <a href="{{ u('/runs/new') }}">New run</a>
+    <a href="{{ u('/runs') }}">Runs</a>
+    <a href="{{ u('/edit') }}">Edit inputs</a>
+    <a href="{{ u('/docs') }}">Docs</a>
+    {% if user.role == 'admin' %}<a href="{{ u('/admin/users') }}">Users</a><a href="{{ u('/admin/audit') }}">Audit</a>{% endif %}
+  </nav>
+  <div class="who">
+    <a href="{{ u('/account') }}" title="Change your password">{{ user.name or user.email }}</a>
+    <form method="post" action="{{ u('/logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Sign out</button></form>
+  </div>
+  {% endif %}
+</header>
+<main class="{% block main_class %}page{% endblock %}">
+{% block content %}{% endblock %}
+</main>
+<footer class="foot">ReCET {{ version }} · the rebuilt Cost Effectiveness Tool</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>
