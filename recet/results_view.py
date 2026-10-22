@@ -46,6 +46,7 @@ RATIOS = [
     Column("RIM_ratio", "RIM", "ratio", "ratio", help="Ratepayer Impact Measure ratio: (benefits + bill increases) / RIM cost"),
     Column("SCB_ratio", "SCT Base", "ratio", "ratio", help="Societal Cost Test, base social cost of carbon: SB benefits / SCB cost"),
     Column("SCH_ratio", "SCT High", "ratio", "ratio", help="Societal Cost Test, high social cost of carbon: SH benefits / SCH cost"),
+    Column("PCT_ratio", "PCT", "ratio", "ratio", help="Participant Cost Test ratio (gross): (bill reductions + incentives + tax credits) / (measure cost + bill increases)"),
     Column("TRC_NoAdmin_ratio", "TRC (no admin)", "ratio", "ratio", help="TRC ratio without program-level costs"),
     Column("PAC_NoAdmin_ratio", "PAC (no admin)", "ratio", "ratio", help="PAC ratio without program-level costs"),
     Column("RIM_NoAdmin_ratio", "RIM (no admin)", "ratio", "ratio", help="RIM ratio without program-level costs"),
@@ -65,6 +66,7 @@ LABELS = {
     "RebatesandIncents": ("Rebates and incentives ($)", "usd"), "WeightedProgramCost": ("Program costs ($)", "usd"),
     "ElecBen": ("Electric benefits ($)", "usd"), "GasBen": ("Gas benefits ($)", "usd"), "TRCCost": ("TRC cost ($)", "usd"), "PACCost": ("PAC cost ($)", "usd"),
     "RIMCost": ("RIM cost ($)", "usd"), "SCBCost": ("SCT Base cost ($)", "usd"), "SCHCost": ("SCT High cost ($)", "usd"),
+    "PCTBen": ("PCT benefits ($)", "usd"), "PCTCost": ("PCT cost ($)", "usd"),
 }
 NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}
 

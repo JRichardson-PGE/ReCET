@@ -22,13 +22,14 @@ the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `Uni
 
 ## 1. `Measure.csv`
 
-The same file you upload to the CET: pipe (`|`) delimited, one header row, UTF-8, one row per `CEInputID`. All 74 CET columns are echoed to the measure-level output in the input's own text form.
+The same file you upload to the CET: pipe (`|`) delimited (or comma-delimited, see [INPUT_FORMATS.md](INPUT_FORMATS.md)), one header row, UTF-8, one row per `CEInputID`. All 74 CET columns are echoed to the measure-level output in the input's own text form.
 
 ### 1.1 Identification and program link
 
 | Field | Type / unit | Column | Description and use |
 |---|---|---|---|
 | `CEInputID` | text, unique | required | The measure's unique, persistent ID. The key of every output row and the join key to a CET outputs file. Blank or duplicate values stop the run. |
+| `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on: `2021`, `2022`, `2024` or `2026` (`2024 ACC` is also accepted). Blank, or a file without the column, means the run's "ACC version" setting. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates (CALCULATIONS C3.5). A supplied ACC file replaces only the run's own version. Reported per measure in `POC_ACC` and `poc_acc_version`. |
 | `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share (C11) and, through the program's `PA` in `ProgramCost.csv`, gives `CreditedIOU`. |
 | `MeasDescription` | text | required | A description of the measure. Carried to the output; used only as a label. |
 | `MeasureID` | text | carried | The measure's unique ID in the source workpaper. |
@@ -62,6 +63,8 @@ The same file you upload to the CET: pipe (`|`) delimited, one header row, UTF-8
 | `IOU_AC_Territory` | `PGE` `SCE` `SDGE` `SCG` | required | The utility whose avoided costs apply (the avoided-cost territory; formerly `PA`). Selects the ACC utility (C3.1, C3.2), the discount rate (C2.4), the retail rates (C9) and the profile match. Any other value is a blocking error. |
 | `E3ClimateZone` | text, e.g. `13`, `3A` | required | The California climate zone. Selects the ACC zone (C3.1) and the profile's zone (C4.1). |
 | `E3MeaElecEndUseShape` | text | required | The name of the electric end-use load shape. Must equal a supplied or library profile's `end_use_name` (the library includes the TOU end uses as 8,760s) or the measure's electricity is **not priced** (C4.1). |
+| `E3MeaElecEndUseShape2nd` | text | optional, **not a CET column** | The electric end-use shape of the 2nd-baseline years of an early replacement (`0 < RUL_Yrs < EUL_Yrs`). Blank, or a file without the column, means `E3MeaElecEndUseShape`. The 1st-baseline years are priced on `E3MeaElecEndUseShape` and the 2nd-baseline years on this shape (CALCULATIONS C4.6). |
+| `E3MeaElecEndUseShapeWater` | text | optional, **not a CET column** | The electric end-use shape the measure's water energy (`UnitkWhIOUWater*`) is spread over, for both baselines. Blank, or a file without the column, means `E3MeaElecEndUseShape`. Matched like `E3MeaElecEndUseShape` (supplied or library profile, IOU, target sector, climate zone). See CALCULATIONS C4.6. |
 | `E3TargetSector` | text | required | The target sector (e.g. `Residential`, `Non_Res`). Part of the profile match, and selects the retail rate schedule (C9) and the NOx/PM10 factors (C14). |
 | `E3GasSavProfile` | text | required | The name of the gas monthly savings profile (e.g. `Annual`, `Winter Only`). A name that matches nothing leaves gas savings **unpriced** (C4.3). A `...FuelSub...` name on a residential measure adds behind-the-meter methane (C3.2). |
 | `E3GasSector` | `Residential` `Commercial` `Core` | required | The gas customer class. Selects the gas ACC class (C3.2) and the gas rate schedule (C9). Must be one of the three for any measure with gas savings. |
@@ -130,7 +133,7 @@ Dollars per unit, undiscounted, blank = 0 (C7).
 
 ## 2. `ProgramCost.csv`
 
-Optional. One row per program per year; pipe delimited. Every `PrgID` must appear in both files. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
+Optional. One row per program per year; pipe or comma delimited. Every `PrgID` must appear in both files. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
 blank = 0.
 
 | Field | Type / unit | Description and use |
@@ -347,6 +350,6 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 
 ## 7. CET outputs file (for comparison)
 
-Optional. A CET run's `*_outputs.csv` (pipe delimited) with a `CET_ID` column; measures are matched to the POC's `CEInputID`. Columns compared when present: `TotalSystemBenefit`, `ElecBen`, `GasBen`, `WaterEnergyBen` (+ `_SB`, `_SH`,
+Optional. A CET run's `*_outputs.csv` (pipe or comma delimited) with a `CET_ID` column; measures are matched to the POC's `CEInputID`. Columns compared when present: `TotalSystemBenefit`, `ElecBen`, `GasBen`, `WaterEnergyBen` (+ `_SB`, `_SH`,
 `Gross`), `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCRatio`, `PACRatio`, `RIMRatio`, `NetElecCO2`, `NetGasCO2`, `BillReducElec`, `BillReducGas`. The comparison is only
 meaningful when the job is run the way the CET run was (same First Year, ACC version, and statewide allocation).

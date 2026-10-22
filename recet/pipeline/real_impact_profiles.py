@@ -107,7 +107,8 @@ def resolve_shape(shape_key: str, iou: str, target_sector: str, climate_zone: st
             zone_gap = True
         elif hit is not None:
             shape, represents_year = hit
-            return shape, represents_year, "user profile"
+            scaled = _USER.scaled_lookup(shape_key, iou, target_sector, climate_zone) is not None
+            return shape, represents_year, ("user profile (kWh per unit)" if scaled else "user profile")
     pid, exact = match_profile_id(shape_key, iou, target_sector)
     if pid is None:
         return None
@@ -116,6 +117,12 @@ def resolve_shape(shape_key: str, iou: str, target_sector: str, climate_zone: st
         return None
     src = "library (user profile has no shape for this zone)" if zone_gap else ("library" if exact else "library (sector-loose match)")
     return shape, profile_meta(pid)["represents_year"], src
+
+
+def scaled_profile(shape_key: str, iou: str, target_sector: str, climate_zone: str) -> float | None:
+    """The profile's annual kWh per unit when the measure is priced on a user profile given in kWh per unit per hour (overrides.UserProfiles.scaled_lookup),
+    else None. resolve_shape returns such a profile as given (not a share of annual savings)."""
+    return _USER.scaled_lookup(shape_key, iou, target_sector, climate_zone) if _USER is not None else None
 
 
 @lru_cache(maxsize=1)

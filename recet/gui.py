@@ -46,11 +46,11 @@ def _check_file(name: str, path: str) -> tuple[bool, str]:
         return False, "file not found"
     try:
         if name in ("measures", "programcost"):
-            head = p.read_text(encoding="utf-8-sig", errors="replace").split("\n", 1)[0]
-            if "|" not in head:
-                return False, "not pipe-delimited (CET files use '|')"
+            from .pipeline import delimited
+            if delimited.detect_sep(p) is None:
+                return False, "not delimited (use pipe- or comma-delimited text)"
             need = ("CEInputID", "PrgID", "ClaimYearQuarter") if name == "measures" else ("PrgID", "PrgYear")
-            cols = [c.strip() for c in head.split("|")]
+            cols = delimited.header_columns(p)
             missing = [c for c in need if c not in cols]
             n = sum(1 for _ in open(p, encoding="utf-8-sig", errors="replace")) - 1
             return (False, f"missing {missing}") if missing else (True, f"{n:,} rows, {len(cols)} columns")

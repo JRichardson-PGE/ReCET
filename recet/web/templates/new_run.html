@@ -33,7 +33,7 @@
   <div class="mode-files">
     <label class="file">Measure.csv <input type="file" name="measures" accept=".csv,.txt"></label>
     <label class="file">ProgramCost.csv <span class="muted">(optional)</span> <input type="file" name="programcost" accept=".csv,.txt"></label>
-    <p class="muted small">CET's pipe-delimited format.</p>
+    <p class="muted small">CET's pipe-delimited format, or an ordinary comma-delimited CSV with the same columns.</p>
   </div>
   {% endif %}
   <details>
@@ -51,9 +51,9 @@
   <h2>Settings</h2>
   <div class="grid2">
     <label>ACC version
-      <select name="acc_version">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ a }} ACC{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
+      <select name="acc_version">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>Compare with
-      <select name="compare_with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ a }} ACC{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
+      <select name="compare_with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>

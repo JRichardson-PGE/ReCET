@@ -26,12 +26,22 @@ def clear_caches() -> int:
     return n
 
 
+_LAST: dict = {}
+
+
+def switch_acc(acc) -> None:
+    """Point the pipeline at another ACC version, keeping the overrides of the last `apply` (used to price a job's measures on their own ACC versions)."""
+    apply(acc, **_LAST)
+
+
 def apply(acc, *, user_profiles=None, user_gas_profiles=None, run_parameters=None, sw_factors=None, programs=None, reference_dir=None) -> None:
     """Point the pipeline at this run's ACC files and overrides.
 
     acc: versions.ResolvedAcc. Every electric measure, SCG included, is priced on the 8,760 path. user_profiles: overrides.UserProfiles or None. user_gas_profiles: {name: array(12)} or None.
     run_parameters: overrides.load_run_parameters' table or None. sw_factors: overrides.load_sw_factors' table or None.
     programs: programs.load_programs' table or None."""
+    global _LAST
+    _LAST = dict(user_profiles=user_profiles, user_gas_profiles=user_gas_profiles, run_parameters=run_parameters, sw_factors=sw_factors, programs=programs)
     if reference_dir is not None:
         paths.set_reference_dir(reference_dir)
     paths.configure_runtime(acc_electric=acc.electric, acc_gas=acc.gas)

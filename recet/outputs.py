@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .pipeline.delimited import read_cet_csv
+
 # derived field -> the raw Measure.csv column it merely restates (dropped from the poc_ block when the values are identical)
 RESTATES = {
     "num_units": "NumUnits", "unit_meas_cost_1st": "UnitMeaCost1stBaseline", "unit_meas_cost_2nd": "UnitMeaCost2ndBaseline",
@@ -36,18 +38,18 @@ DROP_FROM_RESULT = {"measure_id", "prg_id", "NTGRkWh", "ntgr_therm"}   # restate
 
 # the columns compared between two runs / against CET, and the totals in the summary
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas"]
+               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas"]
 SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TotalSystemBenefit", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "BillReducElec", "BillReducGas", "NetElecCO2", "NetGasCO2"]
+                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "BillReducElec", "BillReducGas", "PCTBen", "PCTCost", "NetElecCO2", "NetGasCO2"]
 
 
 def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.DataFrame:
     """The Measure.csv columns as text (blank stays blank); with statewide allocation, the allocated rows (numbers are then written as computed)."""
     p = Path(measure_csv)
     if not allocate_statewide:
-        return pd.read_csv(p, sep="|", dtype=str, keep_default_na=False, low_memory=False, encoding="utf-8-sig")
+        return read_cet_csv(p, dtype=str, keep_default_na=False, low_memory=False)
     from .pipeline.statewide_allocation import allocate_measure_inputs
-    df, _report = allocate_measure_inputs(pd.read_csv(p, sep="|", low_memory=False, encoding="utf-8-sig"))
+    df, _report = allocate_measure_inputs(read_cet_csv(p, low_memory=False))
     return df.astype(object).where(df.notna(), "").astype(str)
 
 
@@ -59,8 +61,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     blank = pd.Series("", index=measures.index, dtype=object)
     if not programcost_csv:
         return blank
-    pc = pd.read_csv(programcost_csv, sep="|", dtype=str, keep_default_na=False, encoding="utf-8-sig")
-    pc.columns = [c.strip() for c in pc.columns]
+    pc = read_cet_csv(programcost_csv, dtype=str, keep_default_na=False)
     if allocate_statewide:
         from .pipeline.statewide_allocation import allocate_program_costs
         pc, _ = allocate_program_costs(pc)
@@ -72,7 +73,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     return pd.Series(vals, index=measures.index, dtype=object)
 
 
-def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str, credited: pd.Series | None = None) -> pd.DataFrame:
+def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series, credited: pd.Series | None = None) -> pd.DataFrame:
     """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
     if not raw["CEInputID"].is_unique:
         raise ValueError("CEInputID is not unique")
@@ -96,7 +97,7 @@ def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd
     poc = derived[keep].add_prefix("poc_").reset_index(drop=True)
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
     frame = pd.concat([raw.reset_index(drop=True), poc, out], axis=1).copy()       # copy: one block, so the two columns added below do not warn
-    frame.insert(0, "POC_ACC", acc_label)
+    frame.insert(0, "POC_ACC", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())     # one label, or one per measure (mixed ACC versions)
     frame["CreditedIOU"] = credited.to_numpy() if credited is not None else ""
     return frame
 
@@ -112,7 +113,7 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
 EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 
 
-SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
+SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "PCT_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
 
 
 def _ratio_parts(get) -> list[tuple[str, object, object]]:
@@ -130,12 +131,12 @@ def _ratio_parts(get) -> list[tuple[str, object, object]]:
             ("SCB", b_sb, get("SCBCost")), ("SCH", b_sh, get("SCHCost")),
             ("TRC_NoAdmin", plus(b, tax), get("TRCCostNoAdmin")), ("PAC_NoAdmin", b, get("PACCostNoAdmin")),
             ("RIM_NoAdmin", plus(b, incr), get("RIMCostNoAdmin")), ("SCB_NoAdmin", b_sb, get("SCBCostNoAdmin")),
-            ("SCH_NoAdmin", b_sh, get("SCHCostNoAdmin"))]
+            ("SCH_NoAdmin", b_sh, get("SCHCostNoAdmin")), ("PCT", get("PCTBen"), get("PCTCost"))]
 
 
 def group_ratios(g: pd.DataFrame) -> dict[str, float]:
     """The cost-test ratios of a group of measures, as CET reports them on a run receipt: the summed BENEFITS (supply costs are already in the costs, not netted
-    from the numerator) over the summed cost; TRC adds tax credits and RIM the bill increases to the numerator. A ratio whose inputs are missing or whose cost is 0
+    from the numerator) over the summed cost; TRC adds tax credits and RIM the bill increases to the numerator; PCT is PCTBen over PCTCost. A ratio whose inputs are missing or whose cost is 0
     is left out. (Until 2026-09-21 the numerator was TotalSystemBenefit, which nets the supply costs out of the numerator as well as counting them in the cost.)
     Used by the portfolio summary and the Results tab's views, so both give the same ratios."""
     get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
@@ -204,7 +205,7 @@ def compare_frames(a: pd.DataFrame, b: pd.DataFrame, label_a: str, label_b: str,
 def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(per-measure, summary) of the POC against a real CET run's *_outputs.csv, matched on CEInputID (= CET_ID). Only meaningful for a job run the way the CET
     run was (same First Year, same ACC version, statewide programs allocated or not to match)."""
-    cet = pd.read_csv(cet_outputs, sep="|", low_memory=False).rename(columns={"CET_ID": "CEInputID"})
+    cet = read_cet_csv(cet_outputs, low_memory=False).rename(columns={"CET_ID": "CEInputID"})
     cols = [c for c in ("TotalSystemBenefit", "ElecBen", "GasBen", "WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyBenGross", "OtherBen",
                         "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
                         "TRCRatio", "PACRatio", "RIMRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas") if c in cet and c in frame]

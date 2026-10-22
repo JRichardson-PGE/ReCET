@@ -233,7 +233,7 @@ INPUT_FIELD = re.compile(r"^(Unit\w+|NTGR\w+|InstallationRate\w+|RealizationRate
 
 
 def test_every_input_field_named_in_the_document_exists():
-    header = set(templates._CET_MEASURE_HEADER)
+    header = set(templates.MEASURE_COLUMNS)                       # CET's columns and the optional ReCET-only ones
     program = set(cost_tests._COST_FIELDS) | {"OnBillFinancing", "PrgID", "PA", "PrgYear", "ClaimYearQuarter"}
     text = TEXT[DOC]
     bad = sorted({t for t in re.findall(r"`([^`\n]+)`", text) if INPUT_FIELD.match(t) and t not in header and t not in program})
