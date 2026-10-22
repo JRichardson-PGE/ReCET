@@ -29,6 +29,7 @@ The same file you upload to the CET: pipe (`|`) delimited (or comma-delimited, s
 | Field | Type / unit | Column | Description and use |
 |---|---|---|---|
 | `CEInputID` | text, unique | required | The measure's unique, persistent ID. The key of every output row and the join key to a CET outputs file. Blank or duplicate values stop the run. |
+| `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on: `2021`, `2022`, `2024` or `2026` (`2024 ACC` is also accepted). Blank, or a file without the column, means the run's "ACC version" setting. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates (CALCULATIONS C3.5). A supplied ACC file replaces only the run's own version. Reported per measure in `POC_ACC` and `poc_acc_version`. |
 | `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share (C11) and, through the program's `PA` in `ProgramCost.csv`, gives `CreditedIOU`. |
 | `MeasDescription` | text | required | A description of the measure. Carried to the output; used only as a label. |
 | `MeasureID` | text | carried | The measure's unique ID in the source workpaper. |

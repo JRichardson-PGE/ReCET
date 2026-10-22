@@ -239,6 +239,7 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | `poc_water_scale_2nd` | The same, 2nd baseline. | `NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
 | `poc_is_fuel_sub` | Whether the measure is treated as fuel substitution, so its negative fuel values become supply costs (true / false). | true if `FuelID` is `AllElec-New`, `FuelSub-ToElec` or `FuelSub-ToGas`, or if `MeasImpactType` contains `FuelSub` |
 | `poc_fuel_type` | The `FuelID` as text (`nan` when blank). | `FuelID` |
+| `poc_acc_version` | The ACC version the measure was priced on (text): its `ACCVersion` (an optional column, not a CET field), or the run's ACC version when blank. See INPUT_FIELDS.md section 1. | `ACCVersion` without a trailing ` ACC`; blank = the run's "ACC version" setting |
 
 The installation and realization rates enter through `poc_shape_scale*`, `poc_annual_net_therms_*` and `poc_water_scale_*` (what is priced), not through `poc_annual_net_kwh_*` (net of NTG only).
 
@@ -1534,7 +1535,7 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
-`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
 Errors stop the run; warnings and info do not.
@@ -1698,6 +1699,7 @@ refer to.
 | `poc_rr_kw` | 1 | 1 |
 | `poc_fuel_type` | (blank) | FuelSub-ToElec |
 | `poc_is_fuel_sub` | false | true |
+| `poc_acc_version` | 2026 | 2026 |
 | `poc_kwh_water_1st` | 3 | -6 |
 | `poc_kwh_water_2nd` | 0 | -4 |
 | `poc_water_net_kwh_1st` | 240 | -45 |

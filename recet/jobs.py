@@ -216,29 +216,58 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     mec = meb                                               # one setting: the same adder on benefits (MEBens) and on costs (MECost)
     log(f"{len(measures):,} measures, First Year {base_year}, market effects {meb:.0%} on benefits and costs")
 
+    # ---- ACC versions: a measure may name its own (ACCVersion column, BRD BR-06.5); blank = this run's version
+    from . import runtime, versions
+    measures["acc_version"] = measures["acc_version"].replace("", acc.key)
+    groups = {k: (acc if k == acc.key else versions.resolve_acc(k)) for k in sorted(measures["acc_version"].unique(), key=lambda k: (k != acc.key, k))}
+    if len(groups) > 1:
+        log("measures by ACC version: " + ", ".join(f"{g.label} {int((measures['acc_version'] == k).sum()):,}" for k, g in groups.items())
+            + f"; program costs are discounted at the {acc.label}'s rates")
+        if cfg.acc_electric_file or cfg.acc_gas_file:
+            log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
+
     societal = cfg.include_societal
     if societal:
         from .pipeline import gas_avoided_cost, real_avoided_cost_v2
-        e_tests, g_tests = real_avoided_cost_v2.available_cost_tests(), gas_avoided_cost.available_cost_tests()
-        if not {"SCT Base", "SCT High"} <= set(e_tests) or "SCT" not in g_tests:
-            societal = False
-            note = (f"the {acc.label} has no Societal Cost Test avoided costs (electric: {', '.join(e_tests)}; gas: {', '.join(g_tests)}): "
-                    f"the SCT Base / SCT High columns (SB, SH, SCB, SCH) are left blank")
-            result.notes.append(note)
-            log(f"note: {note}")
+        for k, g in groups.items():
+            if g is not acc:
+                runtime.switch_acc(g)
+            e_tests, g_tests = real_avoided_cost_v2.available_cost_tests(), gas_avoided_cost.available_cost_tests()
+            if not {"SCT Base", "SCT High"} <= set(e_tests) or "SCT" not in g_tests:
+                societal = False
+                note = (f"the {g.label} has no Societal Cost Test avoided costs (electric: {', '.join(e_tests)}; gas: {', '.join(g_tests)}): "
+                        f"the SCT Base / SCT High columns (SB, SH, SCB, SCH) are left blank")
+                result.notes.append(note)
+                log(f"note: {note}")
+                break
+        runtime.switch_acc(acc)
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
     t0 = time.time()
-    res = run_poc.run_full_cost_effectiveness(measures, program_costs=program, acc_version=acc.settings_acc, base_year=base_year,
-                                              market_effects_bens=meb, market_effects_cost=mec, include_societal=societal)
+    parts, em_parts, comp_parts = [], [], []
+    for k, g in groups.items():
+        sub = measures[measures["acc_version"] == k].reset_index(drop=True) if len(groups) > 1 else measures
+        if g is not acc:
+            runtime.switch_acc(g)
+            log(f"  pricing {len(sub):,} measure(s) on the {g.label}")
+        parts.append(run_poc.price_measure_values(sub, acc_version=g.settings_acc, base_year=base_year, market_effects_bens=meb, market_effects_cost=mec,
+                                                  include_societal=societal))
+        if cfg.emissions:
+            em_parts.append(emissions.price_emissions(sub, acc_version=g.settings_acc, market_effects_bens=meb))
+        if cfg.components:
+            comp_parts.append(comp_mod.price_components(sub, acc_version=g.settings_acc, base_year=base_year, market_effects_bens=meb, log=log))
+    if len(groups) > 1:
+        runtime.switch_acc(acc)
+    res = run_poc.apply_program_costs(pd.concat(parts, ignore_index=True), measures, program, acc_version=acc.settings_acc, base_year=base_year,
+                                      market_effects_bens=meb, include_societal=societal)
     log(f"priced in {time.time() - t0:.0f}s")
     if cfg.emissions:
         log("\n== emissions ==")
-        res = res.merge(emissions.price_emissions(measures, acc_version=acc.settings_acc, market_effects_bens=meb), on="measure_id", how="left")
+        res = res.merge(pd.concat(em_parts, ignore_index=True), on="measure_id", how="left")
 
     comps = None
     if cfg.components:
         log("\n== ACC components (each priced separately) ==")
-        comps = comp_mod.price_components(measures, acc_version=acc.settings_acc, base_year=base_year, market_effects_bens=meb, log=log)
+        comps = pd.concat(comp_parts, ignore_index=True) if len(comp_parts) > 1 else comp_parts[0]
         chk = comp_mod.check_sums(res, comps)
         for fuel, r in chk.items():
             log(f"  {fuel}: {r['components']} components; sum of components vs total: portfolio {r['portfolio_sum_of_components']:,.0f} vs {r['portfolio_total']:,.0f}, "
@@ -251,7 +280,8 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
 
     # ---- assemble and write
     log("\n== writing results ==")
-    frame = outputs.assemble_measure_level(raw, measures, res, acc.label,
+    acc_labels = measures["acc_version"].map({k: g.label for k, g in groups.items()})
+    frame = outputs.assemble_measure_level(raw, measures, res, acc_labels if len(groups) > 1 else acc.label,
                                            credited=outputs.credited_iou(measures, cfg.programcost, cfg.allocate_statewide))
     if comps is not None:
         frame = frame.merge(comps, left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")

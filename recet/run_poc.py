@@ -694,6 +694,17 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
     """
     if base_year is None:
         base_year = int(measures["claim_year"].min())
+    d = price_measure_values(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens,
+                             market_effects_cost=market_effects_cost, include_societal=include_societal)
+    return apply_program_costs(d, measures, program_costs, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens,
+                               include_societal=include_societal)
+
+
+def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0, market_effects_cost: float = 0.0,
+                         include_societal: bool = True) -> pd.DataFrame:
+    """The measure-level half of run_full_cost_effectiveness: every value that depends on the ACC (benefits, supply costs, participant PVs, bill impacts, the
+    societal variants), one row per measure, before program costs are shared out. Measures priced on different ACC versions (BRD BR-06.5) are priced here
+    one group at a time, each under its own ACC, and the groups are joined before apply_program_costs."""
     trc = run_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
                                  market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
     if include_societal:
@@ -712,7 +723,13 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
     d = measures[["measure_id", "prg_id", "NTGRkWh", "ntgr_therm"]].copy()
     d["NTGRkWh"] = d["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
     d["ntgr_therm"] = d["ntgr_therm"] + market_effects_bens
-    d = d.merge(trc, on="measure_id").merge(sct, on="measure_id")
+    return d.merge(trc, on="measure_id").merge(sct, on="measure_id")
+
+
+def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
+                        market_effects_bens: float = 0.0, include_societal: bool = True) -> pd.DataFrame:
+    """The program-level half: share each program's costs over its measures (all of them, whatever ACC version priced them) and finish every cost test.
+    Program costs are discounted with the run's own ACC version's rates (`acc_version`)."""
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
     out = cost_tests.compute_cost_tests(d, prog)
     out = out.merge(first_year_net_savings(measures, market_effects_bens), on="measure_id", how="left")

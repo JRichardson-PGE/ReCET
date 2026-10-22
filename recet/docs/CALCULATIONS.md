@@ -228,6 +228,11 @@ SDG&E 7.36%, the same in every built-in ACC); the societal rate `DiscountRateAnn
 TRC, PAC and RIM as usual and leaves every SCT Base / SCT High column (`*_SB`, `*_SH`, `SCB*`, `SCH*`) blank, with a note in the log and `run_settings.json`. The same
 applies to any supplied ACC file without SCT rows.
 
+**C3.5 A different ACC version per measure (BRD BR-06.5).** A measure whose optional `ACCVersion` column names a version other than the run's is priced on that
+version: its electric and gas avoided costs, its run parameters (discount rates) and E3 tables (rate schedules, emissions), exactly as a run on that version would price
+it. The measure-level values of each version's measures are computed under that version, then joined, and the program costs (C11) are shared over all the job's measures
+and discounted at the rates of the run's own version. The societal tests are left blank for the whole job if any version in it is TRC only.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## C4 Load shapes

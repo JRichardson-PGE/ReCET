@@ -253,6 +253,19 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         rep.add("error", "program_alignment", str(exc), cells=where)
         return rep
     rep.stats["claim years"] = f"{measures['claim_year'].min()}-{measures['claim_year'].max()}"
+    named = measures.loc[measures["acc_version"] != "", "acc_version"]
+    if len(named):                                  # the optional ACCVersion column (BRD BR-06.5): each measure may name its own ACC version
+        from . import paths, versions
+        run_key = acc.key if acc is not None else None
+        rep.stats["measures by ACC version"] = ", ".join(f"{k}: {n:,}" for k, n in named.value_counts().sort_index().items())
+        for k in sorted(named.unique()):
+            rows = mrows(measures["acc_version"] == k)
+            if k != run_key and k not in versions.BUILTIN:
+                rep.add("error", "bad_acc_version", f"ACCVersion {k!r} is not a built-in ACC version ({', '.join(versions.BUILTIN)}) or this run's version",
+                        len(rows), [k], _cells("Measure", rows, "ACCVersion"))
+            elif k != run_key and paths.ref_path(versions.BUILTIN[k].electric_key) is None:
+                rep.add("error", "acc_version_file_missing", f"the {versions.BUILTIN[k].label} electric file is not in the reference data folder, so the measures "
+                        f"that name it cannot be priced", len(rows), [k], _cells("Measure", rows, "ACCVersion"))
     rep.stats["First Year (base year) that will be used"] = base_year or int(measures["claim_year"].min())
     if programcost_csv is None:
         rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
