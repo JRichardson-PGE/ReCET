@@ -70,7 +70,8 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
     kwh_total = {y: 0.0 for y in years}
     kwh_unshaped = {y: 0.0 for y in years}
     groups: dict[tuple, dict[int, float]] = {}
-    for m in measures.itertuples(index=False):
+    from . import run_poc
+    for m in run_poc.split_by_baseline_shape(measures).itertuples(index=False):     # a separate 2nd-baseline shape adds its own part
         if float(m.shape_scale) == 0 and float(m.shape_scale_2nd) == 0:
             continue
         ws = {y: weights_for_year(m, y) for y in years}

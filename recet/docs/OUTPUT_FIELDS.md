@@ -186,8 +186,9 @@ came from), added by the export script `poc/tou/export_measure_level.py`, not by
 
 Which ACC version the row was priced against. Text.
 
-**Formula:** the run's ACC label: `2021 ACC`, `2022 ACC`, `2024 ACC` or `2026 ACC` for a built-in version, `Custom ACC '<label>'` for a new version defined by
-supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
+**Formula:** the run's ACC label, which names both the ACC (the year the calculator was released) and CET's Avoided Cost Version (the first year it was in effect
+for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avoided Cost Version 2024)`, `2024 ACC (Avoided Cost Version 2026)` or
+`2026 ACC (Avoided Cost Version 2028)` for a built-in version, `Custom ACC '<label>'` for a new version defined by supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
@@ -204,6 +205,8 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | `poc_climate_zone` | Climate zone, as text. | `E3ClimateZone` |
 | `poc_target_sector` | Target sector for shapes and rates (text). | `E3TargetSector` |
 | `poc_shape_key` | Electric end-use shape name (text). | `E3MeaElecEndUseShape` |
+| `poc_shape_key_2nd` | The electric end-use shape of the 2nd-baseline years (text). | `E3MeaElecEndUseShape2nd` (an optional ReCET column, not a CET field); blank = `E3MeaElecEndUseShape` |
+| `poc_shape_key_water` | The electric end-use shape the water energy is spread over, both baselines (text). | `E3MeaElecEndUseShapeWater` (optional, not a CET field); blank = `E3MeaElecEndUseShape` |
 | `poc_gas_profile_key` | Gas savings profile name (text). | `E3GasSavProfile` |
 | `poc_gas_sector` | Gas sector (text). | `E3GasSector` |
 | `poc_subset_key` | A label built from zone and sector; not used in pricing (text). | `"CZ" + E3ClimateZone + "_" + Sector` |
@@ -238,8 +241,14 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | `poc_water_scale_2nd` | The same, 2nd baseline. | `NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
 | `poc_is_fuel_sub` | Whether the measure is treated as fuel substitution, so its negative fuel values become supply costs (true / false). | true if `FuelID` is `AllElec-New`, `FuelSub-ToElec` or `FuelSub-ToGas`, or if `MeasImpactType` contains `FuelSub` |
 | `poc_fuel_type` | The `FuelID` as text (`nan` when blank). | `FuelID` |
+| `poc_acc_version` | The ACC version the measure was priced on (text): its `ACCVersion` (an optional column, not a CET field), or the run's ACC version when blank. See INPUT_FIELDS.md section 1. | `ACCVersion` without a trailing ` ACC`; blank = the run's "ACC version" setting |
 
 The installation and realization rates enter through `poc_shape_scale*`, `poc_annual_net_therms_*` and `poc_water_scale_*` (what is priced), not through `poc_annual_net_kwh_*` (net of NTG only).
+
+**A measure priced on an already-scaled 8,760 profile** (kWh per unit per hour, `ProfileSource = user profile (kWh per unit)`, CALCULATIONS C4.5) is the exception: its
+profile carries the kWh, so `poc_shape_scale = NumUnits * NTGRkWh * InstallationRatekWh * RealizationRatekWh` (times `UnitkWh2ndBaseline / UnitkWh1stBaseline` for
+`poc_shape_scale_2nd`), and the measure's annual kWh per unit is the profile's sum (written in its own `poc_` column, since it then differs from `UnitkWh1stBaseline`),
+which `poc_annual_net_kwh_*` use. A load-shifting-only profile has an annual kWh of 0.
 Unlike electricity, the gas quantity includes its rates and its own NTG (`NTGRTherm`).
 
 ### 1.3 Pricing status
@@ -248,8 +257,8 @@ A benefit of 0 alone cannot tell "no savings" from "could not price"; these colu
 
 | Field | Values and the rule that gives each |
 |---|---|
-| `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
-| `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
+| `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `PARTLY PRICED: no hourly profile for one baseline's shape` when the measure has a separate 2nd-baseline shape and only one of its two shapes was found (C4.6); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
+| `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `user profile (kWh per unit)` (an already-scaled profile, C4.5), `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
 | `SystemClimateZone` | For a measure with `E3ClimateZone = System`: the real climate zone it was priced in, the profile's System zone (CALCULATIONS C4.4); blank for every other measure and when nothing was priced |
 | `SystemZoneSource` | Where `SystemClimateZone` came from: `catalog` (the shipped System-zone catalog), or `calculated (...)` with the reason (`user profile`, `supplied ACC`, `reference data differs from the catalog's`, `profile not in catalog`); `no zone could be priced: System shape and blended prices` when no zone was an option; blank otherwise |
 | `GasPricingStatus` | `no gas savings` when `poc_annual_net_therms_1st` and `poc_annual_net_therms_2nd` are both 0; `priced` when the gas value was computed; otherwise `UNPRICED: no gas savings profile match` (`E3GasSavProfile` names no known profile) |
@@ -615,6 +624,33 @@ measure adds electric load, so `PV_elec` is negative:
 - Check, `PV_gas` of example B: 5130 * 1.485816933 + (0.125 * 5130 + 0.875 * 3420) * 1.530391441 / 1.0766^5 + 0.5 * 3420 * 1.576303184 / 1.0766^6 = **13,198.20**
 - Example B, `BillReducGas`: max(0, PV_gas) with PV_gas = 13198.20 = **13,198.20**
 - Example B, `BillIncrGas`: max(0, -PV_gas), and PV_gas is positive, so 0 = **0.00**
+
+#### `BillReducElecGross`, `BillIncrElecGross`, `BillReducGasGross`, `BillIncrGasGross`
+
+**The participant's own bill change** for the Participant Cost Test (1.10): the bill impacts above on **gross** savings, without net-to-gross and without market effects
+(free riders are participants too). Unit: $ (PV, annual discounting). The CET has no such columns.
+
+**Formula**
+
+```text
+PV_elec_gross = PV( NumUnits * UnitkWh1stBaseline * IR * RR ,  NumUnits * UnitkWh2ndBaseline * IR * RR ,  RateE )      IR, RR: InstallationRatekWh, RealizationRatekWh (blank = 1)
+PV_gas_gross  = PV( NumUnits * UnitTherm1stBaseline * IRt * RRt ,  NumUnits * UnitTherm2ndBaseline * IRt * RRt ,  RateG )   IRt, RRt: the therm rates (blank = 1)
+the Reduc / Incr split and PV(s1, s2, rate): exactly as for BillReducElec ... BillIncrGas above
+```
+
+**Inputs:** as for `BillReducElec` ... `BillIncrGas`, without the NTG columns and the market-effects setting.
+
+The gross streams are the net streams of the entry above divided by `NTG + MEB` (example A: 0.8 electric, 0.9 gas; example B: 0.75 + 0.05 and 0.85 + 0.05):
+
+- Example A, `BillReducElecGross`: 42750 * 0.406249518 + 42750 * 0.418437003 / 1.0766^1 + 0.4 * 42750 * 0.430990113 / 1.0766^6 = **38,715.61**
+- Example A, `BillIncrElecGross`: not a fuel-substitution measure, so 0 = **0.00**
+- Example A, `BillReducGasGross`: 1800 * 2.815469667 + 1800 * 2.899933757 / 1.0766^1 + 0.4 * 1800 * 2.986931770 / 1.0766^6 = **11,297.45**
+- Example A, `BillIncrGasGross`: not a fuel-substitution measure, so 0 = **0.00**
+- Check, `PV_elec_gross` of example B: -36000 * 0.426280328 + (0.125 * -36000 + 0.875 * -22500) * 0.439068738 / 1.0766^5 + 0.5 * -22500 * 0.452240800 / 1.0766^6 = **-25,956.07**
+- Example B, `BillReducElecGross`: max(0, PV_elec_gross) with PV_elec_gross = -25956.07, so 0 = **0.00**
+- Example B, `BillIncrElecGross`: max(0, -PV_elec_gross) = **25,956.07**
+- Example B, `BillReducGasGross`: 5700 * 1.485816933 + (0.125 * 5700 + 0.875 * 3800) * 1.530391441 / 1.0766^5 + 0.5 * 3800 * 1.576303184 / 1.0766^6 = **14,664.66**
+- Example B, `BillIncrGasGross`: max(0, -PV_gas_gross), and PV_gas_gross is positive, so 0 = **0.00**
 
 ### 1.6 Societal (SB = Base, SH = High) and societal-rate columns
 
@@ -1040,6 +1076,30 @@ SCHRatioNoAdmin = the same numerator / SCHCostNoAdmin
 - Example B, `SCHRatio`: (0.00 + 10432.0340 + 0.00 + 320.00) / 60932.6233 = **0.1765**
 - Example B, `SCHRatioNoAdmin`: 10752.0340 / 59161.3579 = **0.1817**
 
+#### `PCTBen`, `PCTCost`, `PCTRatio`
+
+**The Participant Cost Test** (CA Standard Practice Manual, Chapter 2), which the CET does not calculate: the participant's benefits (bill reductions, incentives received,
+tax credits) against the participant's costs (the full measure cost and any bill increase), on gross savings and without market effects. `PCTBen` and `PCTCost` are $ (PV);
+`PCTRatio` is a ratio (0 when `PCTCost` is 0). Not yet checked against a CPUC definition: CPUC has not published how the CET will calculate the test.
+
+**Formula**
+
+```text
+PCTBen   = BillReducElecGross + BillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF
+PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + BillIncrElecGross + BillIncrGasGross          (GrossParticipantCostPV + RebatesandIncentsPV = the measure cost before incentives)
+PCTRatio = PCTBen / PCTCost
+```
+
+**Where** `PVF = Rqf ^ Qm` is the participant-cost discount factor of `RebatesandIncentsPV` (1.5): the claim quarter at the primary quarterly rate.
+**Inputs:** the columns named in the formula and their inputs; no program costs.
+
+- Example A, `PCTBen`: 38715.6133 + 11297.4525 + 5776.6364 + 500 / 1.0386667225 = **56,271.09**
+- Example A, `PCTCost`: 13478.8183 + 5776.6364 + 0.00 + 0.00 = **19,255.45**
+- Example A, `PCTRatio`: 56271.0886 / 19255.4547 = **2.9223**
+- Example B, `PCTBen`: 0.00 + 14664.6629 + 13246.3327 + 1000 / 1.01915 = **28,892.21**
+- Example B, `PCTCost`: 47421.2222 + 13246.3327 + 25956.0741 + 0.00 = **86,623.63**
+- Example B, `PCTRatio`: 28892.2054 / 86623.6290 = **0.3335**
+
 ### 1.11 Emissions
 
 Present when "Include emissions" is on. *First-year* is the measure's **first four quarters** of life (`k` = 0 ... 3, or fewer if the life is shorter), not a calendar year; `...Lifecycle` is all of its quarters. `Net` includes net-to-gross
@@ -1361,7 +1421,7 @@ it they are counted like every other measure.
 | `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited IOU`, `program segment` or `excluded` |
 | `value` | The group's value. Text. | `all measures`, the IOU (`PGE`, `SCE`, `SDGE`, `SCG`; `SW` for unallocated statewide programs in the credited-IOU rows), the segment (for example `resource_acquisition`, `(blank)`), or the excluded row's label |
 | `measures` | Number of measures in the group. Count. | `COUNT of the measure-level rows in the group` |
-| `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
+| `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas`, `PCTBen`, `PCTCost` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
 | `NetElecCO2`, `NetGasCO2` | The group's first-year net CO2. Metric tons. | `SUM over the group of NetElecCO2` (and of `NetGasCO2`) |
 | `TRC_ratio` | Portfolio Total Resource Cost ratio, on CET's receipt definition: the summed benefits (supply costs are inside the cost, not netted from the numerator) over the summed cost. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCost)` |
 | `TRC_NoAdmin_ratio` | The same over the cost without program costs. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCostNoAdmin)` |
@@ -1370,6 +1430,7 @@ it they are counted like every other measure.
 | `RIM_ratio` | Portfolio Ratepayer Impact Measure ratio. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(BillIncrElec) + SUM(BillIncrGas) ) / SUM(RIMCost)` |
 | `SCB_ratio` | Portfolio Societal Cost ratio, Base (omitted when SCB/SCH are off). Ratio. | `( SUM(ElecBen_SB) + SUM(GasBen_SB) + SUM(WaterEnergyBen_SB) + SUM(OtherBen) ) / SUM(SCBCost)` |
 | `SCH_ratio` | Portfolio Societal Cost ratio, High (omitted when SCB/SCH are off). Ratio. | `( SUM(ElecBen_SH) + SUM(GasBen_SH) + SUM(WaterEnergyBen_SH) + SUM(OtherBen) ) / SUM(SCHCost)` |
+| `PCT_ratio` | Portfolio Participant Cost Test ratio (gross). Ratio. | `SUM(PCTBen) / SUM(PCTCost)` |
 
 Each `SUM` is over the group's measures. A ratio is omitted when a column it needs is blank or its denominator is 0. **Inputs:** the measure-level table only.
 
@@ -1474,9 +1535,9 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 ### 2.8 `preflight.txt`
 
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
-source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `not_pipe_delimited`, `missing_columns`,
+source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
-`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
 Errors stop the run; warnings and info do not.
@@ -1605,9 +1666,11 @@ refer to.
 <!-- oa-all:start -->
 | Field | Example A | Example B |
 |---|---|---|
-| `POC_ACC` | 2026 ACC | 2026 ACC |
+| `POC_ACC` | 2026 ACC (Avoided Cost Version 2028) | 2026 ACC (Avoided Cost Version 2028) |
 | `poc_subset_key` | CZ13_Res | CZ13_Com |
 | `poc_shape_key` | W_SHAPE | 3 = Commercial HVAC |
+| `poc_shape_key_2nd` | W_SHAPE | 3 = Commercial HVAC |
+| `poc_shape_key_water` | W_SHAPE | 3 = Commercial HVAC |
 | `poc_annual_net_kwh` | 40000 | -30000 |
 | `poc_annual_net_kwh_1st` | 40000 | -30000 |
 | `poc_annual_net_kwh_2nd` | 0 | -18750 |
@@ -1640,6 +1703,7 @@ refer to.
 | `poc_rr_kw` | 1 | 1 |
 | `poc_fuel_type` | (blank) | FuelSub-ToElec |
 | `poc_is_fuel_sub` | false | true |
+| `poc_acc_version` | 2026 | 2026 |
 | `poc_kwh_water_1st` | 3 | -6 |
 | `poc_kwh_water_2nd` | 0 | -4 |
 | `poc_water_net_kwh_1st` | 240 | -45 |
@@ -1676,6 +1740,13 @@ refer to.
 | `BillIncrElec` | 0 | 20764.9 |
 | `BillReducGas` | 10167.7 | 13198.2 |
 | `BillIncrGas` | 0 | 0 |
+| `BillReducElecGross` | 38715.6 | 0 |
+| `BillIncrElecGross` | 0 | 25956.1 |
+| `BillReducGasGross` | 11297.5 | 14664.7 |
+| `BillIncrGasGross` | 0 | 0 |
+| `PCTBen` | 56271.1 | 28892.2 |
+| `PCTCost` | 19255.5 | 86623.6 |
+| `PCTRatio` | 2.92235 | 0.333537 |
 | `ElecBen_SB` | 6688.34 | 0 |
 | `ElecBen_SH` | 7296.37 | 0 |
 | `ElecSupplyCost_SB` | 0 | 4734.01 |

@@ -22,6 +22,9 @@ Matching rules ("if a profile matches an existing defined version, the separate 
 
 Everything is validated when loaded and raises `OverrideError` with the row/hour that is wrong, never a silent fix -- except the two documented
 normalisations (impacts that do not sum to 1 are rescaled and the run says so).
+
+An 8,760 profile may instead be given in kWh per unit per hour (`profile_basis` = `kwh_per_unit`, BRD BR-06.6): the measure's annual kWh is then derived from
+the profile, and a profile that sums to zero (a load-shifting-only measure) is valid. See `load_user_profiles` and run_poc.apply_scaled_profiles.
 """
 from __future__ import annotations
 
@@ -104,13 +107,29 @@ def norm_zone(value) -> str:
     return s
 
 
+SCALED_BASIS = "kwh_per_unit"
+_BASIS_NAMES = {"": "share", "share": "share", "unitized": "share", "normalized": "share", "fraction": "share",
+                "kwh_per_unit": SCALED_BASIS, "kwh per unit": SCALED_BASIS, "kwh": SCALED_BASIS, "scaled": SCALED_BASIS}
+
+
+def norm_basis(v) -> str:
+    s = "" if v is None or (isinstance(v, float) and np.isnan(v)) else str(v).strip().lower().replace("-", "_")
+    if s.replace("_", " ") in _BASIS_NAMES:
+        return _BASIS_NAMES[s.replace("_", " ")]
+    if s in _BASIS_NAMES:
+        return _BASIS_NAMES[s]
+    raise OverrideError(f"8,760 profile file: unrecognised profile_basis {v!r} (use share or kwh_per_unit)")
+
+
 @dataclass
 class _Entry:
     end_use: str                                   # as written in the file (display)
     pa: str | None
     sector: str | None
     represents_year: int
-    zones: dict[str, np.ndarray] = field(default_factory=dict)   # normalised zone -> length-8760 shape (sums to ~1)
+    zones: dict[str, np.ndarray] = field(default_factory=dict)   # zone -> length-8760 shape: shares summing to ~1, or kWh per unit per hour when `scaled`
+    scaled: bool = False                           # profile_basis = kwh_per_unit: the zones hold the profile exactly as given (already scaled)
+    annual_kwh: dict[str, float] = field(default_factory=dict)   # zone -> the scaled profile's annual kWh per unit (its sum; 0 for load shifting only)
 
     def specificity(self) -> int:
         return (self.pa is not None) + (self.sector is not None)
@@ -151,9 +170,21 @@ class UserProfiles:
                 return e.zones[key], e.represents_year
         return "zone_missing"
 
+    def scaled_lookup(self, shape_key: str, iou: str, sector: str, zone: str) -> float | None:
+        """The annual kWh per unit (the profile's sum) when the measure is priced on a kWh-per-unit profile in this zone, else None. The shape `lookup`
+        returns for it is the profile as given, in kWh per unit per hour."""
+        e = self.match(shape_key, iou, sector)
+        if e is None or not e.scaled:
+            return None
+        z = norm_zone(zone)
+        for key in (z, "SYSTEM", "ALL"):
+            if key in e.annual_kwh:
+                return e.annual_kwh[key]
+        return None
+
     def summary(self) -> pd.DataFrame:
         return pd.DataFrame([{"end_use_name": e.end_use, "pa": e.pa or "any", "target_sector": e.sector or "any", "represents_year": e.represents_year,
-                              "zones": ", ".join(sorted(e.zones))} for e in self.entries])
+                              "profile_basis": SCALED_BASIS if e.scaled else "share", "zones": ", ".join(sorted(e.zones))} for e in self.entries])
 
 
 def load_user_profiles(path: str | Path, normalize: bool = True) -> UserProfiles:
@@ -162,6 +193,9 @@ def load_user_profiles(path: str | Path, normalize: bool = True) -> UserProfiles
     has_year = "represents_year" in {c.lower() for c in df.columns}
     if has_year:
         df = df.rename(columns={c: "represents_year" for c in df.columns if c.lower() == "represents_year"})
+    has_basis = "profile_basis" in {c.lower() for c in df.columns}
+    if has_basis:
+        df = df.rename(columns={c: "profile_basis" for c in df.columns if c.lower() == "profile_basis"})
     df = df.dropna(how="all")
     if df.empty:
         raise OverrideError("8,760 profile file has no rows")
@@ -185,6 +219,7 @@ def load_user_profiles(path: str | Path, normalize: bool = True) -> UserProfiles
         df["year_n"] = yr.fillna(DEFAULT_REPRESENTS_YEAR).astype(int)
     else:
         df["year_n"] = DEFAULT_REPRESENTS_YEAR
+    df["basis_n"] = df["profile_basis"].map(norm_basis) if has_basis else "share"
 
     entries: list[_Entry] = []
     notes: list[str] = []
@@ -199,7 +234,10 @@ def load_user_profiles(path: str | Path, normalize: bool = True) -> UserProfiles
         years = sorted(g["year_n"].unique())
         if len(years) != 1:
             raise OverrideError(f"profile {end_use!r}: represents_year must be the same on every row (found {years})")
-        entry = _Entry(end_use=end_use, pa=pa, sector=sector, represents_year=int(years[0]))
+        bases = sorted(g["basis_n"].unique())
+        if len(bases) != 1:
+            raise OverrideError(f"profile {end_use!r}: profile_basis must be the same on every row (found {bases})")
+        entry = _Entry(end_use=end_use, pa=pa, sector=sector, represents_year=int(years[0]), scaled=bases[0] == SCALED_BASIS)
         for zone, z in g.groupby("zone_n", sort=False):
             hours = z["hour_of_year"].to_numpy()
             if len(z) != HOURS or set(hours.tolist()) != set(range(1, HOURS + 1)):
@@ -210,6 +248,13 @@ def load_user_profiles(path: str | Path, normalize: bool = True) -> UserProfiles
                     f"missing {missing[:6]}{'...' if len(missing) > 6 else ''}; duplicated {dupes[:6]}{'...' if len(dupes) > 6 else ''})")
             shape = z.sort_values("hour_of_year")["impact"].to_numpy(dtype=np.float64)
             total = float(shape.sum())
+            if entry.scaled:
+                # kWh per unit per hour, kept exactly as given and priced as such (run_poc.apply_scaled_profiles); it may net to zero (load shifting only).
+                if not np.abs(shape).sum() > 0:
+                    raise OverrideError(f"profile {end_use!r}, zone {zone}: every impact is 0 (a kWh-per-unit profile needs some savings or shifted load)")
+                entry.zones[zone] = shape
+                entry.annual_kwh[zone] = total
+                continue
             if abs(total - 1.0) > SUM_TOLERANCE:
                 if not normalize:
                     raise OverrideError(f"profile {end_use!r}, zone {zone}: impacts sum to {total:.6f}, not 1 (normalization is off)")

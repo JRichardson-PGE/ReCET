@@ -91,6 +91,17 @@ def load_field_rules(path: Path | None = None) -> dict[str, dict[str, str]]:
     return out
 
 
+def electric_factors(prg_ids: pd.Series, years: pd.Series) -> pd.Series:
+    """For allocated measure rows (PrgID `<IOU>_<statewide program>`), the electric factor allocation applied to their kWh fields; 1 for every other row."""
+    factors = load_factors()
+    out = []
+    for prg, year in zip(prg_ids.astype(str), years.astype(int)):
+        iou, _, orig = prg.partition("_")
+        col = f"{iou}ElectricFactor"
+        out.append(float(factors.at[(year, orig), col]) if iou in IOUS and (year, orig) in factors.index and col in factors.columns else 1.0)
+    return pd.Series(out, index=prg_ids.index)
+
+
 def _claim_year(df: pd.DataFrame, table: str) -> pd.Series:
     if "ClaimYearQuarter" in df.columns:
         return df["ClaimYearQuarter"].astype(str).str[:4].astype(int)

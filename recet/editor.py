@@ -32,6 +32,7 @@ PROGRAMCOST_COLUMNS = list(templates.PROGRAMCOST_COLUMNS)
 PROGRAMCOST_NUMERIC = [c for c in PROGRAMCOST_COLUMNS if c not in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")]
 MEASURE_NUMERIC = preflight.NUMERIC_COLUMNS + ["UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"]
 FLAG_COLUMNS = ("Residential_Flag", "Upstream_Flag")
+END_USE_COLUMNS = ("E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater")   # electric shapes: per-row dropdowns (IOU and target sector)
 CYQ = re.compile(r"^\d{4}Q[1-4]$")
 
 # Measure / ProgramCost column -> CET value-list file in data/value_lists (RUL_ID is not checked: CET's RUL IDs are not a published list)
@@ -57,7 +58,8 @@ NEW_MEASURE_DEFAULTS = {
 # poc_annual_net_kw*, so they come last in that group. Sector only labels poc_subset_key; RateScheduleElec/Gas are not used (the schedule follows IOU and sector).
 MEASURE_FROZEN = ["CEInputID", "MeasCode", "MeasDescription"]
 MEASURE_CALC = [
-    "PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3MeaElecEndUseShape", "E3GasSector", "E3GasSavProfile",
+    "PrgID", "ClaimYearQuarter", "ACCVersion", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd",
+    "E3MeaElecEndUseShapeWater", "E3GasSector", "E3GasSavProfile",
     "FuelID", "MeasImpactType", "CombustionType",
     "NumUnits", "UnitkWh1stBaseline", "UnitkWh2ndBaseline", "UnitTherm1stBaseline", "UnitTherm2ndBaseline", "UnitkWhIOUWater1stBaseline",
     "UnitkWhIOUWater2ndBaseline", "EUL_Yrs", "RUL_Yrs",
@@ -145,6 +147,12 @@ EFFECTS = {
                            "Part of the 8,760 profile match; picks the electric retail rate schedule and the NOx/PM10 factors."),
         "E3MeaElecEndUseShape": (_ELEC + ", water-energy value, electric emissions, " + _REST + " (nothing electric is priced if no profile matches)",
                                  "The 8,760-hour load shape the kWh savings are spread over before pricing; part of the NOx/PM10 key."),
+        "E3MeaElecEndUseShape2nd": ("the 2nd-baseline years of " + _ELEC + ", electric emissions, " + _REST,
+                                    "Optional ReCET column (not a CET field): the load shape of the years after RUL_Yrs on an early replacement. Blank = E3MeaElecEndUseShape."),
+        "E3MeaElecEndUseShapeWater": ("water-energy value, " + _REST,
+                                      "Optional ReCET column (not a CET field): the load shape the water energy is spread over. Blank = E3MeaElecEndUseShape."),
+        "ACCVersion": ("every avoided-cost value of the measure, its discount rates, bill impacts and emissions, " + _REST,
+                       "Optional ReCET column (not a CET field): the ACC version this measure is priced on (2021, 2022, 2024, 2026). Blank = the run's version."),
         "E3GasSector": (_GAS + ", the gas bill impact, " + _REST, "Picks the gas ACC class (Residential, Commercial, Core) and the gas retail rate schedule."),
         "E3GasSavProfile": (_GAS + ", " + _REST + " (no gas value if the name matches nothing)",
                             "The 12-month shape the therm savings are spread over. A ...FuelSub... name on a residential measure adds behind-the-meter methane."),
@@ -227,12 +235,10 @@ class EditorError(ValueError):
 # ------------------------------------------------------------------------------------------------------------------------- loading and saving
 def _read_cet(path: str | Path) -> pd.DataFrame:
     p = Path(path)
-    head = p.read_text(encoding="utf-8-sig", errors="replace").split("\n", 1)[0]
-    if "|" not in head:
-        raise EditorError(f"{p.name} is not pipe-delimited (CET files use '|')")
-    df = pd.read_csv(p, sep="|", dtype=str, keep_default_na=False, na_filter=False, encoding="utf-8-sig")
-    df.columns = [c.strip() for c in df.columns]
-    return df
+    from .pipeline import delimited
+    if delimited.detect_sep(p) is None:
+        raise EditorError(f"{p.name} has no '|' or ',' in its header (use pipe- or comma-delimited text)")
+    return delimited.read_cet_csv(p, dtype=str, keep_default_na=False, na_filter=False)
 
 
 def conform(df: pd.DataFrame | None, columns: list[str]) -> pd.DataFrame:
@@ -338,6 +344,7 @@ def write_cet_files(measures: pd.DataFrame, programcost: pd.DataFrame | None, fo
     out = Path(folder)
     out.mkdir(parents=True, exist_ok=True)
     m = _clean(conform(measures, MEASURE_COLUMNS))          # files always in CET's column order, whatever order the editor shows
+    m = m.drop(columns=[c for c in templates.RECET_MEASURE_COLUMNS if c in m and (m[c] == "").all()])   # ReCET-only columns only when used
     if m.empty:
         raise EditorError("the Measure table is empty")
     files: dict[str, Path | None] = {"measures": out / "Measure.csv", "programcost": None}
@@ -565,8 +572,11 @@ class ChoiceSource:
             return ["0", "1"]
         if column == "E3GasSavProfile":
             return sorted(self.gas_names | self.user_gas | set(active_codes("e3gassavprofile")), key=_natural)
-        if column == "E3MeaElecEndUseShape":
+        if column in END_USE_COLUMNS:
             return None                                    # per row: see end_use_choices
+        if column == "ACCVersion":
+            from . import versions
+            return list(versions.BUILTIN)
         name = VALUE_LISTS.get(column)
         if name is None:
             return None
@@ -706,6 +716,24 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                 if why:
                     sev, msg = ("info", why[5:]) if why.startswith("INFO:") else ("warning", why)
                     add("Measure", i, "E3MeaElecEndUseShape", sev, msg)
+        has_kwh2 = rul > 0 and (eul is None or rul < eul) and (vals.get("UnitkWh2ndBaseline") or 0) != 0
+        has_water = any((vals.get(c) or 0) != 0 for c in ("UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"))
+        for c, used, what in (("E3MeaElecEndUseShape2nd", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("E3MeaElecEndUseShapeWater", has_water, "water energy")):
+            if not g(c):
+                continue
+            if not used:
+                add("Measure", i, c, "info", f"not used: the measure has no {what}")
+            elif choices is not None:
+                why = choices.electric_profile_status(g(c), g("IOU_AC_Territory"), g("E3TargetSector"))
+                if why:
+                    sev, msg = ("info", why[5:]) if why.startswith("INFO:") else ("warning", why.replace("electric savings", what))
+                    add("Measure", i, c, sev, msg)
+        if g("ACCVersion"):
+            from . import versions
+            key = re.sub(r"(?i)\s*ACC$", "", g("ACCVersion"))
+            if key not in versions.BUILTIN:
+                add("Measure", i, "ACCVersion", "warning", f"'{g('ACCVersion')}' is not a built-in ACC version ({', '.join(versions.BUILTIN)}): "
+                    "the run stops at its input check unless it is the run's own version")
         if has_gas:
             if g("E3GasSector").upper() not in preflight.VALID_GAS_SECTORS:
                 add("Measure", i, "E3GasSector", "error", "E3GasSector must be Residential, Commercial or Core on a measure with gas savings")

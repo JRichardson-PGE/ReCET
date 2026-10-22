@@ -10,15 +10,18 @@ from pathlib import Path
 
 import pandas as pd
 
+from .delimited import read_cet_csv
+
+
 def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
-    """Generic loader: any real CET Measure.csv (pipe-delimited) in, derived-fields DataFrame out.
+    """Generic loader: any real CET Measure.csv (pipe- or comma-delimited) in, derived-fields DataFrame out.
 
     allocate_statewide=True first splits any statewide-program rows across the
     IOUs (pipeline/statewide_allocation.py): one row per IOU with `<IOU>_`
     prepended to CEInputID and the per-field factors applied to the RAW
     columns, before any derived field is computed. Non-statewide rows are
     untouched."""
-    df = pd.read_csv(measure_csv_path, sep="|", low_memory=False)
+    df = read_cet_csv(measure_csv_path, low_memory=False)
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
         df, report = allocate_measure_inputs(df)
@@ -88,6 +91,11 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     # Load-shape key: E3MeaElecEndUseShape is CET's own real field naming which
     # named electric end-use hourly shape a measure draws from.
     df["shape_key"] = df["E3MeaElecEndUseShape"].astype(str)
+    # Optional ReCET columns (not CET fields): a separate electric end-use shape for the 2nd-baseline years and for the water energy. Blank = the measure's own shape.
+    for col, key in (("E3MeaElecEndUseShape2nd", "shape_key_2nd"), ("E3MeaElecEndUseShapeWater", "shape_key_water")):
+        given = df[col].astype(str).str.strip() if col in df.columns else pd.Series("", index=df.index)
+        given = given.where(df[col].notna(), "") if col in df.columns else given
+        df[key] = given.where(given != "", df["shape_key"])
 
     df["measure_id"] = df["CEInputID"]
     df["eul_years"] = df["EUL_Yrs"].round().astype(int).clip(lower=1)
@@ -183,6 +191,12 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     _by_impact = df["MeasImpactType"].astype(str).str.contains("FuelSub") if "MeasImpactType" in df.columns else False
     df["is_fuel_sub"] = _by_id | _by_impact
 
+    # ACCVersion (optional, not a CET column; BRD BR-06.5): the ACC version this measure is priced on, e.g. "2024" or "2024 ACC". Blank = the run's version.
+    if "ACCVersion" in df.columns:
+        v = df["ACCVersion"].astype(str).str.strip().str.replace(r"(?i)\s*ACC$", "", regex=True).str.replace(r"\.0$", "", regex=True)   # 2024.0 when the column has blanks
+        df["acc_version"] = v.where(~df["ACCVersion"].isna() & (v.str.lower() != "nan"), "")
+    else:
+        df["acc_version"] = ""
     df["eul_years_raw"] = df["EUL_Yrs"].astype(float)            # as filed (first-year savings use it; pricing uses eul_years_exact, floored at 0.25)
     df["claim_year"] = df["ClaimYearQuarter"].astype(str).str[:4].astype(int)
     # Real field: which quarter (1-4) of claim_year the measure starts
@@ -192,7 +206,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["claim_quarter"] = df["ClaimYearQuarter"].astype(str).str[-1].astype(int)
 
     cols = [
-        "measure_id", "MeasDescription", "subset_key", "shape_key",
+        "measure_id", "MeasDescription", "subset_key", "shape_key", "shape_key_2nd", "shape_key_water",
         "annual_net_kwh", "annual_net_kwh_1st", "annual_net_kwh_2nd",
         "annual_net_kw", "annual_net_kw_1st", "annual_net_kw_2nd",
         "eul_years", "eul_years_exact", "rul_years_exact", "NTGRkWh",
@@ -208,7 +222,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
         "unit_kwh_1st", "unit_kwh_2nd", "unit_therm_1st", "unit_therm_2nd", "ntgr_therm",
         "ir_kwh", "rr_kwh", "ir_therm", "rr_therm", "combustion_type", "prg_id",
         "unit_kw_1st", "unit_kw_2nd", "ntgr_kwh", "ntgr_kw", "ir_kw", "rr_kw",
-        "fuel_type", "is_fuel_sub", "eul_years_raw",
+        "fuel_type", "is_fuel_sub", "eul_years_raw", "acc_version",
         "kwh_water_1st", "kwh_water_2nd", "water_net_kwh_1st", "water_net_kwh_2nd", "water_scale_1st", "water_scale_2nd",
     ]
     if "IOU_AC_Territory" in df.columns:

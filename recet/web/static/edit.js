@@ -10,7 +10,9 @@
 
   var API = root.dataset.api, END_USES = root.dataset.endUses, CSRF = root.dataset.csrf, RUN = root.dataset.run;
   var TABLES = ["Measure", "ProgramCost"];
-  var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, E3MeaElecEndUseShape: 240, E3GasSavProfile: 200 };
+  var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, E3MeaElecEndUseShape: 240, E3MeaElecEndUseShape2nd: 240,
+                 E3MeaElecEndUseShapeWater: 240, E3GasSavProfile: 200 };
+  var END_USE_COLUMNS = ["E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater"];   // per-row dropdowns (IOU and target sector)
   var st = {
     rev: null, layout: null, columns: {}, choices: {}, issues: { Measure: {}, ProgramCost: {} }, checkMarks: { Measure: {}, ProgramCost: {} }, grids: {}, current: "Measure",
     timer: null, saving: false, pending: false, dirty: false, conflict: false, nextRid: 1, endUses: {}, maxRows: 500, newMeasure: null, pcLike: []
@@ -126,7 +128,7 @@
   function columnDefs(t) {
     var L = st.layout[t], noEffect = new Set(L.no_effect), numeric = new Set(L.numeric);
     return L.pinned.concat(L.scroll).map(function (col) {
-      var endUse = t === "Measure" && col === "E3MeaElecEndUseShape", list = endUse || !!(st.choices[t] || {})[col];
+      var endUse = t === "Measure" && END_USE_COLUMNS.indexOf(col) >= 0, list = endUse || !!(st.choices[t] || {})[col];
       var d = {
         title: col, field: col, frozen: L.pinned.indexOf(col) >= 0, cssClass: noEffect.has(col) ? "noeff" : "calc",
         headerTooltip: L.tooltips[col] || "", formatter: formatter(t, col, numeric.has(col), list), hozAlign: numeric.has(col) ? "right" : "left",

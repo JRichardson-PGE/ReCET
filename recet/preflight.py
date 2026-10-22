@@ -2,7 +2,7 @@
 
 Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, without pricing anything:
 
-* format problems that would stop the run (not pipe-delimited, missing columns, duplicate CEInputID, bad ClaimYearQuarter, unknown IOU, non-numeric values),
+* format problems that would stop the run (no recognisable delimiter, missing columns, duplicate CEInputID, bad ClaimYearQuarter, unknown IOU, non-numeric values),
 * what the run will and will not be able to price: for every measure with electric savings whether an 8,760 profile (user-supplied or CEDARS library) or a TOU
   H-factor profile exists, for every measure with gas savings whether its monthly profile exists,
 * the ACC horizon: claim years before the first ACC year or measure lives that run past the last one,
@@ -18,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from .pipeline import delimited
 
 REQUIRED_MEASURE_COLUMNS = [
     "CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "Sector", "E3ClimateZone", "E3GasSavProfile", "E3GasSector", "E3MeaElecEndUseShape",
@@ -163,13 +165,13 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     if not p.exists():
         rep.add("error", "file_missing", f"Measure file not found: {p}")
         return rep
-    head = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()[:1]
-    if head and "|" not in head[0]:
-        rep.add("error", "not_pipe_delimited", "The header has no '|' -- CET Measure.csv files are pipe-delimited"
-                + (" (this one looks comma-delimited)" if "," in head[0] else ""))
+    sep = delimited.detect_sep(p)
+    if sep is None:
+        rep.add("error", "no_delimiter", "The header has no '|', ',' or tab -- Measure.csv must be pipe-delimited (CET's format) or comma-delimited")
         return rep
-    df = pd.read_csv(p, sep="|", low_memory=False, dtype=str, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
-    df.columns = [c.strip() for c in df.columns]
+    if sep != "|":
+        rep.add("info", "not_pipe_delimited", f"Measure.csv is {delimited.describe(sep)}; it is read as such (the CET itself needs pipe-delimited files)")
+    df = delimited.read_cet_csv(p, low_memory=False, dtype=str, keep_default_na=False, na_values=[""])
     rep.stats["measures"] = f"{len(df):,}"
     missing = [c for c in REQUIRED_MEASURE_COLUMNS if c not in df.columns]
     if missing:
@@ -236,13 +238,13 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         return [r for r in (_raw_row(m) for m in ids) if r is not None]
 
     from . import run_poc
-    from .pipeline import cost_tests, gas_savings_profiles, real_impact_profiles
+    from .pipeline import cost_tests, gas_savings_profiles, real_impact_profiles, system_zones
     try:
         measures, program = run_poc.load_job(p, programcost_csv, allocate_statewide=allocate_statewide)
     except ValueError as exc:
         where: list = []
         try:                                        # point at the PrgIDs that have no partner in the other file
-            pc = pd.read_csv(programcost_csv, sep="|", dtype=str, keep_default_na=False) if programcost_csv is not None else None
+            pc = delimited.read_cet_csv(programcost_csv, dtype=str, keep_default_na=False) if programcost_csv is not None else None
             if pc is not None and "PrgID" in pc.columns:
                 mp, cp = df["PrgID"].astype(str).str.strip(), pc["PrgID"].astype(str).str.strip()
                 where = _cells("Measure", ~mp.isin(set(cp)), "PrgID") + _cells("ProgramCost", ~cp.isin(set(mp)), "PrgID")
@@ -251,11 +253,24 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         rep.add("error", "program_alignment", str(exc), cells=where)
         return rep
     rep.stats["claim years"] = f"{measures['claim_year'].min()}-{measures['claim_year'].max()}"
+    named = measures.loc[measures["acc_version"] != "", "acc_version"]
+    if len(named):                                  # the optional ACCVersion column (BRD BR-06.5): each measure may name its own ACC version
+        from . import paths, versions
+        run_key = acc.key if acc is not None else None
+        rep.stats["measures by ACC version"] = ", ".join(f"{k}: {n:,}" for k, n in named.value_counts().sort_index().items())
+        for k in sorted(named.unique()):
+            rows = mrows(measures["acc_version"] == k)
+            if k != run_key and k not in versions.BUILTIN:
+                rep.add("error", "bad_acc_version", f"ACCVersion {k!r} is not a built-in ACC version ({', '.join(versions.BUILTIN)}) or this run's version",
+                        len(rows), [k], _cells("Measure", rows, "ACCVersion"))
+            elif k != run_key and paths.ref_path(versions.BUILTIN[k].electric_key) is None:
+                rep.add("error", "acc_version_file_missing", f"the {versions.BUILTIN[k].label} electric file is not in the reference data folder, so the measures "
+                        f"that name it cannot be priced", len(rows), [k], _cells("Measure", rows, "ACCVersion"))
     rep.stats["First Year (base year) that will be used"] = base_year or int(measures["claim_year"].min())
     if programcost_csv is None:
         rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
     else:
-        pc = pd.read_csv(programcost_csv, sep="|")
+        pc = delimited.read_cet_csv(programcost_csv)
         swmask = (pc["PA"].astype(str).str.upper() == "SW") if "PA" in pc.columns else pd.Series(False, index=pc.index)
         sw_rows = int(swmask.sum())
         if sw_rows and not allocate_statewide:
@@ -308,6 +323,38 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
 
+    # --- kWh-per-unit profiles (BRD BR-06.6): the measure's electric kWh comes from the profile, not from UnitkWh1stBaseline / UnitkWh2ndBaseline
+    if user is not None and any(e.scaled for e in user.entries):
+        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["shape_key"], measures["PA"], measures["target_sector"], measures["climate_zone"])]
+        scaled = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) is not None for k, pa, ts, z in
+                            zip(measures["shape_key"], measures["PA"], measures["target_sector"], zones)], index=measures.index)
+        if scaled.any():
+            rep.add("info", "kwh_per_unit_profile", "priced on a kWh-per-unit 8,760 profile: the measure's annual kWh is the profile's (its UnitkWh1stBaseline is "
+                    "not used; a 2nd baseline keeps the file's UnitkWh2ndBaseline / UnitkWh1stBaseline ratio)", int(scaled.sum()),
+                    measures.loc[scaled, "measure_id"].head(5).tolist())
+            zero_net = measures[scaled & (measures["unit_kwh_1st"] == 0) & ((measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0))]
+            if len(zero_net):
+                rep.add("warning", "zero_net_profile_water", "water energy on a load-shifting (zero-net) kWh-per-unit profile is priced on that profile, which nets to "
+                        "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["measure_id"].head(5).tolist(),
+                        _cells("Measure", mrows(zero_net), "UnitkWhIOUWater1stBaseline"))
+
+    # --- a separate 2nd-baseline shape (E3MeaElecEndUseShape2nd) on an early replacement
+    second = measures[(measures["shape_key_2nd"] != measures["shape_key"]) & (measures["rul_years_exact"] > 0)
+                      & (measures["rul_years_exact"] < measures["eul_years_exact"]) & (measures["shape_scale_2nd"] != 0)]
+    if len(second):
+        rep.stats["measures with a separate 2nd-baseline shape"] = f"{len(second):,}"
+        missing2, eg2, where2 = 0, [], []
+        for key, g in second.groupby(["shape_key_2nd", "PA", "target_sector"]):
+            has_user = user is not None and user.match(*key) is not None
+            has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
+            if not (has_user or has_lib):
+                missing2 += len(g)
+                eg2.append(" | ".join(map(str, key)))
+                where2 += _cells("Measure", mrows(g), "E3MeaElecEndUseShape2nd")
+        if missing2:
+            rep.add("warning", "no_electric_profile_2nd", "measures whose E3MeaElecEndUseShape2nd has no 8,760 profile: their 2nd-baseline years are NOT priced "
+                    "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
+
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
     water = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]
     rep.stats["water-energy measures"] = f"{len(water):,}"
@@ -315,13 +362,14 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         no_prof = 0
         eg = []
         where: list = []
-        for key, g in water.groupby(["shape_key", "PA", "target_sector"]):
+        for key, g in water.groupby(["shape_key_water", "PA", "target_sector"]):          # E3MeaElecEndUseShapeWater, or the measure's own shape
             has_user = user is not None and user.match(*key) is not None
             has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
             if not (has_user or has_lib):
                 no_prof += len(g)
                 eg.append(" | ".join(map(str, key)))
-                where += _cells("Measure", mrows(g), "E3MeaElecEndUseShape")
+                own = g["shape_key_water"] != g["shape_key"]
+                where += _cells("Measure", mrows(g[own]), "E3MeaElecEndUseShapeWater") + _cells("Measure", mrows(g[~own]), "E3MeaElecEndUseShape")
         if no_prof:
             rep.add("warning", "no_water_profile", "water-energy measures with no electric profile (the water energy is priced on the measure's electric profile) are NOT priced "
                     "(WaterPricingStatus = UNPRICED)", no_prof, eg, where)

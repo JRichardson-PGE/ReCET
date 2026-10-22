@@ -18,7 +18,8 @@ def test_cet_version_numbers_map_to_acc_versions():
     assert {k: versions.acc_of_cet_version(k) for k in (2022, 2024, 2026, 2027)} == {2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
     assert versions.acc_of_cet_version(2013) is None and versions.acc_of_cet_version(2017) is None and versions.acc_of_cet_version("x") is None
     assert [k for k, _ in versions.choices()] == ["2021", "2022", "2024", "2026"]
-    assert [label for _, label in versions.choices()] == ["2021 ACC", "2022 ACC", "2024 ACC", "2026 ACC"]
+    assert [label for _, label in versions.choices()] == ["2021 ACC (Avoided Cost Version 2022)", "2022 ACC (Avoided Cost Version 2024)",
+                                                          "2024 ACC (Avoided Cost Version 2026)", "2026 ACC (Avoided Cost Version 2028)"]
 
 
 def test_run_parameters_are_picked_by_acc_version():
@@ -84,7 +85,7 @@ def test_trc_only_acc_leaves_the_societal_columns_blank(tmp_path):
     f = r.frame.iloc[0]
     rate = discount_settings.get_discount_rate_qtr("PGE", 2021)
     assert f["ElecBen"] == pytest.approx(expected_flat_value(1000, 0.100, rate), rel=1e-12)
-    assert f["POC_ACC"] == "2021 ACC"
+    assert f["POC_ACC"] == "2021 ACC (Avoided Cost Version 2022)"
     societal = [c for c in r.frame.columns if c.endswith(("_SB", "_SH")) or c.startswith(("SCB", "SCH"))]
     assert societal and all(math.isnan(float(f[c])) for c in societal if pd.api.types.is_number(f[c]))
     assert any("no Societal Cost Test avoided costs" in n for n in r.notes)
