@@ -750,8 +750,9 @@ statewide programs unallocated; First Year = claim year; 0% market effects), pri
 | `NetElecCO2Lifecycle` | 0.9945 | |
 
 Per measure: `GasBen` agrees on all 21,370 measures and `BillReducElec` on all to within 1%; 63% of measures are within 1% on `TRCCost` (the rest carry TOU or DEER
-electric differences into their supply costs); no electric measure is unpriced. Reproduce with the CEDARS-Research repository's validation inputs
-(`poc/data/consolidated_<year>` and `poc/data/cet_output_<year>_run<id>`): run each year on the 2024 ACC with its claim year as First Year and compare with `--cet-outputs`.
+electric differences into their supply costs); no electric measure is unpriced. Reproduce with `python poc/recheck_recet_vs_cet.py` in the CEDARS-Research
+repository, which runs each year on the 2024 ACC with its claim year as First Year against its CET output (`poc/data/consolidated_<year>`,
+`poc/data/cet_output_<year>_run<id>`) and writes these totals, the TOU / DEER split and the per-measure figures.
 
 **Deliberate differences from CET** (the tool does not copy what appear to be CET data errors; each is logged in the project notes):
 
