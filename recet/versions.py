@@ -34,7 +34,9 @@ from . import paths
 CET_VERSION_TO_ACC = {2018: 2017, 2019: 2018, 2020: 2019, 2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
 
 
-AVOIDED_COST_VERSION = {acc: cet for cet, acc in CET_VERSION_TO_ACC.items()}     # ACC year -> CET's Avoided Cost Version
+# ACC year -> CET's Avoided Cost Version (the first year the ACC is in effect for claims or forecasts). The same as CET's table numbers above, except the 2026 ACC:
+# CET's draft tables call it Version 2027, but it takes effect as Avoided Cost Version 2028 (Jake, 2026-10-22).
+AVOIDED_COST_VERSION = {**{acc: cet for cet, acc in CET_VERSION_TO_ACC.items()}, 2026: 2028}
 
 
 def avoided_cost_version(acc) -> int | None:
