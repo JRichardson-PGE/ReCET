@@ -238,6 +238,14 @@ def bill_pv(d, s1, s2, rates, rate_annual, base_year):
     return total
 
 
+def participant_test(d, part, tax_credits_gross, bills_gross, rate_qtr, first_year):
+    """C12: the Participant Cost Test on gross bill impacts (`bills_gross`: the four ...Gross bill columns)."""
+    pvf = (1.0 + rate_qtr) ** ((d["claim_year"] - first_year) * 4 + (d["claim_quarter"] - 1))
+    ben = bills_gross["BillReducElecGross"] + bills_gross["BillReducGasGross"] + part["RebatesandIncentsPV"] + tax_credits_gross / pvf
+    cost = part["GrossParticipantCostPV"] + part["RebatesandIncentsPV"] + bills_gross["BillIncrElecGross"] + bills_gross["BillIncrGasGross"]
+    return {**bills_gross, "PCTBen": ben, "PCTCost": cost, "PCTRatio": ben / cost if cost else 0.0}
+
+
 # ---------------------------------------------------------------------------------------------------------------- C14: emissions
 def annual_kwh(k, kwh1, kwh2, rulq, eulq):
     if rulq == 0:

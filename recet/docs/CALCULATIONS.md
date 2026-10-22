@@ -558,6 +558,17 @@ SCHRatio = (ElecBen_SH + GasBen_SH + WaterEnergyBen_SH + OtherBen) / SCHCost    
 
 Water-energy benefits are in every numerator and TSB; water-energy costs are in every cost. Supply costs are in the *cost*, not netted from the ratio's numerator.
 
+**Participant Cost Test** (CA Standard Practice Manual, Chapter 2; the CET does not calculate it). From the participant's side, on gross savings and without market effects:
+
+```text
+BillReducElecGross ... BillIncrGasGross = C9's bill impacts with NTG = 1 and MEB = 0 (same rates, discounting and fuel-substitution split)
+PCTBen   = BillReducElecGross + BillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF          (PVF of C8)
+PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + BillIncrElecGross + BillIncrGasGross          (= the measure cost before incentives + bill increases)
+PCTRatio = PCTBen / PCTCost                                                                              (0 when PCTCost = 0)
+```
+
+Not yet checked against a CPUC definition: CPUC has not published how the CET will calculate the test. The portfolio `PCT_ratio` is `SUM(PCTBen) / SUM(PCTCost)`.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## C13 Where market effects enter
@@ -672,7 +683,7 @@ weight_m(Y) = overlap( [Y, Y+1), 1st-baseline period ) * S1e + overlap( [Y, Y+1)
 territory.
 
 **C16.3 Portfolio summary.** `portfolio_summary_*` has one row for all measures, one per `IOU_AC_Territory` (`poc_PA`), one per `CreditedIOU` and one per program segment (`Prg_ProgramSegment`, from the program metadata), with the sum of each of: `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`,
-`WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas`, `NetElecCO2`, `NetGasCO2`, and portfolio ratios on CET's receipt definition:
+`WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas`, `PCTBen`, `PCTCost`, `NetElecCO2`, `NetGasCO2`, and portfolio ratios on CET's receipt definition (plus `PCT_ratio = sum(PCTBen) / sum(PCTCost)`):
 
 ```text
 B      = sum(ElecBen) + sum(GasBen) + sum(WaterEnergyBen) + sum(OtherBen)            B_SB, B_SH: the same with the _SB / _SH benefits

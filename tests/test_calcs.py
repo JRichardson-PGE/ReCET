@@ -195,6 +195,12 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         pv_g = ref.bill_pv(d, ft * d["therms_1st"], ft * d["therms_2nd"], rates_g, st["annual"], st["base_year"])
         e["BillReducElec"], e["BillIncrElec"] = ref.split_ben_supply(pv_e, d["is_fuel_sub"])
         e["BillReducGas"], e["BillIncrGas"] = ref.split_ben_supply(pv_g, d["is_fuel_sub"])
+        gross_e = ref.bill_pv(d, d["qty"] * d["kwh1"] * d["irr_kwh"], d["qty"] * d["kwh2"] * d["irr_kwh"], rates_e, st["annual"], st["base_year"])
+        gross_g = ref.bill_pv(d, d["qty"] * d["th1"] * d["irr_therm"], d["qty"] * d["th2"] * d["irr_therm"], rates_g, st["annual"], st["base_year"])
+        bg = {}
+        bg["BillReducElecGross"], bg["BillIncrElecGross"] = ref.split_ben_supply(gross_e, d["is_fuel_sub"])
+        bg["BillReducGasGross"], bg["BillIncrGasGross"] = ref.split_ben_supply(gross_g, d["is_fuel_sub"])
+        e.update(ref.participant_test(d, p1, e["TaxCreditsGross"], bg, st["qtr"], first_year))
         e["prg"], e["ntg_kwh"], e["ntg_therm"] = raw["PrgID"], d["ntg_kwh"], d["ntg_therm"]
         nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["E3TargetSector"], raw["E3MeaElecEndUseShape"], raw["E3ClimateZone"])
         nox_gas = 0.0092 if raw.get("CombustionType") else 0.0
@@ -252,6 +258,7 @@ def test_every_documented_output_matches_the_reference_formulas(tmp_path, meb, m
     assert summ["RIM_ratio"] == pytest.approx((ben + tot("BillIncrElec") + tot("BillIncrGas")) / tot("RIMCost"), rel=1e-9)
     assert summ["SCB_ratio"] == pytest.approx((tot("ElecBen_SB") + tot("GasBen_SB") + tot("WaterEnergyBen_SB") + tot("OtherBen")) / tot("SCBCost"), rel=1e-9)
     assert summ["TotalSystemBenefit"] == pytest.approx(tot("TotalSystemBenefit"), rel=1e-9)
+    assert summ["PCT_ratio"] == pytest.approx(tot("PCTBen") / tot("PCTCost"), rel=1e-9)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------- regressions found while documenting

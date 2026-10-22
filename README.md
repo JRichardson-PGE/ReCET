@@ -1,7 +1,7 @@
 # ReCET
 
 **ReCET** ("reset") is a rebuilt version of the CEDARS Cost Effectiveness Tool (CET). It prices every measure hour by hour (8,760 hours a year) instead of on
-quarterly avoided costs, and runs the same cost tests as the CET (TRC, PAC, RIM, SCT Base/High, TSB). It started as the proof of concept in the CEDARS
+quarterly avoided costs, and runs the same cost tests as the CET (TRC, PAC, RIM, SCT Base/High, TSB) plus the Participant Cost Test, which the CET does not yet have. It started as the proof of concept in the CEDARS
 review research repository and was moved here on its own.
 
 It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`) on the **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
