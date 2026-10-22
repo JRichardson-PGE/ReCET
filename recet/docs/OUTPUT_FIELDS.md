@@ -241,6 +241,11 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | `poc_fuel_type` | The `FuelID` as text (`nan` when blank). | `FuelID` |
 
 The installation and realization rates enter through `poc_shape_scale*`, `poc_annual_net_therms_*` and `poc_water_scale_*` (what is priced), not through `poc_annual_net_kwh_*` (net of NTG only).
+
+**A measure priced on an already-scaled 8,760 profile** (kWh per unit per hour, `ProfileSource = user profile (kWh per unit)`, CALCULATIONS C4.5) is the exception: its
+profile carries the kWh, so `poc_shape_scale = NumUnits * NTGRkWh * InstallationRatekWh * RealizationRatekWh` (times `UnitkWh2ndBaseline / UnitkWh1stBaseline` for
+`poc_shape_scale_2nd`), and the measure's annual kWh per unit is the profile's sum (written in its own `poc_` column, since it then differs from `UnitkWh1stBaseline`),
+which `poc_annual_net_kwh_*` use. A load-shifting-only profile has an annual kWh of 0.
 Unlike electricity, the gas quantity includes its rates and its own NTG (`NTGRTherm`).
 
 ### 1.3 Pricing status
@@ -250,7 +255,7 @@ A benefit of 0 alone cannot tell "no savings" from "could not price"; these colu
 | Field | Values and the rule that gives each |
 |---|---|
 | `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
-| `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
+| `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `user profile (kWh per unit)` (an already-scaled profile, C4.5), `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
 | `SystemClimateZone` | For a measure with `E3ClimateZone = System`: the real climate zone it was priced in, the profile's System zone (CALCULATIONS C4.4); blank for every other measure and when nothing was priced |
 | `SystemZoneSource` | Where `SystemClimateZone` came from: `catalog` (the shipped System-zone catalog), or `calculated (...)` with the reason (`user profile`, `supplied ACC`, `reference data differs from the catalog's`, `profile not in catalog`); `no zone could be priced: System shape and blended prices` when no zone was an option; blank otherwise |
 | `GasPricingStatus` | `no gas savings` when `poc_annual_net_therms_1st` and `poc_annual_net_therms_2nd` are both 0; `priced` when the gas value was computed; otherwise `UNPRICED: no gas savings profile match` (`E3GasSavProfile` names no known profile) |
@@ -1529,7 +1534,7 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
-`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `no_electric_profile`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
 Errors stop the run; warnings and info do not.

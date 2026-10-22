@@ -270,6 +270,20 @@ forecast year's own 1 January weekday (although the ACC data do not follow those
 **C4.3 Gas monthly shape.** `E3GasSavProfile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
 a supplied profile with the same name replaces it). A gas measure whose profile name matches nothing is not priced (`GasPricingStatus = UNPRICED ...`).
 
+**C4.5 Already-scaled profiles and load shifting (BRD BR-06.6).** A supplied profile with `profile_basis = kwh_per_unit` holds the kWh saved per unit in each hour
+(negative = added load) and is priced as given; it is not rescaled. For such a measure
+
+```text
+poc_shape_scale     = NumUnits * NTGRkWh * IR * RR                    the profile carries the kWh, so C5's  SUM over hours of shape x price x scale  is the profile's own value
+poc_shape_scale_2nd = poc_shape_scale * r2        r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline   (1 when UnitkWh1stBaseline is 0)
+annual kWh per unit = S = SUM over hours of the profile                replaces UnitkWh1stBaseline (S x r2 the 2nd) in poc_annual_net_kwh_*, first-year kWh and the bill impacts
+```
+
+Emissions use the profile the same way (its hourly kWh x the hourly emission rate). Water energy is spread by the profile's shares, `profile / S`; with `S = 0` it has none and is
+not priced. With statewide allocation an allocated row is multiplied by its electric factor, as its UnitkWh fields are. A **load-shifting-only** measure (`S = 0`: kWh saved in some
+hours, the same kWh added in others) therefore has a real electric value (the price difference between the hours) in one record, while its annual kWh, first-year kWh and
+annual-rate bill impacts are 0. (CET nets annual savings before shaping, so it values such a measure at 0.)
+
 **C4.4 The System climate zone.** A measure with `E3ClimateZone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
 the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
 

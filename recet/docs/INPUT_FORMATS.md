@@ -73,6 +73,7 @@ CSV or Parquet, **long format**, one row per (profile, climate zone, hour):
 | `hour_of_year` | 1..8760, exactly once per (profile, zone) |
 | `impact` | the share of the measure's **annual** net savings in that hour; each zone's 8,760 values should sum to 1 (see below) |
 | `represents_year` | *(optional, same on every row of a profile)* the calendar year whose weekdays the shape follows; default 2009, the CEDARS default |
+| `profile_basis` | *(optional, same on every row of a profile)* `share` (the default: `impact` is a share of annual savings) or `kwh_per_unit` (`impact` is already scaled: the kWh saved per unit in each hour, negative for added load) |
 
 * **Matching:** a measure is matched on (end use, `pa`, `target_sector`); the most specific entry wins (both given > one > neither). A match is used **instead of** the
   library profile.
@@ -80,11 +81,15 @@ CSV or Parquet, **long format**, one row per (profile, climate zone, hour):
   (`ProfileSource = library (user profile has no shape for this zone)`). A measure whose own zone is `System` is priced in the profile's System zone, the zone with the
   lowest total avoided cost over the ACC (CALCULATIONS C4.4); a file's own `System` rows are not used for it.
 * **Sum:** within 0.1% of 1 the values are used as given; otherwise they are rescaled to sum to 1 and the run says so (`--no-normalize-profiles` makes it an error).
-  A shape that sums to ~0 (pure load shifting) cannot be rescaled and is rejected - give it as a share of a non-zero annual total.
+  A share profile that sums to ~0 cannot be rescaled and is rejected: give it as `kwh_per_unit` instead.
+* **Already-scaled profiles** (`profile_basis = kwh_per_unit`): the values are priced exactly as given, per unit, times `NumUnits`, the kWh net-to-gross ratio and the
+  installation and realization rates. The measure's annual kWh is the profile's sum, which replaces `UnitkWh1stBaseline` (a 2nd baseline keeps the file's
+  `UnitkWh2ndBaseline / UnitkWh1stBaseline` ratio). The sum may be 0: a **load-shifting-only** measure (savings in some hours, the same kWh added in others) is valued in
+  one record (CALCULATIONS C4.5). Water energy on such a measure is spread by the profile's shares, so a zero-net profile gives it no value (the preflight warns).
 * **Calendar:** like the library, the shape is rotated once from `represents_year`'s weekdays onto the ACC's (2018 or 2020), the short way round (at most 3 days).
 * **Start from an existing profile:** `recet template export-profile --end-use "..." --pa PGE --sector Residential --out shape.csv` writes the library profile for editing.
 
-Every measure's output row says where its shape came from in `ProfileSource` (`user profile`, `library`, `library (sector-loose match)`,
+Every measure's output row says where its shape came from in `ProfileSource` (`user profile`, `user profile (kWh per unit)`, `library`, `library (sector-loose match)`,
 `library (user profile has no shape for this zone)`).
 
 ---------------------------------------------------------------------------------------------------------------------------------

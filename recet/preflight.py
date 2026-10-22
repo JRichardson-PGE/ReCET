@@ -238,7 +238,7 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         return [r for r in (_raw_row(m) for m in ids) if r is not None]
 
     from . import run_poc
-    from .pipeline import cost_tests, gas_savings_profiles, real_impact_profiles
+    from .pipeline import cost_tests, gas_savings_profiles, real_impact_profiles, system_zones
     try:
         measures, program = run_poc.load_job(p, programcost_csv, allocate_statewide=allocate_statewide)
     except ValueError as exc:
@@ -309,6 +309,21 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because E3TargetSector has no exact match", counts["library (sector-loose match)"])
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
+
+    # --- kWh-per-unit profiles (BRD BR-06.6): the measure's electric kWh comes from the profile, not from UnitkWh1stBaseline / UnitkWh2ndBaseline
+    if user is not None and any(e.scaled for e in user.entries):
+        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["shape_key"], measures["PA"], measures["target_sector"], measures["climate_zone"])]
+        scaled = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) is not None for k, pa, ts, z in
+                            zip(measures["shape_key"], measures["PA"], measures["target_sector"], zones)], index=measures.index)
+        if scaled.any():
+            rep.add("info", "kwh_per_unit_profile", "priced on a kWh-per-unit 8,760 profile: the measure's annual kWh is the profile's (its UnitkWh1stBaseline is "
+                    "not used; a 2nd baseline keeps the file's UnitkWh2ndBaseline / UnitkWh1stBaseline ratio)", int(scaled.sum()),
+                    measures.loc[scaled, "measure_id"].head(5).tolist())
+            zero_net = measures[scaled & (measures["unit_kwh_1st"] == 0) & ((measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0))]
+            if len(zero_net):
+                rep.add("warning", "zero_net_profile_water", "water energy on a load-shifting (zero-net) kWh-per-unit profile is priced on that profile, which nets to "
+                        "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["measure_id"].head(5).tolist(),
+                        _cells("Measure", mrows(zero_net), "UnitkWhIOUWater1stBaseline"))
 
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
     water = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]

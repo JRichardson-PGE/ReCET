@@ -92,6 +92,13 @@ def _hourly_co2_quarters(pa: str, target_sector: str, shape_key: str, climate_zo
     return out
 
 
+@lru_cache(maxsize=4096)
+def _is_kwh_per_unit(pa: str, target_sector: str, shape_key: str, climate_zone: str) -> bool:
+    """True when the measure is priced on a user profile given in kWh per unit per hour (not a share of annual savings)."""
+    zone = system_zones.priced_zone(shape_key, pa, target_sector, climate_zone)
+    return real_impact_profiles.scaled_profile(shape_key, pa, target_sector, zone) is not None
+
+
 def _annual_kwh(k: int, kwh1: float, kwh2: float, rulq: float, eulq: float) -> float:
     """CalcEmissions' AnnualkWh CASE for quarter offset k (= em Qidx - install Qidx)."""
     if rulq == 0:
@@ -152,6 +159,10 @@ def price_emissions(measures: pd.DataFrame, acc_version: int = 2024, market_effe
         irr_kwh = float(m.ir_kwh) * float(m.rr_kwh)
         irr_thm = float(m.ir_therm) * float(m.rr_therm)
         kwh1, kwh2 = float(m.unit_kwh_1st), float(m.unit_kwh_2nd)
+        if _is_kwh_per_unit(m.PA, m.target_sector, m.shape_key, str(m.climate_zone)):
+            # the profile is already kWh per unit per hour: it is multiplied by what the electric benefit multiplies it by (shape_scale), per unit
+            per_unit = qty * float(m.NTGRkWh) * irr_kwh
+            kwh1, kwh2 = (float(m.shape_scale) / per_unit, float(m.shape_scale_2nd) / per_unit) if per_unit else (1.0, 1.0)
         thm1, thm2 = float(m.unit_therm_1st), float(m.unit_therm_2nd)
         eul = float(m.eul_years_exact)
         rul = float(m.rul_years_exact) if float(m.rul_years_exact) < eul else 0.0
