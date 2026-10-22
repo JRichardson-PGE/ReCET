@@ -19,7 +19,7 @@ def test_cet_version_numbers_map_to_acc_versions():
     assert versions.acc_of_cet_version(2013) is None and versions.acc_of_cet_version(2017) is None and versions.acc_of_cet_version("x") is None
     assert [k for k, _ in versions.choices()] == ["2021", "2022", "2024", "2026"]
     assert [label for _, label in versions.choices()] == ["2021 ACC (Avoided Cost Version 2022)", "2022 ACC (Avoided Cost Version 2024)",
-                                                          "2024 ACC (Avoided Cost Version 2026)", "2026 ACC (Avoided Cost Version 2027)"]
+                                                          "2024 ACC (Avoided Cost Version 2026)", "2026 ACC (Avoided Cost Version 2028)"]
 
 
 def test_run_parameters_are_picked_by_acc_version():
