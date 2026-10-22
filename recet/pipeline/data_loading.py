@@ -10,15 +10,18 @@ from pathlib import Path
 
 import pandas as pd
 
+from .delimited import read_cet_csv
+
+
 def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
-    """Generic loader: any real CET Measure.csv (pipe-delimited) in, derived-fields DataFrame out.
+    """Generic loader: any real CET Measure.csv (pipe- or comma-delimited) in, derived-fields DataFrame out.
 
     allocate_statewide=True first splits any statewide-program rows across the
     IOUs (pipeline/statewide_allocation.py): one row per IOU with `<IOU>_`
     prepended to CEInputID and the per-field factors applied to the RAW
     columns, before any derived field is computed. Non-statewide rows are
     untouched."""
-    df = pd.read_csv(measure_csv_path, sep="|", low_memory=False)
+    df = read_cet_csv(measure_csv_path, low_memory=False)
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
         df, report = allocate_measure_inputs(df)

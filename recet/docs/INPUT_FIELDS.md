@@ -22,7 +22,7 @@ the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `Uni
 
 ## 1. `Measure.csv`
 
-The same file you upload to the CET: pipe (`|`) delimited, one header row, UTF-8, one row per `CEInputID`. All 74 CET columns are echoed to the measure-level output in the input's own text form.
+The same file you upload to the CET: pipe (`|`) delimited (or comma-delimited, see [INPUT_FORMATS.md](INPUT_FORMATS.md)), one header row, UTF-8, one row per `CEInputID`. All 74 CET columns are echoed to the measure-level output in the input's own text form.
 
 ### 1.1 Identification and program link
 
@@ -130,7 +130,7 @@ Dollars per unit, undiscounted, blank = 0 (C7).
 
 ## 2. `ProgramCost.csv`
 
-Optional. One row per program per year; pipe delimited. Every `PrgID` must appear in both files. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
+Optional. One row per program per year; pipe or comma delimited. Every `PrgID` must appear in both files. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
 blank = 0.
 
 | Field | Type / unit | Description and use |
@@ -347,6 +347,6 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 
 ## 7. CET outputs file (for comparison)
 
-Optional. A CET run's `*_outputs.csv` (pipe delimited) with a `CET_ID` column; measures are matched to the POC's `CEInputID`. Columns compared when present: `TotalSystemBenefit`, `ElecBen`, `GasBen`, `WaterEnergyBen` (+ `_SB`, `_SH`,
+Optional. A CET run's `*_outputs.csv` (pipe or comma delimited) with a `CET_ID` column; measures are matched to the POC's `CEInputID`. Columns compared when present: `TotalSystemBenefit`, `ElecBen`, `GasBen`, `WaterEnergyBen` (+ `_SB`, `_SH`,
 `Gross`), `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCRatio`, `PACRatio`, `RIMRatio`, `NetElecCO2`, `NetGasCO2`, `BillReducElec`, `BillReducGas`. The comparison is only
 meaningful when the job is run the way the CET run was (same First Year, ACC version, and statewide allocation).

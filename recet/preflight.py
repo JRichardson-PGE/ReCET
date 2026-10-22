@@ -2,7 +2,7 @@
 
 Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, without pricing anything:
 
-* format problems that would stop the run (not pipe-delimited, missing columns, duplicate CEInputID, bad ClaimYearQuarter, unknown IOU, non-numeric values),
+* format problems that would stop the run (no recognisable delimiter, missing columns, duplicate CEInputID, bad ClaimYearQuarter, unknown IOU, non-numeric values),
 * what the run will and will not be able to price: for every measure with electric savings whether an 8,760 profile (user-supplied or CEDARS library) or a TOU
   H-factor profile exists, for every measure with gas savings whether its monthly profile exists,
 * the ACC horizon: claim years before the first ACC year or measure lives that run past the last one,
@@ -18,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from .pipeline import delimited
 
 REQUIRED_MEASURE_COLUMNS = [
     "CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "Sector", "E3ClimateZone", "E3GasSavProfile", "E3GasSector", "E3MeaElecEndUseShape",
@@ -163,13 +165,13 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     if not p.exists():
         rep.add("error", "file_missing", f"Measure file not found: {p}")
         return rep
-    head = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()[:1]
-    if head and "|" not in head[0]:
-        rep.add("error", "not_pipe_delimited", "The header has no '|' -- CET Measure.csv files are pipe-delimited"
-                + (" (this one looks comma-delimited)" if "," in head[0] else ""))
+    sep = delimited.detect_sep(p)
+    if sep is None:
+        rep.add("error", "no_delimiter", "The header has no '|', ',' or tab -- Measure.csv must be pipe-delimited (CET's format) or comma-delimited")
         return rep
-    df = pd.read_csv(p, sep="|", low_memory=False, dtype=str, keep_default_na=False, na_values=[""], encoding="utf-8-sig")
-    df.columns = [c.strip() for c in df.columns]
+    if sep != "|":
+        rep.add("info", "not_pipe_delimited", f"Measure.csv is {delimited.describe(sep)}; it is read as such (the CET itself needs pipe-delimited files)")
+    df = delimited.read_cet_csv(p, low_memory=False, dtype=str, keep_default_na=False, na_values=[""])
     rep.stats["measures"] = f"{len(df):,}"
     missing = [c for c in REQUIRED_MEASURE_COLUMNS if c not in df.columns]
     if missing:
@@ -242,7 +244,7 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     except ValueError as exc:
         where: list = []
         try:                                        # point at the PrgIDs that have no partner in the other file
-            pc = pd.read_csv(programcost_csv, sep="|", dtype=str, keep_default_na=False) if programcost_csv is not None else None
+            pc = delimited.read_cet_csv(programcost_csv, dtype=str, keep_default_na=False) if programcost_csv is not None else None
             if pc is not None and "PrgID" in pc.columns:
                 mp, cp = df["PrgID"].astype(str).str.strip(), pc["PrgID"].astype(str).str.strip()
                 where = _cells("Measure", ~mp.isin(set(cp)), "PrgID") + _cells("ProgramCost", ~cp.isin(set(mp)), "PrgID")
@@ -255,7 +257,7 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     if programcost_csv is None:
         rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
     else:
-        pc = pd.read_csv(programcost_csv, sep="|")
+        pc = delimited.read_cet_csv(programcost_csv)
         swmask = (pc["PA"].astype(str).str.upper() == "SW") if "PA" in pc.columns else pd.Series(False, index=pc.index)
         sw_rows = int(swmask.sum())
         if sw_rows and not allocate_statewide:

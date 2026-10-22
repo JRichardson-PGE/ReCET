@@ -539,7 +539,7 @@ async def _load_upload(form, folder: Path, limit: int) -> tuple[editor.LoadedJob
     for key, up in (("measures", meas), ("programcost", pcost)):
         if up is not None:
             if Path(up.filename).suffix.lower() not in (".csv", ".txt"):
-                raise editor.EditorError(f"{up.filename}: use a pipe-delimited .csv file")
+                raise editor.EditorError(f"{up.filename}: use a pipe- or comma-delimited .csv file")
             dest = folder / f"upload_{key}.csv"
             await save_upload(up, dest, limit)
             paths[key] = str(dest)

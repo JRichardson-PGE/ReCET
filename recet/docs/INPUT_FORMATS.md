@@ -19,7 +19,7 @@ Templates: `recet template all --out templates` (or the GUI's **Template…** bu
 
 ## 1. The job: CET `Measure.csv` and `ProgramCost.csv`
 
-The same files you upload to the CET: pipe (`|`) delimited, header row, UTF-8. `ProgramCost.csv` is optional.
+The same files you upload to the CET: pipe (`|`) delimited, header row, UTF-8. `ProgramCost.csv` is optional. ReCET also reads the same columns saved as an ordinary comma-delimited CSV (Excel's *Save as CSV*; text with commas in quotes) or a tab-delimited file: the delimiter is taken from the header line, and a file that is not UTF-8 is read as Windows-1252. The CET itself still needs the pipe-delimited form (the Edit inputs tab's *Save as CET files* writes it).
 
 **Required `Measure.csv` columns** (a missing one stops the run, the preflight names it):
 
