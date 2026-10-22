@@ -616,6 +616,33 @@ measure adds electric load, so `PV_elec` is negative:
 - Example B, `BillReducGas`: max(0, PV_gas) with PV_gas = 13198.20 = **13,198.20**
 - Example B, `BillIncrGas`: max(0, -PV_gas), and PV_gas is positive, so 0 = **0.00**
 
+#### `BillReducElecGross`, `BillIncrElecGross`, `BillReducGasGross`, `BillIncrGasGross`
+
+**The participant's own bill change** for the Participant Cost Test (1.10): the bill impacts above on **gross** savings, without net-to-gross and without market effects
+(free riders are participants too). Unit: $ (PV, annual discounting). The CET has no such columns.
+
+**Formula**
+
+```text
+PV_elec_gross = PV( NumUnits * UnitkWh1stBaseline * IR * RR ,  NumUnits * UnitkWh2ndBaseline * IR * RR ,  RateE )      IR, RR: InstallationRatekWh, RealizationRatekWh (blank = 1)
+PV_gas_gross  = PV( NumUnits * UnitTherm1stBaseline * IRt * RRt ,  NumUnits * UnitTherm2ndBaseline * IRt * RRt ,  RateG )   IRt, RRt: the therm rates (blank = 1)
+the Reduc / Incr split and PV(s1, s2, rate): exactly as for BillReducElec ... BillIncrGas above
+```
+
+**Inputs:** as for `BillReducElec` ... `BillIncrGas`, without the NTG columns and the market-effects setting.
+
+The gross streams are the net streams of the entry above divided by `NTG + MEB` (example A: 0.8 electric, 0.9 gas; example B: 0.75 + 0.05 and 0.85 + 0.05):
+
+- Example A, `BillReducElecGross`: 42750 * 0.406249518 + 42750 * 0.418437003 / 1.0766^1 + 0.4 * 42750 * 0.430990113 / 1.0766^6 = **38,715.61**
+- Example A, `BillIncrElecGross`: not a fuel-substitution measure, so 0 = **0.00**
+- Example A, `BillReducGasGross`: 1800 * 2.815469667 + 1800 * 2.899933757 / 1.0766^1 + 0.4 * 1800 * 2.986931770 / 1.0766^6 = **11,297.45**
+- Example A, `BillIncrGasGross`: not a fuel-substitution measure, so 0 = **0.00**
+- Check, `PV_elec_gross` of example B: -36000 * 0.426280328 + (0.125 * -36000 + 0.875 * -22500) * 0.439068738 / 1.0766^5 + 0.5 * -22500 * 0.452240800 / 1.0766^6 = **-25,956.07**
+- Example B, `BillReducElecGross`: max(0, PV_elec_gross) with PV_elec_gross = -25956.07, so 0 = **0.00**
+- Example B, `BillIncrElecGross`: max(0, -PV_elec_gross) = **25,956.07**
+- Example B, `BillReducGasGross`: 5700 * 1.485816933 + (0.125 * 5700 + 0.875 * 3800) * 1.530391441 / 1.0766^5 + 0.5 * 3800 * 1.576303184 / 1.0766^6 = **14,664.66**
+- Example B, `BillIncrGasGross`: max(0, -PV_gas_gross), and PV_gas_gross is positive, so 0 = **0.00**
+
 ### 1.6 Societal (SB = Base, SH = High) and societal-rate columns
 
 Blank when "Include societal cost tests" is off. These are the columns of 1.4 and 1.5 repeated for the Societal Cost tests. Two things change, and only these two: the **price rows** are
@@ -1040,6 +1067,30 @@ SCHRatioNoAdmin = the same numerator / SCHCostNoAdmin
 - Example B, `SCHRatio`: (0.00 + 10432.0340 + 0.00 + 320.00) / 60932.6233 = **0.1765**
 - Example B, `SCHRatioNoAdmin`: 10752.0340 / 59161.3579 = **0.1817**
 
+#### `PCTBen`, `PCTCost`, `PCTRatio`
+
+**The Participant Cost Test** (CA Standard Practice Manual, Chapter 2), which the CET does not calculate: the participant's benefits (bill reductions, incentives received,
+tax credits) against the participant's costs (the full measure cost and any bill increase), on gross savings and without market effects. `PCTBen` and `PCTCost` are $ (PV);
+`PCTRatio` is a ratio (0 when `PCTCost` is 0). Not yet checked against a CPUC definition: CPUC has not published how the CET will calculate the test.
+
+**Formula**
+
+```text
+PCTBen   = BillReducElecGross + BillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF
+PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + BillIncrElecGross + BillIncrGasGross          (GrossParticipantCostPV + RebatesandIncentsPV = the measure cost before incentives)
+PCTRatio = PCTBen / PCTCost
+```
+
+**Where** `PVF = Rqf ^ Qm` is the participant-cost discount factor of `RebatesandIncentsPV` (1.5): the claim quarter at the primary quarterly rate.
+**Inputs:** the columns named in the formula and their inputs; no program costs.
+
+- Example A, `PCTBen`: 38715.6133 + 11297.4525 + 5776.6364 + 500 / 1.0386667225 = **56,271.09**
+- Example A, `PCTCost`: 13478.8183 + 5776.6364 + 0.00 + 0.00 = **19,255.45**
+- Example A, `PCTRatio`: 56271.0886 / 19255.4547 = **2.9223**
+- Example B, `PCTBen`: 0.00 + 14664.6629 + 13246.3327 + 1000 / 1.01915 = **28,892.21**
+- Example B, `PCTCost`: 47421.2222 + 13246.3327 + 25956.0741 + 0.00 = **86,623.63**
+- Example B, `PCTRatio`: 28892.2054 / 86623.6290 = **0.3335**
+
 ### 1.11 Emissions
 
 Present when "Include emissions" is on. *First-year* is the measure's **first four quarters** of life (`k` = 0 ... 3, or fewer if the life is shorter), not a calendar year; `...Lifecycle` is all of its quarters. `Net` includes net-to-gross
@@ -1361,7 +1412,7 @@ it they are counted like every other measure.
 | `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited IOU`, `program segment` or `excluded` |
 | `value` | The group's value. Text. | `all measures`, the IOU (`PGE`, `SCE`, `SDGE`, `SCG`; `SW` for unallocated statewide programs in the credited-IOU rows), the segment (for example `resource_acquisition`, `(blank)`), or the excluded row's label |
 | `measures` | Number of measures in the group. Count. | `COUNT of the measure-level rows in the group` |
-| `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
+| `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `BillReducElec`, `BillReducGas`, `PCTBen`, `PCTCost` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
 | `NetElecCO2`, `NetGasCO2` | The group's first-year net CO2. Metric tons. | `SUM over the group of NetElecCO2` (and of `NetGasCO2`) |
 | `TRC_ratio` | Portfolio Total Resource Cost ratio, on CET's receipt definition: the summed benefits (supply costs are inside the cost, not netted from the numerator) over the summed cost. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCost)` |
 | `TRC_NoAdmin_ratio` | The same over the cost without program costs. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCostNoAdmin)` |
@@ -1370,6 +1421,7 @@ it they are counted like every other measure.
 | `RIM_ratio` | Portfolio Ratepayer Impact Measure ratio. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(BillIncrElec) + SUM(BillIncrGas) ) / SUM(RIMCost)` |
 | `SCB_ratio` | Portfolio Societal Cost ratio, Base (omitted when SCB/SCH are off). Ratio. | `( SUM(ElecBen_SB) + SUM(GasBen_SB) + SUM(WaterEnergyBen_SB) + SUM(OtherBen) ) / SUM(SCBCost)` |
 | `SCH_ratio` | Portfolio Societal Cost ratio, High (omitted when SCB/SCH are off). Ratio. | `( SUM(ElecBen_SH) + SUM(GasBen_SH) + SUM(WaterEnergyBen_SH) + SUM(OtherBen) ) / SUM(SCHCost)` |
+| `PCT_ratio` | Portfolio Participant Cost Test ratio (gross). Ratio. | `SUM(PCTBen) / SUM(PCTCost)` |
 
 Each `SUM` is over the group's measures. A ratio is omitted when a column it needs is blank or its denominator is 0. **Inputs:** the measure-level table only.
 
@@ -1676,6 +1728,13 @@ refer to.
 | `BillIncrElec` | 0 | 20764.9 |
 | `BillReducGas` | 10167.7 | 13198.2 |
 | `BillIncrGas` | 0 | 0 |
+| `BillReducElecGross` | 38715.6 | 0 |
+| `BillIncrElecGross` | 0 | 25956.1 |
+| `BillReducGasGross` | 11297.5 | 14664.7 |
+| `BillIncrGasGross` | 0 | 0 |
+| `PCTBen` | 56271.1 | 28892.2 |
+| `PCTCost` | 19255.5 | 86623.6 |
+| `PCTRatio` | 2.92235 | 0.333537 |
 | `ElecBen_SB` | 6688.34 | 0 |
 | `ElecBen_SH` | 7296.37 | 0 |
 | `ElecSupplyCost_SB` | 0 | 4734.01 |

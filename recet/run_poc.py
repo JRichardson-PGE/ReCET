@@ -468,13 +468,44 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     df["TRCRatio"] = (total_ben + df["TaxCredits"]) / df["TRCCost"]
     df["PACRatio"] = total_ben / df["PACCost"]
     df["RIMRatio"] = (total_ben + df["BillIncrElec"] + df["BillIncrGas"]) / df["RIMCost"]
+    df = df.merge(participant_cost_test(measures, df, acc_version, base_year), on="measure_id", how="left")
 
     return df[["measure_id", "ElecPricingStatus", "ProfileSource", "SystemClimateZone", "SystemZoneSource", "GasPricingStatus", "GasProfileSource", "WaterPricingStatus",
                "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost", "WaterEnergyBen", "WaterEnergyCost",
                "OtherBen", "OtherCost", "TaxCredits", "OtherBenGross", "OtherCostGross", "TaxCreditsGross",
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
                "GrossParticipantCostPV", "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas",
+               "BillReducElecGross", "BillIncrElecGross", "BillReducGasGross", "BillIncrGasGross", "PCTBen", "PCTCost", "PCTRatio",
                "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
+
+
+def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_version: int, base_year: int) -> pd.DataFrame:
+    """The Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (BRD BR-06.8; on CPUC's CET roadmap). From the
+    participant's side, on GROSS savings (free riders are participants too) and without market effects:
+
+        PCTBen   = BillReducElecGross + BillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF       (bill reductions, incentives, tax credits)
+        PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + BillIncrElecGross + BillIncrGasGross       (the full measure cost, bill increases)
+        PCTRatio = PCTBen / PCTCost
+
+    The gross bill impacts are C9's bill impacts with NTG = 1 (same rates, discounting and fuel-substitution split). PVF is the participant-cost discount factor
+    of C8 (the claim quarter at the primary rate). Not yet checked against a CPUC specification of the test: CPUC has not published how the CET will define it."""
+    gross = measures.copy()
+    gross["annual_net_kwh_1st"] = gross["num_units"] * gross["unit_kwh_1st"]
+    gross["annual_net_kwh_2nd"] = gross["num_units"] * gross["unit_kwh_2nd"]
+    gross["annual_net_therms_1st"] = gross["num_units"] * gross["unit_therm_1st"] * gross["ir_therm"] * gross["rr_therm"]
+    gross["annual_net_therms_2nd"] = gross["num_units"] * gross["unit_therm_2nd"] * gross["ir_therm"] * gross["rr_therm"]
+    bills = run_bill_impact(gross, acc_version=acc_version).rename(columns={c: f"{c}Gross" for c in ("BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas")})
+    rates = {pa: discount_settings.get_discount_rate_qtr(pa, acc_version) for pa in measures["PA"].unique()}
+    qm = (measures["claim_year"] - base_year) * 4 + (measures["claim_quarter"] - 1)
+    pvf = (1.0 + measures["PA"].map(rates)) ** qm
+    out = measures[["measure_id"]].assign(_pvf=pvf.to_numpy()).merge(bills, on="measure_id", how="left")
+    out = out.merge(priced[["measure_id", "RebatesandIncentsPV", "GrossParticipantCostPV", "TaxCreditsGross"]], on="measure_id", how="left")
+    gross_cols = ["BillReducElecGross", "BillIncrElecGross", "BillReducGasGross", "BillIncrGasGross"]
+    out[gross_cols] = out[gross_cols].fillna(0.0)
+    out["PCTBen"] = out["BillReducElecGross"] + out["BillReducGasGross"] + out["RebatesandIncentsPV"] + out["TaxCreditsGross"] / out["_pvf"]
+    out["PCTCost"] = out["GrossParticipantCostPV"] + out["RebatesandIncentsPV"] + out["BillIncrElecGross"] + out["BillIncrGasGross"]
+    out["PCTRatio"] = (out["PCTBen"] / out["PCTCost"].where(out["PCTCost"] != 0)).fillna(0.0)
+    return out[["measure_id"] + gross_cols + ["PCTBen", "PCTCost", "PCTRatio"]]
 
 
 def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,

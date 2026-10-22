@@ -38,9 +38,9 @@ DROP_FROM_RESULT = {"measure_id", "prg_id", "NTGRkWh", "ntgr_therm"}   # restate
 
 # the columns compared between two runs / against CET, and the totals in the summary
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas"]
+               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas"]
 SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TotalSystemBenefit", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "BillReducElec", "BillReducGas", "NetElecCO2", "NetGasCO2"]
+                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "BillReducElec", "BillReducGas", "PCTBen", "PCTCost", "NetElecCO2", "NetGasCO2"]
 
 
 def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.DataFrame:
@@ -113,7 +113,7 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
 EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 
 
-SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
+SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "PCT_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
 
 
 def _ratio_parts(get) -> list[tuple[str, object, object]]:
@@ -131,12 +131,12 @@ def _ratio_parts(get) -> list[tuple[str, object, object]]:
             ("SCB", b_sb, get("SCBCost")), ("SCH", b_sh, get("SCHCost")),
             ("TRC_NoAdmin", plus(b, tax), get("TRCCostNoAdmin")), ("PAC_NoAdmin", b, get("PACCostNoAdmin")),
             ("RIM_NoAdmin", plus(b, incr), get("RIMCostNoAdmin")), ("SCB_NoAdmin", b_sb, get("SCBCostNoAdmin")),
-            ("SCH_NoAdmin", b_sh, get("SCHCostNoAdmin"))]
+            ("SCH_NoAdmin", b_sh, get("SCHCostNoAdmin")), ("PCT", get("PCTBen"), get("PCTCost"))]
 
 
 def group_ratios(g: pd.DataFrame) -> dict[str, float]:
     """The cost-test ratios of a group of measures, as CET reports them on a run receipt: the summed BENEFITS (supply costs are already in the costs, not netted
-    from the numerator) over the summed cost; TRC adds tax credits and RIM the bill increases to the numerator. A ratio whose inputs are missing or whose cost is 0
+    from the numerator) over the summed cost; TRC adds tax credits and RIM the bill increases to the numerator; PCT is PCTBen over PCTCost. A ratio whose inputs are missing or whose cost is 0
     is left out. (Until 2026-09-21 the numerator was TotalSystemBenefit, which nets the supply costs out of the numerator as well as counting them in the cost.)
     Used by the portfolio summary and the Results tab's views, so both give the same ratios."""
     get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
