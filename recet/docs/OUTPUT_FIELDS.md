@@ -188,7 +188,7 @@ Which ACC version the row was priced against. Text.
 
 **Formula:** the run's ACC label, which names both the ACC (the year the calculator was released) and CET's Avoided Cost Version (the first year it was in effect
 for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avoided Cost Version 2024)`, `2024 ACC (Avoided Cost Version 2026)` or
-`2026 ACC (Avoided Cost Version 2027)` for a built-in version, `Custom ACC '<label>'` for a new version defined by supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
+`2026 ACC (Avoided Cost Version 2028)` for a built-in version, `Custom ACC '<label>'` for a new version defined by supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
@@ -205,6 +205,8 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | `poc_climate_zone` | Climate zone, as text. | `E3ClimateZone` |
 | `poc_target_sector` | Target sector for shapes and rates (text). | `E3TargetSector` |
 | `poc_shape_key` | Electric end-use shape name (text). | `E3MeaElecEndUseShape` |
+| `poc_shape_key_2nd` | The electric end-use shape of the 2nd-baseline years (text). | `E3MeaElecEndUseShape2nd` (an optional ReCET column, not a CET field); blank = `E3MeaElecEndUseShape` |
+| `poc_shape_key_water` | The electric end-use shape the water energy is spread over, both baselines (text). | `E3MeaElecEndUseShapeWater` (optional, not a CET field); blank = `E3MeaElecEndUseShape` |
 | `poc_gas_profile_key` | Gas savings profile name (text). | `E3GasSavProfile` |
 | `poc_gas_sector` | Gas sector (text). | `E3GasSector` |
 | `poc_subset_key` | A label built from zone and sector; not used in pricing (text). | `"CZ" + E3ClimateZone + "_" + Sector` |
@@ -255,7 +257,7 @@ A benefit of 0 alone cannot tell "no savings" from "could not price"; these colu
 
 | Field | Values and the rule that gives each |
 |---|---|
-| `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
+| `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `PARTLY PRICED: no hourly profile for one baseline's shape` when the measure has a separate 2nd-baseline shape and only one of its two shapes was found (C4.6); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
 | `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `user profile (kWh per unit)` (an already-scaled profile, C4.5), `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
 | `SystemClimateZone` | For a measure with `E3ClimateZone = System`: the real climate zone it was priced in, the profile's System zone (CALCULATIONS C4.4); blank for every other measure and when nothing was priced |
 | `SystemZoneSource` | Where `SystemClimateZone` came from: `catalog` (the shipped System-zone catalog), or `calculated (...)` with the reason (`user profile`, `supplied ACC`, `reference data differs from the catalog's`, `profile not in catalog`); `no zone could be priced: System shape and blended prices` when no zone was an option; blank otherwise |
@@ -1535,7 +1537,7 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
-`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
 Errors stop the run; warnings and info do not.
@@ -1664,9 +1666,11 @@ refer to.
 <!-- oa-all:start -->
 | Field | Example A | Example B |
 |---|---|---|
-| `POC_ACC` | 2026 ACC (Avoided Cost Version 2027) | 2026 ACC (Avoided Cost Version 2027) |
+| `POC_ACC` | 2026 ACC (Avoided Cost Version 2028) | 2026 ACC (Avoided Cost Version 2028) |
 | `poc_subset_key` | CZ13_Res | CZ13_Com |
 | `poc_shape_key` | W_SHAPE | 3 = Commercial HVAC |
+| `poc_shape_key_2nd` | W_SHAPE | 3 = Commercial HVAC |
+| `poc_shape_key_water` | W_SHAPE | 3 = Commercial HVAC |
 | `poc_annual_net_kwh` | 40000 | -30000 |
 | `poc_annual_net_kwh_1st` | 40000 | -30000 |
 | `poc_annual_net_kwh_2nd` | 0 | -18750 |

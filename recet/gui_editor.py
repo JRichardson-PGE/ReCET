@@ -444,7 +444,8 @@ class EditorTab:
     def _apply_row_dropdowns(self) -> None:
         """End-use dropdowns depend on the row's IOU and target sector."""
         g = self.grids["Measure"]
-        if "E3MeaElecEndUseShape" not in g.columns:
+        cols = [c for c in editor.END_USE_COLUMNS if c in g.columns]
+        if not cols:
             return
         df = self.table("Measure")
         cache: dict[tuple[str, str], list[str]] = {}
@@ -452,7 +453,8 @@ class EditorTab:
             key = (str(iou), str(sector))
             if key not in cache:
                 cache[key] = self.choices.end_use_choices(*key)
-            g.dropdown("E3MeaElecEndUseShape", [""] + cache[key], row=r)
+            for c in cols:
+                g.dropdown(c, [""] + cache[key], row=r)
         g.redraw()
 
     # ------------------------------------------------------------------------------------------------------------------ table access

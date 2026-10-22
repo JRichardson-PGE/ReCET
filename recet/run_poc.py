@@ -56,6 +56,29 @@ def _per_route(df: pd.DataFrame, cols: list[str], fn) -> pd.Series:
     return pd.Series(flags[codes], index=df.index)
 
 
+def split_by_baseline_shape(measures: pd.DataFrame) -> pd.DataFrame:
+    """A measure whose 2nd-baseline years have their own electric shape (shape_key_2nd, from E3MeaElecEndUseShape2nd) becomes two rows with the same measure_id:
+    the 1st-baseline part on its own shape (2nd-baseline kWh set to 0) and the 2nd-baseline part on the 2nd shape (1st-baseline kWh, gas and water set to 0).
+    The baseline phasing is linear in the two quantities, so the two parts add up to the measure; with one shape the measure is left as one row. Only early
+    replacements (0 < RUL < EUL) have a 2nd baseline to split. Sum results by measure_id afterwards."""
+    if "shape_key_2nd" not in measures.columns:
+        return measures
+    rul, eul = measures["rul_years_exact"], measures["eul_years_exact"]
+    split = (measures["shape_key_2nd"] != measures["shape_key"]) & (rul > 0) & (rul < eul)
+    if not split.any():
+        return measures
+    first, second = measures[split].copy(), measures[split].copy()
+    for c in ("shape_scale_2nd", "unit_kwh_2nd", "annual_net_kwh_2nd"):
+        first[c] = 0.0
+    second["shape_key"] = second["shape_key_2nd"]
+    for c in ("shape_scale", "unit_kwh_1st", "annual_net_kwh_1st", "annual_net_kwh", "unit_therm_1st", "unit_therm_2nd", "annual_net_therms_1st",
+              "annual_net_therms_2nd", "annual_net_therms", "kwh_water_1st", "kwh_water_2nd", "water_scale_1st", "water_scale_2nd"):
+        if c in second.columns:
+            second[c] = 0.0
+    out = pd.concat([measures[~split], first, second])
+    return out.sort_index(kind="stable").reset_index(drop=True)         # each measure where it was, its 1st-baseline part before its 2nd
+
+
 def _sum_by_measure(df: pd.DataFrame, value_col: str, name: str) -> pd.Series:
     """Lifetime value per measure_id. An empty result (no measure of this fuel priced -- e.g. an electric-only job has no gas rows) is an empty Series that still
     carries the measure_id index, so it merges like any other."""
@@ -143,7 +166,7 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     if base_year is None:
         base_year = int(measures["claim_year"].min())
 
-    other_measures = measures.reset_index(drop=True)
+    other_measures = split_by_baseline_shape(measures.reset_index(drop=True))     # a separate 2nd-baseline shape prices as a second part
     # E3ClimateZone = System is priced in the profile's System zone (pipeline/system_zones.py): its shape AND its prices come from that real zone
     other_measures["price_zone"] = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in
                                     zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"], other_measures["climate_zone"])]
@@ -187,7 +210,9 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
 
     hourly_source = [(match_cache.get(k) or (None, None, ""))[2] for k in zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"],
                                                                           other_measures["price_zone"])]      # where each measure's 8,760 shape came from (user profile / library ...)
-    batched.route = {mid: f"hourly profile | {src}" for mid, src in zip(other_measures["measure_id"], hourly_source)}
+    batched.route = {}
+    for mid, src in zip(other_measures["measure_id"], hourly_source):        # a measure split by baseline reports its 1st-baseline shape
+        batched.route.setdefault(mid, f"hourly profile | {src}")
     return batched
 
 
@@ -349,6 +374,8 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
             elapsed_seconds=0.0, batch_size=0)
     w = w.reset_index(drop=True).copy()
     w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
+    if "shape_key_water" in w.columns:                                     # E3MeaElecEndUseShapeWater (blank = the measure's own shape), for both baselines
+        w["shape_key"] = w["shape_key_2nd"] = w["shape_key_water"]
     if real_impact_profiles.user_profiles() is not None:
         # a kWh-per-unit profile (apply_scaled_profiles) is in kWh, not shares: divide by its annual kWh S so the water energy is spread by its shares.
         # A load-shifting-only profile (S = 0) has no shares, so its water energy is not priced (preflight warns: zero_net_profile_water).
@@ -447,8 +474,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     route_source = route.str.split(" | ", regex=False).str[1].fillna(route_kind)   # user profile / library / library (sector-loose match) / ...
     elec_priced = ids.isin(_ids_in(batched.measure_year))
     df["ElecPricingStatus"] = np.select(
-        [~has_elec, ids.isin(set(batched.unmatched_measure_ids)), elec_priced],
-        ["no electric savings", "UNPRICED: no hourly profile", "priced: " + route_kind],
+        [~has_elec, ids.isin(set(batched.unmatched_measure_ids)) & elec_priced, ids.isin(set(batched.unmatched_measure_ids)), elec_priced],
+        ["no electric savings", "PARTLY PRICED: no hourly profile for one baseline's shape", "UNPRICED: no hourly profile", "priced: " + route_kind],
         default="UNPRICED: no value returned")
     df["ProfileSource"] = route_source.where(elec_priced & has_elec, "")
     # E3ClimateZone = System: the real zone it was priced in, and whether that came from the catalog or was calculated for this run (pipeline/system_zones.py)
@@ -740,34 +767,45 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
 
 def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd.DataFrame:
     """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit` (BRD BR-06.6). The profile is
-    priced as given: its hourly kWh per unit x NumUnits x NTG x IR x RR, so
+    priced as given: its hourly kWh per unit x NumUnits x NTG x IR x RR, so for a baseline priced on such a profile
 
-        shape_scale     = NumUnits x NTGRkWh x IR x RR            (the profile itself carries the kWh)
-        shape_scale_2nd = shape_scale x r2,    r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline (1 when UnitkWh1stBaseline is 0): the 2nd baseline keeps the file's ratio
+        shape_scale(_2nd) = NumUnits x NTGRkWh x IR x RR            (the profile itself carries the kWh)
 
-    and the annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (and S x r2 the 2nd baseline)
-    in the annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). Measures on any other shape are returned unchanged. With statewide allocation
+    and its annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (UnitkWh2ndBaseline) in the
+    annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). The 2nd baseline is priced on its own shape (shape_key_2nd, E3MeaElecEndUseShape2nd)
+    when it has one; when it shares the 1st baseline's scaled profile it keeps the file's ratio r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline (1 when
+    UnitkWh1stBaseline is 0): shape_scale_2nd = shape_scale x r2 and S x r2 kWh. Baselines on any other shape are unchanged. With statewide allocation
     (`allocated`), an allocated row is multiplied by its electric factor, as its UnitkWh fields were."""
     if real_impact_profiles.user_profiles() is None or measures.empty:
         return measures
-    zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["shape_key"], measures["PA"], measures["target_sector"], measures["climate_zone"])]
-    annual = [real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(measures["shape_key"], measures["PA"], measures["target_sector"], zones)]
-    rows = pd.Series([a is not None for a in annual], index=measures.index)
-    if not rows.any():
+
+    def annual_kwh(keys):
+        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(keys, measures["PA"], measures["target_sector"], measures["climate_zone"])]
+        return pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(keys, measures["PA"], measures["target_sector"], zones)],
+                         index=measures.index, dtype=float)
+    s1 = annual_kwh(measures["shape_key"])
+    key2 = measures["shape_key_2nd"] if "shape_key_2nd" in measures.columns else measures["shape_key"]
+    same2 = key2 == measures["shape_key"]
+    s2 = s1.where(same2, annual_kwh(key2))
+    if s1.isna().all() and s2.isna().all():
         return measures
     m = measures.copy()
-    s = pd.Series([np.nan if a is None else a for a in annual], index=m.index)
     f = statewide_allocation.electric_factors(m["prg_id"], m["claim_year"]) if allocated else pd.Series(1.0, index=m.index)
-    u1, u2 = m["unit_kwh_1st"], m["unit_kwh_2nd"]
+    u1, u2 = m["unit_kwh_1st"].astype(float), m["unit_kwh_2nd"].astype(float)
     r2 = (u2 / u1.where(u1 != 0)).fillna(1.0)
     for c in ("unit_kwh_1st", "unit_kwh_2nd", "annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kwh", "shape_scale", "shape_scale_2nd"):
         m[c] = m[c].astype(float)                     # a whole-number file reads as int64, which cannot take the profile's kWh
-    m.loc[rows, "unit_kwh_1st"], m.loc[rows, "unit_kwh_2nd"] = (s * f)[rows], (s * f * r2)[rows]
-    for b in ("1st", "2nd"):
-        m.loc[rows, f"annual_net_kwh_{b}"] = (m["num_units"] * m[f"unit_kwh_{b}"] * m["NTGRkWh"])[rows]
-    m.loc[rows, "annual_net_kwh"] = m.loc[rows, "annual_net_kwh_1st"]
     per_unit = m["num_units"] * f * m["NTGRkWh"] * m["ir_kwh"] * m["rr_kwh"]
-    m.loc[rows, "shape_scale"], m.loc[rows, "shape_scale_2nd"] = per_unit[rows], (per_unit * r2)[rows]
+    first = s1.notna()
+    m.loc[first, "unit_kwh_1st"], m.loc[first, "shape_scale"] = (s1 * f)[first], per_unit[first]
+    shared = same2 & first                            # the 2nd baseline on the same scaled profile: the file's 2nd / 1st ratio
+    m.loc[shared, "unit_kwh_2nd"], m.loc[shared, "shape_scale_2nd"] = (s1 * f * r2)[shared], (per_unit * r2)[shared]
+    own = ~same2 & s2.notna()                         # the 2nd baseline on its own scaled profile
+    m.loc[own, "unit_kwh_2nd"], m.loc[own, "shape_scale_2nd"] = (s2 * f)[own], per_unit[own]
+    changed = first | shared | own
+    for b in ("1st", "2nd"):
+        m.loc[changed, f"annual_net_kwh_{b}"] = (m["num_units"] * m[f"unit_kwh_{b}"] * m["NTGRkWh"])[changed]
+    m.loc[changed, "annual_net_kwh"] = m.loc[changed, "annual_net_kwh_1st"]
     return m
 
 

@@ -201,7 +201,15 @@ def test_files_keep_cets_column_order_whatever_order_they_are_given_in(tmp_path)
     frozen, scroll, _ = editor.display_layout("Measure", list(job.measures.columns))
     files = editor.write_cet_files(job.measures[frozen + scroll], job.programcost, tmp_path)
     head = files["measures"].read_text(encoding="utf-8").splitlines()[0].split("|")
-    assert head == editor.MEASURE_COLUMNS
+    assert head == templates._CET_MEASURE_HEADER                    # the ReCET-only columns are left out while they are all blank
+
+
+def test_a_used_recet_only_column_is_written_after_cets_columns(tmp_path):
+    job = _job()
+    m = job.measures.copy()
+    m.loc[0, "E3MeaElecEndUseShapeWater"] = "W_SHAPE"
+    head = editor.write_cet_files(m, job.programcost, tmp_path)["measures"].read_text(encoding="utf-8").splitlines()[0].split("|")
+    assert head == templates._CET_MEASURE_HEADER + ["E3MeaElecEndUseShapeWater"]
 
 
 @pytest.mark.parametrize("text, shown", [("0.600000", "0.6"), ("15.0", "15"), ("100", "100"), ("-0.50", "-0.5"), ("4.969198677", "4.969199"),

@@ -93,7 +93,10 @@ _EXAMPLE_PROGRAMCOST = {"PrgID": "EXAMPLE_PRG", "PrgYear": "2028", "ClaimYearQua
 
 
 # Public names (the input editor, editor.py, builds its tables from these)
-MEASURE_COLUMNS = _CET_MEASURE_HEADER
+# Optional ReCET columns, not CET fields, kept after CET's 74: a separate electric shape for the 2nd-baseline years and for the water energy, and an ACC
+# version per measure (blank = the measure's own shape / the run's version). CET files written by the editor leave them out when they are all blank.
+RECET_MEASURE_COLUMNS = ["E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater", "ACCVersion"]
+MEASURE_COLUMNS = _CET_MEASURE_HEADER + RECET_MEASURE_COLUMNS
 PROGRAMCOST_COLUMNS = _PROGRAMCOST_HEADER
 EXAMPLE_MEASURE = _EXAMPLE_MEASURE
 EXAMPLE_PROGRAMCOST = _EXAMPLE_PROGRAMCOST
@@ -136,7 +139,9 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         ("Use this workbook instead of separate files: choose it as 'Job workbook' in the window, or run  recet run --workbook FILE.xlsx", False),
         ("", False),
         ("Sheet", True),
-        ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row.", False),
+        ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row. The last three columns are optional ReCET-only "
+         "columns (not CET fields; leave blank for the defaults): E3MeaElecEndUseShape2nd (2nd-baseline shape), E3MeaElecEndUseShapeWater (water-energy shape), "
+         "ACCVersion (2021, 2022, 2024 or 2026; blank = the run's version).", False),
         ("ProgramCost    Optional. CET ProgramCost.csv columns. Replace or delete the yellow example row.", False),
         ("RunParameters  Optional. Discount rates, base year and gas CO2 per PA. Filled in with the built-in values for ACC " + acc_key
          + "; a listed PA replaces the built-in row, so edit only the values you want to change. Rates are fractions (0.0766 = 7.66%).", False),
@@ -183,9 +188,9 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         ws.freeze_panes = "A2"
         return ws
 
-    meas = sheet("Measure", _CET_MEASURE_HEADER, [_EXAMPLE_MEASURE], example=True)
+    meas = sheet("Measure", MEASURE_COLUMNS, [_EXAMPLE_MEASURE], example=True)
     for col in ("CEInputID", "PrgID", "ClaimYearQuarter", "E3ClimateZone"):           # keep these as text even when they look like numbers
-        j = _CET_MEASURE_HEADER.index(col) + 1
+        j = MEASURE_COLUMNS.index(col) + 1
         meas.cell(2, j).number_format = "@"
         meas.cell(2, j).value = str(_EXAMPLE_MEASURE[col])
     sheet("ProgramCost", _PROGRAMCOST_HEADER, [_EXAMPLE_PROGRAMCOST], example=True)
@@ -230,7 +235,7 @@ def write_template(kind: str, out_path: str | Path, acc_key: str = "2026") -> Pa
     elif kind == "workbook":
         return write_workbook_template(out, acc_key)
     else:
-        out.write_text("|".join(_CET_MEASURE_HEADER) + "\r\n", encoding="utf-8")
+        out.write_text("|".join(MEASURE_COLUMNS) + "\r\n", encoding="utf-8")
         return out
     if out.suffix.lower() == ".parquet":
         df.to_parquet(out, index=False)

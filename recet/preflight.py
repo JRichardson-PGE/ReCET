@@ -338,6 +338,23 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
                         "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["measure_id"].head(5).tolist(),
                         _cells("Measure", mrows(zero_net), "UnitkWhIOUWater1stBaseline"))
 
+    # --- a separate 2nd-baseline shape (E3MeaElecEndUseShape2nd) on an early replacement
+    second = measures[(measures["shape_key_2nd"] != measures["shape_key"]) & (measures["rul_years_exact"] > 0)
+                      & (measures["rul_years_exact"] < measures["eul_years_exact"]) & (measures["shape_scale_2nd"] != 0)]
+    if len(second):
+        rep.stats["measures with a separate 2nd-baseline shape"] = f"{len(second):,}"
+        missing2, eg2, where2 = 0, [], []
+        for key, g in second.groupby(["shape_key_2nd", "PA", "target_sector"]):
+            has_user = user is not None and user.match(*key) is not None
+            has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
+            if not (has_user or has_lib):
+                missing2 += len(g)
+                eg2.append(" | ".join(map(str, key)))
+                where2 += _cells("Measure", mrows(g), "E3MeaElecEndUseShape2nd")
+        if missing2:
+            rep.add("warning", "no_electric_profile_2nd", "measures whose E3MeaElecEndUseShape2nd has no 8,760 profile: their 2nd-baseline years are NOT priced "
+                    "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
+
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
     water = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]
     rep.stats["water-energy measures"] = f"{len(water):,}"
@@ -345,13 +362,14 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         no_prof = 0
         eg = []
         where: list = []
-        for key, g in water.groupby(["shape_key", "PA", "target_sector"]):
+        for key, g in water.groupby(["shape_key_water", "PA", "target_sector"]):          # E3MeaElecEndUseShapeWater, or the measure's own shape
             has_user = user is not None and user.match(*key) is not None
             has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
             if not (has_user or has_lib):
                 no_prof += len(g)
                 eg.append(" | ".join(map(str, key)))
-                where += _cells("Measure", mrows(g), "E3MeaElecEndUseShape")
+                own = g["shape_key_water"] != g["shape_key"]
+                where += _cells("Measure", mrows(g[own]), "E3MeaElecEndUseShapeWater") + _cells("Measure", mrows(g[~own]), "E3MeaElecEndUseShape")
         if no_prof:
             rep.add("warning", "no_water_profile", "water-energy measures with no electric profile (the water energy is priced on the measure's electric profile) are NOT priced "
                     "(WaterPricingStatus = UNPRICED)", no_prof, eg, where)
