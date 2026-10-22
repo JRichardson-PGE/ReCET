@@ -19,6 +19,7 @@ from .pipeline import (
     rate_schedules,
     real_avoided_cost_v2,
     real_impact_profiles,
+    statewide_allocation,
     system_zones,
 )
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
@@ -348,6 +349,16 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
             elapsed_seconds=0.0, batch_size=0)
     w = w.reset_index(drop=True).copy()
     w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
+    if real_impact_profiles.user_profiles() is not None:
+        # a kWh-per-unit profile (apply_scaled_profiles) is in kWh, not shares: divide by its annual kWh S so the water energy is spread by its shares.
+        # A load-shifting-only profile (S = 0) has no shares, so its water energy is not priced (preflight warns: zero_net_profile_water).
+        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(w["shape_key"], w["PA"], w["target_sector"], w["climate_zone"])]
+        annual = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(w["shape_key"], w["PA"], w["target_sector"], zones)],
+                           index=w.index, dtype=float)
+        scaled = annual.notna()
+        div = annual.where(annual != 0)
+        for c in ("shape_scale", "shape_scale_2nd"):
+            w.loc[scaled, c] = (w[c] / div).fillna(0.0)[scaled]
     batched = run_real_hourly(w, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_fn,
                                  market_effects_bens=market_effects_bens, gen_only=True)
     return _sum_by_measure(batched.measure_year, "annual_value", "water_value"), batched
@@ -428,7 +439,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     # Reporting only: a benefit of 0 can mean "no savings" or "the POC could not price this measure" -- say which. Does not touch any value.
     ids = df["measure_id"]
     by_id = measures.set_index("measure_id")
-    has_elec = ids.map((by_id[["annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kw_1st", "annual_net_kw_2nd"]] != 0).any(axis=1)).astype(bool)
+    has_elec = ids.map((by_id[["annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kw_1st", "annual_net_kw_2nd", "shape_scale", "shape_scale_2nd"]] != 0)
+                       .any(axis=1)).astype(bool)
     has_gas = ids.map((by_id[["annual_net_therms_1st", "annual_net_therms_2nd"]] != 0).any(axis=1)).astype(bool)
     route = ids.map(batched.route).fillna("")
     route_kind = route.str.split(" | ", regex=False).str[0]                       # always "hourly profile" (the 8,760 path is the only electric route)
@@ -709,6 +721,39 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
     return out
 
 
+def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd.DataFrame:
+    """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit` (BRD BR-06.6). The profile is
+    priced as given: its hourly kWh per unit x NumUnits x NTG x IR x RR, so
+
+        shape_scale     = NumUnits x NTGRkWh x IR x RR            (the profile itself carries the kWh)
+        shape_scale_2nd = shape_scale x r2,    r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline (1 when UnitkWh1stBaseline is 0): the 2nd baseline keeps the file's ratio
+
+    and the annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (and S x r2 the 2nd baseline)
+    in the annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). Measures on any other shape are returned unchanged. With statewide allocation
+    (`allocated`), an allocated row is multiplied by its electric factor, as its UnitkWh fields were."""
+    if real_impact_profiles.user_profiles() is None or measures.empty:
+        return measures
+    zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["shape_key"], measures["PA"], measures["target_sector"], measures["climate_zone"])]
+    annual = [real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(measures["shape_key"], measures["PA"], measures["target_sector"], zones)]
+    rows = pd.Series([a is not None for a in annual], index=measures.index)
+    if not rows.any():
+        return measures
+    m = measures.copy()
+    s = pd.Series([np.nan if a is None else a for a in annual], index=m.index)
+    f = statewide_allocation.electric_factors(m["prg_id"], m["claim_year"]) if allocated else pd.Series(1.0, index=m.index)
+    u1, u2 = m["unit_kwh_1st"], m["unit_kwh_2nd"]
+    r2 = (u2 / u1.where(u1 != 0)).fillna(1.0)
+    for c in ("unit_kwh_1st", "unit_kwh_2nd", "annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kwh", "shape_scale", "shape_scale_2nd"):
+        m[c] = m[c].astype(float)                     # a whole-number file reads as int64, which cannot take the profile's kWh
+    m.loc[rows, "unit_kwh_1st"], m.loc[rows, "unit_kwh_2nd"] = (s * f)[rows], (s * f * r2)[rows]
+    for b in ("1st", "2nd"):
+        m.loc[rows, f"annual_net_kwh_{b}"] = (m["num_units"] * m[f"unit_kwh_{b}"] * m["NTGRkWh"])[rows]
+    m.loc[rows, "annual_net_kwh"] = m.loc[rows, "annual_net_kwh_1st"]
+    per_unit = m["num_units"] * f * m["NTGRkWh"] * m["ir_kwh"] * m["rr_kwh"]
+    m.loc[rows, "shape_scale"], m.loc[rows, "shape_scale_2nd"] = per_unit[rows], (per_unit * r2)[rows]
+    return m
+
+
 def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = False):
     """Load one CET job's inputs, optionally splitting its statewide (SW_) programs across the IOUs -- BOTH files together.
 
@@ -719,7 +764,7 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     is the single entry point; misalignment is reported by cost_tests.check_program_alignment and raised here.
 
     Returns (measures, program_costs or None)."""
-    measures = data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide)
+    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide), allocated=allocate_statewide)
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
     if program is not None:
         gap = cost_tests.check_program_alignment(measures, program)
