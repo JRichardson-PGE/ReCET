@@ -73,7 +73,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     return pd.Series(vals, index=measures.index, dtype=object)
 
 
-def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str, credited: pd.Series | None = None) -> pd.DataFrame:
+def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series, credited: pd.Series | None = None) -> pd.DataFrame:
     """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
     if not raw["CEInputID"].is_unique:
         raise ValueError("CEInputID is not unique")
@@ -97,7 +97,7 @@ def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd
     poc = derived[keep].add_prefix("poc_").reset_index(drop=True)
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
     frame = pd.concat([raw.reset_index(drop=True), poc, out], axis=1).copy()       # copy: one block, so the two columns added below do not warn
-    frame.insert(0, "POC_ACC", acc_label)
+    frame.insert(0, "POC_ACC", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())     # one label, or one per measure (mixed ACC versions)
     frame["CreditedIOU"] = credited.to_numpy() if credited is not None else ""
     return frame
 

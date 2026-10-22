@@ -186,6 +186,12 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     _by_impact = df["MeasImpactType"].astype(str).str.contains("FuelSub") if "MeasImpactType" in df.columns else False
     df["is_fuel_sub"] = _by_id | _by_impact
 
+    # ACCVersion (optional, not a CET column; BRD BR-06.5): the ACC version this measure is priced on, e.g. "2024" or "2024 ACC". Blank = the run's version.
+    if "ACCVersion" in df.columns:
+        v = df["ACCVersion"].astype(str).str.strip().str.replace(r"(?i)\s*ACC$", "", regex=True).str.replace(r"\.0$", "", regex=True)   # 2024.0 when the column has blanks
+        df["acc_version"] = v.where(~df["ACCVersion"].isna() & (v.str.lower() != "nan"), "")
+    else:
+        df["acc_version"] = ""
     df["eul_years_raw"] = df["EUL_Yrs"].astype(float)            # as filed (first-year savings use it; pricing uses eul_years_exact, floored at 0.25)
     df["claim_year"] = df["ClaimYearQuarter"].astype(str).str[:4].astype(int)
     # Real field: which quarter (1-4) of claim_year the measure starts
@@ -211,7 +217,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
         "unit_kwh_1st", "unit_kwh_2nd", "unit_therm_1st", "unit_therm_2nd", "ntgr_therm",
         "ir_kwh", "rr_kwh", "ir_therm", "rr_therm", "combustion_type", "prg_id",
         "unit_kw_1st", "unit_kw_2nd", "ntgr_kwh", "ntgr_kw", "ir_kw", "rr_kw",
-        "fuel_type", "is_fuel_sub", "eul_years_raw",
+        "fuel_type", "is_fuel_sub", "eul_years_raw", "acc_version",
         "kwh_water_1st", "kwh_water_2nd", "water_net_kwh_1st", "water_net_kwh_2nd", "water_scale_1st", "water_scale_2nd",
     ]
     if "IOU_AC_Territory" in df.columns:
