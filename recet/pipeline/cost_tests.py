@@ -45,6 +45,7 @@ import numpy as np
 import pandas as pd
 
 from . import discount_settings
+from .delimited import read_cet_csv
 
 _COST_FIELDS = [
     "AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation",
@@ -60,7 +61,7 @@ UNALLOCATED_SW_PA = "SCE"
 
 
 def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
-    """A real ProgramCost.csv (pipe-delimited).
+    """A real ProgramCost.csv (pipe-delimited, or comma-delimited: pipeline/delimited.py).
 
     allocate_statewide=True splits each statewide program's costs across the IOUs first
     (pipeline/statewide_allocation.allocate_program_costs): PrgID gets `<IOU>_` prepended and PA is set to the IOU, so each IOU's
@@ -68,7 +69,7 @@ def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataF
     data_loading.load_measures_from_csv(..., allocate_statewide=True) so PrgIDs line up (see load_job).
 
     Without allocation, rows with PA = SW are given PA = UNALLOCATED_SW_PA (see above) so they can be discounted."""
-    df = pd.read_csv(path, sep="|")
+    df = read_cet_csv(path)
     if allocate_statewide:
         from .statewide_allocation import allocate_program_costs, warn_unmatched
         df, report = allocate_program_costs(df)

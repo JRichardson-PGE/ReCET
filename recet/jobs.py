@@ -34,7 +34,7 @@ Log = Callable[[str], None]
 @dataclass
 class RunConfig:
     # --- inputs
-    measures: str = ""                       # CET Measure.csv (pipe-delimited)
+    measures: str = ""                       # CET Measure.csv (pipe- or comma-delimited)
     programcost: str | None = None           # CET ProgramCost.csv (optional)
     workbook: str | None = None              # an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760 sheets) instead of files
     out_dir: str = "recet_results"

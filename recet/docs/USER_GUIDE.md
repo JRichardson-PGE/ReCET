@@ -82,7 +82,7 @@ A file box takes a typed or pasted path, or **Browse...**.
 | **Input type** | **Excel job workbook (.xlsx)** or **CET files (Measure.csv, ProgramCost.csv)**. Shows only the boxes for that type, and only that type is run; the other type's boxes keep their paths (remembered between sessions), so you can switch back. Loading a settings file picks the type it names. |
 | **Job workbook (.xlsx)** | One Excel file holding the job: a `Measure` sheet (required) and optional `ProgramCost`, `RunParameters`, `SWAllocation`, `Programs`, `GasProfiles` and `Profiles8760` sheets ([INPUT_FORMATS.md](INPUT_FORMATS.md#8-the-job-as-one-excel-workbook)). Shown with input type *Excel job workbook*. A file chosen on the Supplied inputs tab wins over its sheet. **Template...** saves a workbook with the run parameters and SW factors already filled in. |
 | hint under the workbook box | "Sheets: Measure, ProgramCost, RunParameters, SWAllocation, Programs, GasProfiles, Profiles8760. A file chosen on the Supplied inputs tab wins over its sheet." - a reminder of the sheet names and the precedence rule. |
-| **Measure.csv** | Shown with input type *CET files*. The CET measure file (pipe-delimited); required for that input type. The file is checked (the *preflight*) before anything is priced; see [INPUT_FIELDS.md](INPUT_FIELDS.md#1-measurecsv). |
+| **Measure.csv** | Shown with input type *CET files*. The CET measure file (pipe- or comma-delimited); required for that input type. The file is checked (the *preflight*) before anything is priced; see [INPUT_FIELDS.md](INPUT_FIELDS.md#1-measurecsv). |
 | **ProgramCost.csv (optional)** | The CET program-cost file. With it, program costs are shared over each program's measures (C11) and the *NoAdmin* and regular cost tests differ; without it `WeightedProgramCost` is 0 and `NoAdmin` = regular. Every `PrgID` must match between the two files or the run stops. |
 | **Output folder** | Where results go. Created if missing. Each run makes its own sub-folder (`<run name>_acc<version>`) inside it, so runs never overwrite each other. Default `~/recet_results`. |
 | **Run name (optional)** | The sub-folder's name. Blank = a timestamp (`run_20260921_143005`). Re-using a name re-uses the folder and overwrites the files with the same names. |
@@ -294,7 +294,7 @@ started from the window, start in about a second. Nothing in the cache is ever t
 | Symptom | Cause and fix |
 |---|---|
 | "Measure.csv lacks required column(s) ..." | The file is not in CET's layout or the header is wrong; compare with `recet template measure --out header.csv`. |
-| "The header has no '\|'" | The file is comma-separated; CET files are pipe-delimited. |
+| "The header has no '\|', ',' or tab" (`no_delimiter`) | The file has one column or is not a CET-format file; save it as pipe- or comma-delimited text with CET's header. |
 | "blank_required_value" | `NumUnits`, `EUL_Yrs`, `NTGRkWh` or `UnitkWh1stBaseline` is blank on the listed measures; enter a value (0 if none). |
 | Many `UNPRICED` electric measures | `E3MeaElecEndUseShape` (or the sector / IOU) does not match a profile; the preflight lists examples. Fix the spelling, or supply a profile for that end use. |
 | "electric ACC file for version ... not found" | The reference data folder is not set or lacks `acc/<version>/electric_hourly.parquet`; see the status line and `recet data status`. |

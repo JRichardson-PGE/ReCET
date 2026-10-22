@@ -24,7 +24,7 @@ from . import __version__
 def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g = ap.add_argument_group("inputs")
     g.add_argument("--config", type=Path, help="a JSON RunConfig (other options override it)")
-    g.add_argument("--measures", help="CET Measure.csv (pipe-delimited)")
+    g.add_argument("--measures", help="CET Measure.csv (pipe- or comma-delimited)")
     g.add_argument("--programcost", help="CET ProgramCost.csv (optional)")
     g.add_argument("--workbook", help="an Excel job workbook instead of the CSVs (Measure sheet required; see `recet template workbook`)")
     g.add_argument("--out", dest="out_dir", help="output folder (a run sub-folder is created inside it)")

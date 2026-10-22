@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .pipeline.delimited import read_cet_csv
+
 # derived field -> the raw Measure.csv column it merely restates (dropped from the poc_ block when the values are identical)
 RESTATES = {
     "num_units": "NumUnits", "unit_meas_cost_1st": "UnitMeaCost1stBaseline", "unit_meas_cost_2nd": "UnitMeaCost2ndBaseline",
@@ -45,9 +47,9 @@ def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.Da
     """The Measure.csv columns as text (blank stays blank); with statewide allocation, the allocated rows (numbers are then written as computed)."""
     p = Path(measure_csv)
     if not allocate_statewide:
-        return pd.read_csv(p, sep="|", dtype=str, keep_default_na=False, low_memory=False, encoding="utf-8-sig")
+        return read_cet_csv(p, dtype=str, keep_default_na=False, low_memory=False)
     from .pipeline.statewide_allocation import allocate_measure_inputs
-    df, _report = allocate_measure_inputs(pd.read_csv(p, sep="|", low_memory=False, encoding="utf-8-sig"))
+    df, _report = allocate_measure_inputs(read_cet_csv(p, low_memory=False))
     return df.astype(object).where(df.notna(), "").astype(str)
 
 
@@ -59,8 +61,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     blank = pd.Series("", index=measures.index, dtype=object)
     if not programcost_csv:
         return blank
-    pc = pd.read_csv(programcost_csv, sep="|", dtype=str, keep_default_na=False, encoding="utf-8-sig")
-    pc.columns = [c.strip() for c in pc.columns]
+    pc = read_cet_csv(programcost_csv, dtype=str, keep_default_na=False)
     if allocate_statewide:
         from .pipeline.statewide_allocation import allocate_program_costs
         pc, _ = allocate_program_costs(pc)
@@ -204,7 +205,7 @@ def compare_frames(a: pd.DataFrame, b: pd.DataFrame, label_a: str, label_b: str,
 def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(per-measure, summary) of the POC against a real CET run's *_outputs.csv, matched on CEInputID (= CET_ID). Only meaningful for a job run the way the CET
     run was (same First Year, same ACC version, statewide programs allocated or not to match)."""
-    cet = pd.read_csv(cet_outputs, sep="|", low_memory=False).rename(columns={"CET_ID": "CEInputID"})
+    cet = read_cet_csv(cet_outputs, low_memory=False).rename(columns={"CET_ID": "CEInputID"})
     cols = [c for c in ("TotalSystemBenefit", "ElecBen", "GasBen", "WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyBenGross", "OtherBen",
                         "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
                         "TRCRatio", "PACRatio", "RIMRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas") if c in cet and c in frame]

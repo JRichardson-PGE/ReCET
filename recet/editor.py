@@ -227,12 +227,10 @@ class EditorError(ValueError):
 # ------------------------------------------------------------------------------------------------------------------------- loading and saving
 def _read_cet(path: str | Path) -> pd.DataFrame:
     p = Path(path)
-    head = p.read_text(encoding="utf-8-sig", errors="replace").split("\n", 1)[0]
-    if "|" not in head:
-        raise EditorError(f"{p.name} is not pipe-delimited (CET files use '|')")
-    df = pd.read_csv(p, sep="|", dtype=str, keep_default_na=False, na_filter=False, encoding="utf-8-sig")
-    df.columns = [c.strip() for c in df.columns]
-    return df
+    from .pipeline import delimited
+    if delimited.detect_sep(p) is None:
+        raise EditorError(f"{p.name} has no '|' or ',' in its header (use pipe- or comma-delimited text)")
+    return delimited.read_cet_csv(p, dtype=str, keep_default_na=False, na_filter=False)
 
 
 def conform(df: pd.DataFrame | None, columns: list[str]) -> pd.DataFrame:
