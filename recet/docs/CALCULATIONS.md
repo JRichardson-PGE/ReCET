@@ -719,30 +719,30 @@ difference. *Against a CET outputs file* (`cet_comparison_*`): per measure `c_po
 
 ## C17 Validation, deliberate differences from CET, and limitations
 
-**Validation.** *These figures were measured before 2026-10-02, with the TOU and SCG-table routes and CEDARS' calendar shift; the tool now prices every
-measure on its 8,760 with the 2018 alignment of C4.2 and so departs from CET deliberately (difference 7 below).* The reference is four real CET runs of PG&E's consolidated 2028-2031 portfolio (runs 121219-121222; 21,370 measures; 2024 ACC = CET Version 2026; statewide programs unallocated; First Year = claim year), priced by the tool with
-no CET-derived table in the calculation path. Portfolio total, POC / CET, pooled over the four runs (the per-run values differ from these by up to about 0.01, and by up to 0.04 for the societal water values):
+**Validation** (re-run 2026-10-22 on the current engine: every measure on its 8,760, the 2018 alignment of C4.2, the TOU 8,760s on the 2026 ACC's 2018 TOU map).
+The reference is four real CET runs of PG&E's consolidated 2028-2031 portfolio (runs 121219-121222; 21,370 measures, all matched; 2024 ACC = Avoided Cost Version 2026;
+statewide programs unallocated; First Year = claim year; 0% market effects), priced with no CET-derived table in the calculation path. Portfolio totals, ReCET / CET, pooled over the four runs:
 
-| Output | POC / CET | Note |
+| Output | ReCET / CET | Note |
 |---|---|---|
-| `GasBen`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost` | 1.0000 | |
-| `BillReducElec`, `BillIncrElec` | 1.0000 | every measure within 1% (median difference under 0.001%), including dual-baseline and fractional-life measures (within about $1) |
+| `GasBen`, `GasBen_SB`, `GasBen_SH`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost`, `TotalExpenditures`, `FirstYearNetKWh`, `FirstYearNetThm` | 1.0000 | `GasBen` agrees on every measure |
+| `BillReducElec`, `BillIncrElec` | 1.0000 | every measure within 1% |
 | `BillReducGas` | 0.9995 | |
-| `GasBen_SB`, `GasBen_SH` | 1.0000 | |
-| `ElecBen` | 0.9821 | of which 1.4% is 96 measures the tool cannot price (below); the rest is a 0.2-0.4% residual |
-| `WaterEnergyBen` | 0.9825 | exact where CET's own SCG table is used, so the formula itself is pinned |
-| `ElecSupplyCost` | 0.9666 | |
-| `TotalSystemBenefit` | 0.9911 | |
-| `TRCCost` / `PACCost` / `RIMCost` | 0.9995 / 0.9971 / 0.9998 | |
-| `SCBCost`, `SCHCost` | 0.9998 / 1.0000 | |
-| portfolio `TRC` / `PAC` / `RIM` ratio (receipt definition) | 0.9913 / 0.9937 / 0.9914 | TRC 1.6013 vs CET 1.6153 |
-| `NetElecCO2` | 0.9793 | first year |
-| `NetElecCO2Lifecycle` | 0.9191 | |
-| `NetGasCO2`, `NetElecNOx`, `NetGasNOx`, `NetPM10` (net, first year) | 1.0000 | |
-| `ElecBen_SB`, `ElecBen_SH` | 0.8754 / 0.8780 | **open**: the shortfall is concentrated in SCE TOU-priced measures (which carry ~95% of the electric benefit), whose TRC value is within 0.4%; cause not yet identified |
-| `WaterEnergyBen_SB`, `_SH` | 1.0240 / 1.0376 | CET holds `_SB` = `_SH` here (see below) |
+| `TRCCost` / `PACCost` / `RIMCost` | 0.9992 / 0.9956 / 0.9997 | |
+| `SCBCost`, `SCHCost` | 0.9995 / 0.9996 | |
+| `NetGasCO2`, `NetElecNOx`, `NetGasNOx`, `NetPM10` | 1.0000 | |
+| `ElecBen` | 1.5072 | TOU end uses 1.5297 (5,700 measures, 97% of CET's `ElecBen`), DEER end uses 0.9782 (15,670 measures). The TOU gap is deliberate difference 7: CET's TOU T&D is about 1,000 times too small |
+| `ElecSupplyCost` | 0.9484 | TOU 1.5427, DEER 0.9456 |
+| `ElecBen_SB`, `ElecBen_SH` | 1.3383 / 1.3383 | TOU 1.349 / 1.347 (difference 7, and CET's TOU SCT double-counts cap-and-trade carbon); DEER 1.0018 / 1.0531 (difference 4) |
+| `WaterEnergyBen` | 0.9742 | `_SB` 1.0156, `_SH` 1.0293 (CET holds `_SB` = `_SH` here) |
+| `TotalSystemBenefit` | 1.2632 | **1.0013 without the TOU end uses** |
+| portfolio `TRC` / `PAC` / `RIM` ratio (receipt definition) | 2.0369 / 11.1496 / 0.6450 vs CET 1.6153 / 8.8097 / 0.5157 | without the TOU end uses the TRC ratio is 0.9997 of CET's |
+| `NetElecCO2` | 1.0631 | first year; TOU 1.0785, DEER 1.0032 |
+| `NetElecCO2Lifecycle` | 0.9945 | |
 
-Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (median); 75% of measures are within 1% on `TRCCost`; `ElecBen` is within 5% for 81%.
+Per measure: `GasBen` agrees on all 21,370 measures and `BillReducElec` on all to within 1%; 63% of measures are within 1% on `TRCCost` (the rest carry TOU or DEER
+electric differences into their supply costs); no electric measure is unpriced. Reproduce with the CEDARS-Research repository's validation inputs
+(`poc/data/consolidated_<year>` and `poc/data/cet_output_<year>_run<id>`): run each year on the 2024 ACC with its claim year as First Year and compare with `--cet-outputs`.
 
 **Deliberate differences from CET** (the tool does not copy what appear to be CET data errors; each is logged in the project notes):
 
@@ -763,13 +763,16 @@ Per measure, `GasBen` agrees exactly and `BillReducElec` to within 0.001% (media
 * SCG electric is priced on the SCG routing of C3.1: one utility's whole bundle per zone, SCE unless SCE has no data for the zone (then PG&E). This matches CEDARS'
   DEER-path SCG values in zones 4, 5 (PG&E) and 13 (SCE); CEDARS' own SCG hourly files instead pair SCE generation with PG&E T&D in zones 4, 5 and 13, so the POC
   differs from them there. CET's quarterly SCG table is not used.
-* Not validated against CET, because the real runs contain none: **market effects at 5%**, **`WaterEnergyCost`** and second-baseline water, the **2021, 2022 and 2026 ACCs** (no CET run has used them), and statewide allocation of program costs.
+* Not validated against CET, because the real runs contain none: **`WaterEnergyCost`** and second-baseline water, the **2021, 2022 and 2026 ACCs** (no CET run has used them),
+  statewide allocation of program costs, the Participant Cost Test (CET has none), already-scaled and load-shifting profiles (C4.5) and ACC versions per measure (C3.5).
+  Market effects at 5% match CET jobs 121842 / 121841 on participant costs and bill impacts.
   These paths are covered by the hand-computed tests in `tests`.
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
 * Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from CET's `E3Emissions`, which covers only part of the keys.
 * Input columns that are read but not used: `RateScheduleElec`, `RateScheduleGas` (rate schedules always come from `PA` and sector), and every descriptive column (INPUT_FIELDS.md lists them).
-* CET output fields not produced: the savings-quantity columns (`FirstYear/Lifecycle/Annual` Gross/Net `KWh`, `KW`, `Thm`, `KWhWater`, `KWhSite`, `DiscountedSavings...`), `WeightedSavings`, `WeightedElecAlloc`, `WtdAdminCosts...`,
-  `ProgramCosts`, `TotalExpenditures`, `TRCLifecycleNetBen`, `PACLifecycleNetBen`, and the levelized `Lev...` columns.
+* CET output fields not produced: the savings-quantity columns other than `FirstYearNetKWh`, `FirstYearNetKW` and `FirstYearNetThm` (the gross first-year, lifecycle and annual
+  `KWh`, `KW`, `Thm`, `KWhWater`, `KWhSite` and `DiscountedSavings...` columns), `WeightedSavings`, `WeightedElecAlloc`, `WtdAdminCosts...`, `ProgramCosts`, `TRCLifecycleNetBen`,
+  `PACLifecycleNetBen`, and the levelized `Lev...` columns (whether those are still needed is RAID decision D9 in the replacement BRD).
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
