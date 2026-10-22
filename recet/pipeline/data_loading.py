@@ -91,6 +91,11 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     # Load-shape key: E3MeaElecEndUseShape is CET's own real field naming which
     # named electric end-use hourly shape a measure draws from.
     df["shape_key"] = df["E3MeaElecEndUseShape"].astype(str)
+    # Optional ReCET columns (not CET fields): a separate electric end-use shape for the 2nd-baseline years and for the water energy. Blank = the measure's own shape.
+    for col, key in (("E3MeaElecEndUseShape2nd", "shape_key_2nd"), ("E3MeaElecEndUseShapeWater", "shape_key_water")):
+        given = df[col].astype(str).str.strip() if col in df.columns else pd.Series("", index=df.index)
+        given = given.where(df[col].notna(), "") if col in df.columns else given
+        df[key] = given.where(given != "", df["shape_key"])
 
     df["measure_id"] = df["CEInputID"]
     df["eul_years"] = df["EUL_Yrs"].round().astype(int).clip(lower=1)
@@ -201,7 +206,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["claim_quarter"] = df["ClaimYearQuarter"].astype(str).str[-1].astype(int)
 
     cols = [
-        "measure_id", "MeasDescription", "subset_key", "shape_key",
+        "measure_id", "MeasDescription", "subset_key", "shape_key", "shape_key_2nd", "shape_key_water",
         "annual_net_kwh", "annual_net_kwh_1st", "annual_net_kwh_2nd",
         "annual_net_kw", "annual_net_kw_1st", "annual_net_kw_2nd",
         "eul_years", "eul_years_exact", "rul_years_exact", "NTGRkWh",

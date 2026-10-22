@@ -289,6 +289,15 @@ not priced. With statewide allocation an allocated row is multiplied by its elec
 hours, the same kWh added in others) therefore has a real electric value (the price difference between the hours) in one record, while its annual kWh, first-year kWh and
 annual-rate bill impacts are 0. (CET nets annual savings before shaping, so it values such a measure at 0.)
 
+**C4.6 Separate shapes for the 2nd baseline and for water energy.** Two optional columns, not CET fields, name other electric end-use shapes; each defaults to
+`E3MeaElecEndUseShape` when blank and is matched the same way (C4.1, C4.4, C4.5):
+
+* `E3MeaElecEndUseShape2nd`: an early replacement (`0 < RUL_Yrs < EUL_Yrs`) is priced as two parts with the same `CEInputID`, the 1st-baseline part (`poc_shape_scale`
+  with `poc_shape_scale_2nd = 0`) on `E3MeaElecEndUseShape` and the 2nd-baseline part (`poc_shape_scale = 0` with `poc_shape_scale_2nd`) on this shape, and the parts are added.
+  The phasing of C2 is linear in the two quantities, so with one shape the result is unchanged; the boundary quarter's split is kept. Electric benefits and supply costs (all
+  three tests), emissions and the combined 8,760 output use the parts. If only one of the two shapes is found, the measure is `PARTLY PRICED`.
+* `E3MeaElecEndUseShapeWater`: the water energy (C5.3) is spread over this shape for both baselines.
+
 **C4.4 The System climate zone.** A measure with `E3ClimateZone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
 the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
 
