@@ -21,8 +21,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
-- ACC versions are named by ACC year (2021, 2022, 2024, 2026) everywhere a user sees them, and run parameters / E3 tables are picked by ACC version. CET's own
-  version numbers (its "Version 2026" holds the 2024 ACC) appear only inside the packaged CET exports and are mapped on read (`versions.CET_VERSION_TO_ACC`).
+- ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. Users see both names (BRD BR-11.7,
+  Jake 2026-10-22): the ACC version (the year E3 released the calculator) and CET's Avoided Cost Version (the first year it was in effect for claims or
+  forecasts), e.g. "2024 ACC (Avoided Cost Version 2026)" (`versions.acc_label`, from `versions.CET_VERSION_TO_ACC`). Inside the packaged CET exports CET's
+  numbers are mapped on read.
 - Each ACC's hourly data follow one calendar's weekdays: 2018 for 2024/2026, 2020 for 2021/2022 (read from the file's hour stamps,
   `real_impact_profiles.acc_calendar_year`). An ACC year always has 8,760 hours (the last day of a leap year is dropped); never add leap-day handling.
 - The 2021 and 2022 ACCs are TRC only: SCT columns are left blank. ReCET keeps its own behind-the-meter methane rule (Residential fuel-substitution

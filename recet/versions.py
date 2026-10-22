@@ -13,6 +13,9 @@ A run names a version key. Files supplied with the run REPLACE the shipped file 
 of the built-in one). A label the package does not have ("2028", "2026-draft" ...) is a NEW version made entirely of the supplied files; any fuel not
 supplied falls back to the newest built-in version's file, with a note.
 
+Two labels name every version (BRD BR-11.7): the ACC version, the year E3's calculator was released (2024 ACC), and CET's Avoided Cost Version, the first year
+that ACC was in effect for claims or forecasts (Avoided Cost Version 2026). Labels read "2024 ACC (Avoided Cost Version 2026)".
+
 Run parameters and E3 tables are picked by ACC version too. CET numbers its avoided-cost versions differently (its "Version 2026" holds the 2024 ACC),
 so the packaged tables, which are CET exports, are mapped onto ACC versions when they are read (CET_VERSION_TO_ACC, from each version's release date in
 E3Settings.AvoidedCostVersion). A new version borrows the tables of `settings_from` (an ACC version; default: the newest built-in), since the tables
@@ -29,6 +32,23 @@ from . import paths
 # 2021 = 6/24/2020, 2022 = 8/28/2021, 2024 = 9/26/2022, 2026 = 12/12/2024, 2027 = 5/25/2026 (the draft 2026 ACC; the final v1b uses the same tables).
 # Confirmed by Jake for 2022, 2024, 2026 and 2027. CET versions 2013 and 2017 both carry 2011 dates and are not mapped (not selectable).
 CET_VERSION_TO_ACC = {2018: 2017, 2019: 2018, 2020: 2019, 2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
+
+
+AVOIDED_COST_VERSION = {acc: cet for cet, acc in CET_VERSION_TO_ACC.items()}     # ACC year -> CET's Avoided Cost Version
+
+
+def avoided_cost_version(acc) -> int | None:
+    """CET's Avoided Cost Version for an ACC year (the 2024 ACC -> 2026), or None if CET has no version for it."""
+    try:
+        return AVOIDED_COST_VERSION.get(int(acc))
+    except (TypeError, ValueError):
+        return None
+
+
+def acc_label(acc: int) -> str:
+    """'2024 ACC (Avoided Cost Version 2026)': both names of a version."""
+    cv = avoided_cost_version(acc)
+    return f"{acc} ACC" + (f" (Avoided Cost Version {cv})" if cv else "")
 
 
 def acc_of_cet_version(cet_version) -> int | None:
@@ -49,10 +69,10 @@ class AccVersion:
 
 
 BUILTIN: dict[str, AccVersion] = {v.key: v for v in (
-    AccVersion("2021", "2021 ACC", 2021, "acc_electric_2021", ("acc", "2021", "gas_components.parquet")),
-    AccVersion("2022", "2022 ACC", 2022, "acc_electric_2022", ("acc", "2022", "gas_components.parquet")),
-    AccVersion("2024", "2024 ACC", 2024, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
-    AccVersion("2026", "2026 ACC", 2026, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
+    AccVersion("2021", acc_label(2021), 2021, "acc_electric_2021", ("acc", "2021", "gas_components.parquet")),
+    AccVersion("2022", acc_label(2022), 2022, "acc_electric_2022", ("acc", "2022", "gas_components.parquet")),
+    AccVersion("2024", acc_label(2024), 2024, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
+    AccVersion("2026", acc_label(2026), 2026, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
 )}
 NEWEST_BUILTIN = "2026"
 
@@ -67,6 +87,11 @@ class ResolvedAcc:
     electric_source: str = ""
     gas_source: str = ""
     notes: list[str] = field(default_factory=list)
+
+    @property
+    def avoided_cost_version(self) -> int | None:
+        """CET's Avoided Cost Version of a built-in ACC; None for a new version defined by supplied files."""
+        return avoided_cost_version(self.key) if self.key in BUILTIN else None
 
     @property
     def uses_builtin_electric(self) -> bool:

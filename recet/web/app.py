@@ -26,7 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import __version__
+from .. import __version__, versions
 from . import auth
 from .config import Settings
 from .db import Database
@@ -452,7 +452,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         kw.setdefault("form", dict(rerun["settings"]) if rerun else {})
         carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
         source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
-        return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, uploads=UPLOADS, templates_=TEMPLATE_FILES,
+        return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
 
     @app.get("/runs/new", response_class=HTMLResponse)

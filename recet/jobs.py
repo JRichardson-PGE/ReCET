@@ -288,7 +288,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     settings = {
         "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
         "config": asdict(cfg),
-        "acc": {"key": acc.key, "label": acc.label, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
+        "acc": {"key": acc.key, "label": acc.label, "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
                 "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
         "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source(), "files": ref},
         "supplied_files": {k: {"path": v, "size": _size(v)} for k, v in (("workbook", cfg.workbook), ("profiles_8760", cfg.profiles_8760_file),
