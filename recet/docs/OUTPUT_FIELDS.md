@@ -186,8 +186,9 @@ came from), added by the export script `poc/tou/export_measure_level.py`, not by
 
 Which ACC version the row was priced against. Text.
 
-**Formula:** the run's ACC label: `2021 ACC`, `2022 ACC`, `2024 ACC` or `2026 ACC` for a built-in version, `Custom ACC '<label>'` for a new version defined by
-supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
+**Formula:** the run's ACC label, which names both the ACC (the year the calculator was released) and CET's Avoided Cost Version (the first year it was in effect
+for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avoided Cost Version 2024)`, `2024 ACC (Avoided Cost Version 2026)` or
+`2026 ACC (Avoided Cost Version 2027)` for a built-in version, `Custom ACC '<label>'` for a new version defined by supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
@@ -1657,7 +1658,7 @@ refer to.
 <!-- oa-all:start -->
 | Field | Example A | Example B |
 |---|---|---|
-| `POC_ACC` | 2026 ACC | 2026 ACC |
+| `POC_ACC` | 2026 ACC (Avoided Cost Version 2027) | 2026 ACC (Avoided Cost Version 2027) |
 | `poc_subset_key` | CZ13_Res | CZ13_Com |
 | `poc_shape_key` | W_SHAPE | 3 = Commercial HVAC |
 | `poc_annual_net_kwh` | 40000 | -30000 |
