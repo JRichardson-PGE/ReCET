@@ -2,3 +2,5 @@ CET value lists, downloaded from https://cedars.cpuc.ca.gov/cet_ui/spec/download
 Used only by the input editor (recet/editor.py) for dropdowns and "not an active CET value" warnings; no calculation reads them.
 The web app layers its admins' changes (Docs > Value lists, stored in its database) over these files; the files themselves are never changed.
 A code is active for a claim year when start_year <= year and end_year is blank or >= year. Left out: avoidedcostcombo (22 MB), prgid, semphase.
+Five lists are renamed after the AC_ fields they fill (2026-10-23): e3climatezone -> ac_climate_zone, e3gassavprofile -> ac_gas_impact_profile,
+e3gassector -> ac_gas_target_sector, e3meaelecenduseshape -> ac_elec_impact_profile, e3targetsector -> ac_elec_target_sector. Contents unchanged.

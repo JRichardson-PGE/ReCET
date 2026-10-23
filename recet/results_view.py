@@ -82,7 +82,8 @@ def pa_of(frame: pd.DataFrame) -> pd.Series:
 
 
 def _is_ratio_column(c: str) -> bool:
-    return "Ratio" in c or c.endswith("_ratio")
+    """Per-measure ratios, which a group total cannot add up: benefit-cost ratios and the levelized values (dollars per discounted kWh or therm, CalcCost's Lev...)."""
+    return "Ratio" in c or c.endswith("_ratio") or c.startswith("Lev")
 
 
 def catalog(frame: pd.DataFrame) -> dict[str, Column]:

@@ -2,7 +2,7 @@
 
 CET itself takes pipe-delimited text. ReCET also accepts the same columns as an ordinary comma-delimited CSV (what Excel's "Save as CSV" writes) or a
 tab-delimited file: the delimiter is taken from the header line, which never contains a comma or tab in a CET-format file. A file that is not UTF-8
-(Excel's CSV export on Windows is often cp1252) is read as cp1252.
+(Excel's CSV export on Windows is often cp1252) is read as cp1252. Legacy CET column names (E3ClimateZone ...) are read under ReCET's names (recet.fieldnames).
 """
 from __future__ import annotations
 
@@ -39,7 +39,8 @@ def describe(sep: str | None) -> str:
 def header_columns(path: str | Path) -> list[str]:
     sep = detect_sep(path)
     head = _first_line(path)
-    return [c.strip().strip('"') for c in head.split(sep)] if sep else [head.strip()]
+    from ..fieldnames import recet_name
+    return [recet_name(c.strip().strip('"')) for c in head.split(sep)] if sep else [recet_name(head.strip())]
 
 
 def read_cet_csv(path: str | Path, **kw) -> pd.DataFrame:
@@ -52,4 +53,5 @@ def read_cet_csv(path: str | Path, **kw) -> pd.DataFrame:
     except UnicodeDecodeError:
         df = pd.read_csv(path, sep=sep, encoding="cp1252", **kw)
     df.columns = [str(c).strip() for c in df.columns]
-    return df
+    from ..fieldnames import to_recet
+    return to_recet(df)

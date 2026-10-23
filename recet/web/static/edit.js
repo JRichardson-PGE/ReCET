@@ -10,9 +10,9 @@
 
   var API = root.dataset.api, END_USES = root.dataset.endUses, CSRF = root.dataset.csrf, RUN = root.dataset.run;
   var TABLES = ["Measure", "ProgramCost"];
-  var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, E3MeaElecEndUseShape: 240, E3MeaElecEndUseShape2nd: 240,
-                 E3MeaElecEndUseShapeWater: 240, E3GasSavProfile: 200 };
-  var END_USE_COLUMNS = ["E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater"];   // per-row dropdowns (IOU and target sector)
+  var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, AC_Elec_Impact_Profile: 240, AC_Elec_Impact_Profile_2nd_Baseline: 240,
+                 AC_Elec_Impact_Profile_Water: 240, AC_Gas_Impact_Profile: 200 };
+  var END_USE_COLUMNS = ["AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water"];   // per-row dropdowns (IOU and target sector)
   var st = {
     rev: null, layout: null, columns: {}, choices: {}, issues: { Measure: {}, ProgramCost: {} }, checkMarks: { Measure: {}, ProgramCost: {} }, grids: {}, current: "Measure",
     timer: null, saving: false, pending: false, dirty: false, conflict: false, nextRid: 1, endUses: {}, maxRows: 500, newMeasure: null, pcLike: []
@@ -117,7 +117,7 @@
 
   function endUseLookup(cell) {
     var d = cell.getRow().getData();
-    var iou = d.IOU_AC_Territory || "", sector = d.E3TargetSector || "", key = iou + "|" + sector;
+    var iou = d.IOU_AC_Territory || "", sector = d.AC_Elec_Target_Sector || "", key = iou + "|" + sector;
     if (st.endUses[key]) return st.endUses[key];
     return fetch(END_USES + "?iou=" + encodeURIComponent(iou) + "&sector=" + encodeURIComponent(sector), { credentials: "same-origin" })
       .then(function (r) { return r.json(); })

@@ -23,8 +23,8 @@ GAS_CO2 = {("TRC", ""): 0.10, ("SCT", "Base"): 0.30, ("SCT", "High"): 0.50}
 GAS_MARKET = {"Residential": 0.60, "Commercial": 0.50}          # $/therm, every month; td 0.20 is added in every month
 YEARS = (2028, 2029, 2030)
 
-A_MEASURE = dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", E3ClimateZone="13", E3GasSavProfile="Annual", E3GasSector="Residential", E3MeaElecEndUseShape="W_SHAPE",
-                 E3TargetSector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="2.4", RUL_Yrs="0", NumUnits="100", UnitkWh1stBaseline="500", UnitkW1stBaseline="0.2",
+A_MEASURE = dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Annual", AC_Gas_Target_Sector="Residential", AC_Elec_Impact_Profile="W_SHAPE",
+                 AC_Elec_Target_Sector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="2.4", RUL_Yrs="0", NumUnits="100", UnitkWh1stBaseline="500", UnitkW1stBaseline="0.2",
                  UnitTherm1stBaseline="20", UnitkWhIOUWater1stBaseline="3", NTGRkWh="0.8", NTGRkW="0.8", NTGRTherm="0.9", NTGRCost="0.9", InstallationRatekWh="0.95",
                  RealizationRatekWh="0.9", InstallationRateTherm="1", RealizationRateTherm="0.9", UnitMeaCost1stBaseline="200", UnitIncentiveToOthers="30",
                  UnitEndUserRebate="20", UnitDirectInstallLab="5", UnitDirectInstallMat="5", UnitRefrigCosts="1", UnitMiscBens="2", UnitTaxCredits="5",
@@ -32,9 +32,9 @@ A_MEASURE = dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", E3Climat
 A_PROGRAM = [dict(PrgID="PRG1", PA="PGE", PrgYear="2028", ClaimYearQuarter="2028Q1", AdminCostsOverheadAndGA="1500", MarketingOutreach="500"),
              dict(PrgID="PRG1", PA="PGE", PrgYear="2029", ClaimYearQuarter="2029Q1", EMV="1000")]
 
-B_END_USE = "3 = Commercial HVAC"                               # a key that E3Emissions has PG&E commercial CZ13 NOx / PM10 rows for (0.000046 lb/kWh each)
-B_MEASURE = dict(PrgID="PRG2", ClaimYearQuarter="2028Q2", Sector="Com", E3ClimateZone="13", E3GasSavProfile="Winter Only", E3GasSector="Commercial", E3MeaElecEndUseShape=B_END_USE,
-                 E3TargetSector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.5", RUL_Yrs="1.125", NumUnits="10", UnitkWh1stBaseline="-4000", UnitkWh2ndBaseline="-2500",
+B_END_USE = "3 = Commercial HVAC"                               # a key that the Emissions table has PG&E commercial CZ13 NOx / PM10 rows for (0.000046 lb/kWh each)
+B_MEASURE = dict(PrgID="PRG2", ClaimYearQuarter="2028Q2", Sector="Com", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Winter Only", AC_Gas_Target_Sector="Commercial", AC_Elec_Impact_Profile=B_END_USE,
+                 AC_Elec_Target_Sector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.5", RUL_Yrs="1.125", NumUnits="10", UnitkWh1stBaseline="-4000", UnitkWh2ndBaseline="-2500",
                  UnitTherm1stBaseline="600", UnitTherm2ndBaseline="400", UnitkWhIOUWater1stBaseline="-6", UnitkWhIOUWater2ndBaseline="-4", NTGRkWh="0.75", NTGRkW="0.75",
                  NTGRTherm="0.85", NTGRCost="0.8", InstallationRatekWh="1", RealizationRatekWh="0.9", InstallationRateTherm="1", RealizationRateTherm="0.95",
                  UnitMeaCost1stBaseline="9000", UnitMeaCost2ndBaseline="6000", MeasInflation="0.02", UnitIncentiveToOthers="800", UnitEndUserRebate="400",

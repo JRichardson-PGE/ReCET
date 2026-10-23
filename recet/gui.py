@@ -499,11 +499,11 @@ class App:
             messagebox.showinfo("Templates saved", "\n".join(str(f) for f in files))
 
     def _export_profile(self) -> None:
-        end_use = simpledialog.askstring("Export library profile", "End use (E3MeaElecEndUseShape), exactly as in Measure.csv:", parent=self.root)
+        end_use = simpledialog.askstring("Export library profile", "End use (AC_Elec_Impact_Profile), exactly as in Measure.csv:", parent=self.root)
         if not end_use:
             return
         pa = simpledialog.askstring("Export library profile", "IOU (PGE, SCE, SDGE or SCG):", parent=self.root)
-        sector = simpledialog.askstring("Export library profile", "Target sector (E3TargetSector), e.g. Residential:", parent=self.root)
+        sector = simpledialog.askstring("Export library profile", "Target sector (AC_Elec_Target_Sector), e.g. Residential:", parent=self.root)
         if not (pa and sector):
             return
         p = filedialog.asksaveasfilename(title="Save profile as", defaultextension=".csv", initialfile="library_profile_to_edit.csv")

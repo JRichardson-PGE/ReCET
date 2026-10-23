@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from recet import editor, preflight, templates, workbook
+from recet import editor, fieldnames, preflight, templates, workbook
 from conftest import make_flat_profile_csv, make_measure_csv
 
 
@@ -70,18 +70,18 @@ def test_program_ids_must_line_up_both_ways():
 
 def test_gas_rules_apply_only_with_gas_savings():
     m = _job().measures                          # the example has UnitTherm1stBaseline -0.5
-    m.loc[0, "E3GasSector"] = "Retail"
-    assert ("Measure", 0, "E3GasSector", "error") in _issues(m)
+    m.loc[0, "AC_Gas_Target_Sector"] = "Retail"
+    assert ("Measure", 0, "AC_Gas_Target_Sector", "error") in _issues(m)
     m.loc[0, "UnitTherm1stBaseline"] = "0"
-    assert ("Measure", 0, "E3GasSector", "error") not in _issues(m)
+    assert ("Measure", 0, "AC_Gas_Target_Sector", "error") not in _issues(m)
 
 
 def test_profile_checks_use_the_supplied_and_library_profiles(tmp_path):
     m = _job().measures
     choices = editor.ChoiceSource()
     choices.load_profiles()
-    m.loc[0, "E3GasSavProfile"] = "No Such Profile"
-    assert ("Measure", 0, "E3GasSavProfile", "warning") in _issues(m, choices=choices)
+    m.loc[0, "AC_Gas_Impact_Profile"] = "No Such Profile"
+    assert ("Measure", 0, "AC_Gas_Impact_Profile", "warning") in _issues(m, choices=choices)
     # a supplied 8,760 profile is offered in the end-use dropdown for its IOU
     prof = make_flat_profile_csv(tmp_path / "p.csv", end_use="MY_SHAPE", pa="PGE", sector="Commercial")
     choices.load_profiles(profiles_8760_file=str(prof))
@@ -201,15 +201,16 @@ def test_files_keep_cets_column_order_whatever_order_they_are_given_in(tmp_path)
     frozen, scroll, _ = editor.display_layout("Measure", list(job.measures.columns))
     files = editor.write_cet_files(job.measures[frozen + scroll], job.programcost, tmp_path)
     head = files["measures"].read_text(encoding="utf-8").splitlines()[0].split("|")
-    assert head == templates._CET_MEASURE_HEADER                    # the ReCET-only columns are left out while they are all blank
+    assert head == [fieldnames.RECET_TO_CET.get(c, c) for c in templates._CET_MEASURE_HEADER]   # CET's names and order; ReCET-only columns left out while blank
+    assert "E3ClimateZone" in head and "AC_Climate_Zone" not in head
 
 
 def test_a_used_recet_only_column_is_written_after_cets_columns(tmp_path):
     job = _job()
     m = job.measures.copy()
-    m.loc[0, "E3MeaElecEndUseShapeWater"] = "W_SHAPE"
+    m.loc[0, "AC_Elec_Impact_Profile_Water"] = "W_SHAPE"
     head = editor.write_cet_files(m, job.programcost, tmp_path)["measures"].read_text(encoding="utf-8").splitlines()[0].split("|")
-    assert head == templates._CET_MEASURE_HEADER + ["E3MeaElecEndUseShapeWater"]
+    assert head == [fieldnames.RECET_TO_CET.get(c, c) for c in templates._CET_MEASURE_HEADER] + ["AC_Elec_Impact_Profile_Water"]   # no CET name: ReCET's
 
 
 @pytest.mark.parametrize("text, shown", [("0.600000", "0.6"), ("15.0", "15"), ("100", "100"), ("-0.50", "-0.5"), ("4.969198677", "4.969199"),

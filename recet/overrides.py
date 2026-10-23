@@ -6,18 +6,18 @@ Six kinds, each with a template (`recet.templates`, `recet template ...`, or the
 2. gas monthly savings profiles           -> `load_user_gas_profiles` (CSV/Parquet: Profile, Month, Impact -- the same three columns as the built-in library)
 3. electric ACC (hourly avoided costs)    -> `check_electric_acc` / `prepare_electric_acc`
 4. gas ACC (monthly components)           -> `check_gas_acc` / `prepare_gas_acc`
-5. run parameters (CET's E3Settings)      -> `load_run_parameters`  (one row per PA: discount rates, base year, gas CO2; a supplied PA replaces the built-in row)
+5. run parameters (RunParameters table)   -> `load_run_parameters`  (one row per PA: discount rates, base year, gas CO2; a supplied PA replaces the built-in row)
 6. SW allocation factors                  -> `load_sw_factors`      (the built-in table's layout; a supplied (Year, ProgramID) replaces the built-in row)
 
 Matching rules ("if a profile matches an existing defined version, the separate input replaces it"):
 
-* 8,760 profiles match a measure on (E3MeaElecEndUseShape = `end_use_name`, IOU_AC_Territory = `pa`, E3TargetSector = `target_sector`), the same three keys
+* 8,760 profiles match a measure on (AC_Elec_Impact_Profile = `end_use_name`, IOU_AC_Territory = `pa`, AC_Elec_Target_Sector = `target_sector`), the same three keys
   the CEDARS library is indexed on. Blank / `*` / `ALL` in `pa` or `target_sector` means "any". Names and sectors compare case-insensitively.
   The most specific matching entry wins (PA and sector both given > one of them > neither). A matching user profile is used INSTEAD of the library's
-  profile -- and instead of a TOU (H-factor) profile of the same name. `climate_zone` is the measure's E3ClimateZone ("1", "3A", "13" ... "CZ13" and "01" are
+  profile -- and instead of a TOU (H-factor) profile of the same name. `climate_zone` is the measure's AC_Climate_Zone ("1", "3A", "13" ... "CZ13" and "01" are
   accepted); a zone the file does not have falls back to its `System` (or `ALL`) rows, and if there are none the library's profile is used for that zone
   (reported per measure in `ProfileSource`).
-* Gas profiles match on `Profile` = the measure's E3GasSavProfile. A name in the built-in library is replaced, a new name is added.
+* Gas profiles match on `Profile` = the measure's AC_Gas_Impact_Profile. A name in the built-in library is replaced, a new name is added.
 * ACC files are chosen per run (see `recet.versions`); a file supplied for an ACC version label the package already has replaces that version's file.
 
 Everything is validated when loaded and raises `OverrideError` with the row/hour that is wrong, never a silent fix -- except the two documented
@@ -522,7 +522,7 @@ def prepare_gas_acc(path: str | Path, work_dir: str | Path) -> Path:
 
 
 # ======================================================================================================================================
-# 5. Run parameters (CET's E3Settings table: discount rates, base year, gas CO2)
+# 5. Run parameters (the RunParameters table: discount rates, base year, gas CO2)
 # ======================================================================================================================================
 RUN_PARAMETER_COLUMNS = ["PA", "DiscountRateAnnual", "DiscountRateAnnual_SCT", "CO2Gas"]
 RUN_PARAMETER_OPTIONAL = {"DiscountRateQtr": "DiscountRateAnnual / 4", "DiscountRateQtr_SCT": "DiscountRateAnnual_SCT / 4",

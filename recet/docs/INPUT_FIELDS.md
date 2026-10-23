@@ -24,6 +24,22 @@ the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `Uni
 
 The same file you upload to the CET: pipe (`|`) delimited (or comma-delimited, see [INPUT_FORMATS.md](INPUT_FORMATS.md)), one header row, UTF-8, one row per `CEInputID`. All 74 CET columns are echoed to the measure-level output in the input's own text form.
 
+**Field names: CET's legacy names are accepted.** Seven fields carry names from the E3 calculator the CET grew out of; ReCET names them for what they are.
+A file may use **either name** for each of them (in `Measure.csv`, a comma-delimited file or the job workbook's Measure sheet; the legacy name is matched
+without regard to case, as CET does). It is read under ReCET's name, and every output, template and saved workbook uses ReCET's name. A file that has both
+names of the same field is rejected, since which one to use would be a guess. Files the Edit inputs tab saves for the CET (*Save as CET files*) use CET's names,
+so they can be uploaded to the CET as they are.
+
+| ReCET name | CET's name (also accepted) | What it is |
+|---|---|---|
+| `AC_Climate_Zone` | `E3ClimateZone` | the climate zone whose avoided costs and profile shape price the measure |
+| `AC_Elec_Impact_Profile` | `E3MeaElecEndUseShape` | the electric impact profile (8,760 end-use shape) |
+| `AC_Elec_Impact_Profile_2nd_Baseline` | `E3MeaElecEndUseShape2nd` | the electric impact profile of the 2nd-baseline years (ReCET only; not a CET field) |
+| `AC_Elec_Impact_Profile_Water` | `E3MeaElecEndUseShapeWater` | the electric impact profile of the water energy (ReCET only; not a CET field) |
+| `AC_Elec_Target_Sector` | `E3TargetSector` | the electric target sector (profile match and retail rate) |
+| `AC_Gas_Impact_Profile` | `E3GasSavProfile` | the gas monthly impact profile |
+| `AC_Gas_Target_Sector` | `E3GasSector` | the gas target sector (gas ACC class and retail rate) |
+
 ### 1.1 Identification and program link
 
 | Field | Type / unit | Column | Description and use |
@@ -61,13 +77,13 @@ The same file you upload to the CET: pipe (`|`) delimited (or comma-delimited, s
 | Field | Type | Column | Description and use |
 |---|---|---|---|
 | `IOU_AC_Territory` | `PGE` `SCE` `SDGE` `SCG` | required | The utility whose avoided costs apply (the avoided-cost territory; formerly `PA`). Selects the ACC utility (C3.1, C3.2), the discount rate (C2.4), the retail rates (C9) and the profile match. Any other value is a blocking error. |
-| `E3ClimateZone` | text, e.g. `13`, `3A` | required | The California climate zone. Selects the ACC zone (C3.1) and the profile's zone (C4.1). |
-| `E3MeaElecEndUseShape` | text | required | The name of the electric end-use load shape. Must equal a supplied or library profile's `end_use_name` (the library includes the TOU end uses as 8,760s) or the measure's electricity is **not priced** (C4.1). |
-| `E3MeaElecEndUseShape2nd` | text | optional, **not a CET column** | The electric end-use shape of the 2nd-baseline years of an early replacement (`0 < RUL_Yrs < EUL_Yrs`). Blank, or a file without the column, means `E3MeaElecEndUseShape`. The 1st-baseline years are priced on `E3MeaElecEndUseShape` and the 2nd-baseline years on this shape (CALCULATIONS C4.6). |
-| `E3MeaElecEndUseShapeWater` | text | optional, **not a CET column** | The electric end-use shape the measure's water energy (`UnitkWhIOUWater*`) is spread over, for both baselines. Blank, or a file without the column, means `E3MeaElecEndUseShape`. Matched like `E3MeaElecEndUseShape` (supplied or library profile, IOU, target sector, climate zone). See CALCULATIONS C4.6. |
-| `E3TargetSector` | text | required | The target sector (e.g. `Residential`, `Non_Res`). Part of the profile match, and selects the retail rate schedule (C9) and the NOx/PM10 factors (C14). |
-| `E3GasSavProfile` | text | required | The name of the gas monthly savings profile (e.g. `Annual`, `Winter Only`). A name that matches nothing leaves gas savings **unpriced** (C4.3). A `...FuelSub...` name on a residential measure adds behind-the-meter methane (C3.2). |
-| `E3GasSector` | `Residential` `Commercial` `Core` | required | The gas customer class. Selects the gas ACC class (C3.2) and the gas rate schedule (C9). Must be one of the three for any measure with gas savings. |
+| `AC_Climate_Zone` | text, e.g. `13`, `3A` | required | The California climate zone. Selects the ACC zone (C3.1) and the profile's zone (C4.1). |
+| `AC_Elec_Impact_Profile` | text | required | The name of the electric end-use load shape. Must equal a supplied or library profile's `end_use_name` (the library includes the TOU end uses as 8,760s) or the measure's electricity is **not priced** (C4.1). |
+| `AC_Elec_Impact_Profile_2nd_Baseline` | text | optional, **not a CET column** | The electric end-use shape of the 2nd-baseline years of an early replacement (`0 < RUL_Yrs < EUL_Yrs`). Blank, or a file without the column, means `AC_Elec_Impact_Profile`. The 1st-baseline years are priced on `AC_Elec_Impact_Profile` and the 2nd-baseline years on this shape (CALCULATIONS C4.6). |
+| `AC_Elec_Impact_Profile_Water` | text | optional, **not a CET column** | The electric end-use shape the measure's water energy (`UnitkWhIOUWater*`) is spread over, for both baselines. Blank, or a file without the column, means `AC_Elec_Impact_Profile`. Matched like `AC_Elec_Impact_Profile` (supplied or library profile, IOU, target sector, climate zone). See CALCULATIONS C4.6. |
+| `AC_Elec_Target_Sector` | text | required | The target sector (e.g. `Residential`, `Non_Res`). Part of the profile match, and selects the retail rate schedule (C9) and the NOx/PM10 factors (C14). |
+| `AC_Gas_Impact_Profile` | text | required | The name of the gas monthly savings profile (e.g. `Annual`, `Winter Only`). A name that matches nothing leaves gas savings **unpriced** (C4.3). A `...FuelSub...` name on a residential measure adds behind-the-meter methane (C3.2). |
+| `AC_Gas_Target_Sector` | `Residential` `Commercial` `Core` | required | The gas customer class. Selects the gas ACC class (C3.2) and the gas rate schedule (C9). Must be one of the three for any measure with gas savings. |
 | `FuelID` | text | optional | A DEER value list that identifies fuel substitution. `AllElec-New`, `FuelSub-ToElec` and `FuelSub-ToGas` mark the measure as fuel substitution (C1.5). |
 | `MeasImpactType` | text | optional | The impact type. A value containing `FuelSub` also marks fuel substitution. |
 | `CombustionType` | text | optional | The gas combustion type (a `LookupCode` of the combustion table, e.g. `Residential Furnaces (<0.3):Uncontrolled`). Gives the gas NOx rate (C14.3); blank or unknown means gas NOx = 0. |
@@ -202,10 +218,10 @@ Templates for each: GUI **Template...** buttons or `recet template ...`. Matchin
 
 | Column | Type / unit | Required | Description |
 |---|---|---|---|
-| `end_use_name` | text | yes | Must equal the measure's `E3MeaElecEndUseShape` (case-insensitive). |
+| `end_use_name` | text | yes | Must equal the measure's `AC_Elec_Impact_Profile` (case-insensitive). |
 | `pa` | `PGE` `SCE` `SDGE` `SCG`; blank / `*` / `ALL` = any | yes | The measure's `IOU_AC_Territory`. |
-| `target_sector` | text; blank / `*` / `ALL` = any | yes | The measure's `E3TargetSector`. |
-| `climate_zone` | `1`..`16`, `3A`, `3B`; `System` or `ALL` = every zone without its own rows | yes | The measure's `E3ClimateZone`. |
+| `target_sector` | text; blank / `*` / `ALL` = any | yes | The measure's `AC_Elec_Target_Sector`. |
+| `climate_zone` | `1`..`16`, `3A`, `3B`; `System` or `ALL` = every zone without its own rows | yes | The measure's `AC_Climate_Zone`. |
 | `hour_of_year` | integer 1-8760 | yes | The hour, exactly once per (profile, zone). Hour 1 is 00:00 on 1 January of `represents_year`. |
 | `impact` | fraction of the measure's annual net kWh | yes | The share of the year's savings that falls in the hour; each zone's 8,760 values should sum to 1 (a shape summing to about 0, i.e. pure load shifting, cannot be rescaled and is rejected). |
 | `represents_year` | calendar year | optional | The year whose weekdays the shape follows (same on every row of a profile); default 2009. The shape is rotated once onto the ACC's weekdays (2018 or 2020, C4.2). |
@@ -214,7 +230,7 @@ Templates for each: GUI **Template...** buttons or `recet template ...`. Matchin
 
 | Column | Type / unit | Required | Description |
 |---|---|---|---|
-| `Profile` | text | yes | Must equal the measure's `E3GasSavProfile`. |
+| `Profile` | text | yes | Must equal the measure's `AC_Gas_Impact_Profile`. |
 | `Month` | 1-12 or Jan..Dec | yes | Exactly one row per month per profile. |
 | `Impact` | fraction of annual therms | yes | The month's share; the 12 values sum to 1 (rescaled, with a note, if not). |
 
@@ -242,7 +258,7 @@ One row per `(utility, class, cost_test, scc, year)`; dollar columns are **$/the
 | Column | Type / unit | Description |
 |---|---|---|
 | `utility` | `PG&E`, `Socal Gas` (or `SoCalGas`), `SDG&E` | The gas utility. |
-| `class` | `Residential`, `Commercial`, `Total Core` | The customer class (`E3GasSector`: Residential, Commercial, Core). |
+| `class` | `Residential`, `Commercial`, `Total Core` | The customer class (`AC_Gas_Target_Sector`: Residential, Commercial, Core). |
 | `cost_test` | `TRC` or `SCT` | `TRC` rows are required. |
 | `scc` | blank for `TRC`; `Base` or `High` for `SCT` | The social-cost-of-carbon scenario. |
 | `year` | consecutive calendar years | The pricing year; years outside the file use its nearest year. |
@@ -255,7 +271,7 @@ One row per `(utility, class, cost_test, scc, year)`; dollar columns are **$/the
 
 ### 4.5 Run parameters (CSV, Parquet or xlsx)
 
-The built-in run parameters are CET's `E3Settings` table (section 6). A supplied file replaces them for the PAs it lists; other PAs keep the built-in values. The template
+The built-in run parameters are the RunParameters table (section 6). A supplied file replaces them for the PAs it lists; other PAs keep the built-in values. The template
 (`recet template run-parameters`) is the built-in rows of the chosen ACC version.
 
 | Column | Type / unit | Required | Description |
@@ -325,21 +341,23 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 |---|---|---|
 | `acc/2024/electric_hourly.parquet` | ~1 GB | The 2024 ACC's hourly electric avoided costs; the layout of section 4.3. |
 | `acc/2026/electric_hourly.parquet` | ~1 GB | The 2026 ACC's (final, v1b), same layout. |
-| `impact_profiles/catalog.parquet` | small | The CEDARS impact-profile catalog: one row per profile. Columns used: `id` (profile ID), `end_use_name` (= `E3MeaElecEndUseShape`), `iou_ac_territory` (`PGE`...), `target_sector`, `year_represented` (the calendar year the shape follows; blank = 2009). Other columns (`pa` long name, `climate_zones`, `start_year`, `explicit_end_year`, `description`, `source_impact_type`, `ac_version`) are informational. |
+| `impact_profiles/catalog.parquet` | small | The CEDARS impact-profile catalog: one row per profile. Columns used: `id` (profile ID), `end_use_name` (= `AC_Elec_Impact_Profile`), `iou_ac_territory` (`PGE`...), `target_sector`, `year_represented` (the calendar year the shape follows; blank = 2009). Other columns (`pa` long name, `climate_zones`, `start_year`, `explicit_end_year`, `description`, `source_impact_type`, `ac_version`) are informational. |
 | `impact_profiles/hourly.parquet` | ~9 GB | The 8,760-hour profiles: `impact_profile_id` (matches `id`), `climate_zone` (a zone or `System`), `hour_of_year` (1-8760), `impact` (fraction of annual savings in that hour; each (profile, zone) sums to 1). One row group per profile. |
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## 6. Built-in tables (shipped inside the package)
 
+ReCET's names drop the `E3` prefix of the CET tables they copy; the CET name is given in brackets.
+
 | File (`recet/data/...`) | Columns used | Role |
 |---|---|---|
-| `E3Settings.csv` | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
-| `e3_tables/e3_emissions.parquet` | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
-| `e3_tables/e3_combustion_type.parquet` | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
-| `e3_tables/e3_rate_schedule_elec.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
-| `e3_tables/e3_rate_schedule_elec_mapping.parquet` | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
-| `e3_tables/e3_rate_schedule_gas.parquet`, `e3_rate_schedule_gas_mapping.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
+| `run_parameters.csv` (RunParameters; CET `E3Settings`) | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
+| `cet_tables/emissions.parquet` (Emissions; CET `E3Emissions`) | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
+| `cet_tables/combustion_type.parquet` (CombustionType; CET `E3CombustionType`) | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
+| `cet_tables/rate_schedule_elec.parquet` (RateScheduleElec; CET `E3RateScheduleElec`) | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
+| `cet_tables/rate_schedule_elec_mapping.parquet` (RateScheduleElecMapping; CET `E3RateScheduleElecMapping`) | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
+| `cet_tables/rate_schedule_gas.parquet`, `rate_schedule_gas_mapping.parquet` (RateScheduleGas, RateScheduleGasMapping; CET `E3RateScheduleGas`, `E3RateScheduleGasMapping`) | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
 | `gas_savings_profiles.csv` | `Profile`, `Month`, `Impact` | The library of gas monthly profiles (C4.3). |
 | `acc/2024/gas_components.parquet`, `acc/2026/gas_components.parquet` | the gas ACC layout of section 4.4 | The two gas ACCs, extracted from E3's workbooks. |
 | `statewide_allocation/statewide_factors_20260918.csv` | `Year`, `ProgramID`, `PercentElectric`, `<IOU>GasFactor`, `<IOU>ElectricFactor`, `<IOU>WeightedFactor` for PGE, SDGE, SCE, SCG | The IOU shares of each statewide program (C15). |

@@ -421,7 +421,7 @@ def register(app, ctx) -> None:
                 "issues": _issues(m, pc), "profiles_note": c.catalog_note, "max_rows": editor.MAX_EDIT_ROWS,
                 "check": last_check(ctx, draft_id), "check_defaults": check_defaults(ctx, draft_id),
                 "new_measure": {"defaults": editor.NEW_MEASURE_DEFAULTS,
-                                "like": ["PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3GasSector", "Sector", "Version"]},
+                                "like": ["PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Gas_Target_Sector", "Sector", "Version"]},
                 "new_programcost_like": ["PrgID", "PrgYear", "ClaimYearQuarter", "PA"]}
 
     @app.put("/edit/api/{draft_id}")

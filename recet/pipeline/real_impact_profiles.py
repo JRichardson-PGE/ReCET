@@ -6,10 +6,10 @@ replacing the first proof of concept's randomly-generated placeholder
 shapes (synthetic_curves, now in the CEDARS review research repository's poc/research_lib).
 
 MATCHING a CET Measure.csv row to a real CEDARS impact profile: CET's own
-E3MeaElecEndUseShape field ("28 = Res. New Const. Lighting", "DEER:HVAC_Eff_AC",
+AC_Elec_Impact_Profile field ("28 = Res. New Const. Lighting", "DEER:HVAC_Eff_AC",
 etc.) is the EXACT same string CEDARS' own catalog stores as `end_use_name`
 -- confirmed by direct comparison, not assumed. Combined with the measure's
-IOU_AC_Territory and E3TargetSector, (end_use_name, iou_ac_territory,
+IOU_AC_Territory and AC_Elec_Target_Sector, (end_use_name, iou_ac_territory,
 target_sector) is a UNIQUE key across the whole 20,497-profile catalog
 (verified: zero duplicate keys) -- no version-selection heuristic needed
 here, unlike CEDARS' quarterly/hourly value-list tables elsewhere in this

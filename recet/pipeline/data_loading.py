@@ -74,8 +74,8 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["annual_net_therms_1st"] = (df["NumUnits"] * df["UnitTherm1stBaseline"].fillna(0) * _ntg_therm * _irr_therm).fillna(0)
     df["annual_net_therms_2nd"] = (df["NumUnits"] * df["UnitTherm2ndBaseline"].fillna(0) * _ntg_therm * _irr_therm).fillna(0)
     df["annual_net_therms"] = df["annual_net_therms_1st"]
-    df["gas_profile_key"] = df["E3GasSavProfile"]  # real field: CET's own named monthly gas shape (see gas_savings_profiles.py)
-    df["gas_sector"] = df["E3GasSector"]  # real field: Residential/Commercial/Core (see gas_avoided_cost.py)
+    df["gas_profile_key"] = df["AC_Gas_Impact_Profile"]  # real field: CET's own named monthly gas shape (see gas_savings_profiles.py)
+    df["gas_sector"] = df["AC_Gas_Target_Sector"]  # real field: Residential/Commercial/Core (see gas_avoided_cost.py)
 
     # Real field, genuinely fractional (e.g. 8.33) same as EUL_Yrs -- 0 (not
     # NaN) means "not an early replacement" in every real dataset this POC
@@ -84,15 +84,15 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["rul_years_exact"] = df["RUL_Yrs"].fillna(0.0).clip(lower=0.0)
 
     # Avoided-cost subset key (climate zone + sector): a grouping label only; the hourly ACC series is chosen by PA and climate zone.
-    df["subset_key"] = "CZ" + df["E3ClimateZone"].astype(str) + "_" + df["Sector"].astype(str)
-    df["climate_zone"] = df["E3ClimateZone"].astype(str)  # real field: the zone whose profile and ACC series price the measure
-    df["target_sector"] = df["E3TargetSector"].astype(str)  # real field, needed by real_impact_profiles' catalog match key
+    df["subset_key"] = "CZ" + df["AC_Climate_Zone"].astype(str) + "_" + df["Sector"].astype(str)
+    df["climate_zone"] = df["AC_Climate_Zone"].astype(str)  # real field: the zone whose profile and ACC series price the measure
+    df["target_sector"] = df["AC_Elec_Target_Sector"].astype(str)  # real field, needed by real_impact_profiles' catalog match key
 
-    # Load-shape key: E3MeaElecEndUseShape is CET's own real field naming which
+    # Load-shape key: AC_Elec_Impact_Profile is CET's own real field naming which
     # named electric end-use hourly shape a measure draws from.
-    df["shape_key"] = df["E3MeaElecEndUseShape"].astype(str)
+    df["shape_key"] = df["AC_Elec_Impact_Profile"].astype(str)
     # Optional ReCET columns (not CET fields): a separate electric end-use shape for the 2nd-baseline years and for the water energy. Blank = the measure's own shape.
-    for col, key in (("E3MeaElecEndUseShape2nd", "shape_key_2nd"), ("E3MeaElecEndUseShapeWater", "shape_key_water")):
+    for col, key in (("AC_Elec_Impact_Profile_2nd_Baseline", "shape_key_2nd"), ("AC_Elec_Impact_Profile_Water", "shape_key_water")):
         given = df[col].astype(str).str.strip() if col in df.columns else pd.Series("", index=df.index)
         given = given.where(df[col].notna(), "") if col in df.columns else given
         df[key] = given.where(given != "", df["shape_key"])

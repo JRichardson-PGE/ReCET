@@ -29,6 +29,7 @@ Contents
 * [C16 Optional and secondary outputs](#c16-optional-and-secondary-outputs)
 * [C17 Validation, deliberate differences from CET, and limitations](#c17-validation-deliberate-differences-from-cet-and-limitations)
 * [C18 Worked example](#c18-worked-example)
+* [C19 Savings quantities, discounted savings and levelized values](#c19-savings-quantities-discounted-savings-and-levelized-values)
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -73,12 +74,12 @@ when it is identical to the raw column it restates, for example `poc_num_units`;
 
 ```text
 poc_PA               = IOU_AC_Territory
-poc_climate_zone     = E3ClimateZone (as text)          poc_target_sector = E3TargetSector      poc_shape_key = E3MeaElecEndUseShape
-poc_gas_profile_key  = E3GasSavProfile                  poc_gas_sector    = E3GasSector
+poc_climate_zone     = AC_Climate_Zone (as text)          poc_target_sector = AC_Elec_Target_Sector      poc_shape_key = AC_Elec_Impact_Profile
+poc_gas_profile_key  = AC_Gas_Impact_Profile                  poc_gas_sector    = AC_Gas_Target_Sector
 poc_claim_year       = first four characters of ClaimYearQuarter        poc_claim_quarter = its last character (1-4)
 poc_eul_years_exact  = max(EUL_Yrs, 0.25)                               poc_rul_years_exact = max(RUL_Yrs, 0)      (blank RUL = 0)
 poc_eul_years        = max(round(EUL_Yrs), 1)      (information only: pricing uses poc_eul_years_exact)
-poc_subset_key       = "CZ" + E3ClimateZone + "_" + Sector             (a label; not used in pricing)
+poc_subset_key       = "CZ" + AC_Climate_Zone + "_" + Sector             (a label; not used in pricing)
 ```
 
 **C1.2 Electric quantities**
@@ -191,9 +192,9 @@ Gen(y, i)  = AC(y, i) - TD(y, i)                                                
    rate - by **one** utility: SCE where the ACC file has SCE's own rows for that zone, otherwise PG&E where it has PG&E's, otherwise SCE (with the fallbacks below).
    SCE's CZ5 stand-in (item 2) does not count as SCE data, so SCG CZ5 is PG&E. On both built-in ACCs: SCE in 6, 8, 9, 10, 13, 14, 15, 16; PG&E in 1, 2, 3A, 3B, 4, 5,
    11, 12.
-2. The zone is `"CZ" + E3ClimateZone`. Three (utility, zone) pairs that the ACC model does not export are stood in for by a documented neighbour: SCE CZ5 uses SCE CZ9;
+2. The zone is `"CZ" + AC_Climate_Zone`. Three (utility, zone) pairs that the ACC model does not export are stood in for by a documented neighbour: SCE CZ5 uses SCE CZ9;
    SDG&E CZ6 and CZ8 use SDG&E CZ7.
-3. `E3ClimateZone = System` is first replaced by the profile's System zone (C4.4), so a System measure is priced on a real zone's rows. A zone that is still not in the
+3. `AC_Climate_Zone = System` is first replaced by the profile's System zone (C4.4), so a System measure is priced on a real zone's rows. A zone that is still not in the
    file for that utility (a System measure none of whose zones can be priced) uses the unweighted mean across the utility's zones in the file.
 4. **Year.** A pricing year outside the file's range uses the *nearest* year in the file (a tie takes the earlier year).
 
@@ -201,7 +202,7 @@ Gen(y, i)  = AC(y, i) - TD(y, i)                                                
 
 ```text
 utility:  PGE = PG&E   SCG = Socal Gas   SDGE = SDG&E   SCE = Socal Gas (SCE has no gas utility of its own)
-class:    E3GasSector  Residential = Residential   Commercial = Commercial   Core = Total Core
+class:    AC_Gas_Target_Sector  Residential = Residential   Commercial = Commercial   Core = Total Core
 rows:     TRC (scc blank) for TRC/PAC/RIM;   SCT with scc = Base for SCB;   SCT with scc = High for SCH
 year:     clamped to the first / last year in the file
 
@@ -209,7 +210,7 @@ ACg(y, m) = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder  
 ```
 
 `market` and `td` vary by month; the other components are one annual value used in every month. `behind_meter_methane` is included **only** when the class is Residential and the
-measure's `E3GasSavProfile` contains `FuelSub` (a residential gas-to-electric fuel-substitution profile).
+measure's `AC_Gas_Impact_Profile` contains `FuelSub` (a residential gas-to-electric fuel-substitution profile).
 
 **C3.3 E3 tables and run parameters.** Discount rates, `CO2Gas`, NOx/PM10 factors and retail rate schedules come from CET's E3 tables and are picked by **ACC
 version**. The packaged tables are CET exports, whose `Version` column uses CET's own numbering; each is mapped to the ACC it holds when the table is read:
@@ -218,8 +219,8 @@ version**. The packaged tables are CET exports, whose `Version` column uses CET'
 |---|---|---|---|---|
 | ACC | 2021 | 2022 | 2024 | 2026 |
 
-(from each version's release date in `E3Settings.AvoidedCostVersion`; the older versions 2018-2021 map to the 2017-2020 ACCs). The discount rates, base year and
-`CO2Gas` (CET's `E3Settings`) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. A built-in ACC uses its own tables, and a new
+(from each version's release date in RunParameters `AvoidedCostVersion`; the older versions 2018-2021 map to the 2017-2020 ACCs). The discount rates, base year and
+`CO2Gas` (the RunParameters table) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. A built-in ACC uses its own tables, and a new
 ACC label borrows the tables of the ACC version you name (default: the newest built-in). The primary rate is `DiscountRateAnnual` (PG&E 7.66%, SCE 7.65%, SCG 7.38%,
 SDG&E 7.36%, the same in every built-in ACC); the societal rate `DiscountRateAnnual_SCT` is 5.03% for every utility. `BaseYear`: 2021 (2021 ACC), 2022 (2022 ACC),
 2024 (2024 and 2026 ACCs). The rate schedules have no SCG rows for the 2021 and 2022 ACCs, so SCG bill impacts are not priced on those versions.
@@ -241,14 +242,14 @@ and discounted at the rates of the run's own version. The societal tests are lef
 
 | Order | Shape | `ProfileSource` |
 |---|---|---|
-| 1 | a **supplied 8,760 profile** matching (`E3MeaElecEndUseShape`, `PA`, `E3TargetSector`) | `user profile` |
+| 1 | a **supplied 8,760 profile** matching (`AC_Elec_Impact_Profile`, `PA`, `AC_Elec_Target_Sector`) | `user profile` |
 | 1b | the same, but the supplied profile has no rows for this measure's zone (or `System` / `ALL`): fall through to the library | `library (user profile has no shape for this zone)` |
 | 2 | the **CEDARS library** profile with the same end use, `PA` and target sector | `library` |
 | 3 | the library profile with the same end use and `PA`, ignoring the sector | `library (sector-loose match)` |
 | - | none of the above: the measure is **not priced** (`ElecPricingStatus = UNPRICED ...`), never priced on a made-up shape | (blank) |
 
 A shape is 8,760 non-negative-or-negative shares that sum to 1 (a *fraction of the measure's annual net kWh* in each hour). A library or supplied profile is used for the measure's own
-zone (for `E3ClimateZone = System`, the profile's System zone, C4.4), else the profile's own `System` rows. Every electric measure is priced from an 8,760 shape (C5.1); there is no other electric route. The library includes CEDARS' TOU (H-factor) end
+zone (for `AC_Climate_Zone = System`, the profile's System zone, C4.4), else the profile's own `System` rows. Every electric measure is priced from an 8,760 shape (C5.1); there is no other electric route. The library includes CEDARS' TOU (H-factor) end
 uses as 8,760s built from their Gen-based energy shares: each TOU period's share spread evenly over that period's hours on the TOU map of the 2026 Electric ACC v1b
 as re-issued on 2026-10-20, which is on the real 2018 calendar (`represents_year` = 2018; 2018 holidays and daylight-time dates). SCE/SCG shares are rescaled to sum
 to 1 and SDG&E's winter on-peak share is the remainder to 1. Their catalog rows carry `hourly_source = TOU H-factor 8,760`. (Before 0.1.18 they were drawn on the
@@ -272,7 +273,7 @@ their holidays and season boundaries are two days off 2020's. Leap years: an ACC
 30 December); hour `i` is the same position in every year, and only weekdays are aligned. This is **not** CEDARS' rule: CEDARS aligns the profile to each
 forecast year's own 1 January weekday (although the ACC data do not follow those calendars) and rotates one day too far when the offset is negative. Gas is monthly and is not shifted.
 
-**C4.3 Gas monthly shape.** `E3GasSavProfile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
+**C4.3 Gas monthly shape.** `AC_Gas_Impact_Profile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
 a supplied profile with the same name replaces it). A gas measure whose profile name matches nothing is not priced (`GasPricingStatus = UNPRICED ...`).
 
 **C4.5 Already-scaled profiles and load shifting (BRD BR-06.6).** A supplied profile with `profile_basis = kwh_per_unit` holds the kWh saved per unit in each hour
@@ -290,15 +291,15 @@ hours, the same kWh added in others) therefore has a real electric value (the pr
 annual-rate bill impacts are 0. (CET nets annual savings before shaping, so it values such a measure at 0.)
 
 **C4.6 Separate shapes for the 2nd baseline and for water energy.** Two optional columns, not CET fields, name other electric end-use shapes; each defaults to
-`E3MeaElecEndUseShape` when blank and is matched the same way (C4.1, C4.4, C4.5):
+`AC_Elec_Impact_Profile` when blank and is matched the same way (C4.1, C4.4, C4.5):
 
-* `E3MeaElecEndUseShape2nd`: an early replacement (`0 < RUL_Yrs < EUL_Yrs`) is priced as two parts with the same `CEInputID`, the 1st-baseline part (`poc_shape_scale`
-  with `poc_shape_scale_2nd = 0`) on `E3MeaElecEndUseShape` and the 2nd-baseline part (`poc_shape_scale = 0` with `poc_shape_scale_2nd`) on this shape, and the parts are added.
+* `AC_Elec_Impact_Profile_2nd_Baseline`: an early replacement (`0 < RUL_Yrs < EUL_Yrs`) is priced as two parts with the same `CEInputID`, the 1st-baseline part (`poc_shape_scale`
+  with `poc_shape_scale_2nd = 0`) on `AC_Elec_Impact_Profile` and the 2nd-baseline part (`poc_shape_scale = 0` with `poc_shape_scale_2nd`) on this shape, and the parts are added.
   The phasing of C2 is linear in the two quantities, so with one shape the result is unchanged; the boundary quarter's split is kept. Electric benefits and supply costs (all
   three tests), emissions and the combined 8,760 output use the parts. If only one of the two shapes is found, the measure is `PARTLY PRICED`.
-* `E3MeaElecEndUseShapeWater`: the water energy (C5.3) is spread over this shape for both baselines.
+* `AC_Elec_Impact_Profile_Water`: the water energy (C5.3) is spread over this shape for both baselines.
 
-**C4.4 The System climate zone.** A measure with `E3ClimateZone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
+**C4.4 The System climate zone.** A measure with `AC_Climate_Zone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
 the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
 
 ```text
@@ -309,7 +310,7 @@ System zone = the zone z with the lowest total(z); a tie goes to the first zone 
 `shape_z,aligned` is the profile's own shape for zone z aligned as in C4.2, and `AC_TRC(PA, z, ...)` is the TRC total avoided cost found by the rules of C3.1 (so SCE CZ5 and
 SDG&E CZ6/CZ8 are options, priced on their stand-in zones, and SCG's options are the zones its routing reaches). A zone the ACC cannot price is not an option. The TRC cost
 test decides the zone; the same zone is then used for the shape, every cost test, every component, water energy and the hourly CO2 (NOx and PM10 still use the literal
-`System` key of E3Emissions, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
+`System` key of the Emissions table, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
 the measure's `PA` has prices for, so the prices alone decide.
 
 The choice depends only on the profile and the ACC file, so it is **cataloged**: the package ships the System zone of every library profile under each built-in ACC
@@ -463,6 +464,22 @@ NetParticipantCostPV         = NTGc * (GrossParticipantCostPV + ExcessIncentives
 NetParticipantCostAdjustedPV = NetParticipantCostPV + MarkEffectPlusExcessIncPV                     (what the TRC / SCT costs use)
 ```
 
+CET's nominal (undiscounted) participant columns, and the rest of its participant-cost columns, follow the same steps without `PVF`:
+
+```text
+IncentiveToOthers = Q * UnitIncentiveToOthers      DILaborCost = Q * UnitDirectInstallLab      DIMaterialCost = Q * UnitDirectInstallMat      EndUserRebate = Rebates
+GrossMeasureCost  = GrossMeasCost                  ExcessIncentives = pos( IncentsDI - GrossMeasCost )
+MarkEffectPlusExcessInc        = MEC * (GrossMeasCost + ExcessIncentivesPV)            (CET adds the PV excess incentives to the nominal cost; copied, it matches CET)
+GrossParticipantCost           = GrossMeasCost - (IncentsDI + Rebates)
+GrossParticipantCostAdjusted   = GrossParticipantCost + ExcessIncentives + MarkEffectPlusExcessInc
+GrossParticipantCostAdjustedPV = GrossParticipantCostPV + ExcessIncentivesPV + MarkEffectPlusExcessIncPV
+NetParticipantCost             = NTGc * (GrossParticipantCost + ExcessIncentives)
+NetParticipantCostAdjusted     = NetParticipantCost + MarkEffectPlusExcessInc
+```
+
+`GrossMeasCostPV` and `ExcessIncentivesPV` are output columns too. For an early replacement the nominal and PV measure costs are built differently, as in CET: the nominal one is the
+2nd-baseline cost, the PV one the 1st-baseline cost less the inflation-adjusted difference.
+
 The `_sct` columns (`RebatesandIncentsPV_sct`, `GrossParticipantCostPV_sct`, `NetParticipantCostPV_sct`, `NetParticipantCostAdjustedPV_sct`) are the same with `Rqf_sct`.
 All of these match CET's own columns to the cent with 0% and 5% market effects (CET jobs 121842 / 121841, 13 measures, four of them accelerated replacements). With `MEC = 0` the market-effects term is 0.
 
@@ -470,11 +487,11 @@ All of these match CET's own columns to the cent with 0% and 5% market effects (
 
 ## C9 Bill impacts
 
-The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses the E3 retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `E3TargetSector`) maps to, and `RateG` ($/therm) for
-(`PA`, `E3GasSector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
+The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses the E3 retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to, and `RateG` ($/therm) for
+(`PA`, `AC_Gas_Target_Sector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
 `RateScheduleElec` / `RateScheduleGas` columns are not read.
 
-With `yr1 = Y0 - BaseYear` (E3Settings `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
+With `yr1 = Y0 - BaseYear` (RunParameters `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
 
 ```text
 floor_rul = floor(R) if R > 0 else full                                     boundary share of the 1st baseline:  b = R - floor(R) if R > 0 else 1
@@ -546,6 +563,14 @@ WeightedProgramCost = share_m * SumCosts                 nominal (undiscounted) 
 
 ```text
 TotalExpenditures = RebatesandIncents + WeightedProgramCost          nominal dollars
+```
+
+**C11.4 Program-cost components and the electric share.** CalcCost also reports each program-cost field's share and, per measure, the electric part of its own benefits (which the
+levelized columns of C19.6 use to split a cost between the fuels):
+
+```text
+Wtd<field>        = share_m * SUM_r <field>_r          for each of the ten fields of T_r (nominal)          ProgramCosts = SUM of the ten = WeightedProgramCost
+WeightedElecAlloc = ratio( pos(ElecBen) , pos(ElecBen) + pos(GasBen) + pos(WaterEnergyBen) + pos(OtherBen) )          the measure's own benefits, not the program's
 ```
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -627,7 +652,7 @@ participant-cost columns match CET to the cent. CET's run used its avoided-cost 
 ## C14 Emissions
 
 Emission columns are produced when "Include emissions" is on. "First-year" is the measure's **first four quarters** of life (not the calendar year); "Lifecycle" is all of them; "Net" includes NTG (and `MEB`), "Gross" does not.
-Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and `E3Settings.CO2Gas` = 0.00531 is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
+Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and RunParameters `CO2Gas` = 0.00531 is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
 
 **C14.1 Electric CO2 per annual kWh, by quarter** (`co2(qidx)`, `qidx = 4 * year + quarter`, quarter 1-4):
 
@@ -653,16 +678,16 @@ quarters counted: install <= qidx < install + eulq
 fe(net)  = Q * (NTGe + MEB, or 1 if gross) * IRe * RRe                      fg(net) = Q * (NTGt + MEB, or 1 if gross) * IRt * RRt
 
 ElecCO2   = fe * SUM over counted quarters of  co2(qidx)      * AnnualkWh(k)
-ElecNOx   = fe * SUM over counted quarters of  nox            * AnnualkWh(k) / 4          nox  = E3Emissions NOx for (PA, target sector, end use, zone)   (0 if there is no row)
-PM10      = fe * SUM over counted quarters of  pm10           * AnnualkWh(k) / 4          pm10 = E3Emissions PM10, same key
+ElecNOx   = fe * SUM over counted quarters of  nox            * AnnualkWh(k) / 4          nox  = Emissions NOx for   (PA, target sector, end use, zone)   (0 if there is no row)
+PM10      = fe * SUM over counted quarters of  pm10           * AnnualkWh(k) / 4          pm10 = Emissions PM10, same key
    first-year: the first four counted quarters;   lifecycle: all of them
 
-GasCO2    = fg * CO2Gas(PA) * G          GasNOx = fg * NOxfactor * G          NOxfactor = E3CombustionType NOx for the measure's CombustionType (0 if blank / unknown)
+GasCO2    = fg * CO2Gas(PA) * G          GasNOx = fg * NOxfactor * G          NOxfactor = CombustionType-table NOx for the measure's CombustionType (0 if blank / unknown)
    G_firstyear = Th1 if rul >= 1;  rul*Th1 + (1 - rul)*Th2 if 0 < rul < 1 <= eul;  rul*Th1 + (eul - rul)*Th2 if rul < eul < 1;  Th1 if rul = 0 and eul > 1;  eul*Th1 if rul = 0 and eul <= 1
    G_lifecycle = rul*Th1 + (eul - rul)*Th2 if rul > 0;   eul*Th1 otherwise
 ```
 
-`E3Emissions` covers only a slice of the (PA, sector, end use, zone) keys, so NOx and PM10 are 0 for most electric measures (this is CET's own behaviour). Output columns: `NetElecCO2`, `NetElecNOx`, `NetPM10`, `NetGasCO2`, `NetGasNOx`,
+The Emissions table covers only a slice of the (PA, sector, end use, zone) keys, so NOx and PM10 are 0 for most electric measures (this is CET's own behaviour). Output columns: `NetElecCO2`, `NetElecNOx`, `NetPM10`, `NetGasCO2`, `NetGasNOx`,
 the five `Gross...` counterparts, and the ten `...Lifecycle` columns.
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -734,7 +759,8 @@ statewide programs unallocated; First Year = claim year; 0% market effects), pri
 
 | Output | ReCET / CET | Note |
 |---|---|---|
-| `GasBen`, `GasBen_SB`, `GasBen_SH`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost`, `TotalExpenditures`, `FirstYearNetKWh`, `FirstYearNetThm` | 1.0000 | `GasBen` agrees on every measure |
+| `GasBen`, `GasBen_SB`, `GasBen_SH`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost`, `TotalExpenditures` | 1.0000 | `GasBen` agrees on every measure |
+| every savings column (C19.1-C19.4), the nominal participant-cost columns (C8), the program-cost components (C11.4), `DiscountedSavingsNet...` | 1.0000 | every measure (discounted savings within 2e-6) |
 | `BillReducElec`, `BillIncrElec` | 1.0000 | every measure within 1% |
 | `BillReducGas` | 0.9995 | |
 | `TRCCost` / `PACCost` / `RIMCost` | 0.9992 / 0.9956 / 0.9997 | |
@@ -760,11 +786,19 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 2. `GasSupplyCostGross` is the net value divided by NTG; CET assigns it the net value.
 3. `SCBCost` / `SCHCost` discount program costs at the societal rate; CET uses the primary rate for them.
 4. Electric `_SB` / `_SH` are priced on the real `SCT Base` / `SCT High` rows for every measure. For legacy DEER-named end uses CET's table holds TRC values in its SCT columns (so CET's SB = SH there).
-5. `WeightedElecAlloc` (which CET computes with a `_SB`/`_SH` mix-up) is not produced.
+5. (Withdrawn 2026-10-23: `WeightedElecAlloc` is produced and follows CET's formula, C11.4. CalcCE's `_SB`/`_SH` mix-up in `BenPos` touches no exported column.)
 6. Unallocated statewide rows use `PA = SCE` for discounting, as CET did in the real runs; the effect is nil when every cost falls in the First Year.
 7. Every electric measure is priced from an 8,760 with the 2018 calendar alignment of C4.2 (2026-10-02). CET instead prices TOU end uses from CEDARS' TOU calculators (Gen at
    full-year period means; T&D on kW with a duplicate /1000, about 1,000 times too small) and shifts other profiles to each forecast year's weekdays with a one-day error on
    negative offsets; it prices SCG from its own quarterly table.
+8. **TOU societal (`_SB` / `_SH`) electric values** are priced like every other end use, on the ACC's own `SCT Base` / `SCT High` rows (which leave out the cap-and-trade carbon component).
+   CET's TOU societal values keep the cap-and-trade component alongside the social cost of carbon, so carbon is counted twice (about $21/MWh, 13% of the price), and they carry its TOU
+   T&D error (item 7). This is a deliberate departure from CET, confirmed 2026-10-23; it is why TOU `ElecBen_SB` / `_SH` differ from CET's in the table above.
+9. `LevBenElec` is `ElecBen / DiscountedSavingsNetkWh`. CET's exported `LevBenElec` is `ElecBen_SB / DiscountedSavingsNetkWh` on every measure: CalcCost's `LevelizedCost` step names its
+   three `LevBenElec` columns in a different order from the values it selects, so the TRC value lands under another name.
+10. `DiscountedSavingsGross...` on early-replacement measures (`RUL_Yrs` > 0): ReCET's is the net formula without NTG (C19.5). CET's gross kWh counts one 2nd-baseline year too many
+   (`Raf ^ -(EUL - RUL)` where its net version has `- 1`) and its gross therms leave the 2nd baseline undiscounted (a misplaced bracket), so CET's gross and net disagree even at NTG = 1.
+   Single-baseline measures match CET.
 
 **Limitations.**
 
@@ -778,11 +812,10 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
   Market effects at 5% match CET jobs 121842 / 121841 on participant costs and bill impacts.
   These paths are covered by the hand-computed tests in `tests`.
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
-* Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from CET's `E3Emissions`, which covers only part of the keys.
+* Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from the Emissions table (CET's), which covers only part of the keys.
 * Input columns that are read but not used: `RateScheduleElec`, `RateScheduleGas` (rate schedules always come from `PA` and sector), and every descriptive column (INPUT_FIELDS.md lists them).
-* CET output fields not produced: the savings-quantity columns other than `FirstYearNetKWh`, `FirstYearNetKW` and `FirstYearNetThm` (the gross first-year, lifecycle and annual
-  `KWh`, `KW`, `Thm`, `KWhWater`, `KWhSite` and `DiscountedSavings...` columns), `WeightedSavings`, `WeightedElecAlloc`, `WtdAdminCosts...`, `ProgramCosts`, `TRCLifecycleNetBen`,
-  `PACLifecycleNetBen`, and the levelized `Lev...` columns (whether those are still needed is RAID decision D9 in the replacement BRD).
+* Every CET measure-level output column is produced (2026-10-23) except `JobID` (CET's job number) and `PA`, which in CET's output is the measure's `IOU_AC_Territory` (echoed with the
+  inputs). Whether the levelized `Lev...` columns are still needed is RAID decision D9 in the replacement BRD.
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -799,7 +832,7 @@ One measure, priced against constant (flat) avoided costs and a flat profile so 
 | `UnitkWh1stBaseline` | 500 | `UnitDirectInstallLab` / `UnitDirectInstallMat` | 5 / 5 |
 | `UnitTherm1stBaseline` | 20 | `UnitRefrigCosts` / `UnitMiscBens` / `UnitTaxCredits` | 1 / 2 / 5 |
 | `UnitkWhIOUWater1stBaseline` | 3 | `NTGRkWh` / `NTGRTherm` / `NTGRCost` | 0.8 / 0.9 / 0.9 |
-| `E3GasSavProfile` | `Annual` (1/12 per month) | `InstallationRatekWh` / `RealizationRatekWh` | 0.95 / 0.9 |
+| `AC_Gas_Impact_Profile` | `Annual` (1/12 per month) | `InstallationRatekWh` / `RealizationRatekWh` | 0.95 / 0.9 |
 | shape | flat (1/8760 per hour) | `InstallationRateTherm` / `RealizationRateTherm` | 1 / 0.9 |
 
 ACC: electric $80/MWh (TRC) = energy 70 + transmission 5 + distribution 5, so `AC` = $0.080/kWh and `Gen` = $0.070/kWh; `SCT Base` $88, `SCT High` $96 (Gen 78 / 86). Gas $1.00/therm (TRC), $1.20 (SCT Base), $1.40 (SCT High). Emission rate 0.0002 t/kWh.
@@ -871,19 +904,71 @@ The societal values follow C5.6: for example `ElecBen_SB` reprices the same quar
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
-## C19 First-year net savings
+## C19 Savings quantities, discounted savings and levelized values
 
-CET's first-year net savings (CalcSavings, "First Year Net"), quantities rather than dollars:
+CET's savings columns (CalcSavings) and the columns CalcCost builds on them. All use `EUL_Yrs` **as filed** (no 0.25-year floor) and `RUL = max(RUL_Yrs, 0)`. For each fuel,
+`a1` / `a2` are the per-unit 1st / 2nd-baseline amounts, `IR` / `RR` its installation and realization rates and `NTG` its net-to-gross ratio:
+
+| Suffix | `a1` / `a2` | `IR`, `RR`, `NTG` |
+|---|---|---|
+| `KWh` | `kWh1 + Wt1` / `kWh2 + Wt2` (site plus IOU water) | `IRe`, `RRe`, `NTGRkWh` |
+| `KWhSite` | `kWh1` / `kWh2` | the same |
+| `KWhWater` | `Wt1` / `Wt2` | the same |
+| `KW` | `kW1` / `kW2` | `IRkw`, `RRkw`, `NTGRkW` |
+| `Thm` | `Th1` / `Th2` | `IRt`, `RRt`, `NTGt` |
+
+Every `Net` column is its `Gross` column times `(NTG + MEB)`.
+
+**C19.1 First year.**
 
 ```text
-FirstYearNetKWh = Q * (NTGRkWh + MEB) * IRe * RRe * ( w1 * (kWh1 + Wt1) + w2 * (kWh2 + Wt2) )
-FirstYearNetKW  = Q * (NTGRkW  + MEB) * IRkw * RRkw * ( w1 * kW1 + w2 * kW2 )
-FirstYearNetThm = Q * (NTGt + MEB) * IRt * RRt * ( w1 * Th1 + w2 * Th2 )
+FirstYearGross<x> = Q * IR * RR * ( w1 * a1 + w2 * a2 )
 
 w1 = 1 if RUL > 1;  RUL if 0 < RUL < 1;  EUL if RUL = 0 and EUL < 1;  1 otherwise
 w2 = EUL - RUL if 0 < RUL < 1 and EUL < 1;  1 - RUL if 0 < RUL < 1 and EUL >= 1;  0 otherwise
 ```
 
-`EUL` here is `EUL_Yrs` as filed (no 0.25-year floor). An RUL of exactly 1 takes the "otherwise" branches, as CET's SQL does. Checked against CET's own columns on jobs
-121219, 121842 and 121841 (0% and 5% market effects): equal to rounding for every measure.
+An RUL of exactly 1 takes the "otherwise" branches, as CET's SQL does.
 
+**C19.2 Lifecycle** (no `KW` column):
+
+```text
+LifecycleGross<x> = Q * IR * RR * EUL * a1                           if RUL = 0
+                  = Q * IR * RR * ( a1 * RUL + a2 * (EUL - RUL) )     if RUL > 0
+```
+
+**C19.3 Annual average.** `AnnualGross<x> = LifecycleGross<x> / EUL` (0 when `EUL` = 0), the same expression for `KW`.
+
+**C19.4 Savings share.** Within a program (`PrgID`), CET's savings-based weight, which no cost test uses (program costs are shared by benefits, C11.2):
+
+```text
+S_m = pos(FirstYearGrossKWh) + pos(29.307111111 * FirstYearGrossThm)          (kWh per therm)
+WeightedSavings = S_m / SUM over the program's measures of S        if that sum is not 0;  1 / (number of measures in the program) if it is 0
+```
+
+**C19.5 Discounted savings.** Site kWh (no water) and therms, each year discounted at the annual rate, the whole brought to the First Year at the quarterly rate (`PVF` of C8):
+
+```text
+A(n) = 1 + (1 - Raf ^ -(n - 1)) / DiscountRateAnnual                 the sum of Raf ^ -t for t = 0 ... n-1 (n may be fractional)
+
+DiscountedSavingsGross<f> = Q * IR * RR * a1 * A(EUL) / PVF                                           if RUL = 0
+                          = Q * IR * RR * ( a1 * A(RUL) + a2 * A(EUL - RUL) / Raf ^ RUL ) / PVF       if RUL > 0
+                          = 0                                                                          if a1 = 0 or EUL = 0
+<f> = kWh (the KWhSite amounts) or Thm
+```
+
+These are the measure-level values of the measure's own ACC version (C3.5): `Raf`, `PVF` use that version's run parameters.
+
+**C19.6 Lifecycle net benefits and levelized values.** With `W = WeightedElecAlloc` (C11.4), `DSe = DiscountedSavingsNetkWh`, `DSg = DiscountedSavingsNetThm`:
+
+```text
+TRCLifecycleNetBen = ElecBen + GasBen - TRCCost              PACLifecycleNetBen = ElecBen + GasBen - PACCost
+LevBenElec = ratio(ElecBen, DSe)                             LevBenGas = ratio(GasBen, DSg)
+Lev<T>     = ratio(<T> * W, DSe)                             <T> = TRCCost, TRCCostNoAdmin, PACCost, PACCostNoAdmin, RIMCost
+LevNetBen<t>Elec<v> = ratio(ElecBen - <t>Cost<v> * W, DSe)   LevNetBen<t>Gas<v> = ratio(GasBen - <t>Cost<v> * (1 - W), DSg)       <t> = TRC, PAC (<v> = "" or NoAdmin), RIM
+```
+
+**Checks against CET.** C19.1-C19.4 match CET's own columns to rounding on every measure of jobs 121219-121222 (21,370 measures), 121842 (0% market effects) and 121841 (5%).
+The net discounted savings match to 2e-6 (relative) on every measure. The program-cost components match CET's program totals exactly. The levelized and allocation columns, computed
+from CET's own benefit, cost and discounted-savings columns, reproduce CET's on every measure except `LevBenElec` (C17, deliberate difference 9); with ReCET's own benefits they differ from
+CET's as the benefits do (C17).

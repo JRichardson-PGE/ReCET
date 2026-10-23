@@ -1,5 +1,5 @@
 """
-RUN PARAMETERS (user-facing name, 2026-10-03): discount rates, base year and gas CO2 per PA. The built-in values are CET's E3Settings table; a user-supplied
+RUN PARAMETERS (user-facing name, 2026-10-03): discount rates, base year and gas CO2 per PA. The built-in values are the RunParameters table (run_parameters.csv, a copy of CET's E3Settings); a user-supplied
 run-parameters file (overrides.load_run_parameters, set_user_parameters below) replaces the row of every PA it lists.
 
 Real, per-IOU CET discounting settings -- `dbo.E3Settings` in the actual
@@ -46,10 +46,10 @@ from pathlib import Path
 
 import pandas as pd
 
-# The full dbo.E3Settings export (every ACC Version 2013-2027, one row per PA), supplied by Jake 2026-09-20. It replaces the earlier 20-row
+# The full dbo.E3Settings export, shipped as run_parameters.csv (every ACC Version 2013-2027, one row per PA), supplied by Jake 2026-09-20. It replaces the earlier 20-row
 # avoided_cost_settings.csv, which had no Version 2027 (the 2026 ACC's version, AvoidedCostVersion 5/25/2026).
 from .. import paths, versions
-SETTINGS_CSV = paths.package_data("E3Settings.csv")
+SETTINGS_CSV = paths.package_data("run_parameters.csv")
 
 PA_ALIASES = {"PGE": "PGE", "SCE": "SCE", "SCG": "SCG", "SDGE": "SDGE"}
 
@@ -76,7 +76,7 @@ def known_versions() -> list[int]:
 
 
 def get_settings(pa: str, acc_version: int = 2024) -> dict:
-    """Returns the real E3Settings row for (pa, acc_version) as a dict:
+    """Returns the RunParameters row for (pa, acc_version) as a dict:
     discount_rate_annual, discount_rate_qtr (and the _sct variants, unused
     here but kept for completeness -- Jake confirmed SCT uses a DIFFERENT,
     lower discount rate than the primary TRC-style calculations this POC
@@ -85,7 +85,7 @@ def get_settings(pa: str, acc_version: int = 2024) -> dict:
     return dict(_settings_row(pa_key, int(acc_version))[0])
 
 
-# --- user-supplied RUN PARAMETERS (recet.overrides.load_run_parameters): a PA in this table replaces the built-in E3Settings row for every version ---
+# --- user-supplied RUN PARAMETERS (recet.overrides.load_run_parameters): a PA in this table replaces the built-in RunParameters row for every version ---
 _USER = None
 
 
@@ -126,7 +126,7 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
             "settings_base_year": int(base),
         }, float(u["CO2Gas"]))
     if row.empty:
-        raise KeyError(f"No run parameters (E3Settings) for PA={pa_key!r}, ACC version {acc_version!r}: supply them in a run-parameters file")
+        raise KeyError(f"No run parameters for PA={pa_key!r}, ACC version {acc_version!r}: supply them in a run-parameters file")
     row = row.iloc[0]
     return ({
         "discount_rate_annual": float(row["DiscountRateAnnual"]),
@@ -168,7 +168,7 @@ def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2024) -> float:
 
 
 def get_co2_gas(pa: str, acc_version: int = 2024) -> float:
-    """`E3Settings.CO2Gas` (Settingsvw.CO2Gas): metric tons CO2 per therm of gas
+    """RunParameters `CO2Gas` (CET's Settingsvw.CO2Gas): metric tons CO2 per therm of gas
     saved, used by CalcEmissions for NetGasCO2/GrossGasCO2. 0.00531 for
     Version 2026 (older versions differ, e.g. 0.00585 for 2020)."""
     pa_key = PA_ALIASES.get(pa.upper().replace("&", ""), pa.upper())
