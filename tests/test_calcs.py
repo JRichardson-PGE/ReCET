@@ -108,22 +108,22 @@ def make_profiles(path):
 
 
 MEASURES = {
-    "EX1": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Com", E3ClimateZone="13", E3GasSavProfile="Winter Only", E3GasSector="Commercial",
-                E3MeaElecEndUseShape=EU_COM, E3TargetSector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.4", RUL_Yrs="1", NumUnits="10",
+    "EX1": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Com", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Winter Only", AC_Gas_Target_Sector="Commercial",
+                AC_Elec_Impact_Profile=EU_COM, AC_Elec_Target_Sector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.4", RUL_Yrs="1", NumUnits="10",
                 UnitkWh1stBaseline="1000", UnitkWh2ndBaseline="600", UnitkW1stBaseline="0.5", UnitkW2ndBaseline="0.3", UnitTherm1stBaseline="50", UnitTherm2ndBaseline="30",
                 UnitkWhIOUWater1stBaseline="4", UnitkWhIOUWater2ndBaseline="2.5", NTGRkWh="0.8", NTGRkW="0.8", NTGRTherm="0.9", NTGRCost="0.9",
                 InstallationRatekWh="0.95", RealizationRatekWh="0.9", InstallationRateTherm="1", RealizationRateTherm="0.9",
                 UnitMeaCost1stBaseline="300", UnitMeaCost2ndBaseline="180", UnitIncentiveToOthers="20", UnitEndUserRebate="40", UnitDirectInstallLab="10",
                 UnitDirectInstallMat="5", MeasInflation="0.02", UnitGasInfraBens="2.5", UnitRefrigCosts="2", UnitRefrigBens="1.5", UnitMiscCosts="3", UnitMiscBens="0.5",
                 UnitTaxCredits="7", CombustionType="Residential Furnaces (<0.3):Uncontrolled", MeasDescription="dual baseline, fractional life, mid-year claim"),
-    "EX2": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", E3ClimateZone="13", E3GasSavProfile="Winter Only-FuelSub-ToElec", E3GasSector="Residential",
-                E3MeaElecEndUseShape=EU_RES, E3TargetSector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="3", RUL_Yrs="0", NumUnits="5",
+    "EX2": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Winter Only-FuelSub-ToElec", AC_Gas_Target_Sector="Residential",
+                AC_Elec_Impact_Profile=EU_RES, AC_Elec_Target_Sector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="3", RUL_Yrs="0", NumUnits="5",
                 UnitkWh1stBaseline="-1500", UnitkWh2ndBaseline="0", UnitTherm1stBaseline="120", UnitTherm2ndBaseline="0", UnitkWhIOUWater1stBaseline="-3",
                 UnitkWhIOUWater2ndBaseline="0", NTGRkWh="0.75", NTGRkW="0.75", NTGRTherm="0.85", NTGRCost="1", UnitMeaCost1stBaseline="800",
                 UnitMeaCost2ndBaseline="0", UnitIncentiveToOthers="150", UnitEndUserRebate="150", FuelID="FuelSub-ToElec", MeasImpactType="Deem-FuelSub",
                 UnitRefrigCosts="4", MeasDescription="fuel substitution: added electric load and water use, saved gas"),
-    "EX3": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", E3ClimateZone="13", E3GasSector="Residential", E3MeaElecEndUseShape=EU_RES,
-                E3TargetSector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="4.25", RUL_Yrs="0", NumUnits="20", UnitkWh1stBaseline="100", NTGRkWh="1",
+    "EX3": dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", AC_Climate_Zone="13", AC_Gas_Target_Sector="Residential", AC_Elec_Impact_Profile=EU_RES,
+                AC_Elec_Target_Sector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="4.25", RUL_Yrs="0", NumUnits="20", UnitkWh1stBaseline="100", NTGRkWh="1",
                 NTGRkW="1", NTGRCost="1", UnitMeaCost1stBaseline="50", UnitIncentiveToOthers="60", UnitEndUserRebate="30",
                 MeasDescription="incentives above measure cost (excess incentives)"),
 }
@@ -166,7 +166,7 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
     rows, per = [], {}
     for cid, raw in MEASURES.items():
         d = ref.derive(raw)
-        shape = _shape("com" if raw["E3MeaElecEndUseShape"] == EU_COM else "res")
+        shape = _shape("com" if raw["AC_Elec_Impact_Profile"] == EU_COM else "res")
         w1 = d["w1"]
         e = {}
         sfx = {"": ("TRC", None, st["qtr"], st["annual"]), "_SB": ("SCT Base", "Base", st["qtr_sct"], st["annual_sct"]), "_SH": ("SCT High", "High", st["qtr_sct"], st["annual_sct"])}
@@ -176,8 +176,8 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
             v_w = ref.elec_value(d, shape, REPRESENTS, elec_acc(test, gen_only=True), q, first_year, d["water_scale_1st"], d["water_scale_2nd"], meb)
             v_g = 0.0
             if has_gas:
-                gshare = gas_shares[gas_shares.Profile == raw["E3GasSavProfile"]].sort_values("Month").Impact.to_numpy()
-                btm = raw["E3GasSector"] == "Residential" and "FuelSub" in raw["E3GasSavProfile"]
+                gshare = gas_shares[gas_shares.Profile == raw["AC_Gas_Impact_Profile"]].sort_values("Month").Impact.to_numpy()
+                btm = raw["AC_Gas_Target_Sector"] == "Residential" and "FuelSub" in raw["AC_Gas_Impact_Profile"]
                 v_g = ref.gas_value(d, gshare, gas_acc(scc, btm), q, first_year, meb)
             e[f"ElecBen{s}"], e[f"ElecSupplyCost{s}"] = ref.split_ben_supply(v_e, d["is_fuel_sub"])
             e[f"GasBen{s}"], e[f"GasSupplyCost{s}"] = ref.split_ben_supply(v_g, d["is_fuel_sub"])
@@ -187,8 +187,8 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         e.update(p1)
         e.update({f"{k}_sct": v for k, v in p2.items() if k not in ("MarkEffectPlusExcessIncPV", "RebatesandIncents")})   # the tool has no _sct column of those
         e.update(ref.first_year_net(raw, d, meb))
-        rates_e = ref.rate_series("elec", "PGE", E3_VERSION, raw["E3TargetSector"])
-        rates_g = ref.rate_series("gas", "PGE", E3_VERSION, raw["E3GasSector"])
+        rates_e = ref.rate_series("elec", "PGE", E3_VERSION, raw["AC_Elec_Target_Sector"])
+        rates_g = ref.rate_series("gas", "PGE", E3_VERSION, raw["AC_Gas_Target_Sector"])
         fe = (d["ntg_kwh"] + meb) / d["ntg_kwh"] if (meb and d["ntg_kwh"] > 0) else 1.0           # C9: bill impacts use NTG + MEB as well
         ft = (d["ntg_therm"] + meb) / d["ntg_therm"] if (meb and d["ntg_therm"] > 0) else 1.0
         pv_e = ref.bill_pv(d, fe * d["shape_scale_1st"], fe * d["shape_scale_2nd"], rates_e, st["annual"], st["base_year"])
@@ -202,7 +202,7 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         bg["BillReducGasGross"], bg["BillIncrGasGross"] = ref.split_ben_supply(gross_g, d["is_fuel_sub"])
         e.update(ref.participant_test(d, p1, e["TaxCreditsGross"], bg, st["qtr"], first_year))
         e["prg"], e["ntg_kwh"], e["ntg_therm"] = raw["PrgID"], d["ntg_kwh"], d["ntg_therm"]
-        nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["E3TargetSector"], raw["E3MeaElecEndUseShape"], raw["E3ClimateZone"])
+        nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["AC_Elec_Target_Sector"], raw["AC_Elec_Impact_Profile"], raw["AC_Climate_Zone"])
         nox_gas = 0.0092 if raw.get("CombustionType") else 0.0
         e.update(ref.emissions(d, ref.hourly_co2_quarters(shape, REPRESENTS, {y: _emission_rate(y) for y in YEARS}), nox, pm10, st["co2_gas"], nox_gas, meb))
         e["poc_shape_scale"], e["poc_shape_scale_2nd"] = d["shape_scale_1st"], d["shape_scale_2nd"]
@@ -322,13 +322,13 @@ def make_stub_library(folder):
 
 
 LIB_MEASURES = {
-    "LIB1": dict(MEASURES["EX3"], E3MeaElecEndUseShape="LIB_SHAPE", MeasDescription="library profile, exact match, own zone"),
-    "LIB2": dict(MEASURES["EX3"], E3MeaElecEndUseShape="LIB_SHAPE", E3ClimateZone="5", MeasDescription="library profile, zone falls back to System"),
-    "LIB3": dict(MEASURES["EX3"], E3MeaElecEndUseShape="LIB_LOOSE", MeasDescription="library profile, sector-loose match"),
-    "TOU1": dict(MEASURES["EX1"], E3MeaElecEndUseShape="LIB_TOU", MeasDescription="TOU-style 8,760 in the library (represents 2025): the ordinary 8,760 path"),
-    "TOU2": dict(MEASURES["EX2"], E3MeaElecEndUseShape="21 = Res. Wtr. Heating", E3TargetSector="Res_New_Construction", FuelID="", MeasImpactType="",
+    "LIB1": dict(MEASURES["EX3"], AC_Elec_Impact_Profile="LIB_SHAPE", MeasDescription="library profile, exact match, own zone"),
+    "LIB2": dict(MEASURES["EX3"], AC_Elec_Impact_Profile="LIB_SHAPE", AC_Climate_Zone="5", MeasDescription="library profile, zone falls back to System"),
+    "LIB3": dict(MEASURES["EX3"], AC_Elec_Impact_Profile="LIB_LOOSE", MeasDescription="library profile, sector-loose match"),
+    "TOU1": dict(MEASURES["EX1"], AC_Elec_Impact_Profile="LIB_TOU", MeasDescription="TOU-style 8,760 in the library (represents 2025): the ordinary 8,760 path"),
+    "TOU2": dict(MEASURES["EX2"], AC_Elec_Impact_Profile="21 = Res. Wtr. Heating", AC_Elec_Target_Sector="Res_New_Construction", FuelID="", MeasImpactType="",
                  MeasDescription="TOU end use with no 8,760 in the library: not priced (there is no separate TOU route)"),
-    "NONE1": dict(MEASURES["EX3"], E3MeaElecEndUseShape="NO SUCH SHAPE", MeasDescription="no profile at all: not priced"),
+    "NONE1": dict(MEASURES["EX3"], AC_Elec_Impact_Profile="NO SUCH SHAPE", MeasDescription="no profile at all: not priced"),
 }
 for m_ in ("LIB1", "LIB2", "LIB3", "TOU1", "TOU2", "NONE1"):
     LIB_MEASURES[m_]["PrgID"] = "PRG1"

@@ -28,9 +28,10 @@ from . import overrides, paths, versions
 KINDS = ("workbook", "profiles-8760", "profiles-gas", "acc-electric", "acc-gas", "run-parameters", "sw-factors", "programs", "measure")
 DOCS_DIR = Path(__file__).resolve().parent / "docs"
 
+# CET's 74 Measure.csv columns in CET's order, under ReCET's names: seven E3-calculator names are renamed (recet.fieldnames), the legacy names still accepted.
 _CET_MEASURE_HEADER = [
-    "CEInputID", "PrgID", "ClaimYearQuarter", "Sector", "DeliveryType", "BldgType", "E3ClimateZone", "E3GasSavProfile", "E3GasSector", "E3MeaElecEndUseShape",
-    "E3TargetSector", "MeasAppType", "MeasCode", "MeasDescription", "MeasImpactType", "FuelID", "MeasureID", "TechGroup", "TechType", "UseCategory", "UseSubCategory",
+    "CEInputID", "PrgID", "ClaimYearQuarter", "Sector", "DeliveryType", "BldgType", "AC_Climate_Zone", "AC_Gas_Impact_Profile", "AC_Gas_Target_Sector", "AC_Elec_Impact_Profile",
+    "AC_Elec_Target_Sector", "MeasAppType", "MeasCode", "MeasDescription", "MeasImpactType", "FuelID", "MeasureID", "TechGroup", "TechType", "UseCategory", "UseSubCategory",
     "WaterUse", "PreDesc", "StdDesc", "SourceDesc", "Version", "NormUnit", "NumUnits", "UnitkW1stBaseline", "UnitkWh1stBaseline", "UnitTherm1stBaseline",
     "UnitkW2ndBaseline", "UnitkWh2ndBaseline", "UnitTherm2ndBaseline", "UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline", "UnitMeaCost1stBaseline",
     "UnitMeaCost2ndBaseline", "UnitDirectInstallLab", "UnitDirectInstallMat", "UnitEndUserRebate", "UnitIncentiveToOthers", "NTG_ID", "NTGRkW", "NTGRkWh", "NTGRTherm",
@@ -77,8 +78,8 @@ _PROGRAMCOST_HEADER = ["PrgID", "PrgYear", "ClaimYearQuarter", "AdminCostsOverhe
 # One realistic example row for the workbook template (a PG&E commercial lighting measure on a TOU end use); the user replaces it.
 _EXAMPLE_MEASURE = {
     "CEInputID": "EXAMPLE_1", "PrgID": "EXAMPLE_PRG", "ClaimYearQuarter": "2028Q3", "Sector": "Commercial", "DeliveryType": "DnDeemed", "BldgType": "Com",
-    "E3ClimateZone": "13", "E3GasSavProfile": "Annual", "E3GasSector": "Commercial", "E3MeaElecEndUseShape": "1 = Commercial Indoor Lighting",
-    "E3TargetSector": "COMMERCIAL", "MeasAppType": "NR", "MeasDescription": "Example: LED troffer retrofit (replace this row)", "MeasImpactType": "Deem",
+    "AC_Climate_Zone": "13", "AC_Gas_Impact_Profile": "Annual", "AC_Gas_Target_Sector": "Commercial", "AC_Elec_Impact_Profile": "1 = Commercial Indoor Lighting",
+    "AC_Elec_Target_Sector": "COMMERCIAL", "MeasAppType": "NR", "MeasDescription": "Example: LED troffer retrofit (replace this row)", "MeasImpactType": "Deem",
     "FuelID": "EE-Elec-Only", "NormUnit": "Each", "NumUnits": "100", "UnitkW1stBaseline": "0.03", "UnitkWh1stBaseline": "120", "UnitTherm1stBaseline": "-0.5",
     "UnitkW2ndBaseline": "0", "UnitkWh2ndBaseline": "0", "UnitTherm2ndBaseline": "0", "UnitkWhIOUWater1stBaseline": "0", "UnitkWhIOUWater2ndBaseline": "0",
     "UnitMeaCost1stBaseline": "85", "UnitMeaCost2ndBaseline": "0", "UnitDirectInstallLab": "0", "UnitDirectInstallMat": "0", "UnitEndUserRebate": "25",
@@ -95,7 +96,7 @@ _EXAMPLE_PROGRAMCOST = {"PrgID": "EXAMPLE_PRG", "PrgYear": "2028", "ClaimYearQua
 # Public names (the input editor, editor.py, builds its tables from these)
 # Optional ReCET columns, not CET fields, kept after CET's 74: a separate electric shape for the 2nd-baseline years and for the water energy, and an ACC
 # version per measure (blank = the measure's own shape / the run's version). CET files written by the editor leave them out when they are all blank.
-RECET_MEASURE_COLUMNS = ["E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater", "ACCVersion"]
+RECET_MEASURE_COLUMNS = ["AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "ACCVersion"]
 MEASURE_COLUMNS = _CET_MEASURE_HEADER + RECET_MEASURE_COLUMNS
 PROGRAMCOST_COLUMNS = _PROGRAMCOST_HEADER
 EXAMPLE_MEASURE = _EXAMPLE_MEASURE
@@ -140,7 +141,7 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         ("", False),
         ("Sheet", True),
         ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row. The last three columns are optional ReCET-only "
-         "columns (not CET fields; leave blank for the defaults): E3MeaElecEndUseShape2nd (2nd-baseline shape), E3MeaElecEndUseShapeWater (water-energy shape), "
+         "columns (not CET fields; leave blank for the defaults): AC_Elec_Impact_Profile_2nd_Baseline (2nd-baseline shape), AC_Elec_Impact_Profile_Water (water-energy shape), "
          "ACCVersion (2021, 2022, 2024 or 2026; blank = the run's version).", False),
         ("ProgramCost    Optional. CET ProgramCost.csv columns. Replace or delete the yellow example row.", False),
         ("RunParameters  Optional. Discount rates, base year and gas CO2 per PA. Filled in with the built-in values for ACC " + acc_key
@@ -189,7 +190,7 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         return ws
 
     meas = sheet("Measure", MEASURE_COLUMNS, [_EXAMPLE_MEASURE], example=True)
-    for col in ("CEInputID", "PrgID", "ClaimYearQuarter", "E3ClimateZone"):           # keep these as text even when they look like numbers
+    for col in ("CEInputID", "PrgID", "ClaimYearQuarter", "AC_Climate_Zone"):           # keep these as text even when they look like numbers
         j = MEASURE_COLUMNS.index(col) + 1
         meas.cell(2, j).number_format = "@"
         meas.cell(2, j).value = str(_EXAMPLE_MEASURE[col])
@@ -217,11 +218,11 @@ def write_template(kind: str, out_path: str | Path, acc_key: str = "2026") -> Pa
     out.parent.mkdir(parents=True, exist_ok=True)
     if kind == "profiles-8760":
         df = pd.DataFrame({
-            "end_use_name": "EXAMPLE_END_USE (replace: use the measure's E3MeaElecEndUseShape exactly)",
+            "end_use_name": "EXAMPLE_END_USE (replace: use the measure's AC_Elec_Impact_Profile exactly)",
             "pa": "PGE", "target_sector": "Residential", "climate_zone": "ALL",
             "hour_of_year": np.arange(1, 8761), "impact": 1.0 / 8760, "represents_year": 2018})
     elif kind == "profiles-gas":
-        df = pd.DataFrame({"Profile": "EXAMPLE_GAS_PROFILE (replace: use the measure's E3GasSavProfile exactly)", "Month": np.arange(1, 13), "Impact": 1.0 / 12})
+        df = pd.DataFrame({"Profile": "EXAMPLE_GAS_PROFILE (replace: use the measure's AC_Gas_Impact_Profile exactly)", "Month": np.arange(1, 13), "Impact": 1.0 / 12})
     elif kind == "acc-electric":
         df = _electric_template(acc_key)
     elif kind == "acc-gas":

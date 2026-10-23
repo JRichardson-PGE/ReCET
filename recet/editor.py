@@ -7,7 +7,7 @@ The editor is meant for small jobs, such as an implementer's project of a few me
   all-text DataFrames with every CET column, in CET's order.
 * `ChoiceSource` gives each column's dropdown values: the CET value lists shipped in `data/value_lists/` (codes active for the claim year; in the web app with
   its admins' changes on top, `set_value_list_changes`), the IOUs the POC can
-  price, and, for `E3MeaElecEndUseShape` / `E3GasSavProfile`, the profiles that actually exist for the row's IOU and target sector (library and supplied files).
+  price, and, for `AC_Elec_Impact_Profile` / `AC_Gas_Impact_Profile`, the profiles that actually exist for the row's IOU and target sector (library and supplied files).
 * `check_tables()` returns one `CellIssue` per problem cell. It applies the preflight's own rules (`preflight.py`: required values, numbers, CET ranges, IOU,
   ClaimYearQuarter, duplicate IDs, the second baseline, gas sector, PrgID alignment), plus "not an active CET value" and "no profile, so not priced" warnings.
   The full preflight (`Full check` in the window) still runs on the saved files; this check is the instant per-cell version of it.
@@ -32,13 +32,13 @@ PROGRAMCOST_COLUMNS = list(templates.PROGRAMCOST_COLUMNS)
 PROGRAMCOST_NUMERIC = [c for c in PROGRAMCOST_COLUMNS if c not in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")]
 MEASURE_NUMERIC = preflight.NUMERIC_COLUMNS + ["UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"]
 FLAG_COLUMNS = ("Residential_Flag", "Upstream_Flag")
-END_USE_COLUMNS = ("E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd", "E3MeaElecEndUseShapeWater")   # electric shapes: per-row dropdowns (IOU and target sector)
+END_USE_COLUMNS = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water")   # electric shapes: per-row dropdowns (IOU and target sector)
 CYQ = re.compile(r"^\d{4}Q[1-4]$")
 
 # Measure / ProgramCost column -> CET value-list file in data/value_lists (RUL_ID is not checked: CET's RUL IDs are not a published list)
 VALUE_LISTS = {
-    "Sector": "sector", "DeliveryType": "deliverytype", "BldgType": "bldgtype", "E3ClimateZone": "e3climatezone", "E3GasSavProfile": "e3gassavprofile",
-    "E3GasSector": "e3gassector", "E3MeaElecEndUseShape": "e3meaelecenduseshape", "E3TargetSector": "e3targetsector", "MeasAppType": "measapptype",
+    "Sector": "sector", "DeliveryType": "deliverytype", "BldgType": "bldgtype", "AC_Climate_Zone": "e3climatezone", "AC_Gas_Impact_Profile": "e3gassavprofile",
+    "AC_Gas_Target_Sector": "e3gassector", "AC_Elec_Impact_Profile": "e3meaelecenduseshape", "AC_Elec_Target_Sector": "e3targetsector", "MeasAppType": "measapptype",
     "MeasImpactType": "measimpacttype", "FuelID": "fuelid", "TechGroup": "techgroup", "TechType": "techtype", "UseCategory": "usecategory",
     "UseSubCategory": "usesubcategory", "WaterUse": "wateruse", "Version": "version", "NormUnit": "normunit", "NTG_ID": "ntg", "EUL_ID": "eul",
     "GSIA_ID": "gsia", "RateScheduleElec": "ratescheduleelec", "RateScheduleGas": "rateschedulegas", "CombustionType": "combustiontype",
@@ -58,8 +58,8 @@ NEW_MEASURE_DEFAULTS = {
 # poc_annual_net_kw*, so they come last in that group. Sector only labels poc_subset_key; RateScheduleElec/Gas are not used (the schedule follows IOU and sector).
 MEASURE_FROZEN = ["CEInputID", "MeasCode", "MeasDescription"]
 MEASURE_CALC = [
-    "PrgID", "ClaimYearQuarter", "ACCVersion", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3MeaElecEndUseShape", "E3MeaElecEndUseShape2nd",
-    "E3MeaElecEndUseShapeWater", "E3GasSector", "E3GasSavProfile",
+    "PrgID", "ClaimYearQuarter", "ACCVersion", "IOU_AC_Territory", "AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline",
+    "AC_Elec_Impact_Profile_Water", "AC_Gas_Target_Sector", "AC_Gas_Impact_Profile",
     "FuelID", "MeasImpactType", "CombustionType",
     "NumUnits", "UnitkWh1stBaseline", "UnitkWh2ndBaseline", "UnitTherm1stBaseline", "UnitTherm2ndBaseline", "UnitkWhIOUWater1stBaseline",
     "UnitkWhIOUWater2ndBaseline", "EUL_Yrs", "RUL_Yrs",
@@ -141,20 +141,20 @@ EFFECTS = {
                              "Sets when savings start, which ACC years apply, and how far each value is discounted to the First Year."),
         "IOU_AC_Territory": ("all benefits and supply costs, every present value (discount rate), bill impacts, emissions, " + _REST,
                              "Picks the IOU's avoided costs, discount rate, retail rates, gas CO2 rate and NOx/PM10 factors, and is part of the 8,760 profile match."),
-        "E3ClimateZone": (_ELEC + ", water-energy value, electric emissions, " + _REST,
+        "AC_Climate_Zone": (_ELEC + ", water-energy value, electric emissions, " + _REST,
                           "Picks the ACC climate zone and the profile's shape for that zone; part of the NOx/PM10 key."),
-        "E3TargetSector": ("electric benefits (through the profile match), the electric bill impact, electric NOx/PM10, " + _REST,
+        "AC_Elec_Target_Sector": ("electric benefits (through the profile match), the electric bill impact, electric NOx/PM10, " + _REST,
                            "Part of the 8,760 profile match; picks the electric retail rate schedule and the NOx/PM10 factors."),
-        "E3MeaElecEndUseShape": (_ELEC + ", water-energy value, electric emissions, " + _REST + " (nothing electric is priced if no profile matches)",
+        "AC_Elec_Impact_Profile": (_ELEC + ", water-energy value, electric emissions, " + _REST + " (nothing electric is priced if no profile matches)",
                                  "The 8,760-hour load shape the kWh savings are spread over before pricing; part of the NOx/PM10 key."),
-        "E3MeaElecEndUseShape2nd": ("the 2nd-baseline years of " + _ELEC + ", electric emissions, " + _REST,
-                                    "Optional ReCET column (not a CET field): the load shape of the years after RUL_Yrs on an early replacement. Blank = E3MeaElecEndUseShape."),
-        "E3MeaElecEndUseShapeWater": ("water-energy value, " + _REST,
-                                      "Optional ReCET column (not a CET field): the load shape the water energy is spread over. Blank = E3MeaElecEndUseShape."),
+        "AC_Elec_Impact_Profile_2nd_Baseline": ("the 2nd-baseline years of " + _ELEC + ", electric emissions, " + _REST,
+                                    "Optional ReCET column (not a CET field): the load shape of the years after RUL_Yrs on an early replacement. Blank = AC_Elec_Impact_Profile."),
+        "AC_Elec_Impact_Profile_Water": ("water-energy value, " + _REST,
+                                      "Optional ReCET column (not a CET field): the load shape the water energy is spread over. Blank = AC_Elec_Impact_Profile."),
         "ACCVersion": ("every avoided-cost value of the measure, its discount rates, bill impacts and emissions, " + _REST,
                        "Optional ReCET column (not a CET field): the ACC version this measure is priced on (2021, 2022, 2024, 2026). Blank = the run's version."),
-        "E3GasSector": (_GAS + ", the gas bill impact, " + _REST, "Picks the gas ACC class (Residential, Commercial, Core) and the gas retail rate schedule."),
-        "E3GasSavProfile": (_GAS + ", " + _REST + " (no gas value if the name matches nothing)",
+        "AC_Gas_Target_Sector": (_GAS + ", the gas bill impact, " + _REST, "Picks the gas ACC class (Residential, Commercial, Core) and the gas retail rate schedule."),
+        "AC_Gas_Impact_Profile": (_GAS + ", " + _REST + " (no gas value if the name matches nothing)",
                             "The 12-month shape the therm savings are spread over. A ...FuelSub... name on a residential measure adds behind-the-meter methane."),
         "FuelID": (_FUELSUB, "AllElec-New, FuelSub-ToElec and FuelSub-ToGas mark a fuel-substitution measure."),
         "MeasImpactType": (_FUELSUB, "A value containing 'FuelSub' also marks a fuel-substitution measure (see FuelID)."),
@@ -198,8 +198,8 @@ EFFECTS = {
         # no effect, with a reason worth giving
         "CEInputID": (None, "The measure's key: it labels every output row and joins to a CET outputs file. Must be unique."),
         "Sector": (None, "Only forms the label poc_subset_key."),
-        "RateScheduleElec": (None, "Not read: the electric rate schedule follows IOU_AC_Territory and E3TargetSector."),
-        "RateScheduleGas": (None, "Not read: the gas rate schedule follows IOU_AC_Territory and E3GasSector."),
+        "RateScheduleElec": (None, "Not read: the electric rate schedule follows IOU_AC_Territory and AC_Elec_Target_Sector."),
+        "RateScheduleGas": (None, "Not read: the gas rate schedule follows IOU_AC_Territory and AC_Gas_Target_Sector."),
         "NTG_ID": (None, "A reference ID; the NTGR* values are what is used."),
         "EUL_ID": (None, "A reference ID; EUL_Yrs is what is used."),
         "RUL_ID": (None, "A reference ID; RUL_Yrs is what is used."),
@@ -301,7 +301,7 @@ def new_measure_row(like: dict | None = None, existing_ids=()) -> dict:
     """A blank measure with safe defaults; `like` (another row) supplies its program, IOU, zone, sectors and claim quarter."""
     row = {c: "" for c in MEASURE_COLUMNS}
     row.update(NEW_MEASURE_DEFAULTS)
-    for c in ("PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "E3ClimateZone", "E3TargetSector", "E3GasSector", "Sector", "Version"):
+    for c in ("PrgID", "ClaimYearQuarter", "IOU_AC_Territory", "AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Gas_Target_Sector", "Sector", "Version"):
         if like and like.get(c):
             row[c] = like[c]
     row["CEInputID"] = unique_id("NEW", existing_ids)
@@ -345,6 +345,8 @@ def write_cet_files(measures: pd.DataFrame, programcost: pd.DataFrame | None, fo
     out.mkdir(parents=True, exist_ok=True)
     m = _clean(conform(measures, MEASURE_COLUMNS))          # files always in CET's column order, whatever order the editor shows
     m = m.drop(columns=[c for c in templates.RECET_MEASURE_COLUMNS if c in m and (m[c] == "").all()])   # ReCET-only columns only when used
+    from .fieldnames import to_cet
+    m = to_cet(m)                                           # CET's own names (E3ClimateZone ...): the file is ready for the CET
     if m.empty:
         raise EditorError("the Measure table is empty")
     files: dict[str, Path | None] = {"measures": out / "Measure.csv", "programcost": None}
@@ -570,7 +572,7 @@ class ChoiceSource:
             return sorted(preflight.VALID_PA)
         if column in FLAG_COLUMNS:
             return ["0", "1"]
-        if column == "E3GasSavProfile":
+        if column == "AC_Gas_Impact_Profile":
             return sorted(self.gas_names | self.user_gas | set(active_codes("e3gassavprofile")), key=_natural)
         if column in END_USE_COLUMNS:
             return None                                    # per row: see end_use_choices
@@ -700,7 +702,7 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
             if g(c) and g(c).lower() not in ("0", "1", "true", "false"):
                 add("Measure", i, c, "warning", f"{c} should be 0 or 1")
         for c, name in VALUE_LISTS.items():
-            if c in ("E3MeaElecEndUseShape", "E3GasSavProfile") or not g(c):
+            if c in ("AC_Elec_Impact_Profile", "AC_Gas_Impact_Profile") or not g(c):
                 continue
             why = code_status(name, g(c), year)
             if why:
@@ -709,22 +711,22 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                                                           "UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"))
         has_gas = any((vals.get(c) or 0) != 0 for c in ("UnitTherm1stBaseline", "UnitTherm2ndBaseline"))
         if has_elec:
-            if not g("E3MeaElecEndUseShape"):
-                add("Measure", i, "E3MeaElecEndUseShape", "warning", "blank end use on a measure with electric savings: its electric savings will NOT be priced")
+            if not g("AC_Elec_Impact_Profile"):
+                add("Measure", i, "AC_Elec_Impact_Profile", "warning", "blank end use on a measure with electric savings: its electric savings will NOT be priced")
             elif choices is not None:
-                why = choices.electric_profile_status(g("E3MeaElecEndUseShape"), g("IOU_AC_Territory"), g("E3TargetSector"))
+                why = choices.electric_profile_status(g("AC_Elec_Impact_Profile"), g("IOU_AC_Territory"), g("AC_Elec_Target_Sector"))
                 if why:
                     sev, msg = ("info", why[5:]) if why.startswith("INFO:") else ("warning", why)
-                    add("Measure", i, "E3MeaElecEndUseShape", sev, msg)
+                    add("Measure", i, "AC_Elec_Impact_Profile", sev, msg)
         has_kwh2 = rul > 0 and (eul is None or rul < eul) and (vals.get("UnitkWh2ndBaseline") or 0) != 0
         has_water = any((vals.get(c) or 0) != 0 for c in ("UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"))
-        for c, used, what in (("E3MeaElecEndUseShape2nd", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("E3MeaElecEndUseShapeWater", has_water, "water energy")):
+        for c, used, what in (("AC_Elec_Impact_Profile_2nd_Baseline", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("AC_Elec_Impact_Profile_Water", has_water, "water energy")):
             if not g(c):
                 continue
             if not used:
                 add("Measure", i, c, "info", f"not used: the measure has no {what}")
             elif choices is not None:
-                why = choices.electric_profile_status(g(c), g("IOU_AC_Territory"), g("E3TargetSector"))
+                why = choices.electric_profile_status(g(c), g("IOU_AC_Territory"), g("AC_Elec_Target_Sector"))
                 if why:
                     sev, msg = ("info", why[5:]) if why.startswith("INFO:") else ("warning", why.replace("electric savings", what))
                     add("Measure", i, c, sev, msg)
@@ -735,14 +737,14 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                 add("Measure", i, "ACCVersion", "warning", f"'{g('ACCVersion')}' is not a built-in ACC version ({', '.join(versions.BUILTIN)}): "
                     "the run stops at its input check unless it is the run's own version")
         if has_gas:
-            if g("E3GasSector").upper() not in preflight.VALID_GAS_SECTORS:
-                add("Measure", i, "E3GasSector", "error", "E3GasSector must be Residential, Commercial or Core on a measure with gas savings")
-            if not g("E3GasSavProfile"):
-                add("Measure", i, "E3GasSavProfile", "warning", "blank gas profile on a measure with gas savings: its gas savings will NOT be priced")
+            if g("AC_Gas_Target_Sector").upper() not in preflight.VALID_GAS_SECTORS:
+                add("Measure", i, "AC_Gas_Target_Sector", "error", "AC_Gas_Target_Sector must be Residential, Commercial or Core on a measure with gas savings")
+            if not g("AC_Gas_Impact_Profile"):
+                add("Measure", i, "AC_Gas_Impact_Profile", "warning", "blank gas profile on a measure with gas savings: its gas savings will NOT be priced")
             elif choices is not None:
-                why = choices.gas_profile_status(g("E3GasSavProfile"))
+                why = choices.gas_profile_status(g("AC_Gas_Impact_Profile"))
                 if why:
-                    add("Measure", i, "E3GasSavProfile", "warning", why)
+                    add("Measure", i, "AC_Gas_Impact_Profile", "warning", why)
         for c in m.columns:
             if "|" in g(c):
                 add("Measure", i, c, "error", "a cell may not contain '|' (CET files are '|'-delimited)")

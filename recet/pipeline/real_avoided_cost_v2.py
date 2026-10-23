@@ -130,7 +130,7 @@ Appendix C says nothing about.
 
 Climate zones: each IOU only has real ACC data for the subset of the 17
 statewide zones it actually serves (PG&E 10, SCE 8, SDG&E 4 -- confirmed
-by direct inspection). A measure's own real E3ClimateZone is used
+by direct inspection). A measure's own real AC_Climate_Zone is used
 directly (prefixed "CZ..."), except for the SCE CZ05 / SDG&E CZ06 / CZ08
 substitutions documented above; a measure whose zone isn't one of that
 IOU's covered real zones AND isn't one of those 3 documented pairs

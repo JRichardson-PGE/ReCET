@@ -57,11 +57,11 @@ def _rows(path, rows):
 
 def test_issues_say_which_cells_they_are_about(tmp_path):
     """The web editor highlights the cells a check names: (table, data row of the file, column)."""
-    p = _rows(tmp_path / "m.csv", [{}, {"NTGRkWh": "2"}, {"E3MeaElecEndUseShape": "NO_SUCH_SHAPE"}])
+    p = _rows(tmp_path / "m.csv", [{}, {"NTGRkWh": "2"}, {"AC_Elec_Impact_Profile": "NO_SUCH_SHAPE"}])
     rep = preflight.check_inputs(p).to_dict()
     cells = {i["code"]: i["cells"] for i in rep["issues"]}
     assert cells["outside_cet_range"] == [["Measure", 1, "NTGRkWh"]]
-    assert ["Measure", 2, "E3MeaElecEndUseShape"] in cells["no_electric_profile"]
+    assert ["Measure", 2, "AC_Elec_Impact_Profile"] in cells["no_electric_profile"]
 
     p = _rows(tmp_path / "d.csv", [{}, {"NumUnits": "x"}])
     (tmp_path / "d.csv").write_text((tmp_path / "d.csv").read_text().replace("\nT2|", "\nT1|"))

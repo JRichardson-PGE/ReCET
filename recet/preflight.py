@@ -22,8 +22,8 @@ import pandas as pd
 from .pipeline import delimited
 
 REQUIRED_MEASURE_COLUMNS = [
-    "CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "Sector", "E3ClimateZone", "E3GasSavProfile", "E3GasSector", "E3MeaElecEndUseShape",
-    "E3TargetSector", "IOU_AC_Territory", "EUL_Yrs", "RUL_Yrs", "NumUnits",
+    "CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "Sector", "AC_Climate_Zone", "AC_Gas_Impact_Profile", "AC_Gas_Target_Sector", "AC_Elec_Impact_Profile",
+    "AC_Elec_Target_Sector", "IOU_AC_Territory", "EUL_Yrs", "RUL_Yrs", "NumUnits",
     "UnitkW1stBaseline", "UnitkWh1stBaseline", "UnitTherm1stBaseline", "UnitkW2ndBaseline", "UnitkWh2ndBaseline", "UnitTherm2ndBaseline",
     "NTGRkW", "NTGRkWh", "NTGRTherm", "NTGRCost", "RealizationRatekW", "RealizationRatekWh", "RealizationRateTherm",
     "InstallationRatekW", "InstallationRatekWh", "InstallationRateTherm",
@@ -316,10 +316,10 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
             rep.stats[f"  electric shape: {k}"] = f"{v:,}"
     if counts["NO PROFILE"]:
         rep.add("warning", "no_electric_profile", "electric measures with no 8,760 profile are NOT priced (ElecPricingStatus = UNPRICED); "
-                "supply a profile for them or check the E3MeaElecEndUseShape spelling", counts["NO PROFILE"], missing_examples,
-                _cells("Measure", mrows(elec[pd.MultiIndex.from_frame(elec[["shape_key", "PA", "target_sector"]]).isin(missing_keys)]), "E3MeaElecEndUseShape"))
+                "supply a profile for them or check the AC_Elec_Impact_Profile spelling", counts["NO PROFILE"], missing_examples,
+                _cells("Measure", mrows(elec[pd.MultiIndex.from_frame(elec[["shape_key", "PA", "target_sector"]]).isin(missing_keys)]), "AC_Elec_Impact_Profile"))
     if counts["library (sector-loose match)"]:
-        rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because E3TargetSector has no exact match", counts["library (sector-loose match)"])
+        rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because AC_Elec_Target_Sector has no exact match", counts["library (sector-loose match)"])
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
 
@@ -338,7 +338,7 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
                         "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["measure_id"].head(5).tolist(),
                         _cells("Measure", mrows(zero_net), "UnitkWhIOUWater1stBaseline"))
 
-    # --- a separate 2nd-baseline shape (E3MeaElecEndUseShape2nd) on an early replacement
+    # --- a separate 2nd-baseline shape (AC_Elec_Impact_Profile_2nd_Baseline) on an early replacement
     second = measures[(measures["shape_key_2nd"] != measures["shape_key"]) & (measures["rul_years_exact"] > 0)
                       & (measures["rul_years_exact"] < measures["eul_years_exact"]) & (measures["shape_scale_2nd"] != 0)]
     if len(second):
@@ -350,9 +350,9 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
             if not (has_user or has_lib):
                 missing2 += len(g)
                 eg2.append(" | ".join(map(str, key)))
-                where2 += _cells("Measure", mrows(g), "E3MeaElecEndUseShape2nd")
+                where2 += _cells("Measure", mrows(g), "AC_Elec_Impact_Profile_2nd_Baseline")
         if missing2:
-            rep.add("warning", "no_electric_profile_2nd", "measures whose E3MeaElecEndUseShape2nd has no 8,760 profile: their 2nd-baseline years are NOT priced "
+            rep.add("warning", "no_electric_profile_2nd", "measures whose AC_Elec_Impact_Profile_2nd_Baseline has no 8,760 profile: their 2nd-baseline years are NOT priced "
                     "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
 
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
@@ -362,14 +362,14 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         no_prof = 0
         eg = []
         where: list = []
-        for key, g in water.groupby(["shape_key_water", "PA", "target_sector"]):          # E3MeaElecEndUseShapeWater, or the measure's own shape
+        for key, g in water.groupby(["shape_key_water", "PA", "target_sector"]):          # AC_Elec_Impact_Profile_Water, or the measure's own shape
             has_user = user is not None and user.match(*key) is not None
             has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
             if not (has_user or has_lib):
                 no_prof += len(g)
                 eg.append(" | ".join(map(str, key)))
                 own = g["shape_key_water"] != g["shape_key"]
-                where += _cells("Measure", mrows(g[own]), "E3MeaElecEndUseShapeWater") + _cells("Measure", mrows(g[~own]), "E3MeaElecEndUseShape")
+                where += _cells("Measure", mrows(g[own]), "AC_Elec_Impact_Profile_Water") + _cells("Measure", mrows(g[~own]), "AC_Elec_Impact_Profile")
         if no_prof:
             rep.add("warning", "no_water_profile", "water-energy measures with no electric profile (the water energy is priced on the measure's electric profile) are NOT priced "
                     "(WaterPricingStatus = UNPRICED)", no_prof, eg, where)
@@ -379,12 +379,12 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     rep.stats["gas-savings measures"] = f"{len(gas):,}"
     no_gas = gas[gas["gas_profile_key"].isna() | ~gas["gas_profile_key"].map(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(str(k)) is not None)]
     if len(no_gas):
-        rep.add("warning", "no_gas_profile", "gas measures whose E3GasSavProfile is not a known monthly profile are NOT priced (GasPricingStatus = UNPRICED); "
-                "supply the profile or fix the name", len(no_gas), no_gas["gas_profile_key"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "E3GasSavProfile"))
+        rep.add("warning", "no_gas_profile", "gas measures whose AC_Gas_Impact_Profile is not a known monthly profile are NOT priced (GasPricingStatus = UNPRICED); "
+                "supply the profile or fix the name", len(no_gas), no_gas["gas_profile_key"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "AC_Gas_Impact_Profile"))
     bad_gs = gas[~gas["gas_sector"].astype(str).str.upper().isin(VALID_GAS_SECTORS)]
     if len(bad_gs):
-        rep.add("error", "bad_gas_sector", f"E3GasSector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["gas_sector"].unique(),
-                _cells("Measure", mrows(bad_gs), "E3GasSector"))
+        rep.add("error", "bad_gas_sector", f"AC_Gas_Target_Sector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["gas_sector"].unique(),
+                _cells("Measure", mrows(bad_gs), "AC_Gas_Target_Sector"))
 
     # --- ACC horizon and run-parameter version
     if acc is not None:

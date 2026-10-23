@@ -4,7 +4,7 @@
 quarterly avoided costs, and runs the same cost tests as the CET (TRC, PAC, RIM, SCT Base/High, TSB) plus the Participant Cost Test, which the CET does not yet have. It started as the proof of concept in the CEDARS
 review research repository and was moved here on its own.
 
-It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`) on the **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
+It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`; CET's legacy E3 field names such as `E3ClimateZone` are accepted alongside ReCET's `AC_...` names) on the **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
 2022 ACCs are TRC only) and writes one row per
 measure with every input column and every output, from a graphical interface or the command line.
 

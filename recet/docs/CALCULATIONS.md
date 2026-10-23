@@ -73,12 +73,12 @@ when it is identical to the raw column it restates, for example `poc_num_units`;
 
 ```text
 poc_PA               = IOU_AC_Territory
-poc_climate_zone     = E3ClimateZone (as text)          poc_target_sector = E3TargetSector      poc_shape_key = E3MeaElecEndUseShape
-poc_gas_profile_key  = E3GasSavProfile                  poc_gas_sector    = E3GasSector
+poc_climate_zone     = AC_Climate_Zone (as text)          poc_target_sector = AC_Elec_Target_Sector      poc_shape_key = AC_Elec_Impact_Profile
+poc_gas_profile_key  = AC_Gas_Impact_Profile                  poc_gas_sector    = AC_Gas_Target_Sector
 poc_claim_year       = first four characters of ClaimYearQuarter        poc_claim_quarter = its last character (1-4)
 poc_eul_years_exact  = max(EUL_Yrs, 0.25)                               poc_rul_years_exact = max(RUL_Yrs, 0)      (blank RUL = 0)
 poc_eul_years        = max(round(EUL_Yrs), 1)      (information only: pricing uses poc_eul_years_exact)
-poc_subset_key       = "CZ" + E3ClimateZone + "_" + Sector             (a label; not used in pricing)
+poc_subset_key       = "CZ" + AC_Climate_Zone + "_" + Sector             (a label; not used in pricing)
 ```
 
 **C1.2 Electric quantities**
@@ -191,9 +191,9 @@ Gen(y, i)  = AC(y, i) - TD(y, i)                                                
    rate - by **one** utility: SCE where the ACC file has SCE's own rows for that zone, otherwise PG&E where it has PG&E's, otherwise SCE (with the fallbacks below).
    SCE's CZ5 stand-in (item 2) does not count as SCE data, so SCG CZ5 is PG&E. On both built-in ACCs: SCE in 6, 8, 9, 10, 13, 14, 15, 16; PG&E in 1, 2, 3A, 3B, 4, 5,
    11, 12.
-2. The zone is `"CZ" + E3ClimateZone`. Three (utility, zone) pairs that the ACC model does not export are stood in for by a documented neighbour: SCE CZ5 uses SCE CZ9;
+2. The zone is `"CZ" + AC_Climate_Zone`. Three (utility, zone) pairs that the ACC model does not export are stood in for by a documented neighbour: SCE CZ5 uses SCE CZ9;
    SDG&E CZ6 and CZ8 use SDG&E CZ7.
-3. `E3ClimateZone = System` is first replaced by the profile's System zone (C4.4), so a System measure is priced on a real zone's rows. A zone that is still not in the
+3. `AC_Climate_Zone = System` is first replaced by the profile's System zone (C4.4), so a System measure is priced on a real zone's rows. A zone that is still not in the
    file for that utility (a System measure none of whose zones can be priced) uses the unweighted mean across the utility's zones in the file.
 4. **Year.** A pricing year outside the file's range uses the *nearest* year in the file (a tie takes the earlier year).
 
@@ -201,7 +201,7 @@ Gen(y, i)  = AC(y, i) - TD(y, i)                                                
 
 ```text
 utility:  PGE = PG&E   SCG = Socal Gas   SDGE = SDG&E   SCE = Socal Gas (SCE has no gas utility of its own)
-class:    E3GasSector  Residential = Residential   Commercial = Commercial   Core = Total Core
+class:    AC_Gas_Target_Sector  Residential = Residential   Commercial = Commercial   Core = Total Core
 rows:     TRC (scc blank) for TRC/PAC/RIM;   SCT with scc = Base for SCB;   SCT with scc = High for SCH
 year:     clamped to the first / last year in the file
 
@@ -209,7 +209,7 @@ ACg(y, m) = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder  
 ```
 
 `market` and `td` vary by month; the other components are one annual value used in every month. `behind_meter_methane` is included **only** when the class is Residential and the
-measure's `E3GasSavProfile` contains `FuelSub` (a residential gas-to-electric fuel-substitution profile).
+measure's `AC_Gas_Impact_Profile` contains `FuelSub` (a residential gas-to-electric fuel-substitution profile).
 
 **C3.3 E3 tables and run parameters.** Discount rates, `CO2Gas`, NOx/PM10 factors and retail rate schedules come from CET's E3 tables and are picked by **ACC
 version**. The packaged tables are CET exports, whose `Version` column uses CET's own numbering; each is mapped to the ACC it holds when the table is read:
@@ -241,14 +241,14 @@ and discounted at the rates of the run's own version. The societal tests are lef
 
 | Order | Shape | `ProfileSource` |
 |---|---|---|
-| 1 | a **supplied 8,760 profile** matching (`E3MeaElecEndUseShape`, `PA`, `E3TargetSector`) | `user profile` |
+| 1 | a **supplied 8,760 profile** matching (`AC_Elec_Impact_Profile`, `PA`, `AC_Elec_Target_Sector`) | `user profile` |
 | 1b | the same, but the supplied profile has no rows for this measure's zone (or `System` / `ALL`): fall through to the library | `library (user profile has no shape for this zone)` |
 | 2 | the **CEDARS library** profile with the same end use, `PA` and target sector | `library` |
 | 3 | the library profile with the same end use and `PA`, ignoring the sector | `library (sector-loose match)` |
 | - | none of the above: the measure is **not priced** (`ElecPricingStatus = UNPRICED ...`), never priced on a made-up shape | (blank) |
 
 A shape is 8,760 non-negative-or-negative shares that sum to 1 (a *fraction of the measure's annual net kWh* in each hour). A library or supplied profile is used for the measure's own
-zone (for `E3ClimateZone = System`, the profile's System zone, C4.4), else the profile's own `System` rows. Every electric measure is priced from an 8,760 shape (C5.1); there is no other electric route. The library includes CEDARS' TOU (H-factor) end
+zone (for `AC_Climate_Zone = System`, the profile's System zone, C4.4), else the profile's own `System` rows. Every electric measure is priced from an 8,760 shape (C5.1); there is no other electric route. The library includes CEDARS' TOU (H-factor) end
 uses as 8,760s built from their Gen-based energy shares: each TOU period's share spread evenly over that period's hours on the TOU map of the 2026 Electric ACC v1b
 as re-issued on 2026-10-20, which is on the real 2018 calendar (`represents_year` = 2018; 2018 holidays and daylight-time dates). SCE/SCG shares are rescaled to sum
 to 1 and SDG&E's winter on-peak share is the remainder to 1. Their catalog rows carry `hourly_source = TOU H-factor 8,760`. (Before 0.1.18 they were drawn on the
@@ -272,7 +272,7 @@ their holidays and season boundaries are two days off 2020's. Leap years: an ACC
 30 December); hour `i` is the same position in every year, and only weekdays are aligned. This is **not** CEDARS' rule: CEDARS aligns the profile to each
 forecast year's own 1 January weekday (although the ACC data do not follow those calendars) and rotates one day too far when the offset is negative. Gas is monthly and is not shifted.
 
-**C4.3 Gas monthly shape.** `E3GasSavProfile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
+**C4.3 Gas monthly shape.** `AC_Gas_Impact_Profile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
 a supplied profile with the same name replaces it). A gas measure whose profile name matches nothing is not priced (`GasPricingStatus = UNPRICED ...`).
 
 **C4.5 Already-scaled profiles and load shifting (BRD BR-06.6).** A supplied profile with `profile_basis = kwh_per_unit` holds the kWh saved per unit in each hour
@@ -290,15 +290,15 @@ hours, the same kWh added in others) therefore has a real electric value (the pr
 annual-rate bill impacts are 0. (CET nets annual savings before shaping, so it values such a measure at 0.)
 
 **C4.6 Separate shapes for the 2nd baseline and for water energy.** Two optional columns, not CET fields, name other electric end-use shapes; each defaults to
-`E3MeaElecEndUseShape` when blank and is matched the same way (C4.1, C4.4, C4.5):
+`AC_Elec_Impact_Profile` when blank and is matched the same way (C4.1, C4.4, C4.5):
 
-* `E3MeaElecEndUseShape2nd`: an early replacement (`0 < RUL_Yrs < EUL_Yrs`) is priced as two parts with the same `CEInputID`, the 1st-baseline part (`poc_shape_scale`
-  with `poc_shape_scale_2nd = 0`) on `E3MeaElecEndUseShape` and the 2nd-baseline part (`poc_shape_scale = 0` with `poc_shape_scale_2nd`) on this shape, and the parts are added.
+* `AC_Elec_Impact_Profile_2nd_Baseline`: an early replacement (`0 < RUL_Yrs < EUL_Yrs`) is priced as two parts with the same `CEInputID`, the 1st-baseline part (`poc_shape_scale`
+  with `poc_shape_scale_2nd = 0`) on `AC_Elec_Impact_Profile` and the 2nd-baseline part (`poc_shape_scale = 0` with `poc_shape_scale_2nd`) on this shape, and the parts are added.
   The phasing of C2 is linear in the two quantities, so with one shape the result is unchanged; the boundary quarter's split is kept. Electric benefits and supply costs (all
   three tests), emissions and the combined 8,760 output use the parts. If only one of the two shapes is found, the measure is `PARTLY PRICED`.
-* `E3MeaElecEndUseShapeWater`: the water energy (C5.3) is spread over this shape for both baselines.
+* `AC_Elec_Impact_Profile_Water`: the water energy (C5.3) is spread over this shape for both baselines.
 
-**C4.4 The System climate zone.** A measure with `E3ClimateZone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
+**C4.4 The System climate zone.** A measure with `AC_Climate_Zone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
 the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
 
 ```text
@@ -470,8 +470,8 @@ All of these match CET's own columns to the cent with 0% and 5% market effects (
 
 ## C9 Bill impacts
 
-The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses the E3 retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `E3TargetSector`) maps to, and `RateG` ($/therm) for
-(`PA`, `E3GasSector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
+The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses the E3 retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to, and `RateG` ($/therm) for
+(`PA`, `AC_Gas_Target_Sector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
 `RateScheduleElec` / `RateScheduleGas` columns are not read.
 
 With `yr1 = Y0 - BaseYear` (E3Settings `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
@@ -799,7 +799,7 @@ One measure, priced against constant (flat) avoided costs and a flat profile so 
 | `UnitkWh1stBaseline` | 500 | `UnitDirectInstallLab` / `UnitDirectInstallMat` | 5 / 5 |
 | `UnitTherm1stBaseline` | 20 | `UnitRefrigCosts` / `UnitMiscBens` / `UnitTaxCredits` | 1 / 2 / 5 |
 | `UnitkWhIOUWater1stBaseline` | 3 | `NTGRkWh` / `NTGRTherm` / `NTGRCost` | 0.8 / 0.9 / 0.9 |
-| `E3GasSavProfile` | `Annual` (1/12 per month) | `InstallationRatekWh` / `RealizationRatekWh` | 0.95 / 0.9 |
+| `AC_Gas_Impact_Profile` | `Annual` (1/12 per month) | `InstallationRatekWh` / `RealizationRatekWh` | 0.95 / 0.9 |
 | shape | flat (1/8760 per hour) | `InstallationRateTherm` / `RealizationRateTherm` | 1 / 0.9 |
 
 ACC: electric $80/MWh (TRC) = energy 70 + transmission 5 + distribution 5, so `AC` = $0.080/kWh and `Gen` = $0.070/kWh; `SCT Base` $88, `SCT High` $96 (Gen 78 / 86). Gas $1.00/therm (TRC), $1.20 (SCT Base), $1.40 (SCT High). Emission rate 0.0002 t/kWh.

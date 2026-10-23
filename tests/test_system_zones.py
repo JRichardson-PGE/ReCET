@@ -32,7 +32,7 @@ def _profiles(path, zones: dict[str, np.ndarray]):
 
 
 def _run(tmp_path, acc, profiles, zone="System"):
-    cfg = RunConfig(measures=str(make_measure_csv(tmp_path / "Measure.csv", E3ClimateZone=zone)), out_dir=str(tmp_path / "out"), run_name="t", acc_version="2026",
+    cfg = RunConfig(measures=str(make_measure_csv(tmp_path / "Measure.csv", AC_Climate_Zone=zone)), out_dir=str(tmp_path / "out"), run_name="t", acc_version="2026",
                     acc_electric_file=str(acc), profiles_8760_file=str(profiles), emissions=False)
     return run_job(cfg, log=lambda s: None).frame.iloc[0]
 
