@@ -5,11 +5,11 @@ measure,ClaimYearQuarter,Pass Through
 measure,Sector,Pass Through
 measure,DeliveryType,Pass Through
 measure,BldgType,Pass Through
-measure,E3ClimateZone,Pass Through
-measure,E3GasSavProfile,Pass Through
-measure,E3GasSector,Pass Through
-measure,E3MeaElecEndUseShape,Pass Through
-measure,E3TargetSector,Pass Through
+measure,AC_Climate_Zone,Pass Through
+measure,AC_Gas_Impact_Profile,Pass Through
+measure,AC_Gas_Target_Sector,Pass Through
+measure,AC_Elec_Impact_Profile,Pass Through
+measure,AC_Elec_Target_Sector,Pass Through
 measure,MeasAppType,Pass Through
 measure,MeasCode,Pass Through
 measure,MeasDescription,Pass Through

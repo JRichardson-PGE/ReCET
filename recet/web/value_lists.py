@@ -32,9 +32,9 @@ def lists() -> dict[str, list[tuple[str, str]]]:
 
 # Fields with a dropdown that is not a CET value list, and what they offer.
 NOTES = {
-    "E3MeaElecEndUseShape": "Offers the end uses that have an 8,760 profile in the library (and supplied profile files) for the row's IOU and target sector. "
+    "AC_Elec_Impact_Profile": "Offers the end uses that have an 8,760 profile in the library (and supplied profile files) for the row's IOU and target sector. "
                             "Values are still checked against the list below.",
-    "E3GasSavProfile": "Offers the gas profiles in the library and supplied gas profile files as well as the list below.",
+    "AC_Gas_Impact_Profile": "Offers the gas profiles in the library and supplied gas profile files as well as the list below.",
 }
 
 

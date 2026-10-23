@@ -11,7 +11,7 @@ Each named profile's 12 monthly `Impact` values are NORMALIZED (sum to
 measure's own annual_net_therms at pricing time, don't bake magnitude in
 here.
 
-Matches a measure to its real profile via CET's own `E3GasSavProfile`
+Matches a measure to its real profile via CET's own `AC_Gas_Impact_Profile`
 field, which uses the EXACT same names as this file's `Profile` column
 ("Annual", "Winter Only", "Summer Only" -- confirmed against both bundled
 real datasets).

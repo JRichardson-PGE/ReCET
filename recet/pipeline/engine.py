@@ -541,7 +541,7 @@ def price_bill_impact(
 
     UNLIKE every other benefit stream in this POC, the real calc here is
     ANNUAL, not quarterly: pipeline/rate_schedules.py's `RateE`/`RateG`
-    values are one-per-calendar-year (the real `E3RateScheduleElec[/Gas]`
+    values are one-per-calendar-year (the real `RateScheduleElec[/Gas]`
     tables' "Qy" field, despite its name, increments by year, not
     quarter -- confirmed empirically), and `CalcCE`'s own PV-sum for this
     piece discounts with the ANNUAL `Raf` (1+DiscountRateAnnual), not the
@@ -592,7 +592,7 @@ def price_bill_impact(
 
     for _, m in measures.iterrows():
         claim_year = int(m["claim_year"])
-        yr1 = claim_year - settings_base_year  # CalcCE's own Yr1 (E3Settings.BaseYear: 2024 for Versions 2026 and 2027) -- see docstring's discount-asymmetry note
+        yr1 = claim_year - settings_base_year  # CalcCE's own Yr1 (RunParameters BaseYear: 2024 for Versions 2026 and 2027) -- see docstring's discount-asymmetry note
         raf = 1.0 + get_discount_rate_annual(m)
         rul_years = float(m["rul_years_exact"])
         eul_years = float(m["eul_years_exact"])

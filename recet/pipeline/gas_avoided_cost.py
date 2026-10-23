@@ -53,7 +53,7 @@ chased root cause -- a small, compounding difference in the Commodity
 price chain's escalation rate, isolated to Commodity, not T&D).
 
 MATCHING a measure to a real (Utility, Class) combination: CET's
-Measure.csv gives real `IOU_AC_Territory` (-> Utility) and `E3GasSector`
+Measure.csv gives real `IOU_AC_Territory` (-> Utility) and `AC_Gas_Target_Sector`
 (-> Class). End Use / Emission Control are NOT free dimensions here --
 confirmed by Appendix B step 5 (Residential -> "Residential Furnace";
 Commercial/Total Core -> "Small Boiler (<100MMBtu/Hr)"; Emission Control
@@ -136,7 +136,7 @@ def utility_for_pa(pa: str) -> str:
 def class_for_gas_sector(gas_sector: str) -> str:
     key = str(gas_sector).upper()
     if key not in GAS_SECTOR_TO_CLASS:
-        raise KeyError(f"No Gas ACC Class mapping for E3GasSector {gas_sector!r}")
+        raise KeyError(f"No Gas ACC Class mapping for AC_Gas_Target_Sector {gas_sector!r}")
     return GAS_SECTOR_TO_CLASS[key]
 
 

@@ -7,7 +7,7 @@ window works as before. The editing logic (loading, dropdown values, checks, sav
 * Column order (editor.display_layout): CEInputID, MeasCode and MeasDescription (PrgID for program costs) are pinned on the left; to their right, scrolling, come
   the columns that change a result, then the ones that change nothing (greyed headers). The files are still written in CET's column order.
   Pinning is two tksheet grids side by side (`SplitGrid`) whose vertical scrolling is linked; rows are only added or removed with the buttons, which change both.
-* Dropdowns offer CET's value lists and, for E3MeaElecEndUseShape, only end uses with an 8,760 profile for the row's IOU and target sector. Typing any other value
+* Dropdowns offer CET's value lists and, for AC_Elec_Impact_Profile, only end uses with an 8,760 profile for the row's IOU and target sector. Typing any other value
   is allowed; it is then flagged.
 * Every edit re-checks the tables (editor.check_tables): red = the run would stop, amber = it runs but CET would reject the value or the measure is not priced.
   Hover a coloured cell for the reason; the list under the grid has them all (double-click to go to the cell).
@@ -449,7 +449,7 @@ class EditorTab:
             return
         df = self.table("Measure")
         cache: dict[tuple[str, str], list[str]] = {}
-        for r, (iou, sector) in enumerate(zip(df["IOU_AC_Territory"], df["E3TargetSector"])):
+        for r, (iou, sector) in enumerate(zip(df["IOU_AC_Territory"], df["AC_Elec_Target_Sector"])):
             key = (str(iou), str(sector))
             if key not in cache:
                 cache[key] = self.choices.end_use_choices(*key)

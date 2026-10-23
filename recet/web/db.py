@@ -10,6 +10,10 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+# value lists renamed from CET's E3 file names to the AC_ fields they fill
+VALUE_LIST_RENAMES = {"e3climatezone": "ac_climate_zone", "e3gassavprofile": "ac_gas_impact_profile", "e3gassector": "ac_gas_target_sector",
+                      "e3meaelecenduseshape": "ac_elec_impact_profile", "e3targetsector": "ac_elec_target_sector"}
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY,
@@ -105,6 +109,8 @@ class Database:
         with self.connect() as c:
             c.execute("PRAGMA journal_mode=WAL")
             c.executescript(SCHEMA)
+            for old, new in VALUE_LIST_RENAMES.items():  # admin changes made before the value lists took the AC_ field names (2026-10-23)
+                c.execute("UPDATE value_list_changes SET list = ? WHERE list = ?", (new, old))
 
     @contextmanager
     def connect(self):

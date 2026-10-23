@@ -6,18 +6,18 @@ ELECTRIC CO2 SOURCE (2026-09-18, Jake): by default computed from the ACC's
   own hourly emission rate x the real impact profile, NOT from CET's table
   Validated against CET's `CO2` column at
   ~0.03% aggregate (up to ~1% per quarter). NOx/PM10 have no ACC source and
-  still come from CET's `E3Emissions`.
+  still come from the Emissions table.
 
-DATA (real CET tables, exported by Jake 2026-09-17/09-18):
-  - `E3Emissions`: flat NOx and PM10 rates per (PA, TS, EU, CZ). NOx/PM10
+DATA (real CET tables, exported by Jake 2026-09-17/09-18; shipped in data/cet_tables/ without CET's E3 prefix):
+  - `Emissions` (CET's E3Emissions): flat NOx and PM10 rates per (PA, TS, EU, CZ). NOx/PM10
     are joined to the quarterly CO2 rows by CET's `E3EmissionsSourcevw`, so
-    a key missing from E3Emissions gets NOx = PM10 = 0 (e.g. every SCE and
+    a key missing from Emissions gets NOx = PM10 = 0 (e.g. every SCE and
     SCG row for the DEER:Res_ClothesDishWasher end use) -- real behavior,
     confirmed against real CET output, not a gap.
-  - `E3CombustionType`: NOx (lbs/therm) per combustion type, for gas NOx.
+  - `CombustionType` (CET's E3CombustionType): NOx (lbs/therm) per combustion type, for gas NOx.
     A measure with no CombustionType (all of SWWH025) gets gas NOx = 0.
-  - `E3Settings.CO2Gas` for gas CO2 (0.00531 metric tons/therm for Version 2026; CO2 is in metric tons, NOx and PM10 in lbs).
-  E3Emissions Versions 2026 and 2027 carry identical NOx/PM10 values, so
+  - RunParameters `CO2Gas` for gas CO2 (0.00531 metric tons/therm for Version 2026; CO2 is in metric tons, NOx and PM10 in lbs).
+  Emissions Versions 2026 and 2027 carry identical NOx/PM10 values, so
   either is used.
 
 ELECTRIC (per measure, quarter by quarter from the install quarter through
@@ -47,24 +47,24 @@ from .. import paths, versions
 from . import discount_settings, real_avoided_cost_v2, real_impact_profiles, system_zones
 from .engine import QUARTER_BOUNDS
 
-DATA_DIR = paths.package_data("e3_tables")
+DATA_DIR = paths.package_data("cet_tables")
 def is_available() -> bool:
-    return all((DATA_DIR / f).exists() for f in ("e3_emissions.parquet", "e3_combustion_type.parquet"))
+    return all((DATA_DIR / f).exists() for f in ("emissions.parquet", "combustion_type.parquet"))
 
 
 @lru_cache(maxsize=4)
 def _nox_pm10_index(acc_version: int = 2024) -> dict[tuple[str, str, str, str], tuple[float, float]]:
-    e = pd.read_parquet(DATA_DIR / "e3_emissions.parquet")
-    # E3Emissions' Version is CET's numbering: keep the rows of the version that holds this ACC.
+    e = pd.read_parquet(DATA_DIR / "emissions.parquet")
+    # The Emissions table's Version is CET's numbering: keep the rows of the version that holds this ACC.
     e = e[e["Version"].map(versions.acc_of_cet_version) == acc_version].drop_duplicates(subset=["PA", "TS", "EU", "CZ"])
     # TS upper-cased: CET's join is case-insensitive (SQL_Latin1_General_CP1_CI_AS) but Measure.csv spells some sectors
-    # 'Commercial' where E3Emissions has 'COMMERCIAL' (PG&E numbered TOU end uses), and 'System' vs 'SYSTEM' for the zone.
+    # 'Commercial' where the Emissions table has 'COMMERCIAL' (PG&E numbered TOU end uses), and 'System' vs 'SYSTEM' for the zone.
     return {(r.PA, str(r.TS).upper(), r.EU, str(r.CZ).upper()): (float(r.NOx), float(r.PM10)) for r in e.itertuples()}
 
 
 @lru_cache(maxsize=1)
 def _combustion_nox() -> dict[str, float]:
-    c = pd.read_parquet(DATA_DIR / "e3_combustion_type.parquet")
+    c = pd.read_parquet(DATA_DIR / "combustion_type.parquet")
     return dict(zip(c["LookupCode"], c["NOx"]))
 
 
@@ -149,7 +149,7 @@ def price_emissions(measures: pd.DataFrame, acc_version: int = 2024, market_effe
     Electric CO2 comes from the ACC's own hourly emission rate x the
     measure's real impact profile (see _hourly_co2_quarters), not from CET's
     quarterly CO2 table.
-    NOx/PM10 still come from `E3Emissions` -- the ACC has no electric NOx/
+    NOx/PM10 still come from the Emissions table -- the ACC has no electric NOx/
     PM10 rates, so this remains a CET-table dependency (see module docstring)."""
     nox_idx, comb = _nox_pm10_index(acc_version), _combustion_nox()
     from .. import run_poc

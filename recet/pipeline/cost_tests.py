@@ -35,7 +35,21 @@ CLAUDE.md finding 11):
      Here the societal-rate NPV is used for the societal tests.
   4. `BenPos.ElecBenPos_SH` tests `ElecBen_SB > 0` rather than `ElecBen_SH`,
      and `SumBenPos_SB/_SH` use the TRC `GasBen` rather than `GasBen_SB/_SH`.
-     Only the WeightedElecAlloc by-product depends on these; not reproduced.
+     No exported column depends on them (WeightedElecAlloc uses the TRC
+     ElecBenPos / SumBenPos), so there is nothing to reproduce.
+
+LEVELIZED AND OTHER CalcCost COLUMNS (CET_v25.1_documentation_extracted.txt
+16434-17484): the program-cost components each measure carries (Wtd<field> =
+the program's nominal total of the field x WeightedBenefits; ProgramCosts =
+their sum, = WeightedProgramCost), the lifecycle net benefits (TRC / PAC:
+ElecBen + GasBen - cost) and the levelized columns, which divide a benefit or
+an electric (gas) share of a cost by the discounted net kWh (therms):
+    LevBenElec        = ElecBen / DSkWh           LevBenGas = GasBen / DSThm
+    Lev<T>Cost        = <T>Cost x WeightedElecAlloc / DSkWh            (T = TRC, PAC, RIM; and NoAdmin)
+    LevNetBen<T>Elec  = (ElecBen - <T>Cost x WeightedElecAlloc) / DSkWh
+    LevNetBen<T>Gas   = (GasBen - <T>Cost x (1 - WeightedElecAlloc)) / DSThm
+each 0 when its denominator is 0. WeightedElecAlloc = the measure's positive
+ElecBen / its positive ElecBen + GasBen + WaterEnergyBen + OtherBen (0 if none).
 """
 from __future__ import annotations
 
@@ -90,9 +104,9 @@ def check_program_alignment(measures: pd.DataFrame, program: pd.DataFrame | None
 
 
 def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version: int = 2024) -> pd.DataFrame:
-    """Per PrgID: SumCosts (nominal), SumCostsNPV (Raf), SumCostsNPV_SCT (Raf_SCT)."""
+    """Per PrgID: SumCosts (nominal), SumCostsNPV (Raf), SumCostsNPV_SCT (Raf_SCT), and each cost field's nominal total (`Sum<field>`, for the Wtd columns)."""
     if program is None or program.empty:
-        return pd.DataFrame(columns=["PrgID", "SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"])
+        return pd.DataFrame(columns=["PrgID", "SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"] + [f"Sum{f}" for f in _COST_FIELDS])
     p = program.copy()
     p["total"] = p[_COST_FIELDS].fillna(0.0).sum(axis=1)
     raf = p["PA"].map(lambda pa: 1.0 + discount_settings.get_discount_rate_annual(pa, acc_version))
@@ -100,8 +114,9 @@ def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version
     n = p["Year"] - first_year
     p["npv"] = p["total"] / raf ** n
     p["npv_sct"] = p["total"] / raf_sct ** n
+    p[_COST_FIELDS] = p[_COST_FIELDS].fillna(0.0)
     return p.groupby("PrgID", as_index=False).agg(
-        SumCosts=("total", "sum"), SumCostsNPV=("npv", "sum"), SumCostsNPV_SCT=("npv_sct", "sum"))
+        SumCosts=("total", "sum"), SumCostsNPV=("npv", "sum"), SumCostsNPV_SCT=("npv_sct", "sum"), **{f"Sum{f}": (f, "sum") for f in _COST_FIELDS})
 
 
 def _share(pos_by_measure: pd.Series, prg: pd.Series) -> pd.Series:
@@ -129,7 +144,8 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
     Returns d plus every Gross / NoAdmin / weighting output column.
     """
     d = d.copy()
-    for c in ("WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost", "WaterEnergyCost_SB", "WaterEnergyCost_SH"):
+    for c in ("WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
+              "DiscountedSavingsNetkWh", "DiscountedSavingsNetThm"):
         if c not in d:
             d[c] = 0.0
     prg = d["prg_id"]
@@ -150,9 +166,10 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
         (d.ElecBenGross + d.GasBenGross + d.WaterEnergyBenGross + d.OtherBenGross)
         - (d.ElecSupplyCostGross + d.GasSupplyCostGross + d.WaterEnergyCostGross + d.OtherCostGross))
 
-    ps = prog.set_index("PrgID") if len(prog) else pd.DataFrame(columns=["SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"])
-    for col in ("SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"):
-        d[f"_{col}"] = prg.map(ps[col]).fillna(0.0) if len(ps) else 0.0
+    sums = ["SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"] + [f"Sum{f}" for f in _COST_FIELDS]
+    ps = prog.set_index("PrgID") if len(prog) else pd.DataFrame(columns=sums)
+    for col in sums:
+        d[f"_{col}"] = prg.map(ps[col]).fillna(0.0) if len(ps) and col in ps else 0.0          # a hand-made `prog` may lack the per-field sums
 
     def ben_share(elec, gas, water, other):
         return _share(_pos(d[elec]) + _pos(d[gas]) + _pos(d[water]) + _pos(d[other]), prg)
@@ -165,6 +182,12 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
     sh_sh_g = ben_share("ElecBenGross_SH", "GasBenGross_SH", "WaterEnergyBenGross_SH", "OtherBenGross")
     d["WeightedBenefits"] = sh_trc
     d["WeightedProgramCost"] = sh_trc * d["_SumCosts"]
+    for f in _COST_FIELDS:                                           # CalcCost's program-cost components, each the program's nominal total x WeightedBenefits
+        d[f"Wtd{f}"] = sh_trc * d[f"_Sum{f}"]
+    d["ProgramCosts"] = d["WeightedProgramCost"]                     # CalcCost's own name for the same figure
+    pos_e = _pos(d.ElecBen)
+    pos_all = pos_e + _pos(d.GasBen) + _pos(d.WaterEnergyBen) + _pos(d.OtherBen)
+    d["WeightedElecAlloc"] = (pos_e / pos_all.replace(0, np.nan)).fillna(0.0)
     # CET's TotalExpenditures (the run receipt's "Budget"): nominal rebates and incentives plus the measure's share of nominal program costs. Matches CET jobs
     # 121219 and 121841 to the cent in total (CalcCost's ProgramCosts = WeightedProgramCost).
     d["TotalExpenditures"] = (d["RebatesandIncents"] if "RebatesandIncents" in d else 0.0) + d["WeightedProgramCost"]
@@ -191,7 +214,7 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
         d[f"{name}CostGross"] = sh_g * d["_SumCostsNPV_SCT"] + inc_s + d.GrossParticipantCostPV_sct + sup_sg
 
     def ratio(num, den):
-        return (num / den.replace(0, np.nan)).fillna(0.0)
+        return (num / den.replace(0, np.nan)).fillna(0.0) + 0.0          # + 0.0: a zero over a negative denominator is 0, not -0
 
     b = d.ElecBen + d.GasBen + d.WaterEnergyBen + d.OtherBen
     d["TRCRatio"] = ratio(b + d.TaxCredits, d.TRCCost)
@@ -207,4 +230,18 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
     d["SCHRatio"] = ratio(b_sh, d.SCHCost)
     d["SCBRatioNoAdmin"] = ratio(b_sb, d.SCBCostNoAdmin)
     d["SCHRatioNoAdmin"] = ratio(b_sh, d.SCHCostNoAdmin)
+
+    # CalcCost's lifecycle net benefits and levelized columns (see the module docstring); the benefits are ElecBen + GasBen only, as CET has them
+    d["TRCLifecycleNetBen"] = d.ElecBen + d.GasBen - d.TRCCost
+    d["PACLifecycleNetBen"] = d.ElecBen + d.GasBen - d.PACCost
+    ds_e, ds_g, wea = d.DiscountedSavingsNetkWh, d.DiscountedSavingsNetThm, d.WeightedElecAlloc
+    d["LevBenElec"] = ratio(d.ElecBen, ds_e)
+    d["LevBenGas"] = ratio(d.GasBen, ds_g)
+    for t in ("TRCCost", "TRCCostNoAdmin", "PACCost", "PACCostNoAdmin", "RIMCost"):
+        d[f"Lev{t}"] = ratio(d[t] * wea, ds_e)
+    for t in ("TRC", "PAC", "RIM"):
+        for sfx in (("", "NoAdmin") if t != "RIM" else ("",)):
+            cost = d[f"{t}Cost{sfx}"]
+            d[f"LevNetBen{t}Elec{sfx}"] = ratio(d.ElecBen - cost * wea, ds_e)
+            d[f"LevNetBen{t}Gas{sfx}"] = ratio(d.GasBen - cost * (1.0 - wea), ds_g)
     return d.drop(columns=[c for c in d.columns if c.startswith("_")])

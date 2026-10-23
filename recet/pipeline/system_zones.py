@@ -1,4 +1,4 @@
-"""The "System" climate zone: which real climate zone a measure with E3ClimateZone = System is priced in.
+"""The "System" climate zone: which real climate zone a measure with AC_Climate_Zone = System is priced in.
 
 RULE (Jake, 2026-10-09). A profile's System zone is the climate zone, out of the real zones that profile has, whose shape and avoided costs give the LOWEST
 total electric avoided cost over the full length of the avoided cost data:
@@ -12,7 +12,7 @@ cost test decides the zone and that zone is then used for every cost test and co
 as its TRC value. A zone whose prices the ACC cannot supply (the old blended fallback) is not an option. Ties go to the first zone in natural order (1, 2, 3A,
 3B, 4, ... 16); a tie only happens when two zones have the same shape and the same prices, so the choice does not change any value.
 
-The System zone replaces BOTH the shape and the prices: the measure is priced exactly as if its E3ClimateZone were the chosen zone. The library's own
+The System zone replaces BOTH the shape and the prices: the measure is priced exactly as if its AC_Climate_Zone were the chosen zone. The library's own
 "System" rows (CEDARS' published System shapes) are no longer used for System measures; they remain only as get_shape()'s fallback for a real zone a profile
 does not have.
 
@@ -25,7 +25,7 @@ function either way (zone_totals), so a catalog entry and an on-the-fly choice c
 User-supplied profiles: the options are the zones the file gives shapes for. A file entry with only ALL (or SYSTEM) rows uses that one shape for every zone the
 measure's PA has prices for, so the choice is then decided by the prices alone. A user file's own SYSTEM rows are not used as a System measure's shape.
 
-NOx and PM10 are unaffected: CET looks them up in E3Emissions by the measure's literal climate zone, which has System rows (pipeline/emissions.py).
+NOx and PM10 are unaffected: CET looks them up in its emissions table (ReCET's Emissions) by the measure's literal climate zone, which has System rows (pipeline/emissions.py).
 """
 from __future__ import annotations
 
@@ -164,7 +164,7 @@ def _user_options(entry, pa: str) -> dict[str, np.ndarray]:
 
 @lru_cache(maxsize=4096)
 def resolve(shape_key: str, pa: str, target_sector: str) -> Choice:
-    """The System zone for a measure's profile (E3MeaElecEndUseShape, IOU_AC_Territory, E3TargetSector) under the run's ACC -- the same profile the measure's
+    """The System zone for a measure's profile (AC_Elec_Impact_Profile, IOU_AC_Territory, AC_Elec_Target_Sector) under the run's ACC -- the same profile the measure's
     real-zone lookups would use (a matching user profile first, then the library)."""
     user = rip.user_profiles()
     entry = user.match(shape_key, pa, target_sector) if user is not None else None
@@ -185,7 +185,7 @@ def resolve(shape_key: str, pa: str, target_sector: str) -> Choice:
 
 
 def priced_zone(shape_key: str, pa: str, target_sector: str, climate_zone: str) -> str:
-    """The zone a measure is priced in: its own E3ClimateZone, or for System the resolved zone. If no zone can be resolved the measure keeps "System" and
+    """The zone a measure is priced in: its own AC_Climate_Zone, or for System the resolved zone. If no zone can be resolved the measure keeps "System" and
     falls back to the old behaviour (the library's System shape, the PA's blended prices)."""
     if not is_system(climate_zone):
         return climate_zone

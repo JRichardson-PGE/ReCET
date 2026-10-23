@@ -132,7 +132,7 @@ def test_workbook_job_equals_the_file_job(tmp_path):
     files = run_job(_cfg(tmp_path, run_name="files"), **QUIET).frame
     wbp = _workbook_from(tmp_path, tmp_path / "Measure.csv")
     book = run_job(_cfg(tmp_path, run_name="book", measures="", workbook=str(wbp)), **QUIET).frame
-    for c in ("ElecBen", "ElecBen_SB", "TRCCost", "TotalSystemBenefit", "ElecPricingStatus", "E3ClimateZone", "ClaimYearQuarter"):
+    for c in ("ElecBen", "ElecBen_SB", "TRCCost", "TotalSystemBenefit", "ElecPricingStatus", "AC_Climate_Zone", "ClaimYearQuarter"):
         assert files.iloc[0][c] == book.iloc[0][c], c
 
 
@@ -146,7 +146,7 @@ def test_workbook_reads_cells_as_cet_text(tmp_path):
     wbp = templates.write_template("workbook", tmp_path / "job.xlsx", "2026")
     out = workbook.extract(wbp, tmp_path / "x")
     m = pd.read_csv(out["measures"], sep="|", dtype=str, keep_default_na=False)
-    assert m.loc[0, "E3ClimateZone"] == "13" and m.loc[0, "ClaimYearQuarter"] == "2028Q3" and m.loc[0, "NumUnits"] == "100"
+    assert m.loc[0, "AC_Climate_Zone"] == "13" and m.loc[0, "ClaimYearQuarter"] == "2028Q3" and m.loc[0, "NumUnits"] == "100"
     assert set(out) == {"measures", "programcost", "run_parameters_file", "sw_factors_file", "programs_file"}      # empty profile sheets count as not given
     assert workbook._text(13.0) == "13" and workbook._text(0.6) == "0.6" and workbook._text(None) == "" and workbook._text(True) == "1"
 
