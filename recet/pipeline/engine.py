@@ -6,9 +6,11 @@ The pricing engine behind every ReCET run.
                            what lets a load-shifting measure (zero net annual kWh) show its real value; CET nets annual savings first and prices it at $0.
                            price_real_hourly_per_measure is its per-measure reference (the tests require the two to agree).
   price_gas_benefit        gas benefit on monthly profiles and the monthly gas ACC (price_gas_benefit_per_measure is its reference).
-  price_bill_impact        RIM bill reductions/increases, as CalcCE computes them.
-  price_participant_cost   participant / measure costs.
-  price_other_ben_cost     the other benefits and costs (refrigerant, gas infrastructure, misc., tax credits).
+  price_bill_impact        RIM bill reductions/increases, as CalcCE computes them (price_bill_impact_per_measure is its reference).
+  price_participant_cost   participant / measure costs (price_participant_cost_per_measure is its reference).
+  price_other_ben_cost     the other benefits and costs: refrigerant, gas infrastructure, misc., tax credits (price_other_ben_cost_per_measure).
+  The three are computed on arrays over all measures at once; the *_per_measure versions are the same arithmetic one measure at a time, kept as
+  readable references (tests/test_performance.py requires each pair to agree). Change the arithmetic in both.
 
 The research-era pricers that used to live here (synthetic batched pricing, the "legacy net-then-shape" comparison, the TOU and SCG quarterly
 routes) were moved to the CEDARS review research repository (poc/research_lib) or removed on 2026-10-09.
@@ -525,7 +527,7 @@ def price_gas_benefit(
     return pd.DataFrame({"measure_id": measures["measure_id"].to_numpy()[priced][m_idx], "year": year, "quarter": quarter + 1, "gas_benefit": value})
 
 
-def price_bill_impact(
+def price_bill_impact_per_measure(
     measures: pd.DataFrame,
     get_elec_rate_years: Callable[[pd.Series], dict[int, float] | None],
     get_gas_rate_years: Callable[[pd.Series], dict[int, float] | None],
@@ -656,7 +658,7 @@ def price_bill_impact(
     return pd.DataFrame(rows)
 
 
-def price_participant_cost(
+def price_participant_cost_per_measure(
     measures: pd.DataFrame,
     get_discount_rate_qtr: Callable[[pd.Series], float],
     base_year: int,
@@ -789,7 +791,7 @@ def price_participant_cost(
     return pd.DataFrame(rows)
 
 
-def price_other_ben_cost(
+def price_other_ben_cost_per_measure(
     measures: pd.DataFrame,
     market_effects_bens: float = 0.0,
     market_effects_cost: float = 0.0,
@@ -843,3 +845,158 @@ def price_other_ben_cost(
             "TaxCreditsGross": qty * float(m["unit_tax_credits"]),
         })
     return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Array versions: the arithmetic of the *_per_measure functions above (read their docstrings for the CalcCE mechanics), on whole columns at once. A loop of a
+# few hundred thousand rows through DataFrame.iterrows is what made these three the slowest steps of a large run (about 55% of the pricing time at 100,000
+# records); here only the bill impact loops, over the years of a life (at most a few dozen), not over measures.
+
+def _col(m: pd.DataFrame, name: str, default: float = 0.0) -> np.ndarray:
+    return m[name].astype(float).to_numpy() if name in m.columns else np.full(len(m), default)
+
+
+def _by_key(m: pd.DataFrame, cols: list[str], fn) -> list:
+    """fn(row) evaluated once per distinct value of `cols` (the columns the callback reads) and spread back to every row; the first row of each group is
+    passed. With none of `cols` present the whole frame is one group."""
+    present = [c for c in cols if c in m.columns]
+    if not present:
+        v = fn(m.iloc[0]) if len(m) else None
+        return [v] * len(m)
+    keys = list(zip(*[m[c].to_numpy() for c in present]))
+    first: dict = {}
+    for i, k in enumerate(keys):
+        first.setdefault(k, i)
+    vals = {k: fn(m.iloc[i]) for k, i in first.items()}
+    return [vals[k] for k in keys]
+
+
+def price_bill_impact(
+    measures: pd.DataFrame,
+    get_elec_rate_years: Callable[[pd.Series], dict[int, float] | None],
+    get_gas_rate_years: Callable[[pd.Series], dict[int, float] | None],
+    get_discount_rate_annual: Callable[[pd.Series], float],
+    settings_base_year: int = 2024,
+) -> pd.DataFrame:
+    """price_bill_impact_per_measure on arrays. The callbacks are called once per distinct (PA, target_sector), (PA, gas_sector) and PA (the fields they read
+    in run_poc.run_bill_impact). Years with no rate count 0, a fuel with no rate table gives 0, exactly as in the reference."""
+    m = measures
+    n_rows = len(m)
+    if n_rows == 0:
+        return pd.DataFrame(columns=["measure_id", "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas"])
+    claim_year = m["claim_year"].astype(int).to_numpy()
+    yr1 = claim_year - settings_base_year
+    raf = 1.0 + np.asarray(_by_key(m, ["PA"], get_discount_rate_annual), dtype=float)
+    rul = _col(m, "rul_years_exact")
+    eul = _col(m, "eul_years_exact")
+    full = np.floor(eul).astype(int)
+    frac_rem = eul - full
+    n_years = full + (frac_rem > 1e-9).astype(int)
+    floor_rul = np.where(rul > 0, np.floor(rul), full).astype(int)
+    f1 = np.where(rul > 0, rul - floor_rul, 1.0)
+    k_max = int(n_years.max()) if n_rows else 0
+
+    def rate_matrix(tables: list) -> tuple[np.ndarray, np.ndarray]:
+        """(rates[i, k] for the year claim_year[i] + k, 0 where missing; has_table[i])"""
+        r = np.zeros((n_rows, max(k_max, 1)))
+        has = np.array([t is not None for t in tables])
+        cache: dict = {}
+        for i, (t, y0) in enumerate(zip(tables, claim_year)):
+            if t is None:
+                continue
+            key = (id(t), y0)
+            if key not in cache:
+                cache[key] = np.array([t.get(int(y0) + k, 0.0) or 0.0 for k in range(r.shape[1])])
+            r[i] = cache[key]
+        return r, has
+
+    def pv_sum(s1: np.ndarray, s2: np.ndarray, rates: np.ndarray) -> np.ndarray:
+        total = np.zeros(n_rows)
+        for k in range(k_max):
+            rate = rates[:, k]
+            first = k < np.minimum(floor_rul, n_years)                                   # RE1: discounted by k
+            total += np.where(first, s1 * rate / raf ** k, 0.0)
+            after = (k >= floor_rul) & (k < n_years)                                      # boundary year and RE2: discounted by k + Yr1 (CalcCE's Qy)
+            frac = np.where((k == n_years - 1) & (frac_rem > 1e-9), frac_rem, 1.0)
+            value = np.where(k == floor_rul, f1 * s1 + (1.0 - f1) * s2, s2)
+            total += np.where(after, frac * value * rate / raf ** (k + yr1), 0.0)
+        return total
+
+    irr = _col(m, "ir_kwh", 1.0) * _col(m, "rr_kwh", 1.0)
+    rates_e, has_e = rate_matrix(_by_key(m, ["PA", "target_sector"], get_elec_rate_years))
+    rates_g, has_g = rate_matrix(_by_key(m, ["PA", "gas_sector"], get_gas_rate_years))
+    pv_e = np.where(has_e, pv_sum(_col(m, "annual_net_kwh_1st") * irr, _col(m, "annual_net_kwh_2nd") * irr, rates_e), 0.0)
+    pv_g = np.where(has_g, pv_sum(_col(m, "annual_net_therms_1st"), _col(m, "annual_net_therms_2nd"), rates_g), 0.0)
+    fs = m["is_fuel_sub"].fillna(True).astype(bool).to_numpy() if "is_fuel_sub" in m.columns else np.ones(n_rows, dtype=bool)
+    return pd.DataFrame({
+        "measure_id": m["measure_id"].to_numpy(),
+        "BillReducElec": np.where(fs, np.maximum(pv_e, 0.0), pv_e),
+        "BillIncrElec": np.where(fs, np.maximum(-pv_e, 0.0), 0.0),
+        "BillReducGas": np.where(fs, np.maximum(pv_g, 0.0), pv_g),
+        "BillIncrGas": np.where(fs, np.maximum(-pv_g, 0.0), 0.0),
+    })
+
+
+def price_participant_cost(
+    measures: pd.DataFrame,
+    get_discount_rate_qtr: Callable[[pd.Series], float],
+    base_year: int,
+    market_effects_cost: float = 0.0,
+) -> pd.DataFrame:
+    """price_participant_cost_per_measure on arrays; the discount-rate callback is called once per PA."""
+    m = measures
+    if m.empty:
+        return price_participant_cost_per_measure(m, get_discount_rate_qtr, base_year, market_effects_cost)
+    qty = _col(m, "num_units")
+    rqf = 1.0 + np.asarray(_by_key(m, ["PA"], get_discount_rate_qtr), dtype=float)
+    qm = (m["claim_year"].astype(int).to_numpy() - base_year) * 4 + (m["claim_quarter"].astype(int).to_numpy() - 1)
+    pvf = rqf ** qm
+    ito, lab, mat, reb = (qty * _col(m, c) for c in ("unit_incentive_to_others", "unit_di_labor", "unit_di_material", "unit_end_user_rebate"))
+    incents_di = ito + lab + mat
+    unit_gross, incr = _col(m, "unit_meas_cost_1st"), _col(m, "unit_meas_cost_2nd")
+    rul = _col(m, "rul_years_exact")
+    gross_meas = qty * np.where(rul > 0, incr, unit_gross)
+    pv_sub = np.where(rul > 0, (unit_gross - incr) * ((1.0 + _col(m, "meas_inflation") / 4.0) / rqf) ** (rul * 4.0), 0.0)
+    gross_meas_pv = qty * (unit_gross - pv_sub) / pvf
+    excess = np.maximum(incents_di - gross_meas, 0.0)
+    excess_pv = np.maximum(incents_di / pvf - gross_meas_pv, 0.0)
+    mark = market_effects_cost * (gross_meas + excess_pv)
+    mark_pv = market_effects_cost * (gross_meas_pv + excess_pv)
+    gross = gross_meas - (incents_di + reb)
+    gross_pv = gross_meas_pv - (incents_di + reb) / pvf
+    ntgr_cost = _col(m, "ntgr_cost")
+    net, net_pv = ntgr_cost * (gross + excess), ntgr_cost * (gross_pv + excess_pv)
+    return pd.DataFrame({
+        "measure_id": m["measure_id"].to_numpy(),
+        "IncentiveToOthers": ito, "DILaborCost": lab, "DIMaterialCost": mat, "EndUserRebate": reb,
+        "RebatesandIncents": incents_di + reb, "RebatesandIncentsPV": (incents_di + reb) / pvf,
+        "GrossMeasureCost": gross_meas, "GrossMeasCostPV": gross_meas_pv,
+        "ExcessIncentives": excess, "ExcessIncentivesPV": excess_pv,
+        "MarkEffectPlusExcessInc": mark, "MarkEffectPlusExcessIncPV": mark_pv,
+        "GrossParticipantCost": gross, "GrossParticipantCostPV": gross_pv,
+        "GrossParticipantCostAdjusted": gross + excess + mark, "GrossParticipantCostAdjustedPV": gross_pv + excess_pv + mark_pv,
+        "NetParticipantCost": net, "NetParticipantCostPV": net_pv,
+        "NetParticipantCostAdjusted": net + mark, "NetParticipantCostAdjustedPV": net_pv + mark_pv,
+    })
+
+
+def price_other_ben_cost(
+    measures: pd.DataFrame,
+    market_effects_bens: float = 0.0,
+    market_effects_cost: float = 0.0,
+) -> pd.DataFrame:
+    """price_other_ben_cost_per_measure on arrays."""
+    m = measures
+    qty, ntg = _col(m, "num_units"), _col(m, "NTGRkWh")
+    bens = _col(m, "unit_gas_infra_bens") + _col(m, "unit_refrig_bens") + _col(m, "unit_misc_bens")
+    costs = _col(m, "unit_refrig_costs") + _col(m, "unit_misc_costs")
+    tax = _col(m, "unit_tax_credits")
+    return pd.DataFrame({
+        "measure_id": m["measure_id"].to_numpy(),
+        "OtherBen": qty * (ntg + market_effects_bens) * bens,
+        "OtherCost": qty * (ntg + market_effects_cost) * costs,
+        "TaxCredits": qty * (ntg + market_effects_bens) * tax,
+        "OtherBenGross": qty * bens,
+        "OtherCostGross": qty * costs,
+        "TaxCreditsGross": qty * tax,
+    })
