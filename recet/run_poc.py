@@ -57,7 +57,7 @@ def _per_route(df: pd.DataFrame, cols: list[str], fn) -> pd.Series:
 
 
 def split_by_baseline_shape(measures: pd.DataFrame) -> pd.DataFrame:
-    """A measure whose 2nd-baseline years have their own electric shape (shape_key_2nd, from E3MeaElecEndUseShape2nd) becomes two rows with the same measure_id:
+    """A measure whose 2nd-baseline years have their own electric shape (shape_key_2nd, from AC_Elec_Impact_Profile_2nd_Baseline) becomes two rows with the same measure_id:
     the 1st-baseline part on its own shape (2nd-baseline kWh set to 0) and the 2nd-baseline part on the 2nd shape (1st-baseline kWh, gas and water set to 0).
     The baseline phasing is linear in the two quantities, so the two parts add up to the measure; with one shape the measure is left as one row. Only early
     replacements (0 < RUL < EUL) have a 2nd baseline to split. Sum results by measure_id afterwards."""
@@ -167,7 +167,7 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
         base_year = int(measures["claim_year"].min())
 
     other_measures = split_by_baseline_shape(measures.reset_index(drop=True))     # a separate 2nd-baseline shape prices as a second part
-    # E3ClimateZone = System is priced in the profile's System zone (pipeline/system_zones.py): its shape AND its prices come from that real zone
+    # AC_Climate_Zone = System is priced in the profile's System zone (pipeline/system_zones.py): its shape AND its prices come from that real zone
     other_measures["price_zone"] = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in
                                     zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"], other_measures["climate_zone"])]
 
@@ -228,7 +228,7 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     (pipeline/gas_savings_profiles.py) -- see engine.price_gas_benefit's
     docstring for the full mechanics and its stated scope limits (single-
     year gas ACC rate, End Use/Emission Control approximated from
-    E3GasSector since Measure.csv has no real field for it).
+    AC_Gas_Target_Sector since Measure.csv has no real field for it).
 
     Only measures with a nonzero annual_net_therms AND a real matching gas
     shape are priced -- most of the small 5-measure sample has no real gas
@@ -374,7 +374,7 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
             elapsed_seconds=0.0, batch_size=0)
     w = w.reset_index(drop=True).copy()
     w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
-    if "shape_key_water" in w.columns:                                     # E3MeaElecEndUseShapeWater (blank = the measure's own shape), for both baselines
+    if "shape_key_water" in w.columns:                                     # AC_Elec_Impact_Profile_Water (blank = the measure's own shape), for both baselines
         w["shape_key"] = w["shape_key_2nd"] = w["shape_key_water"]
     if real_impact_profiles.user_profiles() is not None:
         # a kWh-per-unit profile (apply_scaled_profiles) is in kWh, not shares: divide by its annual kWh S so the water energy is spread by its shares.
@@ -478,7 +478,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
         ["no electric savings", "PARTLY PRICED: no hourly profile for one baseline's shape", "UNPRICED: no hourly profile", "priced: " + route_kind],
         default="UNPRICED: no value returned")
     df["ProfileSource"] = route_source.where(elec_priced & has_elec, "")
-    # E3ClimateZone = System: the real zone it was priced in, and whether that came from the catalog or was calculated for this run (pipeline/system_zones.py)
+    # AC_Climate_Zone = System: the real zone it was priced in, and whether that came from the catalog or was calculated for this run (pipeline/system_zones.py)
     is_sys = ids.map(by_id["climate_zone"]).map(system_zones.is_system).astype(bool) & elec_priced & has_elec
     choice = [system_zones.resolve(by_id.at[i, "shape_key"], by_id.at[i, "PA"], by_id.at[i, "target_sector"]) if s else None for i, s in zip(ids, is_sys)]
     df["SystemClimateZone"] = pd.Series([c.zone if c else None for c in choice], index=df.index, dtype=object)
@@ -772,7 +772,7 @@ def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd
         shape_scale(_2nd) = NumUnits x NTGRkWh x IR x RR            (the profile itself carries the kWh)
 
     and its annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (UnitkWh2ndBaseline) in the
-    annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). The 2nd baseline is priced on its own shape (shape_key_2nd, E3MeaElecEndUseShape2nd)
+    annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). The 2nd baseline is priced on its own shape (shape_key_2nd, AC_Elec_Impact_Profile_2nd_Baseline)
     when it has one; when it shares the 1st baseline's scaled profile it keeps the file's ratio r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline (1 when
     UnitkWh1stBaseline is 0): shape_scale_2nd = shape_scale x r2 and S x r2 kWh. Baselines on any other shape are unchanged. With statewide allocation
     (`allocated`), an allocated row is multiplied by its electric factor, as its UnitkWh fields were."""

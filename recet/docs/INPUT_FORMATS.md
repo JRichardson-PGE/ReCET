@@ -21,9 +21,14 @@ Templates: `recet template all --out templates` (or the GUI's **Template…** bu
 
 The same files you upload to the CET: pipe (`|`) delimited, header row, UTF-8. `ProgramCost.csv` is optional. ReCET also reads the same columns saved as an ordinary comma-delimited CSV (Excel's *Save as CSV*; text with commas in quotes) or a tab-delimited file: the delimiter is taken from the header line, and a file that is not UTF-8 is read as Windows-1252. The CET itself still needs the pipe-delimited form (the Edit inputs tab's *Save as CET files* writes it).
 
+ReCET renames seven fields from their E3-calculator names, and **a file may use either the new or CET's legacy name** for each: `E3ClimateZone` is read as
+`AC_Climate_Zone`, `E3MeaElecEndUseShape` as `AC_Elec_Impact_Profile`, `E3TargetSector` as `AC_Elec_Target_Sector`, `E3GasSavProfile` as `AC_Gas_Impact_Profile`,
+`E3GasSector` as `AC_Gas_Target_Sector` (and the ReCET-only `E3MeaElecEndUseShape2nd` / `E3MeaElecEndUseShapeWater` as `AC_Elec_Impact_Profile_2nd_Baseline` /
+`AC_Elec_Impact_Profile_Water`). So a CET file runs unchanged. Outputs use the new names; see [INPUT_FIELDS.md](INPUT_FIELDS.md#1-measurecsv).
+
 **Required `Measure.csv` columns** (a missing one stops the run, the preflight names it):
 
-    CEInputID PrgID MeasDescription ClaimYearQuarter Sector E3ClimateZone E3GasSavProfile E3GasSector E3MeaElecEndUseShape E3TargetSector
+    CEInputID PrgID MeasDescription ClaimYearQuarter Sector AC_Climate_Zone AC_Gas_Impact_Profile AC_Gas_Target_Sector AC_Elec_Impact_Profile AC_Elec_Target_Sector
     IOU_AC_Territory EUL_Yrs RUL_Yrs NumUnits
     UnitkW1stBaseline UnitkWh1stBaseline UnitTherm1stBaseline UnitkW2ndBaseline UnitkWh2ndBaseline UnitTherm2ndBaseline
     NTGRkW NTGRkWh NTGRTherm NTGRCost RealizationRatekW RealizationRatekWh RealizationRateTherm InstallationRatekW InstallationRatekWh InstallationRateTherm
@@ -35,7 +40,7 @@ Optional but used when present: `FuelID`, `MeasImpactType` (fuel-substitution me
 columns are carried into the output unchanged.
 
 Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBaseline` not blank (and `UnitkWh2ndBaseline` not blank when `RUL_Yrs > 0`); values outside the ranges CET's own QC allows are warned about (see INPUT_FIELDS.md); `CEInputID` unique; `ClaimYearQuarter` like `2028Q1`; `IOU_AC_Territory` one of `PGE SCE SDGE SCG`; numeric columns numeric or blank;
-`E3GasSector` one of `Residential Commercial Core` for measures with gas savings; every `PrgID` in `Measure.csv` present in `ProgramCost.csv` and vice versa.
+`AC_Gas_Target_Sector` one of `Residential Commercial Core` for measures with gas savings; every `PrgID` in `Measure.csv` present in `ProgramCost.csv` and vice versa.
 
 ### Things about the CET format that need attention (found on the real 2028-2031 PG&E files)
 
@@ -43,8 +48,8 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
    First Year defaults to the earliest claim year in the job.
 2. **The PA comes from `IOU_AC_Territory`** (the avoided-cost territory), not from a PA column. Statewide programs are priced on the measure's own territory; their
    *program costs* carry a PA in `ProgramCost.csv`. Rows with `PA = SW` are given `PA = SCE` (what CET run 121219 did) unless *Allocate statewide programs* is on.
-3. **Profile names must match exactly.** `E3MeaElecEndUseShape` must equal a library profile's end-use name (or a supplied profile's `end_use_name`), else the measure
-   is left **unpriced** (`ElecPricingStatus = UNPRICED`). `E3GasSavProfile` likewise; 36 measures in the 2028 job have therms but a blank profile, and CET prices those at $0 too.
+3. **Profile names must match exactly.** `AC_Elec_Impact_Profile` must equal a library profile's end-use name (or a supplied profile's `end_use_name`), else the measure
+   is left **unpriced** (`ElecPricingStatus = UNPRICED`). `AC_Gas_Impact_Profile` likewise; 36 measures in the 2028 job have therms but a blank profile, and CET prices those at $0 too.
 4. **TOU (H-factor) end uses are priced from 8,760s.** CEDARS has no hourly data for them; the library holds Gen-based 8,760s built from their H-factors on the ACC's
    2018-calendar TOU map (2026 ACC v1b, re-issued 2026-10-20), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
    replaces the library's.
@@ -54,7 +59,7 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
    2022 ACCs are TRC only (C3.4) and use the 2020 hourly calendar (C4.2). Years outside an ACC's range are priced with its nearest year; the preflight counts the measures affected.
 7. **SCG electric** has no ACC of its own. In each zone SCG is priced entirely by one utility: SCE where the ACC has SCE data for the zone, otherwise PG&E (on the
    built-in ACCs, PG&E in CZ 1, 2, 3A, 3B, 4, 5, 11, 12). Generation, T&D and emission rate always come from the same utility. CET's quarterly SCG table is not used.
-8. **Bill impacts / RIM** use the E3 rate schedules chosen by (PA, `E3TargetSector`); the 2026 ACC uses the same rate tables as the 2024 ACC.
+8. **Bill impacts / RIM** use the E3 rate schedules chosen by (PA, `AC_Elec_Target_Sector`); the 2026 ACC uses the same rate tables as the 2024 ACC.
 9. **Market Effects** is one option: 5% on benefits (`NTGR + 0.05`) and on costs (CET's `MECost`) together. It has not been checked against a CET run made
    with a non-zero setting.
 
@@ -66,9 +71,9 @@ CSV or Parquet, **long format**, one row per (profile, climate zone, hour):
 
 | column | meaning |
 |---|---|
-| `end_use_name` | must equal the measure's `E3MeaElecEndUseShape` (case-insensitive) |
+| `end_use_name` | must equal the measure's `AC_Elec_Impact_Profile` (case-insensitive) |
 | `pa` | `PGE` `SCE` `SDGE` `SCG`; blank / `*` / `ALL` = any IOU |
-| `target_sector` | the measure's `E3TargetSector`; blank / `*` / `ALL` = any sector |
+| `target_sector` | the measure's `AC_Elec_Target_Sector`; blank / `*` / `ALL` = any sector |
 | `climate_zone` | `1`..`16`, `3A`, `3B`, `CZ13` and `01` are accepted; `System` or `ALL` = every zone without its own rows |
 | `hour_of_year` | 1..8760, exactly once per (profile, zone) |
 | `impact` | the share of the measure's **annual** net savings in that hour; each zone's 8,760 values should sum to 1 (see below) |
@@ -100,7 +105,7 @@ The same three columns as the built-in library, CSV or Parquet, 12 rows per prof
 
 | column | meaning |
 |---|---|
-| `Profile` | must equal the measure's `E3GasSavProfile` (e.g. `Annual`, `Winter Only`) |
+| `Profile` | must equal the measure's `AC_Gas_Impact_Profile` (e.g. `Annual`, `Winter Only`) |
 | `Month` | 1..12 (or Jan..Dec) |
 | `Impact` | share of annual therms in that month; sums to 1 (rescaled if not, with a note) |
 

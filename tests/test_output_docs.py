@@ -10,7 +10,7 @@ import pytest
 
 import doc_examples as de
 import reference_calc as ref
-from recet import outputs, templates
+from recet import fieldnames, outputs, templates
 from recet.pipeline import cost_tests
 from test_docs import TEXT, _block, _number, entry_names
 
@@ -126,7 +126,7 @@ def _terms(key: str) -> list[dict]:
     st = ref.settings("PGE", de.E3)
     adj_e, adj_t = (d["ntg_kwh"] + meb) / d["ntg_kwh"], (d["ntg_therm"] + meb) / d["ntg_therm"]
     rq = d["rul"] * 4.0
-    share = GAS_SHARE[raw["E3GasSavProfile"]]
+    share = GAS_SHARE[raw["AC_Gas_Impact_Profile"]]
     rows = []
     for k, year, q, w in ref.quarter_schedule(d["claim_year"], d["claim_quarter"], d["eul"]):
         row = {"k": k, "year": year, "q": q, "hours": HOURS[q], "w": w, "months": sum(share[m] for m in range(*MONTHS[q]))}
@@ -137,7 +137,7 @@ def _terms(key: str) -> list[dict]:
         for sfx, test, qtr, co2 in (("", "TRC", st["qtr"], 0.10), ("_SB", "SCT Base", st["qtr_sct"], 0.30), ("_SH", "SCT High", st["qtr_sct"], 0.50)):
             df = 1 / (1 + qtr) ** ((year - 2028) * 4 + q)
             energy = de.ENERGY[test]
-            acg = de.GAS_MARKET[raw["E3GasSector"]] + 0.20 + 0.05 + co2 + 0.03 + 0.02
+            acg = de.GAS_MARKET[raw["AC_Gas_Target_Sector"]] + 0.20 + 0.05 + co2 + 0.03 + 0.02
             row[f"df{sfx}"] = df
             row[f"ve{sfx}"] = row["elec"] * w * df * (energy + 10.0) / 1000 * row["hours"] / 8760
             row[f"vg{sfx}"] = row["gas"] * w * df * acg * row["months"]
@@ -233,7 +233,7 @@ INPUT_FIELD = re.compile(r"^(Unit\w+|NTGR\w+|InstallationRate\w+|RealizationRate
 
 
 def test_every_input_field_named_in_the_document_exists():
-    header = set(templates.MEASURE_COLUMNS)                       # CET's columns and the optional ReCET-only ones
+    header = set(templates.MEASURE_COLUMNS) | set(fieldnames.LEGACY_TO_RECET)   # CET's columns, the ReCET-only ones, and the legacy names still accepted
     program = set(cost_tests._COST_FIELDS) | {"OnBillFinancing", "PrgID", "PA", "PrgYear", "ClaimYearQuarter"}
     text = TEXT[DOC]
     bad = sorted({t for t in re.findall(r"`([^`\n]+)`", text) if INPUT_FIELD.match(t) and t not in header and t not in program})

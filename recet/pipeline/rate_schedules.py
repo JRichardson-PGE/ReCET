@@ -44,7 +44,7 @@ MAPPING: `CalcCE`'s real E3RateScheduleElecvw/Gasvw join a measure to its
 retail rate two ways -- (1) if the measure has its own explicit
 RateScheduleElec/RateScheduleGas value set, join straight to that Schedule
 name, skipping the mapping table entirely; (2) otherwise, map the measure's
-own TargetSector (elec) or E3GasSector (gas) through
+own TargetSector (elec) or AC_Gas_Target_Sector (gas) through
 E3RateScheduleElecMapping/E3RateScheduleGasMapping to find the Schedule.
 Every real measure in this POC's two ground-truth datasets uses path (2)
 (RateScheduleElec/RateScheduleGas are blank for all 73,024 SWWH025 rows,

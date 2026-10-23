@@ -35,8 +35,8 @@ def _isolated_config(tmp_path, monkeypatch):
 def make_measure_csv(path, **overrides):
     """A one-measure CET Measure.csv: PGE, zone 13, claim 2028Q1, 1-year life, 1,000 kWh, NTG 1, no costs."""
     row = {c: "" for c in templates._CET_MEASURE_HEADER}
-    row.update({"CEInputID": "T1", "PrgID": "PRG1", "ClaimYearQuarter": "2028Q1", "Sector": "Res", "E3ClimateZone": "13", "E3GasSector": "Residential",
-                "E3MeaElecEndUseShape": "TEST_SHAPE", "E3TargetSector": "Residential", "MeasDescription": "test measure", "IOU_AC_Territory": "PGE",
+    row.update({"CEInputID": "T1", "PrgID": "PRG1", "ClaimYearQuarter": "2028Q1", "Sector": "Res", "AC_Climate_Zone": "13", "AC_Gas_Target_Sector": "Residential",
+                "AC_Elec_Impact_Profile": "TEST_SHAPE", "AC_Elec_Target_Sector": "Residential", "MeasDescription": "test measure", "IOU_AC_Territory": "PGE",
                 "EUL_Yrs": "1", "RUL_Yrs": "0", "NumUnits": "1", "UnitkWh1stBaseline": "1000", "UnitkW1stBaseline": "0", "UnitTherm1stBaseline": "0",
                 "UnitkW2ndBaseline": "0", "UnitkWh2ndBaseline": "0", "UnitTherm2ndBaseline": "0",
                 "NTGRkW": "1", "NTGRkWh": "1", "NTGRTherm": "1", "NTGRCost": "1", "RealizationRatekW": "1", "RealizationRatekWh": "1", "RealizationRateTherm": "1",

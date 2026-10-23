@@ -1,4 +1,4 @@
-"""Separate electric shapes for the 2nd-baseline years (E3MeaElecEndUseShape2nd) and for the water energy (E3MeaElecEndUseShapeWater); blank = the measure's own."""
+"""Separate electric shapes for the 2nd-baseline years (AC_Elec_Impact_Profile_2nd_Baseline) and for the water energy (AC_Elec_Impact_Profile_Water); blank = the measure's own."""
 from __future__ import annotations
 
 import numpy as np
@@ -34,7 +34,7 @@ def _profiles(path):
 
 
 def _run(tmp_path, name, **measure):
-    m = make_measure_csv(tmp_path / f"{name}.csv", E3MeaElecEndUseShape="FLAT", **measure)
+    m = make_measure_csv(tmp_path / f"{name}.csv", AC_Elec_Impact_Profile="FLAT", **measure)
     return run_job(RunConfig(measures=str(m), out_dir=str(tmp_path / "out"), run_name=name, acc_version="2026", acc_electric_file=str(_acc(tmp_path / "acc.parquet")),
                              profiles_8760_file=str(_profiles(tmp_path / "p.csv")), emissions=False), log=lambda s: None).frame.iloc[0]
 
@@ -45,7 +45,7 @@ def _rate():
 
 def test_second_baseline_years_are_priced_on_their_own_shape(tmp_path):
     early = dict(RUL_Yrs="0.5", UnitkWh1stBaseline="1000", UnitkWh2ndBaseline="400")      # Q1-Q2 on the 1st baseline, Q3-Q4 on the 2nd
-    f = _run(tmp_path, "split", E3MeaElecEndUseShape2nd="PEAK", **early)
+    f = _run(tmp_path, "split", AC_Elec_Impact_Profile_2nd_Baseline="PEAK", **early)
     r = 1 + _rate()
     first = sum(1000 * 0.100 * QUARTER_HOURS[q] / 8760 / r ** q for q in (0, 1))         # flat shape at $100/MWh
     second = 400 * 0.300 / r ** 2                                                          # all 2nd-baseline kWh in the $300 hour of Q3
@@ -57,12 +57,12 @@ def test_second_baseline_years_are_priced_on_their_own_shape(tmp_path):
 
 
 def test_water_energy_is_priced_on_its_own_shape(tmp_path):
-    f = _run(tmp_path, "water", UnitkWh1stBaseline="0", UnitkWhIOUWater1stBaseline="50", E3MeaElecEndUseShapeWater="PEAK")
+    f = _run(tmp_path, "water", UnitkWh1stBaseline="0", UnitkWhIOUWater1stBaseline="50", AC_Elec_Impact_Profile_Water="PEAK")
     assert f["WaterEnergyBen"] == pytest.approx(50 * 0.300 / (1 + _rate()) ** 2, rel=1e-12) and f["poc_shape_key_water"] == "PEAK"
 
 
 def test_a_missing_second_baseline_shape_leaves_the_measure_partly_priced(tmp_path, monkeypatch):
     from recet.pipeline import real_impact_profiles
     monkeypatch.setattr(real_impact_profiles, "match_profile_id", lambda *a, **k: (None, False))     # no library here: an unknown name matches nothing
-    f = _run(tmp_path, "partly", E3MeaElecEndUseShape2nd="NO_SUCH_SHAPE", RUL_Yrs="0.5", UnitkWh1stBaseline="1000", UnitkWh2ndBaseline="400")
+    f = _run(tmp_path, "partly", AC_Elec_Impact_Profile_2nd_Baseline="NO_SUCH_SHAPE", RUL_Yrs="0.5", UnitkWh1stBaseline="1000", UnitkWh2ndBaseline="400")
     assert f["ElecPricingStatus"].startswith("PARTLY PRICED")

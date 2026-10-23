@@ -137,7 +137,7 @@ Wat(k)  = phased( k ;  poc_water_scale_1st * (NTGRkWh + MEB) / NTGRkWh ,
 shape(i)  = the measure's 8,760-hour load shape: the share of its annual kWh falling in hour i of the year (the shares sum to 1).
             The profile used is reported in `ProfileSource`; it is rotated once so its weekdays line up with the ACC's, which follow one calendar (2018, or 2020 for the 2021/2022 ACCs) in every
             forecast year (CALCULATIONS C4.1, C4.2).
-AC(y, i)  = total_avoided_cost of the ACC row (utility of PA, "CZ" + E3ClimateZone, cost-test row, year y, hour i) / 1000
+AC(y, i)  = total_avoided_cost of the ACC row (utility of PA, "CZ" + AC_Climate_Zone, cost-test row, year y, hour i) / 1000
 Gen(y, i) = AC(y, i) - (transmission + distribution)(y, i) / 1000
 y*(k)     = year(k), or the nearest year in the ACC when year(k) lies outside it
 U_e(k)    = SUM over the hours i of quarter(k) of  shape(i) * AC(y*(k), i)
@@ -150,14 +150,14 @@ substitutions and the price-year rule are in CALCULATIONS C3.1. Because `total_a
 **Gas.**
 
 ```text
-gasshape(m) = the 12 monthly shares (sum 1) of the measure's E3GasSavProfile
+gasshape(m) = the 12 monthly shares (sum 1) of the measure's AC_Gas_Impact_Profile
 ACg(y, m)   = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder [ + behind_meter_methane ]       $ per therm, month m of year y
 y^(k)       = year(k) clamped to the gas ACC's first and last year
 U_g(k)      = SUM over the months m of quarter(k) of  gasshape(m) * ACg(y^(k), m)
 ```
 
-`ACg` is in dollars per therm and `U_g(k)` in dollars per annual therm delivered in quarter `k`. It comes from the gas ACC row for the utility of `PA`, the class of `E3GasSector` and the cost test (`TRC`, `SCT Base`, `SCT High`); `behind_meter_methane` is included only for a Residential-class
-measure whose `E3GasSavProfile` contains `FuelSub`. The months of the quarters are Q1 Jan-Mar, Q2 Apr-Jun, Q3 Jul-Sep, Q4 Oct-Dec.
+`ACg` is in dollars per therm and `U_g(k)` in dollars per annual therm delivered in quarter `k`. It comes from the gas ACC row for the utility of `PA`, the class of `AC_Gas_Target_Sector` and the cost test (`TRC`, `SCT Base`, `SCT High`); `behind_meter_methane` is included only for a Residential-class
+measure whose `AC_Gas_Impact_Profile` contains `FuelSub`. The months of the quarters are Q1 Jan-Mar, Q2 Apr-Jun, Q3 Jul-Sep, Q4 Oct-Dec.
 
 ### 0.7 Lifetime values
 
@@ -192,7 +192,7 @@ for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avo
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
-Every column of the input file, unchanged, as text (a blank stays blank). Each is described in [INPUT_FIELDS.md](INPUT_FIELDS.md#1-measurecsv). **Formula:** copied.
+Every column of the input file, unchanged, as text (a blank stays blank), under ReCET's names: a file that used CET's legacy names (`E3ClimateZone` ...) gets the `AC_...` names here. Each is described in [INPUT_FIELDS.md](INPUT_FIELDS.md#1-measurecsv). **Formula:** copied.
 
 ### 1.2 Derived pricing inputs (`poc_*`)
 
@@ -202,14 +202,14 @@ file. Every formula below is complete: it uses only input fields. Each field's v
 | Field | Meaning and unit | Formula from the input fields |
 |---|---|---|
 | `poc_PA` | Avoided-cost territory (text). | `IOU_AC_Territory` |
-| `poc_climate_zone` | Climate zone, as text. | `E3ClimateZone` |
-| `poc_target_sector` | Target sector for shapes and rates (text). | `E3TargetSector` |
-| `poc_shape_key` | Electric end-use shape name (text). | `E3MeaElecEndUseShape` |
-| `poc_shape_key_2nd` | The electric end-use shape of the 2nd-baseline years (text). | `E3MeaElecEndUseShape2nd` (an optional ReCET column, not a CET field); blank = `E3MeaElecEndUseShape` |
-| `poc_shape_key_water` | The electric end-use shape the water energy is spread over, both baselines (text). | `E3MeaElecEndUseShapeWater` (optional, not a CET field); blank = `E3MeaElecEndUseShape` |
-| `poc_gas_profile_key` | Gas savings profile name (text). | `E3GasSavProfile` |
-| `poc_gas_sector` | Gas sector (text). | `E3GasSector` |
-| `poc_subset_key` | A label built from zone and sector; not used in pricing (text). | `"CZ" + E3ClimateZone + "_" + Sector` |
+| `poc_climate_zone` | Climate zone, as text. | `AC_Climate_Zone` |
+| `poc_target_sector` | Target sector for shapes and rates (text). | `AC_Elec_Target_Sector` |
+| `poc_shape_key` | Electric end-use shape name (text). | `AC_Elec_Impact_Profile` |
+| `poc_shape_key_2nd` | The electric end-use shape of the 2nd-baseline years (text). | `AC_Elec_Impact_Profile_2nd_Baseline` (an optional ReCET column, not a CET field); blank = `AC_Elec_Impact_Profile` |
+| `poc_shape_key_water` | The electric end-use shape the water energy is spread over, both baselines (text). | `AC_Elec_Impact_Profile_Water` (optional, not a CET field); blank = `AC_Elec_Impact_Profile` |
+| `poc_gas_profile_key` | Gas savings profile name (text). | `AC_Gas_Impact_Profile` |
+| `poc_gas_sector` | Gas sector (text). | `AC_Gas_Target_Sector` |
+| `poc_subset_key` | A label built from zone and sector; not used in pricing (text). | `"CZ" + AC_Climate_Zone + "_" + Sector` |
 | `poc_claim_year` | The claim year (year). | first four characters of `ClaimYearQuarter` |
 | `poc_claim_quarter` | The claim quarter, 1-4. | last character of `ClaimYearQuarter` |
 | `poc_eul_years_exact` | The useful life used in pricing (years). | `max(EUL_Yrs, 0.25)` |
@@ -259,9 +259,9 @@ A benefit of 0 alone cannot tell "no savings" from "could not price"; these colu
 |---|---|
 | `ElecPricingStatus` | `no electric savings` when `poc_annual_net_kwh_1st`, `poc_annual_net_kwh_2nd`, `poc_annual_net_kw_1st` and `poc_annual_net_kw_2nd` are all 0; `UNPRICED: no hourly profile` when no shape was found (CALCULATIONS C4.1: no supplied profile, no library profile); `PARTLY PRICED: no hourly profile for one baseline's shape` when the measure has a separate 2nd-baseline shape and only one of its two shapes was found (C4.6); `priced: hourly profile` when the value was produced; otherwise `UNPRICED: no value returned` |
 | `ProfileSource` | Where the electric shape came from (CALCULATIONS C4.1): `user profile`, `user profile (kWh per unit)` (an already-scaled profile, C4.5), `library`, `library (sector-loose match)`, or `library (user profile has no shape for this zone)`; blank when nothing was priced or there are no electric savings |
-| `SystemClimateZone` | For a measure with `E3ClimateZone = System`: the real climate zone it was priced in, the profile's System zone (CALCULATIONS C4.4); blank for every other measure and when nothing was priced |
+| `SystemClimateZone` | For a measure with `AC_Climate_Zone = System`: the real climate zone it was priced in, the profile's System zone (CALCULATIONS C4.4); blank for every other measure and when nothing was priced |
 | `SystemZoneSource` | Where `SystemClimateZone` came from: `catalog` (the shipped System-zone catalog), or `calculated (...)` with the reason (`user profile`, `supplied ACC`, `reference data differs from the catalog's`, `profile not in catalog`); `no zone could be priced: System shape and blended prices` when no zone was an option; blank otherwise |
-| `GasPricingStatus` | `no gas savings` when `poc_annual_net_therms_1st` and `poc_annual_net_therms_2nd` are both 0; `priced` when the gas value was computed; otherwise `UNPRICED: no gas savings profile match` (`E3GasSavProfile` names no known profile) |
+| `GasPricingStatus` | `no gas savings` when `poc_annual_net_therms_1st` and `poc_annual_net_therms_2nd` are both 0; `priced` when the gas value was computed; otherwise `UNPRICED: no gas savings profile match` (`AC_Gas_Impact_Profile` names no known profile) |
 | `GasProfileSource` | Where the gas monthly shape came from: `user profile` or `library`; blank when not priced |
 | `WaterPricingStatus` | `no water energy` when `poc_kwh_water_1st` and `poc_kwh_water_2nd` are both 0; `priced` when the water value was computed (it needs the measure's electric profile); otherwise `UNPRICED: no hourly profile` |
 
@@ -296,7 +296,7 @@ poc_shape_scale_2nd = NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRate
 `n`, `w(k)`, `year(k)`, `quarter(k)`: 0.2. `DF(k)`: 0.3. `phased`: 0.4. `shape(i)`, the ACC row and `y*(k)`: 0.6. `poc_is_fuel_sub`: 1.2.
 
 **Inputs:** `NumUnits`, `UnitkWh1stBaseline`, `UnitkWh2ndBaseline`, `NTGRkWh`, `InstallationRatekWh`, `RealizationRatekWh`, `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`,
-`IOU_AC_Territory`, `E3ClimateZone`, `E3TargetSector`, `E3MeaElecEndUseShape`, `FuelID`, `MeasImpactType`. Settings: First Year, ACC version, market effects; the ACC's hourly prices and the 8,760 profile.
+`IOU_AC_Territory`, `AC_Climate_Zone`, `AC_Elec_Target_Sector`, `AC_Elec_Impact_Profile`, `FuelID`, `MeasImpactType`. Settings: First Year, ACC version, market effects; the ACC's hourly prices and the 8,760 profile.
 
 - Example A, `ElecBen`: the sum of the ten rows of table 3.2 = **5,841.50**
 - Example B, `ElecBen`: `V_elec` is negative (the measure adds load), so pos(V_elec) = **0.00**
@@ -342,12 +342,12 @@ poc_annual_net_therms_2nd = NumUnits * UnitTherm2ndBaseline * NTGRTherm * Instal
 ACg(y, m) = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder  [ + behind_meter_methane ]
 ```
 
-`gasshape(m)` is the monthly share of the measure's `E3GasSavProfile`; `y^(k)` and the gas ACC row are in 0.6. A measure is gas-priced only if it has gas savings and its profile name matches.
+`gasshape(m)` is the monthly share of the measure's `AC_Gas_Impact_Profile`; `y^(k)` and the gas ACC row are in 0.6. A measure is gas-priced only if it has gas savings and its profile name matches.
 **Inputs:** `NumUnits`, `UnitTherm1stBaseline`, `UnitTherm2ndBaseline`, `NTGRTherm`, `InstallationRateTherm`, `RealizationRateTherm`, `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`,
-`IOU_AC_Territory`, `E3GasSector`, `E3GasSavProfile`, `FuelID`, `MeasImpactType`. Settings: First Year, ACC version, market effects; the gas ACC and the gas profile.
+`IOU_AC_Territory`, `AC_Gas_Target_Sector`, `AC_Gas_Impact_Profile`, `FuelID`, `MeasImpactType`. Settings: First Year, ACC version, market effects; the gas ACC and the gas profile.
 
 - Example A, `GasBen`: the sum of the ten rows of table 3.2 = **3,454.03**
-- Example B, `GasBen`: the sum of the ten rows of table 3.4 (`E3GasSavProfile` is `Winter Only`, so only quarters containing Jan-Mar and Oct-Dec carry value) = **6,990.56**
+- Example B, `GasBen`: the sum of the ten rows of table 3.4 (`AC_Gas_Impact_Profile` is `Winter Only`, so only quarters containing Jan-Mar and Oct-Dec carry value) = **6,990.56**
 
 #### `GasSupplyCost`
 
@@ -598,10 +598,10 @@ PV(s1, s2, rate) =   SUM over j = 0 ... min(floor_rul, ny) - 1 of        s1 * ra
     v(j)  = b * s1 + (1 - b) * s2    if j = floor_rul,  else s2
 ```
 
-`RateE` is the retail electric rate ($ per kWh, by calendar year) of the schedule that (`PA`, `E3TargetSector`) maps to and `RateG` the gas rate ($ per therm) for (`PA`, `E3GasSector`), both from CET's E3
+`RateE` is the retail electric rate ($ per kWh, by calendar year) of the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to and `RateG` the gas rate ($ per therm) for (`PA`, `AC_Gas_Target_Sector`), both from CET's E3
 tables. The second sum's exponent `j + yr1` (years since `BaseYear`, not since the claim) reproduces what CET's own calculation does for the boundary year and every 2nd-baseline year, so it is kept.
 A measure whose sector has no schedule mapping, or a year outside the schedule's range, gets no bill impact for that fuel.
-**Inputs:** the fields of `poc_shape_scale` / `poc_annual_net_therms_*` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`, `E3TargetSector`, `E3GasSector`, `FuelID`, `MeasImpactType`; ACC version (E3 rate tables and discount rate); the market-effects setting.
+**Inputs:** the fields of `poc_shape_scale` / `poc_annual_net_therms_*` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`, `AC_Elec_Target_Sector`, `AC_Gas_Target_Sector`, `FuelID`, `MeasImpactType`; ACC version (E3 rate tables and discount rate); the market-effects setting.
 Scaling by market effects matches CET exactly (every `BillReduc` of CET job 121841 is (NTG + 0.05) / NTG times job 121842's).
 
 Example A (single baseline, `EUL_Yrs` 2.4: `ny` = 3, `floor_rul` = 2, `yr1` = 4, so the last, partial year has `wt` = 0.4 and is discounted by `Raf^6`). `RateE` for 2028 / 2029 / 2030 is
@@ -1127,7 +1127,7 @@ AnnualkWh(k) = the per-unit annual kWh in force during quarter k, with  EQ = 4 *
    counted quarters: k = 0 ... EQ - 1 (the quarters of 0.2)
 
 nox, pm10 = the NOx / PM10 rate (lb per kWh) of CET's E3Emissions table for the key
-            (PA, E3TargetSector, E3MeaElecEndUseShape, E3ClimateZone); 0 where the table has no row
+            (PA, AC_Elec_Target_Sector, AC_Elec_Impact_Profile, AC_Climate_Zone); 0 where the table has no row
 NOxfactor = the NOx factor (lb per therm) of CET's E3CombustionType table for CombustionType; 0 when CombustionType is blank or unknown
 CO2Gas    = metric tons of CO2 per therm, E3 settings for PA (0.00531)
 G_firstyear = Th1                                  if RUL >= 1
@@ -1178,7 +1178,7 @@ NetPM10Lifecycle      = fe_net   * SUM over k = 0 ... n-1 of          pm10 * Ann
 GrossPM10Lifecycle    = fe_gross * SUM over k = 0 ... n-1 of          pm10 * AnnualkWh(k) / 4
 ```
 
-The `/ 4` is because `nox` and `pm10` are per annual kWh and each quarter carries a quarter of a year. **Inputs:** those of `NetElecCO2`, plus `E3TargetSector`, `E3MeaElecEndUseShape`, `E3ClimateZone`, `IOU_AC_Territory` (the E3Emissions key).
+The `/ 4` is because `nox` and `pm10` are per annual kWh and each quarter carries a quarter of a year. **Inputs:** those of `NetElecCO2`, plus `AC_Elec_Target_Sector`, `AC_Elec_Impact_Profile`, `AC_Climate_Zone`, `IOU_AC_Territory` (the E3Emissions key).
 
 - Example A, `NetElecNOx`: 0, because E3Emissions has no row for the key (PGE, Residential, `W_SHAPE`, zone 13) = **0.0000**
 - Example A, `NetPM10`: 0, same key = **0.0000**
@@ -1500,7 +1500,7 @@ The measures left out of the combined profile because they have no 8,760 profile
 | Field | Meaning and unit | Formula |
 |---|---|---|
 | `measure_id` | The `CEInputID`. Text. | `CEInputID` |
-| `PA`, `shape_key`, `target_sector`, `climate_zone` | The measure's key fields. Text. | `IOU_AC_Territory`, `E3MeaElecEndUseShape`, `E3TargetSector`, `E3ClimateZone` |
+| `PA`, `shape_key`, `target_sector`, `climate_zone` | The measure's key fields. Text. | `IOU_AC_Territory`, `AC_Elec_Impact_Profile`, `AC_Elec_Target_Sector`, `AC_Climate_Zone` |
 | `kwh_<Y>` | The annual-equivalent net kWh the measure delivers in year `Y`: its share of the "unshaped" total. kWh. | `weight_m(Y)` of 2.4 |
 
 ### 2.6 `cet_comparison_measures_acc<version>` and `cet_comparison_summary_acc<version>` (with a CET outputs file)
@@ -1578,9 +1578,9 @@ A residential efficiency measure claimed in 2028Q3: a single baseline, a fractio
 |---|---|---|---|
 | `CEInputID` | `W1` | `PrgID` | `PRG1` |
 | `ClaimYearQuarter` | 2028Q3 | `IOU_AC_Territory` | PGE |
-| `E3ClimateZone` | 13 | `E3TargetSector` | Residential |
-| `E3MeaElecEndUseShape` | `W_SHAPE` (a flat profile, 1/8760 per hour) | `E3GasSavProfile` | `Annual` (1/12 per month) |
-| `E3GasSector` | Residential | `NumUnits` | 100 |
+| `AC_Climate_Zone` | 13 | `AC_Elec_Target_Sector` | Residential |
+| `AC_Elec_Impact_Profile` | `W_SHAPE` (a flat profile, 1/8760 per hour) | `AC_Gas_Impact_Profile` | `Annual` (1/12 per month) |
+| `AC_Gas_Target_Sector` | Residential | `NumUnits` | 100 |
 | `EUL_Yrs` / `RUL_Yrs` | 2.4 / 0 | `UnitkWh1stBaseline` | 500 |
 | `UnitTherm1stBaseline` | 20 | `UnitkWhIOUWater1stBaseline` | 3 |
 | `NTGRkWh` / `NTGRkW` | 0.8 / 0.8 | `NTGRTherm` / `NTGRCost` | 0.9 / 0.9 |
@@ -1621,9 +1621,9 @@ a winter-only gas shape, 5% market effects on benefits and on costs (`MEB` = `ME
 |---|---|---|---|
 | `CEInputID` | `W1` | `PrgID` | `PRG2` |
 | `ClaimYearQuarter` | 2028Q2 | `IOU_AC_Territory` | PGE |
-| `E3ClimateZone` | 13 | `E3TargetSector` | Commercial |
-| `E3MeaElecEndUseShape` | `3 = Commercial HVAC` (a flat profile) | `E3GasSavProfile` | `Winter Only` (1/6 in Jan, Feb, Mar, Oct, Nov, Dec) |
-| `E3GasSector` | Commercial | `NumUnits` | 10 |
+| `AC_Climate_Zone` | 13 | `AC_Elec_Target_Sector` | Commercial |
+| `AC_Elec_Impact_Profile` | `3 = Commercial HVAC` (a flat profile) | `AC_Gas_Impact_Profile` | `Winter Only` (1/6 in Jan, Feb, Mar, Oct, Nov, Dec) |
+| `AC_Gas_Target_Sector` | Commercial | `NumUnits` | 10 |
 | `EUL_Yrs` / `RUL_Yrs` | 2.5 / 1.125 | `FuelID` / `MeasImpactType` | `FuelSub-ToElec` / `Deem-FuelSub` |
 | `UnitkWh1stBaseline` / `UnitkWh2ndBaseline` | -4000 / -2500 | `UnitTherm1stBaseline` / `UnitTherm2ndBaseline` | 600 / 400 |
 | `UnitkWhIOUWater1stBaseline` / `...2ndBaseline` | -6 / -4 | `CombustionType` | `Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled` |
