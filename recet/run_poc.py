@@ -731,12 +731,17 @@ def savings_outputs(measures: pd.DataFrame, market_effects_bens: float = 0.0) ->
     return pd.DataFrame(out)[["measure_id"] + order]
 
 
-def weighted_savings(sav: pd.DataFrame, prg: pd.Series) -> pd.Series:
+def weighted_savings_pos(sav: pd.DataFrame) -> pd.Series:
+    """The amount WeightedSavings divides up: the measure's positive first-year gross kWh plus its positive first-year gross therms in kWh."""
+    return sav["FirstYearGrossKWh"].clip(lower=0.0) + (THERM_TO_KWH * sav["FirstYearGrossThm"]).clip(lower=0.0)
+
+
+def weighted_savings(sav: pd.DataFrame, prg: pd.Series, totals: pd.DataFrame | None = None) -> pd.Series:
     """CalcSavings' WeightedSavings: a measure's share of its program's positive first-year gross savings, therms converted at THERM_TO_KWH kWh per therm;
-    1 / (measures in the program) when the program has none. Not used by any cost test (CET shares program costs by benefits, WeightedBenefits)."""
-    pos = sav["FirstYearGrossKWh"].clip(lower=0.0) + (THERM_TO_KWH * sav["FirstYearGrossThm"]).clip(lower=0.0)
+    1 / (measures in the program) when the program has none. Not used by any cost test (CET shares program costs by benefits, WeightedBenefits).
+    `totals`: the programs' totals over the whole job when `sav` is only part of it (cost_tests.share_totals)."""
     from .pipeline.cost_tests import _share
-    return _share(pos, prg)
+    return _share(weighted_savings_pos(sav), prg, totals)
 
 
 def discounted_savings(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0) -> pd.DataFrame:
@@ -833,14 +838,26 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     return d.merge(trc, on="measure_id").merge(sct, on="measure_id").merge(ds, on="measure_id", how="left")
 
 
+def program_share_totals(d: pd.DataFrame, measures: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Each program's totals of the amounts its program-level shares divide up (the benefits behind WeightedBenefits and the cost tests' program-cost shares,
+    and the savings behind WeightedSavings), over `d` (price_measure_values) and its `measures`. A chunked run adds these up over its chunks
+    (cost_tests.combine_share_totals) and passes the sum to apply_program_costs, so every measure gets the share it has in the whole job."""
+    totals = cost_tests.share_totals(cost_tests.share_inputs(d), d["prg_id"])
+    sav = savings_outputs(measures)
+    totals.update(cost_tests.share_totals(pd.DataFrame({"savings": weighted_savings_pos(sav).to_numpy()}), measures["prg_id"].reset_index(drop=True)))
+    return totals
+
+
 def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
-                        market_effects_bens: float = 0.0, include_societal: bool = True) -> pd.DataFrame:
+                        market_effects_bens: float = 0.0, include_societal: bool = True, totals: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
     """The program-level half: share each program's costs over its measures (all of them, whatever ACC version priced them) and finish every cost test.
-    Program costs are discounted with the run's own ACC version's rates (`acc_version`)."""
+    Program costs are discounted with the run's own ACC version's rates (`acc_version`). `totals` (program_share_totals over the whole job) is for a run that
+    passes the job in parts; None = `d` is the whole job."""
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
-    out = cost_tests.compute_cost_tests(d, prog)
+    out = cost_tests.compute_cost_tests(d, prog, totals)
     sav = savings_outputs(measures, market_effects_bens)
-    sav["WeightedSavings"] = weighted_savings(sav, measures["prg_id"].reset_index(drop=True)).to_numpy()          # savings_outputs keeps the measures' order
+    sav["WeightedSavings"] = weighted_savings(sav, measures["prg_id"].reset_index(drop=True),                       # savings_outputs keeps the measures' order
+                                              None if totals is None else totals["savings"]).to_numpy()
     out = out.merge(sav, on="measure_id", how="left")
     if not include_societal:
         out[[c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]] = float("nan")
@@ -891,7 +908,7 @@ def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd
     return m
 
 
-def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = False):
+def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = False, dtypes: dict | None = None):
     """Load one CET job's inputs, optionally splitting its statewide (SW_) programs across the IOUs -- BOTH files together.
 
     allocate_statewide=True (pipeline/statewide_allocation.py, the inputs route): each SW program's measures are split by the per-fuel
@@ -900,8 +917,11 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     and are shared only among that IOU's own measures. Allocating only one of the two files would leave the PrgIDs unmatched, so this
     is the single entry point; misalignment is reported by cost_tests.check_program_alignment and raised here.
 
+    dtypes: the Measure.csv column types to read with (a part of a larger file: see data_loading.load_measures_from_csv).
+
     Returns (measures, program_costs or None)."""
-    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide), allocated=allocate_statewide)
+    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes),
+                                     allocated=allocate_statewide)
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
     if program is not None:
         gap = cost_tests.check_program_alignment(measures, program)

@@ -206,6 +206,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `compare_with` | Also run another ACC version | `--compare-with` | none | A second built-in ACC version to run and compare measure by measure. |
 | `output_format` | Output format | `--format` | `csv` | `csv`, `xlsx` or `parquet` for every table written. `xlsx` writes one formatted Excel file per table (a table longer than Excel's 1,048,575 rows is written as `csv` instead, with a warning). |
 | `preflight_only` | Preflight check only | `--preflight-only` / `preflight` | false | Check the inputs and stop before pricing. |
+| `chunk_size` | (none) | `--chunk-size` | 20,000 | A job whose `Measure.csv` has more rows than this is run in parts of this many rows, so the run holds about one part at a time (0.96 GB peak at 1,000,000 records, against 17.8 GB as one piece; larger parts are a little faster and use more memory: 2.3 GB at 50,000; README Performance, USER_GUIDE "What a run does"). The files written are the same as a whole-job run's, values equal to rounding. 0 = always run the whole job at once. |
 | `subset_step` | (none) | (none) | 1 | Test hook: price every Nth measure only. Program costs then weight a partial job; never use for a deliverable. |
 
 ---------------------------------------------------------------------------------------------------------------------------------

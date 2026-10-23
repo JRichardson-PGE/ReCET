@@ -25,6 +25,7 @@ services:
       RECET_WEB_SECURE_COOKIES: ${RECET_WEB_SECURE_COOKIES:-1}
       RECET_WEB_TRUST_PROXY: ${RECET_WEB_TRUST_PROXY:-1}
       RECET_WEB_WORKERS: "1"
+      OPENBLAS_NUM_THREADS: "1"               # recet sets this too; here it also covers anything that imports numpy first
       RECET_WEB_ACC_VERSIONS: "2021,2022,2024,2026"
     volumes:
       - ${RECET_DATA_DIR:-~/recet-data}:/data:ro
