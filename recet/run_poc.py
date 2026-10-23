@@ -34,7 +34,7 @@ from .pipeline.engine import (
 
 def _ids_in(df: pd.DataFrame | None) -> set:
     """The measure_ids present in a pricing result; empty when nothing was priced (such a frame has no columns at all)."""
-    return set() if df is None or df.empty else set(df["measure_id"])
+    return set() if df is None or df.empty else set(df["measure_id"].unique())          # unique first: the frame has a row per quarter
 
 
 ROUTE_COLUMNS = ["shape_key", "PA", "target_sector", "climate_zone"]   # what decides a measure's electric shape and avoided-cost series
