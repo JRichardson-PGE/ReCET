@@ -25,7 +25,7 @@ function either way (zone_totals), so a catalog entry and an on-the-fly choice c
 User-supplied profiles: the options are the zones the file gives shapes for. A file entry with only ALL (or SYSTEM) rows uses that one shape for every zone the
 measure's PA has prices for, so the choice is then decided by the prices alone. A user file's own SYSTEM rows are not used as a System measure's shape.
 
-NOx and PM10 are unaffected: CET looks them up in E3Emissions by the measure's literal climate zone, which has System rows (pipeline/emissions.py).
+NOx and PM10 are unaffected: CET looks them up in its emissions table (ReCET's Emissions) by the measure's literal climate zone, which has System rows (pipeline/emissions.py).
 """
 from __future__ import annotations
 

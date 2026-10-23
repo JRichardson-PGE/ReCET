@@ -218,8 +218,8 @@ version**. The packaged tables are CET exports, whose `Version` column uses CET'
 |---|---|---|---|---|
 | ACC | 2021 | 2022 | 2024 | 2026 |
 
-(from each version's release date in `E3Settings.AvoidedCostVersion`; the older versions 2018-2021 map to the 2017-2020 ACCs). The discount rates, base year and
-`CO2Gas` (CET's `E3Settings`) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. A built-in ACC uses its own tables, and a new
+(from each version's release date in RunParameters `AvoidedCostVersion`; the older versions 2018-2021 map to the 2017-2020 ACCs). The discount rates, base year and
+`CO2Gas` (the RunParameters table) are the **run parameters**; a supplied run-parameters file replaces them for the PAs it lists. A built-in ACC uses its own tables, and a new
 ACC label borrows the tables of the ACC version you name (default: the newest built-in). The primary rate is `DiscountRateAnnual` (PG&E 7.66%, SCE 7.65%, SCG 7.38%,
 SDG&E 7.36%, the same in every built-in ACC); the societal rate `DiscountRateAnnual_SCT` is 5.03% for every utility. `BaseYear`: 2021 (2021 ACC), 2022 (2022 ACC),
 2024 (2024 and 2026 ACCs). The rate schedules have no SCG rows for the 2021 and 2022 ACCs, so SCG bill impacts are not priced on those versions.
@@ -309,7 +309,7 @@ System zone = the zone z with the lowest total(z); a tie goes to the first zone 
 `shape_z,aligned` is the profile's own shape for zone z aligned as in C4.2, and `AC_TRC(PA, z, ...)` is the TRC total avoided cost found by the rules of C3.1 (so SCE CZ5 and
 SDG&E CZ6/CZ8 are options, priced on their stand-in zones, and SCG's options are the zones its routing reaches). A zone the ACC cannot price is not an option. The TRC cost
 test decides the zone; the same zone is then used for the shape, every cost test, every component, water energy and the hourly CO2 (NOx and PM10 still use the literal
-`System` key of E3Emissions, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
+`System` key of the Emissions table, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
 the measure's `PA` has prices for, so the prices alone decide.
 
 The choice depends only on the profile and the ACC file, so it is **cataloged**: the package ships the System zone of every library profile under each built-in ACC
@@ -474,7 +474,7 @@ The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, an
 (`PA`, `AC_Gas_Target_Sector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
 `RateScheduleElec` / `RateScheduleGas` columns are not read.
 
-With `yr1 = Y0 - BaseYear` (E3Settings `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
+With `yr1 = Y0 - BaseYear` (RunParameters `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
 
 ```text
 floor_rul = floor(R) if R > 0 else full                                     boundary share of the 1st baseline:  b = R - floor(R) if R > 0 else 1
@@ -627,7 +627,7 @@ participant-cost columns match CET to the cent. CET's run used its avoided-cost 
 ## C14 Emissions
 
 Emission columns are produced when "Include emissions" is on. "First-year" is the measure's **first four quarters** of life (not the calendar year); "Lifecycle" is all of them; "Net" includes NTG (and `MEB`), "Gross" does not.
-Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and `E3Settings.CO2Gas` = 0.00531 is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
+Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and RunParameters `CO2Gas` = 0.00531 is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
 
 **C14.1 Electric CO2 per annual kWh, by quarter** (`co2(qidx)`, `qidx = 4 * year + quarter`, quarter 1-4):
 
@@ -653,16 +653,16 @@ quarters counted: install <= qidx < install + eulq
 fe(net)  = Q * (NTGe + MEB, or 1 if gross) * IRe * RRe                      fg(net) = Q * (NTGt + MEB, or 1 if gross) * IRt * RRt
 
 ElecCO2   = fe * SUM over counted quarters of  co2(qidx)      * AnnualkWh(k)
-ElecNOx   = fe * SUM over counted quarters of  nox            * AnnualkWh(k) / 4          nox  = E3Emissions NOx for (PA, target sector, end use, zone)   (0 if there is no row)
-PM10      = fe * SUM over counted quarters of  pm10           * AnnualkWh(k) / 4          pm10 = E3Emissions PM10, same key
+ElecNOx   = fe * SUM over counted quarters of  nox            * AnnualkWh(k) / 4          nox  = Emissions NOx for   (PA, target sector, end use, zone)   (0 if there is no row)
+PM10      = fe * SUM over counted quarters of  pm10           * AnnualkWh(k) / 4          pm10 = Emissions PM10, same key
    first-year: the first four counted quarters;   lifecycle: all of them
 
-GasCO2    = fg * CO2Gas(PA) * G          GasNOx = fg * NOxfactor * G          NOxfactor = E3CombustionType NOx for the measure's CombustionType (0 if blank / unknown)
+GasCO2    = fg * CO2Gas(PA) * G          GasNOx = fg * NOxfactor * G          NOxfactor = CombustionType-table NOx for the measure's CombustionType (0 if blank / unknown)
    G_firstyear = Th1 if rul >= 1;  rul*Th1 + (1 - rul)*Th2 if 0 < rul < 1 <= eul;  rul*Th1 + (eul - rul)*Th2 if rul < eul < 1;  Th1 if rul = 0 and eul > 1;  eul*Th1 if rul = 0 and eul <= 1
    G_lifecycle = rul*Th1 + (eul - rul)*Th2 if rul > 0;   eul*Th1 otherwise
 ```
 
-`E3Emissions` covers only a slice of the (PA, sector, end use, zone) keys, so NOx and PM10 are 0 for most electric measures (this is CET's own behaviour). Output columns: `NetElecCO2`, `NetElecNOx`, `NetPM10`, `NetGasCO2`, `NetGasNOx`,
+The Emissions table covers only a slice of the (PA, sector, end use, zone) keys, so NOx and PM10 are 0 for most electric measures (this is CET's own behaviour). Output columns: `NetElecCO2`, `NetElecNOx`, `NetPM10`, `NetGasCO2`, `NetGasNOx`,
 the five `Gross...` counterparts, and the ten `...Lifecycle` columns.
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -778,7 +778,7 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
   Market effects at 5% match CET jobs 121842 / 121841 on participant costs and bill impacts.
   These paths are covered by the hand-computed tests in `tests`.
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
-* Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from CET's `E3Emissions`, which covers only part of the keys.
+* Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from the Emissions table (CET's), which covers only part of the keys.
 * Input columns that are read but not used: `RateScheduleElec`, `RateScheduleGas` (rate schedules always come from `PA` and sector), and every descriptive column (INPUT_FIELDS.md lists them).
 * CET output fields not produced: the savings-quantity columns other than `FirstYearNetKWh`, `FirstYearNetKW` and `FirstYearNetThm` (the gross first-year, lifecycle and annual
   `KWh`, `KW`, `Thm`, `KWhWater`, `KWhSite` and `DiscountedSavings...` columns), `WeightedSavings`, `WeightedElecAlloc`, `WtdAdminCosts...`, `ProgramCosts`, `TRCLifecycleNetBen`,

@@ -271,7 +271,7 @@ One row per `(utility, class, cost_test, scc, year)`; dollar columns are **$/the
 
 ### 4.5 Run parameters (CSV, Parquet or xlsx)
 
-The built-in run parameters are CET's `E3Settings` table (section 6). A supplied file replaces them for the PAs it lists; other PAs keep the built-in values. The template
+The built-in run parameters are the RunParameters table (section 6). A supplied file replaces them for the PAs it lists; other PAs keep the built-in values. The template
 (`recet template run-parameters`) is the built-in rows of the chosen ACC version.
 
 | Column | Type / unit | Required | Description |
@@ -348,14 +348,16 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 
 ## 6. Built-in tables (shipped inside the package)
 
+ReCET's names drop the `E3` prefix of the CET tables they copy; the CET name is given in brackets.
+
 | File (`recet/data/...`) | Columns used | Role |
 |---|---|---|
-| `E3Settings.csv` | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
-| `e3_tables/e3_emissions.parquet` | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
-| `e3_tables/e3_combustion_type.parquet` | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
-| `e3_tables/e3_rate_schedule_elec.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
-| `e3_tables/e3_rate_schedule_elec_mapping.parquet` | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
-| `e3_tables/e3_rate_schedule_gas.parquet`, `e3_rate_schedule_gas_mapping.parquet` | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
+| `run_parameters.csv` (RunParameters; CET `E3Settings`) | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
+| `cet_tables/emissions.parquet` (Emissions; CET `E3Emissions`) | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
+| `cet_tables/combustion_type.parquet` (CombustionType; CET `E3CombustionType`) | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
+| `cet_tables/rate_schedule_elec.parquet` (RateScheduleElec; CET `E3RateScheduleElec`) | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
+| `cet_tables/rate_schedule_elec_mapping.parquet` (RateScheduleElecMapping; CET `E3RateScheduleElecMapping`) | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
+| `cet_tables/rate_schedule_gas.parquet`, `rate_schedule_gas_mapping.parquet` (RateScheduleGas, RateScheduleGasMapping; CET `E3RateScheduleGas`, `E3RateScheduleGasMapping`) | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
 | `gas_savings_profiles.csv` | `Profile`, `Month`, `Impact` | The library of gas monthly profiles (C4.3). |
 | `acc/2024/gas_components.parquet`, `acc/2026/gas_components.parquet` | the gas ACC layout of section 4.4 | The two gas ACCs, extracted from E3's workbooks. |
 | `statewide_allocation/statewide_factors_20260918.csv` | `Year`, `ProgramID`, `PercentElectric`, `<IOU>GasFactor`, `<IOU>ElectricFactor`, `<IOU>WeightedFactor` for PGE, SDGE, SCE, SCG | The IOU shares of each statewide program (C15). |

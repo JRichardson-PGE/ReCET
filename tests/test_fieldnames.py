@@ -38,3 +38,22 @@ def test_every_legacy_name_maps_and_both_names_at_once_is_an_error():
     assert fieldnames.recet_name("e3climatezone") == "AC_Climate_Zone"           # case-insensitive, as CET is
     with pytest.raises(ValueError, match="both the legacy and the ReCET name"):
         fieldnames.to_recet(pd.DataFrame(columns=["E3ClimateZone", "AC_Climate_Zone"]))
+
+
+def test_value_lists_are_named_after_their_fields():
+    from recet import editor, paths
+    for field in fieldnames.RECET_TO_CET:
+        name = editor.VALUE_LISTS[field]
+        assert name == field.lower() and paths.package_data("value_lists", f"{name}.csv").exists()
+
+
+def test_saved_value_list_changes_follow_the_renamed_lists(tmp_path):
+    """An admin change stored under a list's old (CET E3) file name is moved to the new name when the web database opens."""
+    import sqlite3
+    from recet.web import db
+    path = tmp_path / "recet.db"
+    db.Database(path)
+    with sqlite3.connect(path) as c:
+        c.execute("INSERT INTO value_list_changes (list, code, kind, at) VALUES ('e3climatezone', 'CZ99', 'added', 0)")
+    d = db.Database(path)
+    assert [tuple(r) for r in d.all("SELECT list, code FROM value_list_changes")] == [("ac_climate_zone", "CZ99")]

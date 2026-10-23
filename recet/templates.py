@@ -104,7 +104,7 @@ EXAMPLE_PROGRAMCOST = _EXAMPLE_PROGRAMCOST
 
 
 def run_parameters_template(acc_key: str = "2026") -> pd.DataFrame:
-    """The built-in run parameters (CET E3Settings) of an ACC version, one row per IOU, in the run-parameters file layout."""
+    """The built-in run parameters (the RunParameters table) of an ACC version, one row per IOU, in the run-parameters file layout."""
     from .pipeline import discount_settings
     version = versions.BUILTIN[acc_key].acc if acc_key in versions.BUILTIN else versions.BUILTIN[versions.NEWEST_BUILTIN].acc
     t = discount_settings._table()

@@ -32,7 +32,7 @@ A_MEASURE = dict(PrgID="PRG1", ClaimYearQuarter="2028Q3", Sector="Res", AC_Clima
 A_PROGRAM = [dict(PrgID="PRG1", PA="PGE", PrgYear="2028", ClaimYearQuarter="2028Q1", AdminCostsOverheadAndGA="1500", MarketingOutreach="500"),
              dict(PrgID="PRG1", PA="PGE", PrgYear="2029", ClaimYearQuarter="2029Q1", EMV="1000")]
 
-B_END_USE = "3 = Commercial HVAC"                               # a key that E3Emissions has PG&E commercial CZ13 NOx / PM10 rows for (0.000046 lb/kWh each)
+B_END_USE = "3 = Commercial HVAC"                               # a key that the Emissions table has PG&E commercial CZ13 NOx / PM10 rows for (0.000046 lb/kWh each)
 B_MEASURE = dict(PrgID="PRG2", ClaimYearQuarter="2028Q2", Sector="Com", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Winter Only", AC_Gas_Target_Sector="Commercial", AC_Elec_Impact_Profile=B_END_USE,
                  AC_Elec_Target_Sector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.5", RUL_Yrs="1.125", NumUnits="10", UnitkWh1stBaseline="-4000", UnitkWh2ndBaseline="-2500",
                  UnitTherm1stBaseline="600", UnitTherm2ndBaseline="400", UnitkWhIOUWater1stBaseline="-6", UnitkWhIOUWater2ndBaseline="-4", NTGRkWh="0.75", NTGRkW="0.75",

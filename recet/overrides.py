@@ -6,7 +6,7 @@ Six kinds, each with a template (`recet.templates`, `recet template ...`, or the
 2. gas monthly savings profiles           -> `load_user_gas_profiles` (CSV/Parquet: Profile, Month, Impact -- the same three columns as the built-in library)
 3. electric ACC (hourly avoided costs)    -> `check_electric_acc` / `prepare_electric_acc`
 4. gas ACC (monthly components)           -> `check_gas_acc` / `prepare_gas_acc`
-5. run parameters (CET's E3Settings)      -> `load_run_parameters`  (one row per PA: discount rates, base year, gas CO2; a supplied PA replaces the built-in row)
+5. run parameters (RunParameters table)   -> `load_run_parameters`  (one row per PA: discount rates, base year, gas CO2; a supplied PA replaces the built-in row)
 6. SW allocation factors                  -> `load_sw_factors`      (the built-in table's layout; a supplied (Year, ProgramID) replaces the built-in row)
 
 Matching rules ("if a profile matches an existing defined version, the separate input replaces it"):
@@ -522,7 +522,7 @@ def prepare_gas_acc(path: str | Path, work_dir: str | Path) -> Path:
 
 
 # ======================================================================================================================================
-# 5. Run parameters (CET's E3Settings table: discount rates, base year, gas CO2)
+# 5. Run parameters (the RunParameters table: discount rates, base year, gas CO2)
 # ======================================================================================================================================
 RUN_PARAMETER_COLUMNS = ["PA", "DiscountRateAnnual", "DiscountRateAnnual_SCT", "CO2Gas"]
 RUN_PARAMETER_OPTIONAL = {"DiscountRateQtr": "DiscountRateAnnual / 4", "DiscountRateQtr_SCT": "DiscountRateAnnual_SCT / 4",

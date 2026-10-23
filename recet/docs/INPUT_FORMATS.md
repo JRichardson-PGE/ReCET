@@ -158,7 +158,7 @@ The gas price is the sum of these seven components (behind-the-meter methane onl
 
 ## 6. Run parameters
 
-The discount rates, base year and gas CO2 factor used for each PA. The built-in values are CET's `E3Settings` table for the run's version; a supplied file **replaces the
+The discount rates, base year and gas CO2 factor used for each PA. The built-in values are the RunParameters table (a copy of CET's settings) for the run's version; a supplied file **replaces the
 row of every PA it lists**, and the others keep their built-in values. Start from `recet template run-parameters` (the GUI's **Template...** button), which holds the
 built-in values, and change only what you need. Columns are defined in INPUT_FIELDS.md section 4.5.
 

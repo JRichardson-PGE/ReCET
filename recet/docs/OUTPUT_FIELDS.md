@@ -1126,9 +1126,9 @@ AnnualkWh(k) = the per-unit annual kWh in force during quarter k, with  EQ = 4 *
                               kWh2 * (EQ - floor(EQ))                   if only EQ falls inside quarter k;   else kWh2
    counted quarters: k = 0 ... EQ - 1 (the quarters of 0.2)
 
-nox, pm10 = the NOx / PM10 rate (lb per kWh) of CET's E3Emissions table for the key
+nox, pm10 = the NOx / PM10 rate (lb per kWh) of the Emissions table (CET's) for the key
             (PA, AC_Elec_Target_Sector, AC_Elec_Impact_Profile, AC_Climate_Zone); 0 where the table has no row
-NOxfactor = the NOx factor (lb per therm) of CET's E3CombustionType table for CombustionType; 0 when CombustionType is blank or unknown
+NOxfactor = the NOx factor (lb per therm) of the CombustionType table (CET's) for CombustionType; 0 when CombustionType is blank or unknown
 CO2Gas    = metric tons of CO2 per therm, E3 settings for PA (0.00531)
 G_firstyear = Th1                                  if RUL >= 1
             = RUL*Th1 + (1 - RUL)*Th2              if 0 < RUL < 1 <= EUL
@@ -1163,7 +1163,7 @@ GrossElecCO2Lifecycle = fe_gross * SUM over k = 0 ... n-1 of          co2(k) * A
 
 #### `NetElecNOx`, `GrossElecNOx`, `NetElecNOxLifecycle`, `GrossElecNOxLifecycle`, `NetPM10`, `GrossPM10`, `NetPM10Lifecycle`, `GrossPM10Lifecycle`
 
-**Electric NOx and PM10 (particulates under 10 microns) emissions avoided.** Unit: pounds. 0 where CET's E3Emissions table has no row for the measure's key.
+**Electric NOx and PM10 (particulates under 10 microns) emissions avoided.** Unit: pounds. 0 where the Emissions table (CET's) has no row for the measure's key.
 
 **Formula**
 
@@ -1178,9 +1178,9 @@ NetPM10Lifecycle      = fe_net   * SUM over k = 0 ... n-1 of          pm10 * Ann
 GrossPM10Lifecycle    = fe_gross * SUM over k = 0 ... n-1 of          pm10 * AnnualkWh(k) / 4
 ```
 
-The `/ 4` is because `nox` and `pm10` are per annual kWh and each quarter carries a quarter of a year. **Inputs:** those of `NetElecCO2`, plus `AC_Elec_Target_Sector`, `AC_Elec_Impact_Profile`, `AC_Climate_Zone`, `IOU_AC_Territory` (the E3Emissions key).
+The `/ 4` is because `nox` and `pm10` are per annual kWh and each quarter carries a quarter of a year. **Inputs:** those of `NetElecCO2`, plus `AC_Elec_Target_Sector`, `AC_Elec_Impact_Profile`, `AC_Climate_Zone`, `IOU_AC_Territory` (the Emissions table key).
 
-- Example A, `NetElecNOx`: 0, because E3Emissions has no row for the key (PGE, Residential, `W_SHAPE`, zone 13) = **0.0000**
+- Example A, `NetElecNOx`: 0, because the Emissions table has no row for the key (PGE, Residential, `W_SHAPE`, zone 13) = **0.0000**
 - Example A, `NetPM10`: 0, same key = **0.0000**
 - Example B, `NetElecNOx`: the key (PGE, Commercial, `3 = Commercial HVAC`, zone 13) has `nox` = 0.00004643: 7.2 * (4 * 0.00004643 * -4000 / 4) = **-1.3372**
 - Example B, `NetPM10`: `pm10` = 0.00004643 for the same key: 7.2 * (4 * 0.00004643 * -4000 / 4) = **-1.3372**
@@ -1217,7 +1217,7 @@ NetGasNOx            = fg_net   * NOxfactor * G_firstyear       GrossGasNOx     
 NetGasNOxLifecycle   = fg_net   * NOxfactor * G_lifecycle       GrossGasNOxLifecycle   = fg_gross * NOxfactor * G_lifecycle
 ```
 
-**Inputs:** those of `NetGasCO2`, plus `CombustionType` (the E3CombustionType key, `<combustor type>:<controls>`).
+**Inputs:** those of `NetGasCO2`, plus `CombustionType` (the CombustionType table key, `<combustor type>:<controls>`).
 
 - Example A, `NetGasNOx`: `CombustionType` is blank, so `NOxfactor` = 0 and 81 * 0 * 20 = **0.0000**
 - Example B, `NetGasNOx`: `CombustionType` = `Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled`, `NOxfactor` = 0.0098: 8.55 * 0.0098 * 600 = **50.2740**
@@ -1633,8 +1633,8 @@ a winter-only gas shape, 5% market effects on benefits and on costs (`MEB` = `ME
 | `UnitIncentiveToOthers` / `UnitEndUserRebate` | 800 / 400 | `UnitDirectInstallLab` / `UnitDirectInstallMat` | 100 / 50 |
 | `UnitGasInfraBens` / `UnitRefrigBens` / `UnitMiscBens` | 20 / 8 / 12 | `UnitRefrigCosts` / `UnitMiscCosts` / `UnitTaxCredits` | 10 / 5 / 100 |
 
-Program `PRG2`: 2028 row: `EMV` 900 and `DIActivity` 300; 2029 row: `MarketingOutreach` 600. CET's E3Emissions table gives PG&E commercial zone 13 `3 = Commercial HVAC` a `NOx` and a `PM10` rate of
-0.00004643 pounds per kWh; the E3CombustionType table gives `Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled` a NOx factor of 0.0098 pounds per therm.
+Program `PRG2`: 2028 row: `EMV` 900 and `DIActivity` 300; 2029 row: `MarketingOutreach` 600. The Emissions table gives PG&E commercial zone 13 `3 = Commercial HVAC` a `NOx` and a `PM10` rate of
+0.00004643 pounds per kWh; the CombustionType table gives `Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled` a NOx factor of 0.0098 pounds per therm.
 
 ### 3.4 Example B: quarter by quarter (TRC prices, primary discount rate)
 
