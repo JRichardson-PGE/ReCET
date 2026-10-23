@@ -18,7 +18,7 @@ that ACC was in effect for claims or forecasts (Avoided Cost Version 2026). Labe
 
 Run parameters and E3 tables are picked by ACC version too. CET numbers its avoided-cost versions differently (its "Version 2026" holds the 2024 ACC),
 so the packaged tables, which are CET exports, are mapped onto ACC versions when they are read (CET_VERSION_TO_ACC, from each version's release date in
-E3Settings.AvoidedCostVersion). A new version borrows the tables of `settings_from` (an ACC version; default: the newest built-in), since the tables
+RunParameters AvoidedCostVersion). A new version borrows the tables of `settings_from` (an ACC version; default: the newest built-in), since the tables
 for a brand-new ACC do not exist yet.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from . import paths
 
-# CET avoided-cost version -> the ACC it holds. Release dates (E3Settings.AvoidedCostVersion): 2018 = 9/1/2017, 2019 = 6/28/2018, 2020 = 9/15/2019,
+# CET avoided-cost version -> the ACC it holds. Release dates (RunParameters AvoidedCostVersion): 2018 = 9/1/2017, 2019 = 6/28/2018, 2020 = 9/15/2019,
 # 2021 = 6/24/2020, 2022 = 8/28/2021, 2024 = 9/26/2022, 2026 = 12/12/2024, 2027 = 5/25/2026 (the draft 2026 ACC; the final v1b uses the same tables).
 # Confirmed by Jake for 2022, 2024, 2026 and 2027. CET versions 2013 and 2017 both carry 2011 dates and are not mapped (not selectable).
 CET_VERSION_TO_ACC = {2018: 2017, 2019: 2018, 2020: 2019, 2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}

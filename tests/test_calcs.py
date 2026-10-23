@@ -26,7 +26,7 @@ HOD, DOY = I % 24, I // 24
 COMPONENTS = ("energy", "generation_capacity", "avoided_as_procurement", "losses", "methane_leakage", "ghg_cap_and_invest", "ghg_adder", "air_quality_adder",
               "transmission", "distribution")
 GHG_MULT = {"TRC": 1.0, "SCT Base": 1.5, "SCT High": 2.5}       # the societal rows differ from TRC in the GHG term
-EU_COM = "1 = Commercial Indoor Lighting"                       # has E3Emissions rows (PGE, COMMERCIAL, CZ13) so electric NOx / PM10 are non-zero
+EU_COM = "1 = Commercial Indoor Lighting"                       # has Emissions-table rows (PGE, COMMERCIAL, CZ13) so electric NOx / PM10 are non-zero
 EU_RES = "TEST_RES_SHAPE"                                       # has none: NOx = PM10 = 0
 REPRESENTS = 2012
 

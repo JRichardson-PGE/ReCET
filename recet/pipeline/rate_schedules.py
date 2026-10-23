@@ -6,7 +6,8 @@ bill-impact columns (`BillReducElec`, `BillIncrElec`, `BillReducGas`,
 `dbo.E3RateScheduleGasMapping` (Jake exported all four as CSVs, 2026-09-17,
 after this project confirmed via `CET_v25.1_documentation_extracted.txt`
 that only the table SCHEMAS -- not the row data -- were already in this
-repo; converted to parquet at `poc/data/cet_backup_tables_2026-09-17/`).
+repo; converted to parquet and shipped in `data/cet_tables/` as RateScheduleElec, RateScheduleElecMapping, RateScheduleGas and
+RateScheduleGasMapping, without CET's E3 prefix).
 
 Distinct from avoided costs: these are what a customer actually PAYS at
 retail (used only for the ratepayer bill-impact side of the RIM test), not
@@ -15,10 +16,10 @@ what it costs the utility system to serve them.
 SCHEMA, confirmed from the real CREATE TABLE statements (not the PDF's own
 garbled "Properties" table renderer, which interleaves columns across two
 visual columns and cannot be trusted for column order):
-  E3RateScheduleElec: ID, PA, Version, Year, Qy, Schedule, RateE
-  E3RateScheduleElecMapping: PA, TargetSector, Schedule, ID, Version
-  E3RateScheduleGas: ID, PA, Version, Year, Qy, Schedule, RateG
-  E3RateScheduleGasMapping: PA, Version, GasSector, GasRateSchedule
+  RateScheduleElec: ID, PA, Version, Year, Qy, Schedule, RateE
+  RateScheduleElecMapping: PA, TargetSector, Schedule, ID, Version
+  RateScheduleGas: ID, PA, Version, Year, Qy, Schedule, RateG
+  RateScheduleGasMapping: PA, Version, GasSector, GasRateSchedule
 
 "Qy" is misleadingly named -- despite the name, it's an ANNUAL index, not
 quarterly (confirmed empirically: each (PA, Version, Schedule) has exactly
@@ -45,7 +46,7 @@ retail rate two ways -- (1) if the measure has its own explicit
 RateScheduleElec/RateScheduleGas value set, join straight to that Schedule
 name, skipping the mapping table entirely; (2) otherwise, map the measure's
 own TargetSector (elec) or AC_Gas_Target_Sector (gas) through
-E3RateScheduleElecMapping/E3RateScheduleGasMapping to find the Schedule.
+RateScheduleElecMapping/RateScheduleGasMapping to find the Schedule.
 Every real measure in this POC's two ground-truth datasets uses path (2)
 (RateScheduleElec/RateScheduleGas are blank for all 73,024 SWWH025 rows,
 confirmed) -- path (1) is supported here (`explicit_schedule` param) but
@@ -59,7 +60,7 @@ from pathlib import Path
 import pandas as pd
 
 from .. import paths, versions
-DATA_DIR = paths.package_data("e3_tables")
+DATA_DIR = paths.package_data("cet_tables")
 
 
 def _read(name: str) -> pd.DataFrame:
@@ -70,10 +71,10 @@ def _read(name: str) -> pd.DataFrame:
     return df[df["Version"].notna()].astype({"Version": int}).reset_index(drop=True)
 
 _FILES = [
-    "e3_rate_schedule_elec.parquet",
-    "e3_rate_schedule_elec_mapping.parquet",
-    "e3_rate_schedule_gas.parquet",
-    "e3_rate_schedule_gas_mapping.parquet",
+    "rate_schedule_elec.parquet",
+    "rate_schedule_elec_mapping.parquet",
+    "rate_schedule_gas.parquet",
+    "rate_schedule_gas_mapping.parquet",
 ]
 
 
@@ -83,22 +84,22 @@ def is_available() -> bool:
 
 @lru_cache(maxsize=1)
 def _elec_rates() -> pd.DataFrame:
-    return _read("e3_rate_schedule_elec.parquet")
+    return _read("rate_schedule_elec.parquet")
 
 
 @lru_cache(maxsize=1)
 def _elec_mapping() -> pd.DataFrame:
-    return _read("e3_rate_schedule_elec_mapping.parquet")
+    return _read("rate_schedule_elec_mapping.parquet")
 
 
 @lru_cache(maxsize=1)
 def _gas_rates() -> pd.DataFrame:
-    return _read("e3_rate_schedule_gas.parquet")
+    return _read("rate_schedule_gas.parquet")
 
 
 @lru_cache(maxsize=1)
 def _gas_mapping() -> pd.DataFrame:
-    return _read("e3_rate_schedule_gas_mapping.parquet")
+    return _read("rate_schedule_gas_mapping.parquet")
 
 
 @lru_cache(maxsize=1)

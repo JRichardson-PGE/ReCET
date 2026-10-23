@@ -64,7 +64,7 @@ def nearest(years, y):
 
 # ---------------------------------------------------------------------------------------------------------------- settings tables
 def settings(pa: str, version: int) -> dict:
-    t = pd.read_csv(paths.package_data("E3Settings.csv"))
+    t = pd.read_csv(paths.package_data("run_parameters.csv"))
     t["PA"] = t["PA"].str.strip()
     r = t[(t.PA == pa) & (t.Version == version)].iloc[0]
     return {"annual": float(r.DiscountRateAnnual), "qtr": float(r.DiscountRateQtr), "annual_sct": float(r.DiscountRateAnnual_SCT),
@@ -72,22 +72,22 @@ def settings(pa: str, version: int) -> dict:
 
 
 def rate_series(kind: str, pa: str, version: int, sector: str) -> dict[int, float]:
-    d = paths.package_data("e3_tables")
+    d = paths.package_data("cet_tables")
     if kind == "elec":
-        mp = pd.read_parquet(d / "e3_rate_schedule_elec_mapping.parquet")
+        mp = pd.read_parquet(d / "rate_schedule_elec_mapping.parquet")
         sched = mp[(mp.PA == pa) & (mp.Version == version) & (mp.TargetSector.astype(str).str.upper() == sector.upper())].Schedule.iloc[0]
-        rt = pd.read_parquet(d / "e3_rate_schedule_elec.parquet")
+        rt = pd.read_parquet(d / "rate_schedule_elec.parquet")
         rt = rt[(rt.PA == pa) & (rt.Version == version) & (rt.Schedule == sched)].dropna(subset=["Year"])
         return dict(zip(rt.Year.astype(int), rt.RateE))
-    mp = pd.read_parquet(d / "e3_rate_schedule_gas_mapping.parquet")
+    mp = pd.read_parquet(d / "rate_schedule_gas_mapping.parquet")
     sched = mp[(mp.PA == pa) & (mp.Version == version) & (mp.GasSector == sector)].GasRateSchedule.iloc[0]
-    rt = pd.read_parquet(d / "e3_rate_schedule_gas.parquet")
+    rt = pd.read_parquet(d / "rate_schedule_gas.parquet")
     rt = rt[(rt.PA == pa) & (rt.Version == version) & (rt.Schedule == sched)]
     return dict(zip(rt.Year.astype(int), rt.RateG))
 
 
 def nox_pm10(pa: str, version: int, sector: str, end_use: str, zone: str) -> tuple[float, float]:
-    e = pd.read_parquet(paths.package_data("e3_tables") / "e3_emissions.parquet")
+    e = pd.read_parquet(paths.package_data("cet_tables") / "emissions.parquet")
     e = e[(e.Version == version) & (e.PA == pa) & (e.TS.astype(str).str.upper() == sector.upper()) & (e.EU == end_use) & (e.CZ.astype(str).str.upper() == zone.upper())]
     return (float(e.NOx.iloc[0]), float(e.PM10.iloc[0])) if len(e) else (0.0, 0.0)
 

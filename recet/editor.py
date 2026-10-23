@@ -37,8 +37,8 @@ CYQ = re.compile(r"^\d{4}Q[1-4]$")
 
 # Measure / ProgramCost column -> CET value-list file in data/value_lists (RUL_ID is not checked: CET's RUL IDs are not a published list)
 VALUE_LISTS = {
-    "Sector": "sector", "DeliveryType": "deliverytype", "BldgType": "bldgtype", "AC_Climate_Zone": "e3climatezone", "AC_Gas_Impact_Profile": "e3gassavprofile",
-    "AC_Gas_Target_Sector": "e3gassector", "AC_Elec_Impact_Profile": "e3meaelecenduseshape", "AC_Elec_Target_Sector": "e3targetsector", "MeasAppType": "measapptype",
+    "Sector": "sector", "DeliveryType": "deliverytype", "BldgType": "bldgtype", "AC_Climate_Zone": "ac_climate_zone", "AC_Gas_Impact_Profile": "ac_gas_impact_profile",
+    "AC_Gas_Target_Sector": "ac_gas_target_sector", "AC_Elec_Impact_Profile": "ac_elec_impact_profile", "AC_Elec_Target_Sector": "ac_elec_target_sector", "MeasAppType": "measapptype",
     "MeasImpactType": "measimpacttype", "FuelID": "fuelid", "TechGroup": "techgroup", "TechType": "techtype", "UseCategory": "usecategory",
     "UseSubCategory": "usesubcategory", "WaterUse": "wateruse", "Version": "version", "NormUnit": "normunit", "NTG_ID": "ntg", "EUL_ID": "eul",
     "GSIA_ID": "gsia", "RateScheduleElec": "ratescheduleelec", "RateScheduleGas": "rateschedulegas", "CombustionType": "combustiontype",
@@ -573,7 +573,7 @@ class ChoiceSource:
         if column in FLAG_COLUMNS:
             return ["0", "1"]
         if column == "AC_Gas_Impact_Profile":
-            return sorted(self.gas_names | self.user_gas | set(active_codes("e3gassavprofile")), key=_natural)
+            return sorted(self.gas_names | self.user_gas | set(active_codes("ac_gas_impact_profile")), key=_natural)
         if column in END_USE_COLUMNS:
             return None                                    # per row: see end_use_choices
         if column == "ACCVersion":
@@ -594,7 +594,7 @@ class ChoiceSource:
         iou = str(iou).strip().upper()
         out = list(self._by_iou_sector.get((iou, str(sector).strip().upper()), []) or self._by_iou.get(iou, []))
         if not out and not getattr(self, "catalog_available", False):
-            out = active_codes("e3meaelecenduseshape")
+            out = active_codes("ac_elec_impact_profile")
         if self.user_8760 is not None:
             out = sorted(set(out) | {e.end_use for e in self.user_8760.entries}, key=_natural)
         return out
