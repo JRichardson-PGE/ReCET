@@ -8,7 +8,8 @@ RECET_WEB_WORKERS        how many runs may execute at once (default 1: the serve
 RECET_WEB_ACC_VERSIONS   the ACC versions offered (default "2024,2026")
 RECET_WEB_RETENTION_DAYS days a run's uploads and results are kept (default 7)
 RECET_WEB_DRAFT_DAYS     days an untouched Edit inputs draft is kept (default 30)
-RECET_WEB_MAX_UPLOAD_MB  largest accepted upload, per file (default 50)
+RECET_WEB_MAX_UPLOAD_MB  largest accepted upload, per file (default 150)
+RECET_WEB_MAX_UNZIPPED_MB largest a job zip may unzip to: Measure.csv plus ProgramCost.csv (default 1024; a 1,000,000-row Measure.csv is about 600 MB)
 RECET_WEB_RUN_TIMEOUT    seconds before a run is stopped (default 7200)
 RECET_WEB_RUN_DEFAULTS   JSON merged into every run's RunConfig (tests use it to supply a synthetic ACC; not needed in production)
 """
@@ -40,7 +41,8 @@ class Settings:
     acc_versions: tuple[str, ...] = ("2024", "2026")
     retention_days: int = 7
     draft_days: int = 30
-    max_upload_mb: int = 50
+    max_upload_mb: int = 150
+    max_unzipped_mb: int = 1024
     run_timeout: int = 7200
     run_defaults: dict = field(default_factory=dict)
     start_workers: bool = True          # tests turn the background threads off and drive the queue by hand
@@ -62,7 +64,8 @@ class Settings:
             s.acc_versions = tuple(a.strip() for a in accs.split(",") if a.strip())
         s.retention_days = _int("RECET_WEB_RETENTION_DAYS", 7)
         s.draft_days = _int("RECET_WEB_DRAFT_DAYS", 30)
-        s.max_upload_mb = _int("RECET_WEB_MAX_UPLOAD_MB", 50)
+        s.max_upload_mb = _int("RECET_WEB_MAX_UPLOAD_MB", 150)
+        s.max_unzipped_mb = _int("RECET_WEB_MAX_UNZIPPED_MB", 1024)
         s.run_timeout = _int("RECET_WEB_RUN_TIMEOUT", 7200)
         if os.environ.get("RECET_WEB_RUN_DEFAULTS", "").strip():
             s.run_defaults = json.loads(os.environ["RECET_WEB_RUN_DEFAULTS"])
@@ -83,3 +86,7 @@ class Settings:
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def max_unzipped_bytes(self) -> int:
+        return self.max_unzipped_mb * 1024 * 1024

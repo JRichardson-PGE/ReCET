@@ -332,7 +332,7 @@ def register(app, ctx) -> None:
                 job = editor.new_job()
                 source = "new job (template example rows)"
             elif mode == "upload":
-                job, source = await _load_upload(form, folder, s.max_upload_bytes)
+                job, source = await _load_upload(form, folder, s.max_upload_bytes, s.max_unzipped_bytes)
             else:
                 raise editor.EditorError("unknown way to start a draft")
             _write(folder, 1, job.measures, job.programcost)
@@ -518,15 +518,18 @@ def _draft_lock(draft_id: str) -> threading.Lock:
         return _locks.setdefault(draft_id, threading.Lock())
 
 
-async def _load_upload(form, folder: Path, limit: int) -> tuple[editor.LoadedJob, str]:
-    """A draft from an uploaded job workbook, or a Measure.csv (and optional ProgramCost.csv)."""
-    from .app import save_upload
-    wb, meas, pcost = (form.get(k) for k in ("workbook", "measures", "programcost"))
+async def _load_upload(form, folder: Path, limit: int, unzipped_limit: int) -> tuple[editor.LoadedJob, str]:
+    """A draft from an uploaded job workbook, or a job zip holding Measure.csv (and optional ProgramCost.csv; jobzip.py), or both (the zip's files then replace
+    those sheets)."""
+    from . import jobzip
+    from .app import BARE_CSV_MESSAGE, save_upload
+    if any(isinstance(form.get(k), UploadFile) and form.get(k).filename for k in ("measures", "programcost")):
+        raise editor.EditorError(BARE_CSV_MESSAGE)
+    wb, jz = (form.get(k) for k in ("workbook", "job_zip"))
     wb = wb if isinstance(wb, UploadFile) and wb.filename else None
-    meas = meas if isinstance(meas, UploadFile) and meas.filename else None
-    pcost = pcost if isinstance(pcost, UploadFile) and pcost.filename else None
-    if wb is None and meas is None:
-        raise editor.EditorError("choose a job workbook or a Measure.csv")
+    jz = jz if isinstance(jz, UploadFile) and jz.filename else None
+    if wb is None and jz is None:
+        raise editor.EditorError("choose a job workbook or a job zip (Measure.csv and an optional ProgramCost.csv)")
     folder.mkdir(parents=True, exist_ok=True)
     paths: dict[str, str] = {}
     names = []
@@ -536,17 +539,22 @@ async def _load_upload(form, folder: Path, limit: int) -> tuple[editor.LoadedJob
         await save_upload(wb, folder / "base.xlsx", limit)
         paths["workbook"] = str(folder / "base.xlsx")
         names.append(Path(wb.filename).name)
-    for key, up in (("measures", meas), ("programcost", pcost)):
-        if up is not None:
-            if Path(up.filename).suffix.lower() not in (".csv", ".txt"):
-                raise editor.EditorError(f"{up.filename}: use a pipe- or comma-delimited .csv file")
-            dest = folder / f"upload_{key}.csv"
-            await save_upload(up, dest, limit)
-            paths[key] = str(dest)
-            names.append(Path(up.filename).name)
+    unpacked = folder / "upload_job"
+    if jz is not None:
+        if Path(jz.filename).suffix.lower() != ".zip":
+            raise editor.EditorError(BARE_CSV_MESSAGE)
+        await save_upload(jz, folder / "upload_job.zip", limit)
+        try:
+            got = jobzip.unpack(folder / "upload_job.zip", unpacked, unzipped_limit)
+        except jobzip.JobZipError as exc:
+            raise editor.EditorError(f"job zip: {exc}") from None
+        finally:
+            (folder / "upload_job.zip").unlink(missing_ok=True)
+        paths.update({k: str(v) for k, v in got.items()})
+        names.append(Path(jz.filename).name)
     try:
         job = editor.load_tables(paths.get("measures"), paths.get("programcost"), paths.get("workbook"))
     finally:
-        for key in ("measures", "programcost"):
-            (folder / f"upload_{key}.csv").unlink(missing_ok=True)
+        import shutil
+        shutil.rmtree(unpacked, ignore_errors=True)
     return job, " + ".join(names)

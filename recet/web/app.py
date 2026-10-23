@@ -27,7 +27,7 @@ from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import __version__, versions
-from . import auth
+from . import auth, jobzip
 from .config import Settings
 from .db import Database
 from .runner import Runner, write_config
@@ -47,8 +47,7 @@ def doc_names() -> list[str]:
 # Upload fields of the New run form: field -> (RunConfig field, accepted extensions, label)
 UPLOADS = {
     "workbook": ("workbook", (".xlsx", ".xlsm"), "Job workbook"),
-    "measures": ("measures", (".csv", ".txt"), "Measure.csv"),
-    "programcost": ("programcost", (".csv", ".txt"), "ProgramCost.csv"),
+    "job_zip": ("job_zip", (".zip",), "Job zip (Measure.csv, optional ProgramCost.csv)"),     # unpacked into measures / programcost (jobzip.py)
     "profiles_8760": ("profiles_8760_file", (".csv", ".parquet", ".xlsx"), "8,760 electric profiles"),
     "profiles_gas": ("profiles_gas_file", (".csv", ".parquet", ".xlsx"), "Gas monthly profiles"),
     "run_parameters": ("run_parameters_file", (".csv", ".parquet", ".xlsx"), "Run parameters"),
@@ -223,6 +222,10 @@ async def save_upload(up: UploadFile, dest: Path, limit: int) -> int:
                 raise ValueError(f"{up.filename} is larger than the {limit // (1024 * 1024)} MB limit")
             f.write(chunk)
     return n
+
+
+BARE_CSV_MESSAGE = ("Upload Measure.csv and ProgramCost.csv together in one .zip file (ProgramCost.csv is optional), as CET takes them: "
+                    "a CSV on its own is not accepted.")
 
 
 def new_run_id() -> str:
@@ -453,7 +456,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
         source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
-                          max_mb=s.max_upload_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
+                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
 
     @app.get("/runs/new", response_class=HTMLResponse)
     async def new_run(request: Request, draft: str = ""):
@@ -516,24 +519,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # --- inputs
         mode = "draft" if draft else str(form.get("input_mode", "workbook"))
+        if any(isinstance(form.get(k), UploadFile) and form.get(k).filename for k in ("measures", "programcost")):
+            return fail(BARE_CSV_MESSAGE)
         ups = {k: form.get(k) for k in UPLOADS}
         ups = {k: v for k, v in ups.items() if isinstance(v, UploadFile) and v.filename}
         for k, v in ups.items():
             if Path(v.filename).suffix.lower() not in UPLOADS[k][1]:
-                return fail(f"{UPLOADS[k][2]}: use a {' or '.join(UPLOADS[k][1])} file ({v.filename} was given).")
+                return fail(BARE_CSV_MESSAGE if k == "job_zip" and Path(v.filename).suffix.lower() in jobzip.SUFFIXES
+                            else f"{UPLOADS[k][2]}: use a {' or '.join(UPLOADS[k][1])} file ({v.filename} was given).")
         if mode == "workbook":
-            ups.pop("measures", None)
-            ups.pop("programcost", None)
+            ups.pop("job_zip", None)
             if "workbook" not in ups:
                 return fail("Choose a job workbook (or switch to CET files).")
         elif mode == "files":
             ups.pop("workbook", None)
-            if "measures" not in ups:
-                return fail("Choose a Measure.csv (or switch to a job workbook).")
+            if "job_zip" not in ups:
+                return fail("Choose a job zip holding Measure.csv and, optionally, ProgramCost.csv (or switch to a job workbook).")
         else:
             ups.pop("workbook", None)
-            ups.pop("measures", None)
-            ups.pop("programcost", None)
+            ups.pop("job_zip", None)
 
         run_id = new_run_id()
         folder = ctx.runner.folder(run_id)
@@ -542,6 +546,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for k, up in ups.items():
                 dest = folder / "inputs" / f"{k}{Path(up.filename).suffix.lower()}"
                 await save_upload(up, dest, s.max_upload_bytes)
+                if k == "job_zip":                                   # the job's files, copied out to inputs/measures.csv and inputs/programcost.csv
+                    try:
+                        got = jobzip.unpack(dest, folder / "inputs", s.max_unzipped_bytes)
+                    finally:
+                        dest.unlink(missing_ok=True)
+                    for key, p in got.items():
+                        cfg[key] = str(p)
+                    names.append(f"Job zip: {Path(up.filename).name} ({', '.join('Measure.csv' if key == 'measures' else 'ProgramCost.csv' for key in got)})")
+                    continue
                 cfg[UPLOADS[k][0]] = str(dest)
                 names.append(f"{UPLOADS[k][2]}: {Path(up.filename).name}")
             if draft is not None:
@@ -553,6 +566,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     return fail(problem)
                 cfg.update(updates)
                 names.insert(0, f"Edited inputs: {draft['name']}")
+        except jobzip.JobZipError as exc:
+            shutil.rmtree(folder, ignore_errors=True)
+            return fail(f"Job zip: {exc}.")
         except Exception as exc:
             shutil.rmtree(folder, ignore_errors=True)
             return fail(str(exc))
