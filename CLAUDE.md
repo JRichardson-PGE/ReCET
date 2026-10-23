@@ -43,3 +43,6 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   (run_poc.savings_outputs / weighted_savings), discounted savings per ACC group (run_poc.discounted_savings), nominal participant-cost columns (engine), Wtd* /
   ProgramCosts / WeightedElecAlloc / lifecycle net benefits / Lev* (cost_tests). Deliberate differences: LevBenElec is TRC ElecBen per kWh (CET's export is
   ElecBen_SB: a column-order mix-up in CalcCost); gross discounted savings on dual-baseline measures use the net formula (CET's has two errors). C17 items 8-10.
+- 0.1.32 (2026-10-23): price_bill_impact, price_participant_cost, price_other_ben_cost (engine) and price_emissions (emissions) are column-wise; their
+  row-by-row originals are kept as *_per_measure references (tests/test_performance.py, and the re-check showed every output unchanged to 3e-14). Change the
+  arithmetic in both. 1,000,000 records: 4.5 min, 7.4 GB peak (README Performance).
