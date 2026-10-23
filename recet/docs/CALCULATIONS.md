@@ -29,6 +29,7 @@ Contents
 * [C16 Optional and secondary outputs](#c16-optional-and-secondary-outputs)
 * [C17 Validation, deliberate differences from CET, and limitations](#c17-validation-deliberate-differences-from-cet-and-limitations)
 * [C18 Worked example](#c18-worked-example)
+* [C19 Savings quantities, discounted savings and levelized values](#c19-savings-quantities-discounted-savings-and-levelized-values)
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -463,6 +464,22 @@ NetParticipantCostPV         = NTGc * (GrossParticipantCostPV + ExcessIncentives
 NetParticipantCostAdjustedPV = NetParticipantCostPV + MarkEffectPlusExcessIncPV                     (what the TRC / SCT costs use)
 ```
 
+CET's nominal (undiscounted) participant columns, and the rest of its participant-cost columns, follow the same steps without `PVF`:
+
+```text
+IncentiveToOthers = Q * UnitIncentiveToOthers      DILaborCost = Q * UnitDirectInstallLab      DIMaterialCost = Q * UnitDirectInstallMat      EndUserRebate = Rebates
+GrossMeasureCost  = GrossMeasCost                  ExcessIncentives = pos( IncentsDI - GrossMeasCost )
+MarkEffectPlusExcessInc        = MEC * (GrossMeasCost + ExcessIncentivesPV)            (CET adds the PV excess incentives to the nominal cost; copied, it matches CET)
+GrossParticipantCost           = GrossMeasCost - (IncentsDI + Rebates)
+GrossParticipantCostAdjusted   = GrossParticipantCost + ExcessIncentives + MarkEffectPlusExcessInc
+GrossParticipantCostAdjustedPV = GrossParticipantCostPV + ExcessIncentivesPV + MarkEffectPlusExcessIncPV
+NetParticipantCost             = NTGc * (GrossParticipantCost + ExcessIncentives)
+NetParticipantCostAdjusted     = NetParticipantCost + MarkEffectPlusExcessInc
+```
+
+`GrossMeasCostPV` and `ExcessIncentivesPV` are output columns too. For an early replacement the nominal and PV measure costs are built differently, as in CET: the nominal one is the
+2nd-baseline cost, the PV one the 1st-baseline cost less the inflation-adjusted difference.
+
 The `_sct` columns (`RebatesandIncentsPV_sct`, `GrossParticipantCostPV_sct`, `NetParticipantCostPV_sct`, `NetParticipantCostAdjustedPV_sct`) are the same with `Rqf_sct`.
 All of these match CET's own columns to the cent with 0% and 5% market effects (CET jobs 121842 / 121841, 13 measures, four of them accelerated replacements). With `MEC = 0` the market-effects term is 0.
 
@@ -546,6 +563,14 @@ WeightedProgramCost = share_m * SumCosts                 nominal (undiscounted) 
 
 ```text
 TotalExpenditures = RebatesandIncents + WeightedProgramCost          nominal dollars
+```
+
+**C11.4 Program-cost components and the electric share.** CalcCost also reports each program-cost field's share and, per measure, the electric part of its own benefits (which the
+levelized columns of C19.6 use to split a cost between the fuels):
+
+```text
+Wtd<field>        = share_m * SUM_r <field>_r          for each of the ten fields of T_r (nominal)          ProgramCosts = SUM of the ten = WeightedProgramCost
+WeightedElecAlloc = ratio( pos(ElecBen) , pos(ElecBen) + pos(GasBen) + pos(WaterEnergyBen) + pos(OtherBen) )          the measure's own benefits, not the program's
 ```
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -734,7 +759,8 @@ statewide programs unallocated; First Year = claim year; 0% market effects), pri
 
 | Output | ReCET / CET | Note |
 |---|---|---|
-| `GasBen`, `GasBen_SB`, `GasBen_SH`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost`, `TotalExpenditures`, `FirstYearNetKWh`, `FirstYearNetThm` | 1.0000 | `GasBen` agrees on every measure |
+| `GasBen`, `GasBen_SB`, `GasBen_SH`, `OtherBen`, `RebatesandIncentsPV`, `NetParticipantCostPV`, `WeightedProgramCost`, `TotalExpenditures` | 1.0000 | `GasBen` agrees on every measure |
+| every savings column (C19.1-C19.4), the nominal participant-cost columns (C8), the program-cost components (C11.4), `DiscountedSavingsNet...` | 1.0000 | every measure (discounted savings within 2e-6) |
 | `BillReducElec`, `BillIncrElec` | 1.0000 | every measure within 1% |
 | `BillReducGas` | 0.9995 | |
 | `TRCCost` / `PACCost` / `RIMCost` | 0.9992 / 0.9956 / 0.9997 | |
@@ -760,11 +786,19 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 2. `GasSupplyCostGross` is the net value divided by NTG; CET assigns it the net value.
 3. `SCBCost` / `SCHCost` discount program costs at the societal rate; CET uses the primary rate for them.
 4. Electric `_SB` / `_SH` are priced on the real `SCT Base` / `SCT High` rows for every measure. For legacy DEER-named end uses CET's table holds TRC values in its SCT columns (so CET's SB = SH there).
-5. `WeightedElecAlloc` (which CET computes with a `_SB`/`_SH` mix-up) is not produced.
+5. (Withdrawn 2026-10-23: `WeightedElecAlloc` is produced and follows CET's formula, C11.4. CalcCE's `_SB`/`_SH` mix-up in `BenPos` touches no exported column.)
 6. Unallocated statewide rows use `PA = SCE` for discounting, as CET did in the real runs; the effect is nil when every cost falls in the First Year.
 7. Every electric measure is priced from an 8,760 with the 2018 calendar alignment of C4.2 (2026-10-02). CET instead prices TOU end uses from CEDARS' TOU calculators (Gen at
    full-year period means; T&D on kW with a duplicate /1000, about 1,000 times too small) and shifts other profiles to each forecast year's weekdays with a one-day error on
    negative offsets; it prices SCG from its own quarterly table.
+8. **TOU societal (`_SB` / `_SH`) electric values** are priced like every other end use, on the ACC's own `SCT Base` / `SCT High` rows (which leave out the cap-and-trade carbon component).
+   CET's TOU societal values keep the cap-and-trade component alongside the social cost of carbon, so carbon is counted twice (about $21/MWh, 13% of the price), and they carry its TOU
+   T&D error (item 7). This is a deliberate departure from CET, confirmed 2026-10-23; it is why TOU `ElecBen_SB` / `_SH` differ from CET's in the table above.
+9. `LevBenElec` is `ElecBen / DiscountedSavingsNetkWh`. CET's exported `LevBenElec` is `ElecBen_SB / DiscountedSavingsNetkWh` on every measure: CalcCost's `LevelizedCost` step names its
+   three `LevBenElec` columns in a different order from the values it selects, so the TRC value lands under another name.
+10. `DiscountedSavingsGross...` on early-replacement measures (`RUL_Yrs` > 0): ReCET's is the net formula without NTG (C19.5). CET's gross kWh counts one 2nd-baseline year too many
+   (`Raf ^ -(EUL - RUL)` where its net version has `- 1`) and its gross therms leave the 2nd baseline undiscounted (a misplaced bracket), so CET's gross and net disagree even at NTG = 1.
+   Single-baseline measures match CET.
 
 **Limitations.**
 
@@ -780,9 +814,8 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 * The gas ACCs are extracted from E3's workbooks, not taken from CET. The project notes record an unexplained 0.7-2.9% gap between the workbook's gas Commodity and CET's own gas-table export; it does not show in the real runs, where `GasBen` agrees to 4 decimals.
 * Emissions beyond the last ACC year are not counted (C14.1), and NOx/PM10 come from the Emissions table (CET's), which covers only part of the keys.
 * Input columns that are read but not used: `RateScheduleElec`, `RateScheduleGas` (rate schedules always come from `PA` and sector), and every descriptive column (INPUT_FIELDS.md lists them).
-* CET output fields not produced: the savings-quantity columns other than `FirstYearNetKWh`, `FirstYearNetKW` and `FirstYearNetThm` (the gross first-year, lifecycle and annual
-  `KWh`, `KW`, `Thm`, `KWhWater`, `KWhSite` and `DiscountedSavings...` columns), `WeightedSavings`, `WeightedElecAlloc`, `WtdAdminCosts...`, `ProgramCosts`, `TRCLifecycleNetBen`,
-  `PACLifecycleNetBen`, and the levelized `Lev...` columns (whether those are still needed is RAID decision D9 in the replacement BRD).
+* Every CET measure-level output column is produced (2026-10-23) except `JobID` (CET's job number) and `PA`, which in CET's output is the measure's `IOU_AC_Territory` (echoed with the
+  inputs). Whether the levelized `Lev...` columns are still needed is RAID decision D9 in the replacement BRD.
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -871,19 +904,71 @@ The societal values follow C5.6: for example `ElecBen_SB` reprices the same quar
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
-## C19 First-year net savings
+## C19 Savings quantities, discounted savings and levelized values
 
-CET's first-year net savings (CalcSavings, "First Year Net"), quantities rather than dollars:
+CET's savings columns (CalcSavings) and the columns CalcCost builds on them. All use `EUL_Yrs` **as filed** (no 0.25-year floor) and `RUL = max(RUL_Yrs, 0)`. For each fuel,
+`a1` / `a2` are the per-unit 1st / 2nd-baseline amounts, `IR` / `RR` its installation and realization rates and `NTG` its net-to-gross ratio:
+
+| Suffix | `a1` / `a2` | `IR`, `RR`, `NTG` |
+|---|---|---|
+| `KWh` | `kWh1 + Wt1` / `kWh2 + Wt2` (site plus IOU water) | `IRe`, `RRe`, `NTGRkWh` |
+| `KWhSite` | `kWh1` / `kWh2` | the same |
+| `KWhWater` | `Wt1` / `Wt2` | the same |
+| `KW` | `kW1` / `kW2` | `IRkw`, `RRkw`, `NTGRkW` |
+| `Thm` | `Th1` / `Th2` | `IRt`, `RRt`, `NTGt` |
+
+Every `Net` column is its `Gross` column times `(NTG + MEB)`.
+
+**C19.1 First year.**
 
 ```text
-FirstYearNetKWh = Q * (NTGRkWh + MEB) * IRe * RRe * ( w1 * (kWh1 + Wt1) + w2 * (kWh2 + Wt2) )
-FirstYearNetKW  = Q * (NTGRkW  + MEB) * IRkw * RRkw * ( w1 * kW1 + w2 * kW2 )
-FirstYearNetThm = Q * (NTGt + MEB) * IRt * RRt * ( w1 * Th1 + w2 * Th2 )
+FirstYearGross<x> = Q * IR * RR * ( w1 * a1 + w2 * a2 )
 
 w1 = 1 if RUL > 1;  RUL if 0 < RUL < 1;  EUL if RUL = 0 and EUL < 1;  1 otherwise
 w2 = EUL - RUL if 0 < RUL < 1 and EUL < 1;  1 - RUL if 0 < RUL < 1 and EUL >= 1;  0 otherwise
 ```
 
-`EUL` here is `EUL_Yrs` as filed (no 0.25-year floor). An RUL of exactly 1 takes the "otherwise" branches, as CET's SQL does. Checked against CET's own columns on jobs
-121219, 121842 and 121841 (0% and 5% market effects): equal to rounding for every measure.
+An RUL of exactly 1 takes the "otherwise" branches, as CET's SQL does.
 
+**C19.2 Lifecycle** (no `KW` column):
+
+```text
+LifecycleGross<x> = Q * IR * RR * EUL * a1                           if RUL = 0
+                  = Q * IR * RR * ( a1 * RUL + a2 * (EUL - RUL) )     if RUL > 0
+```
+
+**C19.3 Annual average.** `AnnualGross<x> = LifecycleGross<x> / EUL` (0 when `EUL` = 0), the same expression for `KW`.
+
+**C19.4 Savings share.** Within a program (`PrgID`), CET's savings-based weight, which no cost test uses (program costs are shared by benefits, C11.2):
+
+```text
+S_m = pos(FirstYearGrossKWh) + pos(29.307111111 * FirstYearGrossThm)          (kWh per therm)
+WeightedSavings = S_m / SUM over the program's measures of S        if that sum is not 0;  1 / (number of measures in the program) if it is 0
+```
+
+**C19.5 Discounted savings.** Site kWh (no water) and therms, each year discounted at the annual rate, the whole brought to the First Year at the quarterly rate (`PVF` of C8):
+
+```text
+A(n) = 1 + (1 - Raf ^ -(n - 1)) / DiscountRateAnnual                 the sum of Raf ^ -t for t = 0 ... n-1 (n may be fractional)
+
+DiscountedSavingsGross<f> = Q * IR * RR * a1 * A(EUL) / PVF                                           if RUL = 0
+                          = Q * IR * RR * ( a1 * A(RUL) + a2 * A(EUL - RUL) / Raf ^ RUL ) / PVF       if RUL > 0
+                          = 0                                                                          if a1 = 0 or EUL = 0
+<f> = kWh (the KWhSite amounts) or Thm
+```
+
+These are the measure-level values of the measure's own ACC version (C3.5): `Raf`, `PVF` use that version's run parameters.
+
+**C19.6 Lifecycle net benefits and levelized values.** With `W = WeightedElecAlloc` (C11.4), `DSe = DiscountedSavingsNetkWh`, `DSg = DiscountedSavingsNetThm`:
+
+```text
+TRCLifecycleNetBen = ElecBen + GasBen - TRCCost              PACLifecycleNetBen = ElecBen + GasBen - PACCost
+LevBenElec = ratio(ElecBen, DSe)                             LevBenGas = ratio(GasBen, DSg)
+Lev<T>     = ratio(<T> * W, DSe)                             <T> = TRCCost, TRCCostNoAdmin, PACCost, PACCostNoAdmin, RIMCost
+LevNetBen<t>Elec<v> = ratio(ElecBen - <t>Cost<v> * W, DSe)   LevNetBen<t>Gas<v> = ratio(GasBen - <t>Cost<v> * (1 - W), DSg)       <t> = TRC, PAC (<v> = "" or NoAdmin), RIM
+```
+
+**Checks against CET.** C19.1-C19.4 match CET's own columns to rounding on every measure of jobs 121219-121222 (21,370 measures), 121842 (0% market effects) and 121841 (5%).
+The net discounted savings match to 2e-6 (relative) on every measure. The program-cost components match CET's program totals exactly. The levelized and allocation columns, computed
+from CET's own benefit, cost and discounted-savings columns, reproduce CET's on every measure except `LevBenElec` (C17, deliberate difference 9); with ReCET's own benefits they differ from
+CET's as the benefits do (C17).

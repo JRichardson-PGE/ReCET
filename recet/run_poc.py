@@ -397,6 +397,12 @@ def _split_water(value: pd.Series, kwh_water_1st: pd.Series) -> tuple[pd.Series,
     return value.where(kwh_water_1st > 0, 0.0), (-value).where(kwh_water_1st < 0, 0.0)
 
 
+# CalcCost's undiscounted cost components and the rest of its participant-cost columns (CET_v25.1_documentation_extracted.txt:16672-16800), from engine.price_participant_cost
+PARTICIPANT_EXTRA = ["IncentiveToOthers", "DILaborCost", "DIMaterialCost", "EndUserRebate", "GrossMeasureCost", "ExcessIncentives", "MarkEffectPlusExcessInc",
+                     "GrossParticipantCost", "GrossParticipantCostAdjusted", "NetParticipantCost", "NetParticipantCostAdjusted", "GrossMeasCostPV", "ExcessIncentivesPV",
+                     "GrossParticipantCostAdjustedPV"]
+
+
 def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                            market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
     """
@@ -458,7 +464,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     df = df.merge(gas_value, on="measure_id", how="left")
     df = df.merge(water_value, on="measure_id", how="left")
     df = df.merge(participant[["measure_id", "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV",
-                               "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"]], on="measure_id", how="left")
+                               "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"] + PARTICIPANT_EXTRA], on="measure_id", how="left")
     df = df.merge(other, on="measure_id", how="left")
     df = df.merge(bill_impact, on="measure_id", how="left")
     df[["elec_value", "gas_value", "water_value"]] = df[["elec_value", "gas_value", "water_value"]].fillna(0.0)
@@ -513,7 +519,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
                "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost", "WaterEnergyBen", "WaterEnergyCost",
                "OtherBen", "OtherCost", "TaxCredits", "OtherBenGross", "OtherCostGross", "TaxCreditsGross",
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
-               "GrossParticipantCostPV", "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas",
+               "GrossParticipantCostPV",
+               *PARTICIPANT_EXTRA, "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas",
                "BillReducElecGross", "BillIncrElecGross", "BillReducGasGross", "BillIncrGasGross", "PCTBen", "PCTCost", "PCTRatio",
                "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
 
@@ -679,26 +686,98 @@ def _first_year_weights(rul: pd.Series, eul: pd.Series) -> tuple[pd.Series, pd.S
     return pd.Series(w1, index=rul.index), pd.Series(w2, index=rul.index)
 
 
-def first_year_net_savings(measures: pd.DataFrame, market_effects_bens: float = 0.0) -> pd.DataFrame:
-    """CET's first-year NET savings per measure (CalcSavings, "First Year Net"; market effects included as NTG + MEBens):
+THERM_TO_KWH = 29.307111111          # CalcSavings' @ThermConv: kWh per therm, for WeightedSavings
 
-        FirstYearNetKWh = Q x (NTGRkWh + MEB) x IRkWh x RRkWh x [ w1 x (kWh1 + kWhWater1) + w2 x (kWh2 + kWhWater2) ]
-        FirstYearNetKW  = Q x (NTGRkW  + MEB) x IRkW  x RRkW  x [ w1 x kW1 + w2 x kW2 ]
-        FirstYearNetThm = Q x (NTGRThm + MEB) x IRThm x RRThm x [ w1 x Thm1 + w2 x Thm2 ]
 
-    with w1 / w2 from _first_year_weights. CET's kWh total includes the IOU water energy (its FirstYearNetKWhSite leaves it out). Uses the raw EUL_Yrs
-    (not the 0.25-year floor the pricing applies), as CalcSavings does."""
+def _savings_quantities(m: pd.DataFrame) -> dict[str, pd.Series]:
+    """Per fuel: (units x installation x realization, 1st-baseline amount, 2nd-baseline amount, NTG) -- the pieces every CalcSavings column is built from."""
+    q = m["num_units"].astype(float)
+    return {
+        "KWh": (q * m["ir_kwh"] * m["rr_kwh"], m["unit_kwh_1st"] + m["kwh_water_1st"], m["unit_kwh_2nd"] + m["kwh_water_2nd"], m["ntgr_kwh"]),
+        "KWhSite": (q * m["ir_kwh"] * m["rr_kwh"], m["unit_kwh_1st"], m["unit_kwh_2nd"], m["ntgr_kwh"]),
+        "KWhWater": (q * m["ir_kwh"] * m["rr_kwh"], m["kwh_water_1st"], m["kwh_water_2nd"], m["ntgr_kwh"]),
+        "KW": (q * m["ir_kw"] * m["rr_kw"], m["unit_kw_1st"], m["unit_kw_2nd"], m["ntgr_kw"]),
+        "Thm": (q * m["ir_therm"] * m["rr_therm"], m["unit_therm_1st"], m["unit_therm_2nd"], m["ntgr_therm"]),
+    }
+
+
+def savings_outputs(measures: pd.DataFrame, market_effects_bens: float = 0.0) -> pd.DataFrame:
+    """CET's savings quantities per measure (CalcSavings, CET_v25.1_documentation_extracted.txt:20804-21356), gross and net (net = x (NTG + MEB)):
+
+        FirstYear = Q x IR x RR x ( w1 x a1 + w2 x a2 )                           (w1 / w2 from _first_year_weights)
+        Lifecycle = Q x IR x RR x EUL x a1                                       when RUL = 0
+                  = Q x IR x RR x ( a1 x RUL + a2 x (EUL - RUL) )                 when RUL > 0
+        Annual    = Lifecycle / EUL                                              (the lifetime average)
+
+    for a = kWh (site + IOU water: `KWh`), site kWh only (`KWhSite`), IOU water kWh only (`KWhWater`), kW (`KW`; no Lifecycle column) and therms (`Thm`).
+    Uses the raw EUL_Yrs, as CalcSavings does (not the pricing's 0.25-year floor). Quantities, not dollars; nothing is priced."""
     m = measures
     rul = m["rul_years_exact"].astype(float)
     eul = m["eul_years_raw"].astype(float) if "eul_years_raw" in m else m["eul_years_exact"].astype(float)
     w1, w2 = _first_year_weights(rul, eul)
-    q = m["num_units"].astype(float)
     meb = float(market_effects_bens or 0.0)
-    kwh = q * (m["ntgr_kwh"] + meb) * m["ir_kwh"] * m["rr_kwh"] * (w1 * (m["unit_kwh_1st"] + m["kwh_water_1st"]) + w2 * (m["unit_kwh_2nd"] + m["kwh_water_2nd"]))
-    kw = q * (m["ntgr_kw"] + meb) * m["ir_kw"] * m["rr_kw"] * (w1 * m["unit_kw_1st"] + w2 * m["unit_kw_2nd"])
-    thm = q * (m["ntgr_therm"] + meb) * m["ir_therm"] * m["rr_therm"] * (w1 * m["unit_therm_1st"] + w2 * m["unit_therm_2nd"])
-    return pd.DataFrame({"measure_id": m["measure_id"].to_numpy(), "FirstYearNetKWh": kwh.to_numpy(), "FirstYearNetKW": kw.to_numpy(),
-                         "FirstYearNetThm": thm.to_numpy()})
+    out = {"measure_id": m["measure_id"].to_numpy()}
+    for name, (base, a1, a2, ntg) in _savings_quantities(m).items():
+        first = base * (w1 * a1 + w2 * a2)
+        life = base * pd.Series(np.where(rul > 0, a1 * rul + a2 * (eul - rul), eul * a1), index=m.index)
+        annual = (life / eul.where(eul != 0)).fillna(0.0)
+        net = ntg + meb
+        out[f"FirstYearGross{name}"], out[f"FirstYearNet{name}"] = first.to_numpy(), (first * net).to_numpy()
+        if name != "KW":
+            out[f"LifecycleGross{name}"], out[f"LifecycleNet{name}"] = life.to_numpy(), (life * net).to_numpy()
+        out[f"AnnualGross{name}"], out[f"AnnualNet{name}"] = annual.to_numpy(), (annual * net).to_numpy()
+    order = [f"{p}{gn}{f}" for p in ("FirstYear", "Lifecycle", "Annual") for gn in ("Gross", "Net") for f in ("KWh", "KWhSite", "KWhWater", "KW", "Thm")
+             if not (p == "Lifecycle" and f == "KW")]
+    return pd.DataFrame(out)[["measure_id"] + order]
+
+
+def weighted_savings(sav: pd.DataFrame, prg: pd.Series) -> pd.Series:
+    """CalcSavings' WeightedSavings: a measure's share of its program's positive first-year gross savings, therms converted at THERM_TO_KWH kWh per therm;
+    1 / (measures in the program) when the program has none. Not used by any cost test (CET shares program costs by benefits, WeightedBenefits)."""
+    pos = sav["FirstYearGrossKWh"].clip(lower=0.0) + (THERM_TO_KWH * sav["FirstYearGrossThm"]).clip(lower=0.0)
+    from .pipeline.cost_tests import _share
+    return _share(pos, prg)
+
+
+def discounted_savings(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0) -> pd.DataFrame:
+    """CalcCost's discounted savings (DiscountedSavings CTE, CET_v25.1_documentation_extracted.txt:16851-16904), the denominators of the levelized columns:
+    the lifetime kWh (site only, no water) and therms, each year discounted at the PA's annual rate and the whole brought back to the run's First Year at the
+    quarterly rate:
+
+        A(n) = 1 + (1 - Raf^-(n - 1)) / Ra                       (n years, the first undiscounted: sum of Raf^-t for t = 0 .. n-1)
+        DS   = Q x IR x RR x a1 x A(EUL) / Rqf^Qm                                          when RUL = 0
+             = Q x IR x RR x ( a1 x A(RUL) + a2 x A(EUL - RUL) / Raf^RUL ) / Rqf^Qm          when RUL > 0
+        Net  = DS x (NTG + MEB);  0 when the 1st-baseline amount a1 is 0 or EUL is 0 (as CET)
+
+    Ra / Raf / Rqf are the PA's annual rate, 1 + it and 1 + the quarterly rate; Qm the claim quarter's offset from the First Year. CET's Gross versions differ
+    from its Net ones on dual-baseline measures (its gross kWh counts one 2nd-baseline year too many, its gross therms leave the 2nd baseline undiscounted;
+    finding C-3); ReCET's Gross is the Net formula without the NTG, so the two agree whenever NTG + MEB = 1."""
+    m = measures
+    if m.empty:
+        return pd.DataFrame(columns=["measure_id", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"])
+    ra = m["PA"].map({pa: discount_settings.get_discount_rate_annual(pa, acc_version) for pa in m["PA"].unique()}).astype(float)
+    rq = m["PA"].map({pa: discount_settings.get_discount_rate_qtr(pa, acc_version) for pa in m["PA"].unique()}).astype(float)
+    raf = 1.0 + ra
+    qm = (m["claim_year"] - base_year) * 4 + (m["claim_quarter"] - 1)
+    pv = (1.0 + rq) ** qm
+    rul = m["rul_years_exact"].astype(float)
+    eul = m["eul_years_raw"].astype(float) if "eul_years_raw" in m else m["eul_years_exact"].astype(float)
+
+    def annuity(n):
+        return 1.0 + (1.0 - raf ** -(n - 1.0)) / ra
+
+    out = {"measure_id": m["measure_id"].to_numpy()}
+    q = _savings_quantities(m)
+    meb = float(market_effects_bens or 0.0)
+    for name, key in (("kWh", "KWhSite"), ("Thm", "Thm")):
+        base, a1, a2, ntg = q[key]
+        dual = a1 * annuity(rul) + a2 * annuity(eul - rul) / raf ** rul
+        single = a1 * annuity(eul)
+        gross = base * pd.Series(np.where(rul > 0, dual, single), index=m.index) / pv
+        gross = gross.where((a1 != 0) & (eul != 0) & eul.notna(), 0.0).fillna(0.0)
+        out[f"DiscountedSavingsGross{name}"] = gross.to_numpy()
+        out[f"DiscountedSavingsNet{name}"] = (gross * (ntg + meb)).to_numpy()
+    return pd.DataFrame(out)[["measure_id", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"]]
 
 
 def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFrame | None = None,
@@ -750,7 +829,8 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     d = measures[["measure_id", "prg_id", "NTGRkWh", "ntgr_therm"]].copy()
     d["NTGRkWh"] = d["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
     d["ntgr_therm"] = d["ntgr_therm"] + market_effects_bens
-    return d.merge(trc, on="measure_id").merge(sct, on="measure_id")
+    ds = discounted_savings(measures, acc_version, base_year, market_effects_bens)       # the levelized columns' denominators, at this group's ACC rates
+    return d.merge(trc, on="measure_id").merge(sct, on="measure_id").merge(ds, on="measure_id", how="left")
 
 
 def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
@@ -759,7 +839,9 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
     Program costs are discounted with the run's own ACC version's rates (`acc_version`)."""
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
     out = cost_tests.compute_cost_tests(d, prog)
-    out = out.merge(first_year_net_savings(measures, market_effects_bens), on="measure_id", how="left")
+    sav = savings_outputs(measures, market_effects_bens)
+    sav["WeightedSavings"] = weighted_savings(sav, measures["prg_id"].reset_index(drop=True)).to_numpy()          # savings_outputs keeps the measures' order
+    out = out.merge(sav, on="measure_id", how="left")
     if not include_societal:
         out[[c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]] = float("nan")
     return out

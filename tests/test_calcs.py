@@ -185,8 +185,9 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         e.update(ref.other(raw, d, meb, mec))
         p1, p2 = ref.participant(raw, d, st["qtr"], first_year, mec), ref.participant(raw, d, st["qtr_sct"], first_year, mec)
         e.update(p1)
-        e.update({f"{k}_sct": v for k, v in p2.items() if k not in ("MarkEffectPlusExcessIncPV", "RebatesandIncents")})   # the tool has no _sct column of those
-        e.update(ref.first_year_net(raw, d, meb))
+        e.update({f"{k}_sct": p2[k] for k in ref.PARTICIPANT_SCT})                    # the tool's _sct participant columns
+        e.update(ref.savings(raw, d, meb))
+        e.update(ref.discounted_savings(raw, d, st["annual"], st["qtr"], first_year, meb))
         rates_e = ref.rate_series("elec", "PGE", E3_VERSION, raw["AC_Elec_Target_Sector"])
         rates_g = ref.rate_series("gas", "PGE", E3_VERSION, raw["AC_Gas_Target_Sector"])
         fe = (d["ntg_kwh"] + meb) / d["ntg_kwh"] if (meb and d["ntg_kwh"] > 0) else 1.0           # C9: bill impacts use NTG + MEB as well
