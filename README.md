@@ -87,6 +87,24 @@ read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.p
     result.frame            # the measure-level table
     result.files            # every file written
 
+## Performance
+
+The replacement BRD's target (NFR Performance) is at least 1,000,000 records priced on 8,760 profiles in 15 minutes or less. Measured with
+`poc/benchmark_recet_scale.py` in the CEDARS review research repository: the four real PG&E 2028-2031 jobs repeated to 1,000,000 records, the 2024 ACC,
+societal tests and emissions on, one process on a 16-thread laptop with 11.6 GB of memory (version 0.1.32, 2026-10-23):
+
+| Stage | Seconds |
+|---|---|
+| preflight checks | 39 |
+| loading | 22 |
+| pricing (TRC, SCB, SCH, PAC, RIM, bill impacts, emissions) | 167 |
+| writing results (parquet) | 43 |
+| **total** | **272 (4.5 minutes, about 3,700 records a second)** |
+
+Peak memory was 7.4 GB. Before 0.1.32 the same job took 8.6 minutes (pricing 401 s): the bill-impact, participant-cost, other-benefit and emissions steps
+looped over measures one row at a time and are now computed on whole columns (`pipeline/engine.py`, `pipeline/emissions.py`; the row-by-row versions are kept
+as `..._per_measure` references that the tests compare them with). The web app's own limits (upload size, one worker, its server's memory) are separate.
+
 ## Tests
 
     pip install -e ".[test]"  &&  pytest        # from the repository root; the unit tests need no reference data

@@ -320,3 +320,41 @@ def test_data_clear_cache_removes_the_cache(tmp_path, capsys):
     with pytest.raises(SystemExit):
         cli.main(["data", "clear-cache"])
     assert "no cache" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------------------------------------------- the array versions of three per-row loops
+def _cost_inputs(seed: int, n: int = 400) -> pd.DataFrame:
+    """Measures covering every branch: single and dual baseline (RUL whole, fractional, 0), fractional and short lives, fuel substitution and not, signs of both
+    savings, incentives above and below the measure cost, two PAs and sectors, one sector with no rate table, claims before and after the First Year."""
+    rng = np.random.default_rng(seed)
+    rul = rng.choice([0.0, 0.0, 0.5, 1.0, 2.25, 3.0, 7.75], n)
+    eul = np.maximum(rul + rng.choice([0.0, 0.25, 1.0, 4.4, 10.0], n), rng.choice([0.25, 1.0, 3.5, 12.0], n))
+    return pd.DataFrame({
+        "measure_id": [f"m{i}" for i in range(n)], "PA": rng.choice(["PGE", "SCE"], n), "target_sector": rng.choice(["Res", "Com", "NoTable"], n),
+        "gas_sector": rng.choice(["Residential", "Commercial", "NoTable"], n),
+        "claim_year": rng.choice([2027, 2028, 2030], n), "claim_quarter": rng.choice([1, 2, 3, 4], n), "rul_years_exact": rul, "eul_years_exact": eul,
+        "ir_kwh": rng.uniform(0.8, 1.0, n), "rr_kwh": rng.uniform(0.8, 1.1, n),
+        "annual_net_kwh_1st": rng.normal(0, 5000, n), "annual_net_kwh_2nd": rng.normal(0, 3000, n),
+        "annual_net_therms_1st": rng.normal(0, 300, n), "annual_net_therms_2nd": rng.normal(0, 200, n), "is_fuel_sub": rng.random(n) < 0.5,
+        "num_units": rng.integers(1, 50, n).astype(float), "NTGRkWh": rng.uniform(0.5, 1.0, n), "ntgr_cost": rng.uniform(0.5, 1.0, n),
+        "unit_incentive_to_others": rng.uniform(0, 400, n), "unit_di_labor": rng.uniform(0, 100, n), "unit_di_material": rng.uniform(0, 100, n),
+        "unit_end_user_rebate": rng.uniform(0, 200, n), "unit_meas_cost_1st": rng.uniform(50, 900, n), "unit_meas_cost_2nd": rng.uniform(20, 600, n),
+        "meas_inflation": rng.choice([0.0, 0.02], n), "unit_gas_infra_bens": rng.uniform(0, 10, n), "unit_refrig_bens": rng.uniform(0, 10, n),
+        "unit_misc_bens": rng.uniform(0, 10, n), "unit_refrig_costs": rng.uniform(0, 10, n), "unit_misc_costs": rng.uniform(0, 10, n),
+        "unit_tax_credits": rng.uniform(0, 10, n),
+    })
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_array_bill_impact_participant_and_other_costs_equal_the_per_measure_versions(seed):
+    m = _cost_inputs(seed)
+    tables = {(pa, s): {y: 0.1 + 0.01 * (y - 2024) + (0.03 if pa == "SCE" else 0.0) for y in range(2024, 2041) if y != 2033}       # 2033 missing
+              for pa in ("PGE", "SCE") for s in ("Res", "Com", "Residential", "Commercial")}
+    elec, gas = (lambda r: tables.get((r["PA"], r["target_sector"]))), (lambda r: tables.get((r["PA"], r["gas_sector"])))
+    rate = lambda r: 0.0766 if r["PA"] == "PGE" else 0.0765
+    for got, ref in ((engine.price_bill_impact(m, elec, gas, rate, 2024), engine.price_bill_impact_per_measure(m, elec, gas, rate, 2024)),
+                     (engine.price_participant_cost(m, lambda r: rate(r) / 4, 2028, 0.05), engine.price_participant_cost_per_measure(m, lambda r: rate(r) / 4, 2028, 0.05)),
+                     (engine.price_other_ben_cost(m, 0.05, 0.05), engine.price_other_ben_cost_per_measure(m, 0.05, 0.05))):
+        pd.testing.assert_frame_equal(got[ref.columns].reset_index(drop=True), ref.reset_index(drop=True), check_dtype=False, rtol=1e-12, atol=1e-9)
+    bills = engine.price_bill_impact(m, elec, gas, rate, 2024)
+    assert (bills.BillIncrElec > 0).any() and (bills.BillReducElec < 0).any() and (bills.BillReducGas != 0).any()      # both sign rules were exercised
