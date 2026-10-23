@@ -56,3 +56,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   pricing gains nothing from them), so import recet before numpy in new entry points; `AccStore.series` returns read-only views of a memory-mapped, already-divided
   cache file (`scaled_column`) instead of copies (bit-identical; copies only without the cache), so never write into a series in place. 1,000,000 records:
   5.0 min, 0.96 GB committed.
+- 0.1.35 (2026-10-23, Jake): the web app takes a job's CET files only as ONE .zip (Measure.csv required, ProgramCost.csv optional; `web/jobzip.py`), as CET
+  does: a bare CSV is refused on New run and Edit inputs. The zip may hold only those two files (any case, .csv/.txt, top level or one folder; macOS/Windows
+  extras skipped); each is copied out to `inputs/measures.csv` / `inputs/programcost.csv` (the zip is deleted), byte-counted against
+  RECET_WEB_MAX_UNZIPPED_MB (1024). Uploads are capped at 150 MB per file (RECET_WEB_MAX_UPLOAD_MB, was 50); the edge nginx must allow it too.

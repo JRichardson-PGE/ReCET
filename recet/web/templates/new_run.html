@@ -24,16 +24,16 @@
   {% else %}
   <div class="radios" id="input-mode">
     <label><input type="radio" name="input_mode" value="workbook" {% if f.get('input_mode', 'workbook') == 'workbook' %}checked{% endif %}> Job workbook (.xlsx)</label>
-    <label><input type="radio" name="input_mode" value="files" {% if f.get('input_mode') == 'files' %}checked{% endif %}> CET files (Measure.csv, ProgramCost.csv)</label>
+    <label><input type="radio" name="input_mode" value="files" {% if f.get('input_mode') == 'files' %}checked{% endif %}> CET files in a .zip (Measure.csv, ProgramCost.csv)</label>
   </div>
   <div class="mode-workbook">
     <label class="file">Job workbook <input type="file" name="workbook" accept=".xlsx,.xlsm"></label>
     <p class="muted small">Sheets: Measure (required), ProgramCost, and the optional RunParameters, SWAllocation, GasProfiles, Profiles8760 and Programs.</p>
   </div>
   <div class="mode-files">
-    <label class="file">Measure.csv <input type="file" name="measures" accept=".csv,.txt"></label>
-    <label class="file">ProgramCost.csv <span class="muted">(optional)</span> <input type="file" name="programcost" accept=".csv,.txt"></label>
-    <p class="muted small">CET's pipe-delimited format, or an ordinary comma-delimited CSV with the same columns.</p>
+    <label class="file">Job zip <input type="file" name="job_zip" accept=".zip"></label>
+    <p class="muted small">One .zip holding <code>Measure.csv</code> and, optionally, <code>ProgramCost.csv</code>, as CET takes them (a CSV on its own is not accepted).
+      Each in CET's pipe-delimited format, or an ordinary comma-delimited CSV with the same columns. Up to {{ max_unzipped_mb }} MB once unzipped.</p>
   </div>
   {% endif %}
   <details>
