@@ -215,6 +215,13 @@ off until you load one version's run folder.
 5. **Components** (if on), then **assemble and write** the measure-level table, the portfolio summary and any optional files; **combined 8760 profile** and **CET comparison** if requested.
 6. **Record.** `run_settings.json` lists the exact settings, files and timings.
 
+**Large jobs run in parts.** A `Measure.csv` with more than 50,000 rows (the `chunk_size` setting, `--chunk-size`) is split into parts of that many rows in the
+run folder's `_parts` folder (deleted at the end), and steps 2-5 work on one part at a time, so the run's memory is about that of one part whatever the job's size.
+The preflight checks each part and checks duplicate CEInputIDs and the ProgramCost alignment over the whole file. Pricing makes two passes: the first prices every
+part and adds up each program's totals (the benefits its costs are shared by); the second shares each program's costs over all its measures with those totals,
+finishes the cost tests and appends each part's rows to the output files. The files are the same as a whole-job run writes and the values equal to rounding
+(sums are added in a different order). The run log shows one line per part.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## Common jobs
@@ -255,7 +262,7 @@ recet data status | set-dir PATH | build DEST | verify DIR [--full] | pack DIR O
 ```python
 from recet.jobs import RunConfig, run_job
 result = run_job(RunConfig(measures="Measure.csv", programcost="ProgramCost.csv", out_dir="results", acc_version="2026", components=True))
-result.frame        # the measure-level table (a pandas DataFrame)
+result.frame        # the measure-level table (a pandas DataFrame); None for a job run in parts (more rows than chunk_size): read result.files["measure_level"]
 result.files        # every file written
 ```
 

@@ -73,16 +73,24 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     return pd.Series(vals, index=measures.index, dtype=object)
 
 
-def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series, credited: pd.Series | None = None) -> pd.DataFrame:
-    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
+def _aligned_raw(raw: pd.DataFrame, measures: pd.DataFrame) -> pd.DataFrame:
     if not raw["CEInputID"].is_unique:
         raise ValueError("CEInputID is not unique")
     raw = raw.set_index("CEInputID", drop=False).reindex(measures["measure_id"]).reset_index(drop=True)
     if raw["CEInputID"].isna().any() or not (raw["CEInputID"].to_numpy() == measures["measure_id"].to_numpy()).all():
         raise ValueError("raw Measure.csv rows and loaded measures do not line up on CEInputID")
-    result = result.set_index("measure_id").reindex(measures["measure_id"]).reset_index()
-    derived = measures.drop(columns=["measure_id", "prg_id", "MeasDescription", "eul_years_raw"])        # eul_years_raw = EUL_Yrs as filed (already echoed)
-    keep = []
+    return raw
+
+
+def _derived(measures: pd.DataFrame) -> pd.DataFrame:
+    return measures.drop(columns=["measure_id", "prg_id", "MeasDescription", "eul_years_raw"])        # eul_years_raw = EUL_Yrs as filed (already echoed)
+
+
+def restated_differs(raw: pd.DataFrame, measures: pd.DataFrame) -> set[str]:
+    """The derived fields in RESTATES whose values are NOT straight copies of their raw column for these measures: they get a poc_ column. A chunked run takes
+    the union over its parts, which is the set the whole job gives."""
+    raw, derived = _aligned_raw(raw, measures), _derived(measures)
+    out = set()
     for c in derived.columns:
         if c in RESTATES:
             col = RESTATES[c]
@@ -91,9 +99,21 @@ def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd
             else:
                 same = np.allclose(pd.to_numeric(raw[col], errors="coerce").fillna(0.0).to_numpy(),
                                    pd.to_numeric(derived[c], errors="coerce").fillna(0.0).to_numpy(), rtol=0, atol=1e-12)
-            if same:
-                continue
-        keep.append(c)
+            if not same:
+                out.add(c)
+    return out
+
+
+def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series, credited: pd.Series | None = None,
+                           restated: set[str] | None = None) -> pd.DataFrame:
+    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID. `restated`
+    (restated_differs over the whole job) decides which RESTATES fields get a poc_ column when `measures` is only part of the job; None = decide on these rows."""
+    raw = _aligned_raw(raw, measures)
+    result = result.set_index("measure_id").reindex(measures["measure_id"]).reset_index()
+    derived = _derived(measures)
+    if restated is None:
+        restated = restated_differs(raw, measures)
+    keep = [c for c in derived.columns if c not in RESTATES or c in restated]
     poc = derived[keep].add_prefix("poc_").reset_index(drop=True)
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
     frame = pd.concat([raw.reset_index(drop=True), poc, out], axis=1).copy()       # copy: one block, so the two columns added below do not warn
@@ -157,14 +177,7 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
     """Portfolio totals and ratios, overall and by IOU territory (PA), by credited IOU and by program segment. With `apply_exclude_from_ce`, measures of programs
     whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`)."""
     def block(g: pd.DataFrame, label: str, group: str) -> dict:
-        row = {"group": group, "value": label, "measures": len(g)}
-        for c in SUMMARY_TOTALS:
-            if c in g and g[c].notna().any():
-                row[c] = float(g[c].sum())
-        for name, value in group_ratios(g).items():
-            if name in SUMMARY_RATIOS:
-                row[name] = value
-        return row
+        return _summary_row(g, label, group, len(g))
     excluded = None
     if apply_exclude_from_ce and EXCLUDE_FLAG in frame:
         from . import programs
@@ -178,6 +191,82 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
     if excluded is not None:
         rows.append(block(excluded, "Exclude_From_CE programs (left out of the rows above)", "excluded"))
     return pd.DataFrame(rows)
+
+
+class SummaryParts:
+    """summarize() over a table that arrives in parts (a chunked run): each part is reduced to per-group sums as it comes, so the whole table is never held.
+    `result()` gives the rows summarize(whole table) gives, to rounding (the sums are taken in a different order)."""
+    GROUPS = (("poc_PA", "IOU territory (PA)"), ("CreditedIOU", "credited IOU"), ("Prg_ProgramSegment", "program segment"))
+    EXCLUDED = ("excluded", "Exclude_From_CE programs (left out of the rows above)")
+
+    def __init__(self, apply_exclude_from_ce: bool = False):
+        self.apply_exclude = apply_exclude_from_ce
+        self.sums: dict[tuple[str, str], pd.DataFrame] = {}      # (group, key) -> one row of column sums (NaN where the column was NaN throughout)
+        self.counts: dict[tuple[str, str], int] = {}
+        self.present: dict[str, bool] = {}                       # group column -> in the table
+        self.nonblank: dict[str, bool] = {}                      # group column -> some row is not blank
+        self.cols: list[str] | None = None
+
+    def _add(self, key: tuple[str, str], g: pd.DataFrame) -> None:
+        part = g[self.cols].astype(float).sum(min_count=1).to_frame().T
+        prev = self.sums.get(key)
+        self.sums[key] = part if prev is None else prev.add(part, fill_value=0.0)      # NaN only where both are NaN
+        self.counts[key] = self.counts.get(key, 0) + len(g)
+
+    def add(self, frame: pd.DataFrame) -> None:
+        if self.cols is None:
+            self.cols = [c for c in frame.columns if c in summary_input_columns()]
+        excluded = None
+        if self.apply_exclude and EXCLUDE_FLAG in frame:
+            from . import programs
+            flag = programs.is_true(frame[EXCLUDE_FLAG]).to_numpy()
+            excluded, frame = frame[flag], frame[~flag]
+        self._add(("portfolio", "all measures"), frame)
+        for col, group in self.GROUPS:
+            self.present.setdefault(col, col in frame)
+            if col in frame:
+                keys = frame[col].astype(str)
+                self.nonblank[col] = self.nonblank.get(col, False) or bool((keys != "").any())
+                for k, g in frame.groupby(keys.replace("", "(blank)"), sort=False):
+                    self._add((group, str(k)), g)
+        if excluded is not None and len(excluded):
+            self._add(self.EXCLUDED, excluded)
+        elif excluded is not None:
+            self.counts.setdefault(self.EXCLUDED, 0)
+
+    def result(self) -> pd.DataFrame:
+        def block(key):
+            g = self.sums.get(key, pd.DataFrame(columns=self.cols or []))
+            return _summary_row(g, key[1], key[0], self.counts[key])
+        rows = [block(("portfolio", "all measures"))]
+        for col, group in self.GROUPS:
+            if self.present.get(col) and (col == "poc_PA" or self.nonblank.get(col)):
+                rows += [block(k) for k in sorted(k for k in self.sums if k[0] == group)]
+        if self.EXCLUDED in self.counts:
+            rows.append(block(self.EXCLUDED))
+        return pd.DataFrame(rows)
+
+
+def summary_input_columns() -> set[str]:
+    """Every column summarize() reads: the totals and each ratio's parts."""
+    used: set[str] = set()
+
+    def get(c):
+        used.add(c)
+        return 1.0
+    _ratio_parts(get)
+    return used | set(SUMMARY_TOTALS)
+
+
+def _summary_row(g: pd.DataFrame, label: str, group: str, n: int) -> dict:
+    row = {"group": group, "value": label, "measures": n}
+    for c in SUMMARY_TOTALS:
+        if c in g and g[c].notna().any():
+            row[c] = float(g[c].sum())
+    for name, value in group_ratios(g).items():
+        if name in SUMMARY_RATIOS:
+            row[name] = value
+    return row
 
 
 def compare_frames(a: pd.DataFrame, b: pd.DataFrame, label_a: str, label_b: str, key: str = "CEInputID") -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -202,26 +291,44 @@ def compare_frames(a: pd.DataFrame, b: pd.DataFrame, label_a: str, label_b: str,
     return out, pd.DataFrame(rows)
 
 
-def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """(per-measure, summary) of the POC against a real CET run's *_outputs.csv, matched on CEInputID (= CET_ID). Only meaningful for a job run the way the CET
-    run was (same First Year, same ACC version, statewide programs allocated or not to match)."""
-    cet = read_cet_csv(cet_outputs, low_memory=False).rename(columns={"CET_ID": "CEInputID"})
-    cols = [c for c in ("TotalSystemBenefit", "ElecBen", "GasBen", "WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyBenGross", "OtherBen",
-                        "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                        "TRCRatio", "PACRatio", "RIMRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas") if c in cet and c in frame]
+CET_COMPARED = ("TotalSystemBenefit", "ElecBen", "GasBen", "WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyBenGross", "OtherBen",
+                "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
+                "TRCRatio", "PACRatio", "RIMRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas")
+
+
+def read_cet_outputs(cet_outputs: str | Path) -> pd.DataFrame:
+    """The columns of a CET *_outputs.csv that compare_to_cet uses, with CET_ID named CEInputID."""
+    cols = {"CET_ID", "CEInputID", *CET_COMPARED}
+    return read_cet_csv(cet_outputs, low_memory=False, usecols=lambda c: str(c).strip() in cols).rename(columns={"CET_ID": "CEInputID"})
+
+
+def compare_to_cet_part(frame: pd.DataFrame, cet: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, tuple[float, float]], int]:
+    """(per-measure rows, {metric: (POC total, CET total)} for the summed metrics, measures matched) of `frame` against `cet` (read_cet_outputs)."""
+    cols = [c for c in CET_COMPARED if c in cet and c in frame]
     j = frame[["CEInputID", "PrgID", "MeasDescription"] + cols].merge(cet[["CEInputID"] + cols], on="CEInputID", suffixes=("_poc", "_cet"), how="inner")
     per = j[["CEInputID", "PrgID", "MeasDescription"]].copy()
-    rows = []
+    sums = {}
     for c in cols:
         per[f"{c}_poc"], per[f"{c}_cet"] = j[f"{c}_poc"], j[f"{c}_cet"]
         per[f"{c}_diff"] = j[f"{c}_poc"] - j[f"{c}_cet"]
         per[f"{c}_ratio"] = (j[f"{c}_poc"] / j[f"{c}_cet"]).where(j[f"{c}_cet"] != 0)
         if not c.endswith("Ratio"):
-            tp, tc = float(j[f"{c}_poc"].sum()), float(j[f"{c}_cet"].sum())
-            rows.append({"metric": c, "POC": tp, "CET": tc, "POC/CET": tp / tc if tc else np.nan})
-    summary = pd.DataFrame(rows)
-    summary.attrs["matched"] = f"{len(j):,} of {len(frame):,} measures matched by CEInputID ({len(cet):,} in the CET file)"
-    return per, summary
+            sums[c] = (float(j[f"{c}_poc"].sum()), float(j[f"{c}_cet"].sum()))
+    return per, sums, len(j)
+
+
+def cet_comparison_summary(sums: dict[str, tuple[float, float]], matched: int, measures: int, cet_rows: int) -> pd.DataFrame:
+    summary = pd.DataFrame([{"metric": c, "POC": tp, "CET": tc, "POC/CET": tp / tc if tc else np.nan} for c, (tp, tc) in sums.items()])
+    summary.attrs["matched"] = f"{matched:,} of {measures:,} measures matched by CEInputID ({cet_rows:,} in the CET file)"
+    return summary
+
+
+def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(per-measure, summary) of the POC against a real CET run's *_outputs.csv, matched on CEInputID (= CET_ID). Only meaningful for a job run the way the CET
+    run was (same First Year, same ACC version, statewide programs allocated or not to match)."""
+    cet = read_cet_outputs(cet_outputs)
+    per, sums, matched = compare_to_cet_part(frame, cet)
+    return per, cet_comparison_summary(sums, matched, len(frame), len(cet))
 
 
 FORMATS = ("csv", "parquet", "xlsx")
@@ -251,55 +358,133 @@ def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv") -> Path:
 def _write_xlsx(df: pd.DataFrame, path: Path) -> None:
     """One sheet named after the table: a bold, shaded, frozen header with filters, columns sized to their content, numbers as numbers and text as text (a text
     cell starting with '=' stays text, never a formula; characters Excel cannot store are dropped)."""
-    from openpyxl import Workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    x = _XlsxStream(path, df, len(df))
+    x.append(df)
+    x.close()
 
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet(re.sub(r"[\[\]:*?/\\]", "_", path.stem)[:31])
-    ws.freeze_panes = "A2"
-    cols = list(df.columns)
-    for j, c in enumerate(cols, start=1):
-        s = df[c]
-        sample = s.head(200).astype(str).str.len().max() if len(s) else 0
-        sample = 0 if pd.isna(sample) else int(sample)
-        ws.column_dimensions[get_column_letter(j)].width = max(8, min(45, max(len(str(c)), sample) + 2))
-    if cols:
-        ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{len(df) + 1}"
-    head_font, head_fill = Font(name="Arial", bold=True, color="FFFFFF", size=10), PatternFill("solid", fgColor="1F3864")
-    header = []
-    for c in cols:
-        cell = WriteOnlyCell(ws, value=str(c))
-        cell.font, cell.fill, cell.alignment = head_font, head_fill, Alignment(vertical="center")
-        header.append(cell)
-    ws.append(header)
 
-    def convert(v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            v = ILLEGAL_CHARACTERS_RE.sub("", v)
-            if v.startswith("="):
-                cell = WriteOnlyCell(ws, value=v)
-                cell.data_type = "s"
-                return cell
+class _XlsxStream:
+    """_write_xlsx for a table written in parts: the header, column widths (from the first part) and filter range (from `total_rows`) are set up front, rows are
+    appended part by part (openpyxl's write-only mode keeps them on disk, not in memory)."""
+
+    def __init__(self, path: Path, first: pd.DataFrame, total_rows: int):
+        from openpyxl import Workbook
+        from openpyxl.cell import WriteOnlyCell
+        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.utils import get_column_letter
+        self.path = path
+        self.wb = Workbook(write_only=True)
+        ws = self.ws = self.wb.create_sheet(re.sub(r"[\[\]:*?/\\]", "_", path.stem)[:31])
+        ws.freeze_panes = "A2"
+        cols = list(first.columns)
+        for j, c in enumerate(cols, start=1):
+            s = first[c]
+            sample = s.head(200).astype(str).str.len().max() if len(s) else 0
+            sample = 0 if pd.isna(sample) else int(sample)
+            ws.column_dimensions[get_column_letter(j)].width = max(8, min(45, max(len(str(c)), sample) + 2))
+        if cols:
+            ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{total_rows + 1}"
+        head_font, head_fill = Font(name="Arial", bold=True, color="FFFFFF", size=10), PatternFill("solid", fgColor="1F3864")
+        header = []
+        for c in cols:
+            cell = WriteOnlyCell(ws, value=str(c))
+            cell.font, cell.fill, cell.alignment = head_font, head_fill, Alignment(vertical="center")
+            header.append(cell)
+        ws.append(header)
+
+    def append(self, df: pd.DataFrame) -> None:
+        from openpyxl.cell import WriteOnlyCell
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+        ws = self.ws
+
+        def convert(v):
+            if v is None:
+                return None
+            if isinstance(v, str):
+                v = ILLEGAL_CHARACTERS_RE.sub("", v)
+                if v.startswith("="):
+                    cell = WriteOnlyCell(ws, value=v)
+                    cell.data_type = "s"
+                    return cell
+                return v
+            if isinstance(v, (np.floating, float)):
+                return None if np.isnan(v) or np.isinf(v) else float(v)
+            if isinstance(v, (np.integer,)):
+                return int(v)
+            if isinstance(v, (np.bool_, bool)):
+                return bool(v)
+            if isinstance(v, pd.Timestamp):
+                return None if pd.isna(v) else v.to_pydatetime()
+            if v is pd.NA or v is pd.NaT:
+                return None
             return v
-        if isinstance(v, (np.floating, float)):
-            return None if np.isnan(v) or np.isinf(v) else float(v)
-        if isinstance(v, (np.integer,)):
-            return int(v)
-        if isinstance(v, (np.bool_, bool)):
-            return bool(v)
-        if isinstance(v, pd.Timestamp):
-            return None if pd.isna(v) else v.to_pydatetime()
-        if v is pd.NA or v is pd.NaT:
-            return None
-        return v
-    for row in df.itertuples(index=False, name=None):
-        ws.append([convert(v) for v in row])
-    wb.save(path)
+        for row in df.itertuples(index=False, name=None):
+            ws.append([convert(v) for v in row])
+
+    def close(self) -> None:
+        self.wb.save(self.path)
+
+
+class TableWriter:
+    """write_table for a table that arrives in parts (a chunked run), holding one part at a time. `total_rows` (known before the first part) decides, as
+    write_table does, whether an xlsx table fits in Excel. Every part must have the first part's columns (in any order). csv parts are appended; xlsx rows are
+    streamed; parquet parts are written as separate files and joined at close() under one schema (a column blank in one part takes the type it has elsewhere)."""
+
+    def __init__(self, path: Path, fmt: str, total_rows: int):
+        if fmt not in FORMATS:
+            raise ValueError(f"unknown output format {fmt!r}; choose from {FORMATS}")
+        if fmt == "xlsx" and total_rows > EXCEL_MAX_ROWS:
+            import warnings
+            warnings.warn(f"{path.name}: {total_rows:,} rows is more than Excel holds; written as csv instead", stacklevel=2)
+            fmt = "csv"
+        self.fmt, self.total = fmt, total_rows
+        self.path = path.with_suffix("." + fmt)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.cols: list[str] | None = None
+        self.parts: list[Path] = []
+        self.xlsx: _XlsxStream | None = None
+        self.rows = 0
+
+    def write(self, df: pd.DataFrame) -> None:
+        if self.cols is None:
+            self.cols = list(df.columns)
+        elif list(df.columns) != self.cols:
+            if set(df.columns) != set(self.cols):
+                raise ValueError(f"{self.path.name}: a part has different columns: extra {sorted(set(df.columns) - set(self.cols))}, "
+                                 f"missing {sorted(set(self.cols) - set(df.columns))}")
+            df = df[self.cols]
+        if self.fmt == "csv":
+            first = not self.rows
+            df.to_csv(self.path, index=False, header=first, mode="w" if first else "a", encoding="utf-8-sig" if first else "utf-8")
+        elif self.fmt == "xlsx":
+            if self.xlsx is None:
+                self.xlsx = _XlsxStream(self.path, df, self.total)
+            self.xlsx.append(df)
+        else:
+            part = self.path.with_name(f"{self.path.stem}.part{len(self.parts):04d}.parquet")
+            df.to_parquet(part, index=False)
+            self.parts.append(part)
+        self.rows += len(df)
+
+    def close(self) -> Path:
+        if self.fmt == "xlsx" and self.xlsx is not None:
+            self.xlsx.close()
+        elif self.fmt == "parquet":
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+            if not self.parts:
+                pd.DataFrame(columns=self.cols or []).to_parquet(self.path, index=False)
+                return self.path
+            schemas = [pq.read_schema(p) for p in self.parts]
+            schema = pa.unify_schemas([s.remove_metadata() for s in schemas], promote_options="permissive").with_metadata(schemas[0].metadata)
+            with pq.ParquetWriter(self.path, schema) as w:
+                for p in self.parts:
+                    w.write_table(pq.read_table(p).replace_schema_metadata(None).cast(schema.remove_metadata()).replace_schema_metadata(schema.metadata))
+            for p in self.parts:
+                p.unlink()
+        elif self.rows == 0:
+            write_table(pd.DataFrame(columns=self.cols or []), self.path, self.fmt)
+        return self.path
 
 
 def read_table(path: Path) -> pd.DataFrame:

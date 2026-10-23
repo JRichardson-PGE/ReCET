@@ -119,18 +119,74 @@ def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version
         SumCosts=("total", "sum"), SumCostsNPV=("npv", "sum"), SumCostsNPV_SCT=("npv_sct", "sum"), **{f"Sum{f}": (f, "sum") for f in _COST_FIELDS})
 
 
-def _share(pos_by_measure: pd.Series, prg: pd.Series) -> pd.Series:
-    """A measure's share of its program's positive benefits; 1/ClaimCount if the program has none."""
-    total = pos_by_measure.groupby(prg).transform("sum")
-    count = pos_by_measure.groupby(prg).transform("size")
+def _share(pos_by_measure: pd.Series, prg: pd.Series, totals: pd.DataFrame | None = None) -> pd.Series:
+    """A measure's share of its program's positive benefits; 1/ClaimCount if the program has none. `totals` (index PrgID, columns `sum` and `count`, see
+    share_totals) gives the programs' totals when `pos_by_measure` is only part of the job (a chunked run); None = the totals of the measures given."""
+    if totals is None:
+        total = pos_by_measure.groupby(prg).transform("sum")
+        count = pos_by_measure.groupby(prg).transform("size")
+    else:
+        total = prg.map(totals["sum"]).astype(float)
+        count = prg.map(totals["count"]).astype(float)
     return pd.Series(np.where(total != 0, pos_by_measure / total.replace(0, np.nan), 1.0 / count), index=pos_by_measure.index)
+
+
+# the program-level shares compute_cost_tests uses: name -> the four benefits whose positive parts are summed per measure
+SHARES = {
+    "trc": ("ElecBen", "GasBen", "WaterEnergyBen", "OtherBen"),
+    "trc_gross": ("ElecBenGross", "GasBenGross", "WaterEnergyBenGross", "OtherBenGross"),
+    "sb": ("ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "OtherBen"),
+    "sh": ("ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH", "OtherBen"),
+    "sb_gross": ("ElecBenGross_SB", "GasBenGross_SB", "WaterEnergyBenGross_SB", "OtherBenGross"),
+    "sh_gross": ("ElecBenGross_SH", "GasBenGross_SH", "WaterEnergyBenGross_SH", "OtherBenGross"),
+}
+
+
+def _with_gross(d: pd.DataFrame) -> pd.DataFrame:
+    """`d` (a copy) with the water-energy and discounted-savings columns filled in when absent and the Gross benefits and supply costs added."""
+    d = d.copy()
+    for c in ("WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
+              "DiscountedSavingsNetkWh", "DiscountedSavingsNetThm"):
+        if c not in d:
+            d[c] = 0.0
+    ntg_e = d["NTGRkWh"].replace(0, np.nan)
+    ntg_t = d["ntgr_therm"].replace(0, np.nan)
+    for sfx in ("", "_SB", "_SH"):
+        d[f"ElecBenGross{sfx}"] = (d[f"ElecBen{sfx}"] / ntg_e).fillna(0.0)
+        d[f"GasBenGross{sfx}"] = (d[f"GasBen{sfx}"] / ntg_t).fillna(0.0)
+        d[f"ElecSupplyCostGross{sfx}"] = (d[f"ElecSupplyCost{sfx}"] / ntg_e).fillna(0.0)
+        d[f"GasSupplyCostGross{sfx}"] = (d[f"GasSupplyCost{sfx}"] / ntg_t).fillna(0.0)
+        d[f"WaterEnergyBenGross{sfx}"] = (d[f"WaterEnergyBen{sfx}"] / ntg_e).fillna(0.0)          # water energy is priced on the kWh NTG
+        d[f"WaterEnergyCostGross{sfx}"] = (d[f"WaterEnergyCost{sfx}"] / ntg_e).fillna(0.0)
+    return d
+
+
+def share_inputs(d: pd.DataFrame) -> pd.DataFrame:
+    """Per measure (aligned with `d`, the frame compute_cost_tests takes): the positive benefits each program-level share in SHARES divides up."""
+    g = _with_gross(d)
+    return pd.DataFrame({name: sum(_pos(g[c]) for c in cols) for name, cols in SHARES.items()}, index=d.index)
+
+
+def share_totals(pos: pd.DataFrame, prg: pd.Series) -> dict[str, pd.DataFrame]:
+    """Per share in `pos` (share_inputs, or any frame of per-measure positive amounts): each program's `sum` and measure `count`. Totals of separate parts of a job
+    add up (combine_share_totals), which is how a chunked run gives every measure the share it would have in the whole job."""
+    by = pos.groupby(prg.to_numpy())
+    sums, counts = by.sum(), by.size()
+    return {name: pd.DataFrame({"sum": sums[name], "count": counts}) for name in pos.columns}
+
+
+def combine_share_totals(a: dict[str, pd.DataFrame] | None, b: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """The totals of two parts of a job together."""
+    if a is None:
+        return b
+    return {k: a[k].add(b[k], fill_value=0.0) for k in b}
 
 
 def _pos(s: pd.Series) -> pd.Series:
     return s.where(s > 0, 0.0)
 
 
-def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
+def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
     """
     `d` (one row per measure) must carry: measure_id, prg_id, NTGRkWh, ntgr_therm,
     ElecBen, GasBen, ElecSupplyCost, GasSupplyCost, ElecBen_SB/_SH, GasBen_SB/_SH,
@@ -141,24 +197,12 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
     BillReducElec/Gas, BillIncrElec/Gas. `prog` is program_cost_sums(...).
     WaterEnergyBen / WaterEnergyCost (+ _SB/_SH) enter TSB, the program-cost weighting and every cost and ratio the way CalcCE has them (Calculations CTE 15148-15723);
     a frame without those columns is treated as having none.
+    `totals` (share_totals over the whole job) gives the programs' benefit totals when `d` holds only part of the job (a chunked run, see recet/chunked.py);
+    None = the programs' totals over `d` itself.
     Returns d plus every Gross / NoAdmin / weighting output column.
     """
-    d = d.copy()
-    for c in ("WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
-              "DiscountedSavingsNetkWh", "DiscountedSavingsNetThm"):
-        if c not in d:
-            d[c] = 0.0
+    d = _with_gross(d)
     prg = d["prg_id"]
-    ntg_e = d["NTGRkWh"].replace(0, np.nan)
-    ntg_t = d["ntgr_therm"].replace(0, np.nan)
-
-    for sfx in ("", "_SB", "_SH"):
-        d[f"ElecBenGross{sfx}"] = (d[f"ElecBen{sfx}"] / ntg_e).fillna(0.0)
-        d[f"GasBenGross{sfx}"] = (d[f"GasBen{sfx}"] / ntg_t).fillna(0.0)
-        d[f"ElecSupplyCostGross{sfx}"] = (d[f"ElecSupplyCost{sfx}"] / ntg_e).fillna(0.0)
-        d[f"GasSupplyCostGross{sfx}"] = (d[f"GasSupplyCost{sfx}"] / ntg_t).fillna(0.0)
-        d[f"WaterEnergyBenGross{sfx}"] = (d[f"WaterEnergyBen{sfx}"] / ntg_e).fillna(0.0)          # water energy is priced on the kWh NTG
-        d[f"WaterEnergyCostGross{sfx}"] = (d[f"WaterEnergyCost{sfx}"] / ntg_e).fillna(0.0)
 
     d["TotalSystemBenefit"] = ((d.ElecBen + d.GasBen + d.WaterEnergyBen + d.OtherBen)
                                - (d.ElecSupplyCost + d.GasSupplyCost + d.WaterEnergyCost + d.OtherCost))
@@ -171,15 +215,10 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame) -> pd.DataFrame:
     for col in sums:
         d[f"_{col}"] = prg.map(ps[col]).fillna(0.0) if len(ps) and col in ps else 0.0          # a hand-made `prog` may lack the per-field sums
 
-    def ben_share(elec, gas, water, other):
-        return _share(_pos(d[elec]) + _pos(d[gas]) + _pos(d[water]) + _pos(d[other]), prg)
+    def ben_share(name):
+        return _share(sum(_pos(d[c]) for c in SHARES[name]), prg, None if totals is None else totals[name])
 
-    sh_trc = ben_share("ElecBen", "GasBen", "WaterEnergyBen", "OtherBen")
-    sh_trc_g = ben_share("ElecBenGross", "GasBenGross", "WaterEnergyBenGross", "OtherBenGross")
-    sh_sb = ben_share("ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "OtherBen")
-    sh_sh = ben_share("ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH", "OtherBen")
-    sh_sb_g = ben_share("ElecBenGross_SB", "GasBenGross_SB", "WaterEnergyBenGross_SB", "OtherBenGross")
-    sh_sh_g = ben_share("ElecBenGross_SH", "GasBenGross_SH", "WaterEnergyBenGross_SH", "OtherBenGross")
+    sh_trc, sh_trc_g, sh_sb, sh_sh, sh_sb_g, sh_sh_g = (ben_share(k) for k in ("trc", "trc_gross", "sb", "sh", "sb_gross", "sh_gross"))
     d["WeightedBenefits"] = sh_trc
     d["WeightedProgramCost"] = sh_trc * d["_SumCosts"]
     for f in _COST_FIELDS:                                           # CalcCost's program-cost components, each the program's nominal total x WeightedBenefits

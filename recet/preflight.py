@@ -67,6 +67,7 @@ class Issue:
 class PreflightReport:
     issues: list[Issue] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
+    agg: dict = field(default_factory=dict)          # raw values behind some stats, for combining the reports of a file checked in parts (not reported)
 
     def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None) -> None:
         self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS]))
@@ -124,6 +125,7 @@ def _check_programs(rep: PreflightReport, measures: pd.DataFrame, programcost_cs
     pid = measures["prg_id"].astype(str).str.strip().to_numpy()
     year = measures["claim_year"].to_numpy()
     missing = meta["Prg_MatchedOn"].to_numpy() == "(not found)"
+    rep.agg["programs"] = (set(pid), set(pid[missing]))
     rep.stats["programs"] = f"{len(set(pid)):,} ({len(set(pid[missing])):,} not in the program metadata)"
     if missing.any():
         rep.add("warning", "program_not_in_metadata", "PrgID is not in the program metadata (the built-in CEDARS Programs list or the supplied one): its Prg_ columns are "
@@ -156,12 +158,144 @@ def _check_programs(rep: PreflightReport, measures: pd.DataFrame, programcost_cs
                     sorted({f"{p}: {c} vs {l}" for p, c, l in zip(pid[differ], credited[differ], listed[differ])}), _cells("Measure", mrows(differ), "PrgID"))
 
 
+@dataclass
+class _Part:
+    """How to check one part of a Measure.csv that is checked in parts: the whole file's column types, and the ProgramCost PrgIDs (as the run sees them) to
+    mark this part's measures that have no program costs (None without a ProgramCost file)."""
+    dtypes: dict
+    program_ids: set | None
+
+
 def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = None, *, acc=None, allocate_statewide: bool = False,
-                 base_year: int | None = None, apply_exclude_from_ce: bool = False) -> PreflightReport:
+                 base_year: int | None = None, apply_exclude_from_ce: bool = False, chunk_size: int | None = None,
+                 parts: list | None = None, dtypes: dict | None = None) -> PreflightReport:
     """`acc` is a versions.ResolvedAcc (for the horizon and E3-version checks); the runtime must already be configured for it (runtime.apply) so that profile
-    and TOU coverage reflect this run's user-supplied profiles."""
-    rep = PreflightReport()
+    and TOU coverage reflect this run's user-supplied profiles.
+
+    A Measure.csv with more than `chunk_size` rows is checked in parts of that size, so the check never holds the whole file: `parts` / `dtypes` are the
+    file already split (delimited.split_file, delimited.part_dtypes; a run splits once and passes them), else it is split here into a temporary folder. The
+    checks across rows (duplicate CEInputIDs, PrgID alignment with ProgramCost.csv) are made on the whole file, and the counts and stats are combined, so the
+    report is the one the whole file gives, except that a part's checks still run when another part has a blocking problem."""
     p = Path(measure_csv)
+    if parts is None and chunk_size and p.exists() and delimited.detect_sep(p) and delimited.count_rows(p) > chunk_size:
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="recet_preflight_") as tmp:
+            parts = delimited.split_file(p, chunk_size, tmp)
+            dtypes = delimited.part_dtypes(parts)[0]
+            return _check_parts(p, parts, dtypes, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce)
+    if parts is not None and len(parts) > 1:
+        return _check_parts(p, parts, dtypes or {}, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce)
+    return _check(p, programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce)
+
+
+def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, allocate_statewide: bool, base_year: int | None,
+                 apply_exclude_from_ce: bool) -> PreflightReport:
+    """check_inputs for a file split into `parts` ((file, first row, rows) each): each part is checked on its own, its Measure row numbers shifted to the whole
+    file's, and the reports combined; duplicate CEInputIDs and the ProgramCost alignment are checked on the whole file."""
+    from .pipeline import cost_tests
+    rep = PreflightReport()
+    sep = delimited.detect_sep(p)
+    if sep != "|":
+        rep.add("info", "not_pipe_delimited", f"Measure.csv is {delimited.describe(sep)}; it is read as such (the CET itself needs pipe-delimited files)")
+    if "CEInputID" in delimited.header_columns(p):
+        ids = delimited.read_cet_csv(p, dtype=str, keep_default_na=False, na_values=[""], usecols=lambda c: c.strip() == "CEInputID")["CEInputID"]
+        dupmask = ids.duplicated(keep=False) & ids.notna()
+        dup = ids[ids.duplicated()]
+        if len(dup):
+            rep.add("error", "duplicate_id", "CEInputID must be unique (results are keyed on it)", int(dup.nunique()), dup.unique(), _cells("Measure", dupmask, "CEInputID"))
+        del ids, dupmask, dup
+    program = None
+    if programcost_csv is not None:
+        try:
+            program = cost_tests.load_program_costs(Path(programcost_csv), allocate_statewide=allocate_statewide)
+        except Exception as exc:
+            rep.add("error", "program_costs_unreadable", f"could not read ProgramCost.csv: {exc}")
+    reports = []
+    for f, start, _n in parts:
+        r = _check(Path(f), programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
+                   part=_Part(dtypes, None if program is None else set(program["PrgID"])))
+        for i in r.issues:
+            i.cells = [(t, row + start if t == "Measure" else row, c) for t, row, c in i.cells]
+        r.agg["no_cost_cells"] = [(t, row + start, c) for t, row, c in r.agg.get("no_cost_cells", [])]
+        reports.append(r)
+    merged: dict[tuple, Issue] = {}
+    for r in reports:
+        for i in r.issues:
+            k = (i.severity, i.code, i.message)
+            if k not in merged:
+                merged[k] = Issue(i.severity, i.code, i.message, i.count, list(i.examples), list(i.cells))
+            else:
+                m = merged[k]
+                m.count += i.count
+                m.examples = list(dict.fromkeys([*m.examples, *i.examples]))[:5]
+                m.cells = (m.cells + i.cells)[:MAX_CELLS]
+    rep.issues += list(merged.values())
+    rep.stats.update(_merge_stats(reports, base_year))
+    if programcost_csv is None:
+        rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
+    elif program is not None:
+        pc = delimited.read_cet_csv(programcost_csv)
+        swmask = (pc["PA"].astype(str).str.upper() == "SW") if "PA" in pc.columns else pd.Series(False, index=pc.index)
+        sw_rows = int(swmask.sum())
+        if sw_rows and not allocate_statewide:
+            rep.add("info", "statewide_program_costs", "ProgramCost rows with PA = SW are given PA = SCE (what CET does with them); tick 'allocate statewide programs' to split them across the IOUs", sw_rows,
+                    cells=_cells("ProgramCost", swmask, "PA"))
+        m_ids = set().union(*(r.agg.get("measure_prg_ids", set()) for r in reports))
+        p_ids = set(program["PrgID"])
+        gap = {"program_costs_without_measures": sorted(p_ids - m_ids), "measure_programs_without_costs": sorted(m_ids - p_ids)}
+        if gap["measure_programs_without_costs"] or gap["program_costs_without_measures"]:
+            no_meas = set(gap["program_costs_without_measures"]) | {i.partition("_")[2] for i in gap["program_costs_without_measures"] if i.partition("_")[0] in VALID_PA}
+            where = sorted(set(c for r in reports for c in r.agg["no_cost_cells"]))
+            if "PrgID" in pc.columns:
+                where += _cells("ProgramCost", pc["PrgID"].astype(str).str.strip().isin(no_meas), "PrgID")
+            rep.add("error", "program_alignment", f"PrgIDs do not line up: {gap}", cells=where)
+    return rep
+
+
+def _merge_stats(reports: list[PreflightReport], base_year: int | None) -> dict:
+    """The stats of the whole file from those of its parts, in the order a part lists them: counts add up, ranges widen, the program count is of distinct PrgIDs."""
+    def as_int(v):
+        try:
+            return int(str(v).replace(",", ""))
+        except ValueError:
+            return None
+    keys: list[str] = []
+    for r in reports:                               # every part's keys in its own order: a key a part adds goes after the key it follows there
+        prev = None
+        for k in r.stats:
+            if k not in keys:
+                keys.insert(keys.index(prev) + 1 if prev is not None else 0, k)
+            prev = k
+    out = {}
+    for k in keys:
+        vals = [r.stats[k] for r in reports if k in r.stats]
+        if k == "claim years":
+            out[k] = f"{min(int(str(v).split('-')[0]) for v in vals)}-{max(int(str(v).split('-')[1]) for v in vals)}"
+        elif k == "measures by ACC version":
+            counts: dict[str, int] = {}
+            for v in vals:
+                for item in str(v).split(", "):
+                    name, _, n = item.rpartition(": ")
+                    counts[name] = counts.get(name, 0) + int(n.replace(",", ""))
+            out[k] = ", ".join(f"{name}: {n:,}" for name, n in sorted(counts.items()))
+        elif k == "First Year (base year) that will be used":
+            out[k] = base_year or min(int(str(r.stats["claim years"]).split("-")[0]) for r in reports if "claim years" in r.stats)
+        elif k == "programs":
+            allp = set().union(*(r.agg["programs"][0] for r in reports if "programs" in r.agg))
+            miss = set().union(*(r.agg["programs"][1] for r in reports if "programs" in r.agg))
+            out[k] = f"{len(allp):,} ({len(miss):,} not in the program metadata)"
+        elif all(as_int(v) is not None for v in vals):
+            out[k] = f"{sum(as_int(v) for v in vals):,}"
+        else:
+            out[k] = vals[0]
+    return out
+
+
+def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = False, base_year: int | None = None, apply_exclude_from_ce: bool = False,
+           part: _Part | None = None) -> PreflightReport:
+    """The check of one file. `part` = it is one part of a larger file (see _Part): the checks across the whole file are left to _check_parts."""
+    rep = PreflightReport()
+    p = Path(p)
     if not p.exists():
         rep.add("error", "file_missing", f"Measure file not found: {p}")
         return rep
@@ -185,7 +319,7 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     dup = df["CEInputID"][df["CEInputID"].duplicated()]
     if df["CEInputID"].isna().any():
         rep.add("error", "blank_id", "blank CEInputID", int(df["CEInputID"].isna().sum()), cells=_cells("Measure", df["CEInputID"].isna(), "CEInputID"))
-    if len(dup):
+    if len(dup) and part is None:                   # a file checked in parts is checked for duplicates as a whole (_check_parts)
         rep.add("error", "duplicate_id", "CEInputID must be unique (results are keyed on it)", int(dup.nunique()), dup.unique(), _cells("Measure", dupmask, "CEInputID"))
     bad_cyq = ~df["ClaimYearQuarter"].astype(str).str.match(r"^\d{4}Q[1-4]$")
     if bad_cyq.any():
@@ -240,7 +374,10 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     from . import run_poc
     from .pipeline import cost_tests, gas_savings_profiles, real_impact_profiles, system_zones
     try:
-        measures, program = run_poc.load_job(p, programcost_csv, allocate_statewide=allocate_statewide)
+        if part is not None:                        # one part's measures never line up with the whole ProgramCost.csv: _check_parts checks the alignment
+            measures, program = run_poc.load_job(p, None, allocate_statewide=allocate_statewide, dtypes=part.dtypes)
+        else:
+            measures, program = run_poc.load_job(p, programcost_csv, allocate_statewide=allocate_statewide)
     except ValueError as exc:
         where: list = []
         try:                                        # point at the PrgIDs that have no partner in the other file
@@ -267,7 +404,12 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
                 rep.add("error", "acc_version_file_missing", f"the {versions.BUILTIN[k].label} electric file is not in the reference data folder, so the measures "
                         f"that name it cannot be priced", len(rows), [k], _cells("Measure", rows, "ACCVersion"))
     rep.stats["First Year (base year) that will be used"] = base_year or int(measures["claim_year"].min())
-    if programcost_csv is None:
+    if part is not None:
+        prg = measures["prg_id"].astype(str).str.strip()
+        rep.agg["measure_prg_ids"] = set(prg)
+        if part.program_ids is not None:
+            rep.agg["no_cost_cells"] = [("Measure", r, "PrgID") for r in sorted(set(mrows(~prg.isin(part.program_ids))))]
+    elif programcost_csv is None:
         rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
     else:
         pc = delimited.read_cet_csv(programcost_csv)

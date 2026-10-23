@@ -46,3 +46,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
 - 0.1.32 (2026-10-23): price_bill_impact, price_participant_cost, price_other_ben_cost (engine) and price_emissions (emissions) are column-wise; their
   row-by-row originals are kept as *_per_measure references (tests/test_performance.py, and the re-check showed every output unchanged to 3e-14). Change the
   arithmetic in both. 1,000,000 records: 4.5 min, 7.4 GB peak (README Performance).
+- 0.1.33 (2026-10-23): a job with more Measure.csv rows than `RunConfig.chunk_size` (50,000; 0 = never) runs in parts (`recet/chunked.py`): split once into
+  `<run>/_parts` with the whole file's column types (`delimited.split_file`, `part_dtypes`), preflight per part with the whole-file checks done once
+  (`preflight._check_parts`), pass 1 prices each part and adds up the program totals (`run_poc.program_share_totals`), pass 2 shares program costs with those
+  totals (`apply_program_costs(..., totals=)`), writes parts (`outputs.TableWriter`) and sums the summary (`outputs.SummaryParts`). RunResult.frame is None then.
+  Anything new that needs the whole job (a program-level share, a summary, a cross-row check) must get a parts version too; `tests/test_chunked.py` compares
+  every output file of a run in parts with the whole-job run. 1,000,000 records: 4.6 min, 2.3 GB committed (was 17.8 GB; the 7.4 GB first reported was RAM only).

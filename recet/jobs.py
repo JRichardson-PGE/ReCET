@@ -14,10 +14,14 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh; portfolio_8760_unshaped_<acc>.csv lists measures left out
   cet_comparison_*.csv           (when a CET outputs file is given) POC vs CET, per measure and in total
   comparison_<A>_vs_<B>.csv      (compare mode) per-measure and portfolio differences between two ACC versions (see `run_compare`)
+
+A job with more Measure.csv rows than `chunk_size` is run in parts of that size (recet/chunked.py), so its memory stays about that of one part; the files are
+the same, and RunResult.frame is None (the measure-level table is only in its file).
 """
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -67,6 +71,7 @@ class RunConfig:
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
     output_format: str = "csv"               # csv | parquet | xlsx
     preflight_only: bool = False
+    chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
     subset_step: int = 1
 
@@ -177,23 +182,88 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
     return acc, user_profiles, user_gas
 
 
+def societal_available(groups: dict, acc, wanted: bool, result: RunResult, log: Log) -> bool:
+    """Whether the societal tests can be priced: wanted, and every ACC version in `groups` has SCT Base / SCT High avoided costs (else a note says why not)."""
+    if not wanted:
+        return False
+    from . import runtime
+    from .pipeline import gas_avoided_cost, real_avoided_cost_v2
+    ok = True
+    for k, g in groups.items():
+        if g is not acc:
+            runtime.switch_acc(g)
+        e_tests, g_tests = real_avoided_cost_v2.available_cost_tests(), gas_avoided_cost.available_cost_tests()
+        if not {"SCT Base", "SCT High"} <= set(e_tests) or "SCT" not in g_tests:
+            ok = False
+            note = (f"the {g.label} has no Societal Cost Test avoided costs (electric: {', '.join(e_tests)}; gas: {', '.join(g_tests)}): "
+                    f"the SCT Base / SCT High columns (SB, SH, SCB, SCH) are left blank")
+            result.notes.append(note)
+            log(f"note: {note}")
+            break
+    runtime.switch_acc(acc)
+    return ok
+
+
+def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_start: float, measures_priced: int, base_year: int, parts: dict | None = None) -> None:
+    """run_settings.json: everything needed to reproduce the run. `parts`: how a chunked run split the job."""
+    from . import __version__, paths
+    ref = paths.ref_status()
+    settings = {
+        "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
+        "config": asdict(cfg),
+        "acc": {"key": acc.key, "label": acc.label, "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
+                "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
+        "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source(), "files": ref},
+        "supplied_files": {k: {"path": v, "size": _size(v)} for k, v in (("workbook", cfg.workbook), ("profiles_8760", cfg.profiles_8760_file),
+                                                                       ("profiles_gas", cfg.profiles_gas_file), ("run_parameters", cfg.run_parameters_file),
+                                                                       ("sw_factors", cfg.sw_factors_file), ("programs", cfg.programs_file),
+                                                                       ("acc_electric", cfg.acc_electric_file),
+                                                                       ("acc_gas", cfg.acc_gas_file)) if v},
+        "inputs": {"measures": str(cfg.measures), "programcost": str(cfg.programcost or ""), "measures_priced": measures_priced, "first_year": base_year},
+        "totals": result.totals,
+    }
+    if parts:
+        settings["parts"] = parts
+    (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
+    result.files["run_settings"] = run_dir / "run_settings.json"
+
+
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     t_start = time.time()
     if not cfg.measures and not cfg.workbook:
         raise ValueError("no Measure.csv or job workbook given")
     cfg = RunConfig.from_dict(asdict(cfg))          # prepare() may fill in files from a workbook; leave the caller's config as it was
-    from . import __version__, components as comp_mod, outputs, paths, preflight, profile8760, run_poc
-    from .pipeline import emissions
 
     run_dir = _run_folder(cfg, str(cfg.acc_version))
     result = RunResult(run_dir=run_dir)
     acc, user_profiles, user_gas = prepare(cfg, run_dir, log)
     tag = f"acc{acc.key}"
 
+    # ---- a large job is run in parts (chunked.py): split Measure.csv once, here
+    from .pipeline import delimited
+    parts = dtypes = values = None
+    parts_dir = run_dir / "_parts"
+    if cfg.chunk_size and cfg.subset_step <= 1 and Path(cfg.measures).exists() and delimited.detect_sep(cfg.measures):
+        n_rows = delimited.count_rows(cfg.measures)
+        if n_rows > cfg.chunk_size:
+            log(f"splitting Measure.csv ({n_rows:,} rows) into parts of {cfg.chunk_size:,} rows")
+            parts = delimited.split_file(cfg.measures, cfg.chunk_size, parts_dir / "measures")
+            dtypes, values = delimited.part_dtypes(parts, ("ClaimYearQuarter", "ACCVersion"))
+    try:
+        return _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
+    finally:
+        if parts is not None:
+            shutil.rmtree(parts_dir, ignore_errors=True)
+
+
+def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: Log, t_start: float, parts, dtypes, values) -> RunResult:
+    from . import components as comp_mod, outputs, profile8760, preflight, run_poc
+    from .pipeline import emissions
+
     # ---- preflight
     log("\n== preflight ==")
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
-                                 apply_exclude_from_ce=cfg.apply_exclude_from_ce)
+                                 apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes)
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
     result.files["preflight"] = run_dir / "preflight.txt"
@@ -203,6 +273,9 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     if cfg.preflight_only:
         log("\npreflight only: stopping before pricing")
         return result
+    if parts is not None:
+        from . import chunked
+        return chunked.run_parts(cfg, acc, run_dir, result, parts, dtypes, values, log, t_start)
 
     # ---- load and price
     log("\n== loading ==")
@@ -226,21 +299,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
         if cfg.acc_electric_file or cfg.acc_gas_file:
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
 
-    societal = cfg.include_societal
-    if societal:
-        from .pipeline import gas_avoided_cost, real_avoided_cost_v2
-        for k, g in groups.items():
-            if g is not acc:
-                runtime.switch_acc(g)
-            e_tests, g_tests = real_avoided_cost_v2.available_cost_tests(), gas_avoided_cost.available_cost_tests()
-            if not {"SCT Base", "SCT High"} <= set(e_tests) or "SCT" not in g_tests:
-                societal = False
-                note = (f"the {g.label} has no Societal Cost Test avoided costs (electric: {', '.join(e_tests)}; gas: {', '.join(g_tests)}): "
-                        f"the SCT Base / SCT High columns (SB, SH, SCB, SCH) are left blank")
-                result.notes.append(note)
-                log(f"note: {note}")
-                break
-        runtime.switch_acc(acc)
+    societal = societal_available(groups, acc, cfg.include_societal, result, log)
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
     t0 = time.time()
     parts, em_parts, comp_parts = [], [], []
@@ -314,23 +373,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
         log(csum.to_string(index=False, float_format=lambda v: f"{v:,.4f}" if abs(v) < 100 else f"{v:,.0f}"))
 
     # ---- record
-    ref = paths.ref_status()
-    settings = {
-        "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
-        "config": asdict(cfg),
-        "acc": {"key": acc.key, "label": acc.label, "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
-                "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
-        "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source(), "files": ref},
-        "supplied_files": {k: {"path": v, "size": _size(v)} for k, v in (("workbook", cfg.workbook), ("profiles_8760", cfg.profiles_8760_file),
-                                                                       ("profiles_gas", cfg.profiles_gas_file), ("run_parameters", cfg.run_parameters_file),
-                                                                       ("sw_factors", cfg.sw_factors_file), ("programs", cfg.programs_file),
-                                                                       ("acc_electric", cfg.acc_electric_file),
-                                                                       ("acc_gas", cfg.acc_gas_file)) if v},
-        "inputs": {"measures": str(cfg.measures), "programcost": str(cfg.programcost or ""), "measures_priced": len(measures), "first_year": base_year},
-        "totals": result.totals,
-    }
-    (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
-    result.files["run_settings"] = run_dir / "run_settings.json"
+    write_settings(cfg, acc, run_dir, result, t_start, len(measures), base_year)
     log(f"\ndone in {time.time() - t_start:.0f}s -- results in {run_dir}")
     return result
 
