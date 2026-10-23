@@ -23,7 +23,7 @@ from typing import Callable
 
 import pandas as pd
 
-CHUNK_SIZE = 50_000          # measures per part; a job with more rows than this is run in parts (RunConfig.chunk_size; 0 = never)
+CHUNK_SIZE = 20_000          # measures per part; a job with more rows than this is run in parts (RunConfig.chunk_size; 0 = never)
 
 Log = Callable[[str], None]
 

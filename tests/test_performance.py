@@ -66,11 +66,37 @@ def test_store_gives_exactly_the_values_the_pandas_filter_gave(tmp_path, monkeyp
         store.column("no_such_column")
 
 
-def test_store_series_are_fresh_copies(tmp_path):
+def test_store_series_are_read_only_views_of_the_cache(tmp_path):
+    """With the cache on, series are views of a memory-mapped file of the divided values (no private copy per series), and cannot be written to."""
     store = acc_store.AccStore(_write(tmp_path, _acc_frame()))
+    a = store.series("SCE", "CZ9", "TRC", "total_avoided_cost")
+    scaled = store.scaled_column("total_avoided_cost", 1000.0)
+    assert isinstance(scaled, np.memmap) and (store.dir / "col-total_avoided_cost-div1000.npy").exists()
+    assert np.shares_memory(a[2027], scaled) and not a[2027].flags.writeable
+    with pytest.raises(ValueError):
+        a[2027][:] = -1.0                                   # a caller cannot scribble on the store
+    assert store.series("SCE", "CZ9", "TRC", "total_avoided_cost")[2027].min() >= 0.02
+
+
+def test_store_series_are_fresh_copies_without_the_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("RECET_NO_CACHE", "1")
+    store = acc_store.AccStore(_write(tmp_path, _acc_frame()))
+    assert store.scaled_column("total_avoided_cost", 1000.0) is None
     a = store.series("SCE", "CZ9", "TRC", "total_avoided_cost")
     a[2027][:] = -1.0                                       # a caller scribbling on its copy must not touch the store
     assert store.series("SCE", "CZ9", "TRC", "total_avoided_cost")[2027].min() >= 0.02
+
+
+def test_importing_recet_first_gives_numpy_one_blas_thread():
+    """recet sets OPENBLAS_NUM_THREADS=1 unless it is already set (OpenBLAS reserves a buffer per thread; ReCET gains nothing from the threads)."""
+    import subprocess
+    import sys
+    env = {k: v for k, v in __import__("os").environ.items() if k != "OPENBLAS_NUM_THREADS"}
+    out = subprocess.run([sys.executable, "-c", "import recet, os; print(os.environ['OPENBLAS_NUM_THREADS'])"], env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "1"
+    env["OPENBLAS_NUM_THREADS"] = "4"
+    out = subprocess.run([sys.executable, "-c", "import recet, os; print(os.environ['OPENBLAS_NUM_THREADS'])"], env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "4"                        # a user's own setting wins
 
 
 def test_a_second_store_reads_the_cache_and_is_identical(tmp_path):

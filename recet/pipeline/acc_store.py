@@ -182,12 +182,55 @@ class AccStore:
             out.setdefault(iou, set()).add(zone)
         return {iou: sorted(z) for iou, z in out.items()}
 
+    def scaled_column(self, name: str, divisor: float) -> np.ndarray | None:
+        """`column(name) / divisor`, as its own memory-mapped cache file (built a few blocks at a time, so never held whole in memory); None when the cache is off
+        or cannot be written. The values are the same divisions series() always made, done once on disk instead of in memory for each series."""
+        key = f"{name}/{divisor!r}"
+        if key in self._columns:
+            return self._columns[key]
+        base = self.column(name)
+        if self.dir is None or not isinstance(base, np.memmap):
+            return None
+        f = self.dir / f"col-{name}-div{divisor:g}.npy"
+        arr = None
+        if f.exists():
+            try:
+                arr = np.load(f, mmap_mode="r")
+            except (OSError, ValueError):
+                arr = None
+        if arr is None:
+            tmp = f.with_name(f"{f.stem}.{os.getpid()}.tmp.npy")
+            try:
+                out = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.float64, shape=base.shape)
+                for i in range(0, base.shape[0], 256):
+                    out[i:i + 256] = base[i:i + 256] / divisor
+                out.flush()
+                del out
+                os.replace(tmp, f)
+                arr = np.load(f, mmap_mode="r")
+            except OSError:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+                if not f.exists():
+                    return None
+                arr = np.load(f, mmap_mode="r")                    # another process wrote the same file first
+        self._columns[key] = arr
+        return arr
+
     def series(self, iou: str, zone: str, test: str, column: str, divisor: float | None = 1000.0) -> dict[int, np.ndarray]:
-        """{year: array(8760)} of `column` for one (iou, zone, test), in years order, as fresh copies divided by `divisor` (1000 turns $/MWh into $/kWh, the value the
-        pricing has always used; None leaves the values as stored, e.g. the emission rate). Empty when the ACC has no such block."""
+        """{year: array(8760)} of `column` for one (iou, zone, test), in years order, divided by `divisor` (1000 turns $/MWh into $/kWh, the value the pricing has
+        always used; None leaves the values as stored, e.g. the emission rate). Empty when the ACC has no such block.
+
+        With the cache on, the arrays are read-only views of memory-mapped cache files (scaled_column), so they take no private memory however many series a job
+        uses; the operating system keeps or drops their pages as memory allows. Without it they are fresh copies, as before 0.1.34."""
         blocks = self.blocks.get((iou, zone, test))
         if not blocks:
             return {}
+        col = self.column(column) if divisor is None else self.scaled_column(column, divisor)
+        if col is not None and isinstance(col, np.memmap):
+            return {y: np.asarray(col[blocks[y]]) for y in sorted(blocks)}
         col = self.column(column)
         if divisor is None:
             return {y: np.array(col[blocks[y]], dtype=np.float64) for y in sorted(blocks)}

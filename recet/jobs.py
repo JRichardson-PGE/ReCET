@@ -71,7 +71,7 @@ class RunConfig:
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
     output_format: str = "csv"               # csv | parquet | xlsx
     preflight_only: bool = False
-    chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
+    chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
     subset_step: int = 1
 

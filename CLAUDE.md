@@ -52,3 +52,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   totals (`apply_program_costs(..., totals=)`), writes parts (`outputs.TableWriter`) and sums the summary (`outputs.SummaryParts`). RunResult.frame is None then.
   Anything new that needs the whole job (a program-level share, a summary, a cross-row check) must get a parts version too; `tests/test_chunked.py` compares
   every output file of a run in parts with the whole-job run. 1,000,000 records: 4.6 min, 2.3 GB committed (was 17.8 GB; the 7.4 GB first reported was RAM only).
+- 0.1.34 (2026-10-23): default `chunk_size` 20,000; `import recet` sets `OPENBLAS_NUM_THREADS=1` unless set (numpy's OpenBLAS reserves a buffer per thread; the
+  pricing gains nothing from them), so import recet before numpy in new entry points; `AccStore.series` returns read-only views of a memory-mapped, already-divided
+  cache file (`scaled_column`) instead of copies (bit-identical; copies only without the cache), so never write into a series in place. 1,000,000 records:
+  5.0 min, 0.96 GB committed.

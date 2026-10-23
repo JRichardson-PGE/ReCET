@@ -215,7 +215,7 @@ off until you load one version's run folder.
 5. **Components** (if on), then **assemble and write** the measure-level table, the portfolio summary and any optional files; **combined 8760 profile** and **CET comparison** if requested.
 6. **Record.** `run_settings.json` lists the exact settings, files and timings.
 
-**Large jobs run in parts.** A `Measure.csv` with more than 50,000 rows (the `chunk_size` setting, `--chunk-size`) is split into parts of that many rows in the
+**Large jobs run in parts.** A `Measure.csv` with more than 20,000 rows (the `chunk_size` setting, `--chunk-size`) is split into parts of that many rows in the
 run folder's `_parts` folder (deleted at the end), and steps 2-5 work on one part at a time, so the run's memory is about that of one part whatever the job's size.
 The preflight checks each part and checks duplicate CEInputIDs and the ProgramCost alignment over the whole file. Pricing makes two passes: the first prices every
 part and adds up each program's totals (the benefits its costs are shared by); the second shares each program's costs over all its measures with those totals,
@@ -280,7 +280,8 @@ the window's box, `recet data set-dir PATH`, the environment variable `RECET_DAT
 
 A warm job of about 5,500 measures prices in roughly 5 seconds per claim year (about 30 s before the 0.1.3 speed-ups), and a 73,000-measure filing in under a minute. Two things make that possible. The pricing works out the hourly (electric) and
 monthly (gas) value of each *distinct* profile, climate zone and year once and reuses it for every measure that shares it (that 73,000-measure filing has only 48 distinct combinations). And the tool keeps a **cache** of data it derives from the large files, so the next run does not rebuild it: the
-ACC as memory-mapped arrays (about 0.5 GB per ACC file) and each impact profile a job has used (about 1 MB each). The first run with a given ACC or profile library builds its cache (a few extra seconds); later runs, including runs
+ACC as memory-mapped arrays (about 0.5 GB per ACC file, plus about 0.14 GB for each column also kept divided by 1,000 into $/kWh: the total and T&D in a standard run,
+every component in components mode; the pricing reads its hourly series from those files in place, so they take no private memory) and each impact profile a job has used (about 1 MB each). The first run with a given ACC or profile library builds its cache (a few extra seconds); later runs, including runs
 started from the window, start in about a second. Nothing in the cache is ever the only copy of anything.
 
 * It lives in `~/.recet/cache` (set `RECET_CACHE` to put it elsewhere). `recet data status` shows its size; `recet data clear-cache` deletes it (it is rebuilt on demand).
