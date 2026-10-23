@@ -102,7 +102,10 @@ def cmd_warm_cache(a, s: Settings) -> int:
             cols = WARM_COLUMNS + [f.name for f in schema if f.name not in acc_store.KEY_COLUMNS and (pt.is_floating(f.type) or pt.is_integer(f.type))]
         for c in dict.fromkeys(cols):
             store.column(c)
-            store._columns.pop(c, None)                  # drop the memory map; the .npy file stays
+            if c != "emission_rate_tonnes_per_kwh":      # the $/MWh columns are priced in $/kWh: their divided copy (acc_store.scaled_column) is cached too
+                store.scaled_column(c, 1000.0)
+            for k in [k for k in store._columns if k == c or k.startswith(f"{c}/")]:
+                store._columns.pop(k, None)              # drop the memory maps; the .npy files stay
             print(f"ACC {acc}: {c} ready", flush=True)
         print(f"ACC {acc}: cache built in {time.time() - t0:.0f} s ({store.dir})", flush=True)
         del store

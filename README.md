@@ -84,24 +84,39 @@ read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.p
 
     from recet.jobs import RunConfig, run_job
     result = run_job(RunConfig(measures="Measure.csv", programcost="ProgramCost.csv", out_dir="results", acc_version="2026", components=True))
-    result.frame            # the measure-level table
+    result.frame            # the measure-level table; None for a job run in parts (more rows than chunk_size): read result.files["measure_level"]
     result.files            # every file written
 
 ## Performance
 
 The replacement BRD's target (NFR Performance) is at least 1,000,000 records priced on 8,760 profiles in 15 minutes or less. Measured with
 `poc/benchmark_recet_scale.py` in the CEDARS review research repository: the four real PG&E 2028-2031 jobs repeated to 1,000,000 records, the 2024 ACC,
-societal tests and emissions on, one process on a 16-thread laptop with 11.6 GB of memory (version 0.1.32, 2026-10-23):
+societal tests and emissions on, one process on a 16-thread laptop with 11.6 GB of memory (version 0.1.34, 2026-10-23). The job is run in 50 parts of
+20,000 measures (the default `chunk_size`, see the user guide's "What a run does"):
 
 | Stage | Seconds |
 |---|---|
-| preflight checks | 39 |
-| loading | 22 |
-| pricing (TRC, SCB, SCH, PAC, RIM, bill impacts, emissions) | 167 |
-| writing results (parquet) | 43 |
-| **total** | **272 (4.5 minutes, about 3,700 records a second)** |
+| splitting Measure.csv into parts and reading their column types | 29 |
+| preflight checks (part by part) | 39 |
+| pass 1: load and price each part (TRC, SCB, SCH, PAC, RIM, bill impacts, emissions) | 174 |
+| pass 2: program costs over the whole job, assemble and write (parquet) | 59 |
+| **total** | **301 (5.0 minutes, about 3,300 records a second)** |
 
-Peak memory was 7.4 GB. Before 0.1.32 the same job took 8.6 minutes (pricing 401 s): the bill-impact, participant-cost, other-benefit and emissions steps
+Peak memory was **0.96 GB committed** (1.27 GB in RAM, which includes pages of the memory-mapped ACC and profile files that the system can drop and re-read).
+How it came down, all on the same job:
+
+| Version | How the job is run | Peak committed | Time |
+|---|---|---|---|
+| 0.1.32 | as one piece | 17.8 GB | 4.5 min |
+| 0.1.33 | in parts of 50,000 | 2.28 GB | 4.6 min |
+| 0.1.33 | in parts of 20,000 | 1.74 GB | 5.1 min |
+| 0.1.34 | in parts of 20,000, one BLAS thread, ACC series read in place | **0.96 GB** | 5.0 min |
+
+As one piece the run expanded the whole job into about 54 million measure-quarter rows at once, more than the laptop's RAM, so part of it was paged to disk
+(the 7.4 GB first reported for it was the peak held in RAM, not what the run needed). In 0.1.34, `import recet` sets `OPENBLAS_NUM_THREADS=1` (numpy's BLAS
+reserved a 32 MB buffer per CPU thread, 0.5 GB here, and the pricing does not use its threads), and the ACC's hourly series are read straight from the
+memory-mapped cache instead of being copied (`acc_store.scaled_column`). Every output of the run in parts equals the one-piece run's (worst difference 1e-13, in a
+levelized ratio). Before 0.1.32 the same job took 8.6 minutes (pricing 401 s): the bill-impact, participant-cost, other-benefit and emissions steps
 looped over measures one row at a time and are now computed on whole columns (`pipeline/engine.py`, `pipeline/emissions.py`; the row-by-row versions are kept
 as `..._per_measure` references that the tests compare them with). The web app's own limits (upload size, one worker, its server's memory) are separate.
 

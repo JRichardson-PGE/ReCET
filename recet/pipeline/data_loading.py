@@ -13,20 +13,29 @@ import pandas as pd
 from .delimited import read_cet_csv
 
 
-def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
+def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False, dtypes: dict | None = None) -> pd.DataFrame:
     """Generic loader: any real CET Measure.csv (pipe- or comma-delimited) in, derived-fields DataFrame out.
 
     allocate_statewide=True first splits any statewide-program rows across the
     IOUs (pipeline/statewide_allocation.py): one row per IOU with `<IOU>_`
     prepended to CEInputID and the per-field factors applied to the RAW
     columns, before any derived field is computed. Non-statewide rows are
-    untouched."""
-    df = read_cet_csv(measure_csv_path, low_memory=False)
+    untouched.
+
+    dtypes: column types to read with instead of inferring them from the file (delimited.part_dtypes): a part of a larger file is read with the types the
+    whole file would get, so it loads exactly as those rows do in the whole file."""
+    df = read_cet_csv(measure_csv_path, low_memory=False, **({"dtype": dtypes} if dtypes else {}))
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
         df, report = allocate_measure_inputs(df)
         warn_unmatched(report, "Measure.csv")
     return _derive_fields(df)
+
+
+def acc_versions(col: pd.Series) -> pd.Series:
+    """The ACCVersion column as version keys: "2024 ACC" and 2024.0 (the column read as numbers because it has blanks) both give "2024"; blank gives ""."""
+    v = col.astype(str).str.strip().str.replace(r"(?i)\s*ACC$", "", regex=True).str.replace(r"\.0$", "", regex=True)
+    return v.where(~col.isna() & (v.str.lower() != "nan"), "")
 
 
 def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
@@ -192,11 +201,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["is_fuel_sub"] = _by_id | _by_impact
 
     # ACCVersion (optional, not a CET column; BRD BR-06.5): the ACC version this measure is priced on, e.g. "2024" or "2024 ACC". Blank = the run's version.
-    if "ACCVersion" in df.columns:
-        v = df["ACCVersion"].astype(str).str.strip().str.replace(r"(?i)\s*ACC$", "", regex=True).str.replace(r"\.0$", "", regex=True)   # 2024.0 when the column has blanks
-        df["acc_version"] = v.where(~df["ACCVersion"].isna() & (v.str.lower() != "nan"), "")
-    else:
-        df["acc_version"] = ""
+    df["acc_version"] = acc_versions(df["ACCVersion"]) if "ACCVersion" in df.columns else ""
     df["eul_years_raw"] = df["EUL_Yrs"].astype(float)            # as filed (first-year savings use it; pricing uses eul_years_exact, floored at 0.25)
     df["claim_year"] = df["ClaimYearQuarter"].astype(str).str[:4].astype(int)
     # Real field: which quarter (1-4) of claim_year the measure starts

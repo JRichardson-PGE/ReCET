@@ -107,3 +107,20 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
     if unshaped:
         log(f"  {len(unshaped)} measure(s) have no 8,760 shape and are left out of the profile (listed in the unshaped table)")
     return df, pd.DataFrame(unshaped), summary
+
+
+def combine_profiles(parts: list[tuple[pd.DataFrame, pd.DataFrame, dict]], years: list[int]) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """portfolio_profile's (profile, unshaped, summary) for a whole job from the same for each of its parts (a chunked run): the hourly kWh add up per PA."""
+    years = sorted(int(y) for y in years)
+    pas = sorted({c.rsplit("_", 1)[1] for p, _u, _s in parts for c in p.columns if c.startswith("net_kwh_") and c.count("_") == 3})
+    df = parts[0][0][["hour_of_year", "datetime"]].copy()
+    for y in years:
+        by_pa = {pa: sum((p[f"net_kwh_{y}_{pa}"].to_numpy() for p, _u, _s in parts if f"net_kwh_{y}_{pa}" in p), np.zeros(HOURS)) for pa in pas}
+        df[f"net_kwh_{y}"] = sum(by_pa[pa] for pa in pas) if pas else np.zeros(HOURS)
+        for pa in pas:
+            df[f"net_kwh_{y}_{pa}"] = by_pa[pa]
+    summary = {y: {"delivered_net_kwh": sum(s[y]["delivered_net_kwh"] for _p, _u, s in parts), "in_profile_kwh": float(df[f"net_kwh_{y}"].sum()),
+                   "unshaped_kwh": sum(s[y]["unshaped_kwh"] for _p, _u, s in parts), "peak_hour_kwh": float(df[f"net_kwh_{y}"].max()),
+                   "peak_hour_of_year": int(df.loc[df[f"net_kwh_{y}"].idxmax(), "hour_of_year"])} for y in years}
+    unshaped = [u for _p, u, _s in parts if len(u)]
+    return df, (pd.concat(unshaped, ignore_index=True) if unshaped else pd.DataFrame()), summary
