@@ -26,7 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import __version__, versions
+from .. import __version__, outputs, versions
 from . import auth, jobzip
 from .config import Settings
 from .db import Database
@@ -638,7 +638,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return []
         out = []
         for f in sorted(p.rglob("*")):
-            if f.is_file() and "_prepared_inputs" not in f.parts and not f.name.startswith("_config"):
+            if f.is_file() and "_prepared_inputs" not in f.parts and outputs.RESULTS_DIR not in f.parts and not f.name.startswith("_config"):
                 out.append((str(f.relative_to(p)), f.stat().st_size))
         return out
 
@@ -738,6 +738,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404)
         subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*"))
         measure_files = sorted(folder.glob("measure_level_*.*"))
+        source = outputs.results_source(folder)                # a CSV run's kept parquet (outputs.RESULTS_DIR) when there is one
         comparison = sorted(folder.glob("comparison_summary_*.*"))
         kw = dict(run=run, sub=sub, subruns=subruns, levels=rv.LEVELS, level=level, plain=None, plain_name="")
         if not measure_files:
@@ -748,7 +749,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             df = ctx.frame(plain_file)
             kw.update(plain=df, plain_name=plain_file.name)
             return ctx.render(request, "results.html", **kw, note="", table=None)
-        frame = ctx.frame(measure_files[0])
+        frame = ctx.frame(source)
         pas = rv.available_pas(frame)
         pa = pa if pa in pas else rv.ALL_PAS
         views = user_views(u["id"])
@@ -777,10 +778,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         base = ctx.result_path(run, sub) if sub else ctx.result_path(run)
-        files = sorted(base.glob("measure_level_*.*")) if base else []
-        if not files:
+        source = outputs.results_source(base) if base else None
+        if source is None:
             raise HTTPException(404)
-        frame = ctx.frame(files[0])
+        frame = ctx.frame(source)
         cat = rv.catalog(frame)
         views = user_views(request.state.user["id"])
         keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])

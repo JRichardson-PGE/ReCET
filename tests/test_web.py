@@ -580,11 +580,16 @@ def test_csv_outputs_are_zipped_and_downloads_stream_from_disk(web, tmp_path):
     assert ctx.runner.work_once()
     files = sorted(f.name for f in ctx.result_path(ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))).iterdir())
     assert [f for f in files if f.startswith(("measure_level_", "portfolio_summary_"))] == ["measure_level_acc2026.csv.zip", "portfolio_summary_acc2026.csv.zip"]
-    assert c.get(f"{P}/runs/{run_id}/results").status_code == 200               # the results page reads the zipped table
+    from recet import outputs
+    folder = ctx.result_path(ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,)))
+    assert (folder / outputs.RESULTS_DIR / "measure_level_acc2026.parquet").exists()          # parquet first, kept for the Results tables
+    assert outputs.RESULTS_DIR not in c.get(f"{P}/runs/{run_id}").text                          # but not listed for download
+    assert c.get(f"{P}/runs/{run_id}/results").status_code == 200               # the results page reads the kept parquet
     r = c.get(f"{P}/runs/{run_id}/zip")
     assert r.status_code == 200 and r.headers["content-disposition"].endswith(f'recet_{run_id}.zip"')
     z = zipfile.ZipFile(io.BytesIO(r.content))
     assert "measure_level_acc2026.csv.zip" in z.namelist() and "log.txt" in z.namelist()
+    assert not [n for n in z.namelist() if n.startswith(outputs.RESULTS_DIR)]                  # the kept parquet is not downloaded again
     assert z.getinfo("measure_level_acc2026.csv.zip").compress_type == zipfile.ZIP_STORED       # already compressed: stored, not zipped twice
     assert z.getinfo("log.txt").compress_type == zipfile.ZIP_DEFLATED
     inner = zipfile.ZipFile(io.BytesIO(z.read("measure_level_acc2026.csv.zip")))

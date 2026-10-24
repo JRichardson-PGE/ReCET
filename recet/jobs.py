@@ -349,7 +349,9 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
     result.frame = frame
-    result.files["measure_level"] = outputs.write_table(frame, run_dir / f"measure_level_{tag}", cfg.output_format)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True)
+    writer.write(frame)
+    result.files["measure_level"] = writer.close()                   # csv / csv.zip: parquet first (kept for the Results tables), then CSV
     summary = outputs.summarize(frame, cfg.apply_exclude_from_ce)
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
@@ -401,8 +403,7 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         if proc.wait() != 0:
             raise RuntimeError(f"run for ACC version {key} failed (exit code {proc.returncode})")
         run_dir = folder / f"run_acc{key}"
-        table = next(run_dir.glob("measure_level_*.*"))
-        frames[key] = outputs.read_table(table)
+        frames[key] = outputs.read_table(outputs.results_source(run_dir))
         results[key] = run_dir
     a, b = cfg.acc_version, cfg.compare_with
     per, summ = outputs.compare_frames(frames[a], frames[b], f"acc{a}", f"acc{b}")

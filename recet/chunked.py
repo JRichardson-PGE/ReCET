@@ -121,7 +121,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     # ---- pass 2: program costs shared over the whole job, then the measure-level rows, part by part
     log("\n== writing results ==")
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
     cet = outputs.read_cet_outputs(cfg.cet_outputs) if cfg.cet_outputs else None
     cet_writer = outputs.TableWriter(run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group) if cet is not None else None
