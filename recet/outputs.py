@@ -461,6 +461,18 @@ def _frame_batches(df: pd.DataFrame):
     return t.to_batches(max_chunksize=CSV_BATCH_ROWS) or [pa.RecordBatch.from_pylist([], schema=t.schema)]
 
 
+def _remove(path: Path) -> None:
+    """Delete a temporary file, retrying for a moment if Windows still holds it (an antivirus scanner briefly locks newly written files); one that
+    still cannot be deleted is left for the run folder's cleanup rather than failing the run."""
+    import time
+    for attempt in range(10):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.1 * (attempt + 1))
+
+
 def results_source(folder: Path) -> Path | None:
     """The file a run folder's Results tables read: the kept parquet of a CSV run (RESULTS_DIR), else its measure-level file; None if there is neither."""
     folder = Path(folder)
@@ -649,7 +661,7 @@ class TableWriter:
             for p in self.parts:                                 # parts gathered into full row groups of n rows (about one group in memory)
                 buf.append(pq.read_table(p).replace_schema_metadata(None).cast(plain))
                 rows += buf[-1].num_rows
-                p.unlink()
+                _remove(p)
                 if rows >= n:
                     t = pa.concat_tables(buf)
                     while t.num_rows >= n:
@@ -659,7 +671,7 @@ class TableWriter:
             if buf:
                 w.write_table(pa.concat_tables(buf).replace_schema_metadata(schema.metadata), row_group_size=n)
         for p in self.parts:
-            p.unlink(missing_ok=True)
+            _remove(p)
 
     def close(self) -> Path:
         if self.fmt == "xlsx":

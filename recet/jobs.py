@@ -71,7 +71,7 @@ class RunConfig:
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
     output_format: str = "csv"               # csv | csv.zip (each CSV inside a zip; the web app's choice) | parquet | xlsx
     excel_max_rows: int = 50_000             # an xlsx table with more rows than this is written as excel_fallback instead (outputs.ExcelLimit)
-    excel_fallback: str = "csv"              # csv | csv.zip (the web app) | parquet
+    excel_fallback: str = "csv.zip"          # csv.zip | csv | parquet: every table of a run whose measures are over excel_max_rows (run_format)
     preflight_only: bool = False
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
@@ -217,6 +217,20 @@ def excel_limit(cfg: RunConfig, result: RunResult, log: Log):
     return outputs.ExcelLimit(cfg.excel_max_rows, cfg.excel_fallback, notify)
 
 
+def run_format(cfg: RunConfig, rows: int, log: Log) -> str:
+    """The format the run's tables are written in: cfg.output_format, except that an Excel run with more measures than excel_max_rows writes EVERY table as
+    excel_fallback (zipped CSV by default), so a run's files are all one format. The measure-level table is the run's longest; outputs.ExcelLimit still
+    guards any single table. Called once the number of measures (after statewide allocation) is known, before any table is written."""
+    from . import outputs
+    limit = min(int(cfg.excel_max_rows), outputs.EXCEL_MAX_ROWS)
+    if cfg.output_format != "xlsx" or rows <= limit:
+        return cfg.output_format
+    fallback = cfg.excel_fallback if cfg.excel_fallback in outputs.FORMATS and cfg.excel_fallback != "xlsx" else "csv.zip"
+    name = {"csv.zip": "zipped CSV", "csv": "CSV"}.get(fallback, fallback)
+    log(f"note: {rows:,} measures is more than the {limit:,}-row limit for Excel output, so every table of this run is written as {name} instead")
+    return fallback
+
+
 def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_start: float, measures_priced: int, base_year: int, parts: dict | None = None) -> None:
     """run_settings.json: everything needed to reproduce the run. `parts`: how a chunked run split the job."""
     from . import __version__, paths
@@ -304,6 +318,11 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     meb = float(cfg.market_effects or 0.0)
     mec = meb                                               # one setting: the same adder on benefits (MEBens) and on costs (MECost)
     log(f"{len(measures):,} measures, First Year {base_year}, market effects {meb:.0%} on benefits and costs")
+    used = run_format(cfg, len(measures), log)
+    if used != cfg.output_format:
+        result.notes.append(f"Excel output was chosen, but {len(measures):,} measures is over the {cfg.excel_max_rows:,}-row limit, so every table is "
+                            f"{dict(csv='CSV', parquet='parquet').get(used, 'zipped CSV')}")
+        cfg.output_format = used                                   # cfg is this run's own copy (run_job)
 
     # ---- ACC versions: a measure may name its own (ACCVersion column, BRD BR-06.5); blank = this run's version
     from . import runtime, versions
@@ -421,6 +440,9 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         frames[key] = outputs.read_table(outputs.results_source(run_dir))
         results[key] = run_dir
     a, b = cfg.acc_version, cfg.compare_with
+    used = run_format(cfg, max(len(f) for f in frames.values()), log)             # the two runs decided the same way for their own files
+    if used != cfg.output_format:
+        cfg = RunConfig.from_dict({**asdict(cfg), "output_format": used})
     res = RunResult(run_dir=folder)
     excel = excel_limit(cfg, res, log)
     per, summ = outputs.compare_frames(frames[a], frames[b], f"acc{a}", f"acc{b}")
