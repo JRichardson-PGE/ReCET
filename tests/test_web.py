@@ -56,9 +56,22 @@ def _csrf(c: TestClient, path=f"{P}/runs/new") -> str:
     return re.search(r'name="csrf" value="([^"]+)"', c.get(path).text).group(1)
 
 
+def _zip(members: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in members.items():
+            z.writestr(name, data)
+    return buf.getvalue()
+
+
+def _job(measure: bytes, programcost: bytes | None = None, name: str = "job.zip"):
+    """The job upload: one .zip with Measure.csv (and ProgramCost.csv), as the New run page takes it."""
+    return (name, _zip({"Measure.csv": measure, **({"ProgramCost.csv": programcost} if programcost is not None else {})}), "application/zip")
+
+
 def _start_run(c, tmp_path, **form):
     data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv", **form}
-    files = {"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")}
+    files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
     r = c.post(f"{P}/runs", data=data, files=files)
     assert r.status_code == 303, r.text
     return r.headers["location"].rsplit("/", 1)[-1]
@@ -141,7 +154,7 @@ def test_csrf_is_required(web, tmp_path):
     app, ctx = web
     _user(ctx, "f@example.com")
     c = _login(app, "f@example.com")
-    files = {"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")}
+    files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
     r = c.post(f"{P}/runs", data={"csrf": "wrong", "acc_version": "2026", "input_mode": "files"}, files=files)
     assert r.status_code == 400
     assert ctx.db.one("SELECT COUNT(*) n FROM runs")["n"] == 0
@@ -151,12 +164,12 @@ def test_bad_options_are_refused(web, tmp_path):
     app, ctx = web
     _user(ctx, "g@example.com")
     c = _login(app, "g@example.com")
-    files = {"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")}
+    files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
     for bad in ({"acc_version": "2021"}, {"market_effects": "0.5"}, {"compare_with": "2026"}):
         data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", **bad}
         assert c.post(f"{P}/runs", data=data, files=files).status_code == 400
     r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files"},
-               files={"measures": ("evil.exe", b"x", "application/octet-stream")})
+               files={"job_zip": ("evil.exe", b"x", "application/octet-stream")})
     assert r.status_code == 400
 
 
@@ -220,7 +233,7 @@ def test_a_failed_run_says_so(web, tmp_path):
     _user(ctx, "j@example.com")
     c = _login(app, "j@example.com")
     data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files"}
-    r = c.post(f"{P}/runs", data=data, files={"measures": ("Measure.csv", b"not|a\nreal|file\n", "text/csv")})
+    r = c.post(f"{P}/runs", data=data, files={"job_zip": _job(b"not|a\nreal|file\n")})
     run_id = r.headers["location"].rsplit("/", 1)[-1]
     ctx.runner.work_once()
     row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))
@@ -270,7 +283,7 @@ def test_draft_runs_and_downloads(web, tmp_path):
     _user(ctx, "l@example.com")
     c = _login(app, "l@example.com")
     r = c.post(f"{P}/edit", data={"csrf": _csrf(c, f"{P}/edit"), "mode": "upload", "name": ""},
-               files={"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")})
+               files={"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())})
     assert r.status_code == 303, r.text
     draft = r.headers["location"].split("draft=")[1]
     d = c.get(f"{P}/edit/api/{draft}").json()
@@ -299,7 +312,7 @@ def test_edit_inputs_of_a_finished_run_and_rerun(web, tmp_path):
     c = _login(app, "q@example.com")
     data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0.05", "output_format": "csv", "label": "base case",
             "emissions": "on"}
-    files = {"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv"),
+    files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes()),
              "profiles_8760": ("shapes.csv", make_flat_profile_csv(tmp_path / "shapes.csv").read_bytes(), "text/csv")}
     run_id = c.post(f"{P}/runs", data=data, files=files).headers["location"].rsplit("/", 1)[-1]
     assert ctx.runner.work_once()
@@ -346,7 +359,7 @@ def test_edit_inputs_of_a_finished_run_and_rerun(web, tmp_path):
     big.write_text("\n".join([lines[0], *rows]) + "\n")
     big_run = c.post(f"{P}/runs", data={"csrf": csrf, "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv",
                                         "preflight_only": "on"},
-                     files={"measures": ("Measure.csv", big.read_bytes(), "text/csv")}).headers["location"].rsplit("/", 1)[-1]
+                     files={"job_zip": _job(big.read_bytes())}).headers["location"].rsplit("/", 1)[-1]
     r = c.post(f"{P}/runs/{big_run}/edit", data={"csrf": csrf})
     assert r.status_code == 400 and "up to 500" in r.text and "Download the inputs" in r.text
     import time
@@ -362,7 +375,7 @@ def test_validate_inputs_from_the_editor(web, tmp_path):
     _user(ctx, "w@example.com")
     c = _login(app, "v@example.com")
     r = c.post(f"{P}/edit", data={"csrf": _csrf(c, f"{P}/edit"), "mode": "upload", "name": "check me"},
-               files={"measures": ("Measure.csv", make_measure_csv(tmp_path / "Measure.csv").read_bytes(), "text/csv")})
+               files={"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())})
     draft = r.headers["location"].split("draft=")[1]
     csrf = re.search(r'data-csrf="([^"]+)"', c.get(f"{P}/edit?draft={draft}").text).group(1)
     d = c.get(f"{P}/edit/api/{draft}").json()
@@ -516,3 +529,43 @@ def test_value_list_pages_and_admin_changes(web):
     create_app(ctx.s)
     assert "Kept" in editor.active_codes("sector", 2028)
     editor.set_value_list_changes({})
+
+
+# ------------------------------------------------------------------------------------------------------------------------- the job zip
+def test_csv_files_must_come_in_a_zip(web, tmp_path):
+    """Measure.csv / ProgramCost.csv on their own are refused, on New run and on Edit inputs, with a message saying to zip them (as CET takes a job)."""
+    app, ctx = web
+    _user(ctx, "z@example.com")
+    c = _login(app, "z@example.com")
+    m = make_measure_csv(tmp_path / "Measure.csv").read_bytes()
+    data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv"}
+    for files in ({"measures": ("Measure.csv", m, "text/csv")}, {"job_zip": ("Measure.csv", m, "text/csv")}):
+        r = c.post(f"{P}/runs", data={**data, "csrf": _csrf(c)}, files=files)
+        assert r.status_code == 400 and "in one .zip" in r.text
+    r = c.post(f"{P}/edit", data={"csrf": _csrf(c, f"{P}/edit"), "mode": "upload", "name": ""}, files={"measures": ("Measure.csv", m, "text/csv")})
+    assert "in one .zip" in r.text and ctx.db.one("SELECT COUNT(*) n FROM drafts")["n"] == 0
+    r = c.post(f"{P}/runs", data={**data, "csrf": _csrf(c)}, files={"job_zip": ("job.zip", _zip({"ProgramCost.csv": b"x"}), "application/zip")})
+    assert r.status_code == 400 and "Job zip: the zip has no Measure.csv" in r.text
+    assert ctx.db.one("SELECT COUNT(*) n FROM runs")["n"] == 0
+    assert not list(ctx.s.runs_dir.glob("*/inputs/*")) if ctx.s.runs_dir.exists() else True          # a refused upload leaves no folder behind
+
+
+def test_a_zip_with_program_costs_runs_with_them(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "pc@example.com")
+    c = _login(app, "pc@example.com")
+    pc = ("PrgID|PrgYear|ClaimYearQuarter|AdminCostsOverheadAndGA|AdminCostsOther|MarketingOutreach|DIActivity|DIInstallation|DIHardwareAndMaterials|"
+          "DIRebateAndInspection|EMV|UserInputIncentive|OnBillFinancing|CostsRecoveredFromOtherSources|PA\nPRG1|2028|2028Q4|500|0|0|0|0|0|0|0|0|0|0|PGE\n")
+    data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv"}
+    r = c.post(f"{P}/runs", data=data, files={"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes(), pc.encode())})
+    assert r.status_code == 303, r.text
+    run_id = r.headers["location"].rsplit("/", 1)[-1]
+    row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))
+    assert "Measure.csv, ProgramCost.csv" in row["inputs"]
+    assert sorted(f.name for f in (ctx.runner.folder(run_id) / "inputs").iterdir()) == ["measures.csv", "programcost.csv"]    # the zip itself is not kept
+    assert ctx.runner.work_once()
+    row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))
+    assert row["status"] == "finished", c.get(f"{P}/runs/{run_id}/log").json()["text"]
+    import pandas as pd
+    level = next(ctx.runner.folder(run_id).rglob("measure_level_*.csv"))
+    assert pd.read_csv(level, encoding="utf-8-sig")["WeightedProgramCost"].sum() == pytest.approx(500.0)
