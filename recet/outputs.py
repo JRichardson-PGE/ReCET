@@ -333,7 +333,7 @@ def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.Dat
 
 FORMATS = ("csv", "csv.zip", "parquet", "xlsx")
 PARQUET_ROW_GROUP = 200_000  # rows per row group when a run in parts joins its parquet parts (TableWriter); RunConfig.parquet_row_group
-CSV_BATCH_ROWS = 50_000      # rows formatted at a time when CSV is written from parquet
+CSV_BATCH_ROWS = 10_000      # rows formatted at a time when CSV is written from parquet (50,000 held 2.3 GB more at 1M rows; 10,000 holds 0.4 GB, as fast)
 RESULTS_DIR = "_results"     # a run's measure-level table as parquet when its output is CSV, kept for the Results tables (results_source)
 
 
@@ -438,9 +438,19 @@ def write_csv(batches, path: Path, zipped: bool) -> Path:
 
 
 def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool) -> Path:
-    """The parquet table at `parquet` as CSV (write_csv), read CSV_BATCH_ROWS rows at a time."""
+    """The parquet table at `parquet` as CSV (write_csv), read CSV_BATCH_ROWS rows at a time. Kept small on purpose, measured on the 1,000,000-row
+    measure-level table: read single-threaded through a 1 MB buffer with no read-ahead (pyarrow otherwise pre-reads whole row groups), and with pyarrow's
+    system allocator for the duration (its default, mimalloc, keeps freed memory), the conversion holds about 0.4 GB, against 2.3 GB with the defaults and
+    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop)."""
+    import pyarrow as pa
     import pyarrow.parquet as pq
-    return write_csv(pq.ParquetFile(parquet).iter_batches(batch_size=CSV_BATCH_ROWS), path, zipped)
+    previous = pa.default_memory_pool()
+    pa.set_memory_pool(pa.system_memory_pool())
+    try:
+        pf = pq.ParquetFile(parquet, pre_buffer=False, buffer_size=1 << 20)
+        return write_csv(pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False), path, zipped)
+    finally:
+        pa.set_memory_pool(previous)
 
 
 def _frame_batches(df: pd.DataFrame):
