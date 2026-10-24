@@ -566,6 +566,28 @@ def test_a_zip_with_program_costs_runs_with_them(web, tmp_path):
     assert ctx.runner.work_once()
     row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))
     assert row["status"] == "finished", c.get(f"{P}/runs/{run_id}/log").json()["text"]
-    import pandas as pd
-    level = next(ctx.runner.folder(run_id).rglob("measure_level_*.csv"))
-    assert pd.read_csv(level, encoding="utf-8-sig")["WeightedProgramCost"].sum() == pytest.approx(500.0)
+    from recet import outputs
+    level = next(ctx.runner.folder(run_id).rglob("measure_level_*.*"))
+    assert level.name.endswith(".csv.zip")                                   # the web app zips its CSV outputs
+    assert outputs.read_table(level)["WeightedProgramCost"].sum() == pytest.approx(500.0)
+
+
+def test_csv_outputs_are_zipped_and_downloads_stream_from_disk(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "dl@example.com")
+    c = _login(app, "dl@example.com")
+    run_id = _start_run(c, tmp_path)
+    assert ctx.runner.work_once()
+    files = sorted(f.name for f in ctx.result_path(ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))).iterdir())
+    assert [f for f in files if f.startswith(("measure_level_", "portfolio_summary_"))] == ["measure_level_acc2026.csv.zip", "portfolio_summary_acc2026.csv.zip"]
+    assert c.get(f"{P}/runs/{run_id}/results").status_code == 200               # the results page reads the zipped table
+    r = c.get(f"{P}/runs/{run_id}/zip")
+    assert r.status_code == 200 and r.headers["content-disposition"].endswith(f'recet_{run_id}.zip"')
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert "measure_level_acc2026.csv.zip" in z.namelist() and "log.txt" in z.namelist()
+    assert z.getinfo("measure_level_acc2026.csv.zip").compress_type == zipfile.ZIP_STORED       # already compressed: stored, not zipped twice
+    assert z.getinfo("log.txt").compress_type == zipfile.ZIP_DEFLATED
+    inner = zipfile.ZipFile(io.BytesIO(z.read("measure_level_acc2026.csv.zip")))
+    assert inner.namelist() == ["measure_level_acc2026.csv"]
+    assert "measures.csv" in zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/inputs.zip").content)).namelist()
+    assert not list((ctx.s.state_dir / "tmp").glob("download_*.zip"))          # the temporary download files are removed after sending

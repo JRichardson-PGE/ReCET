@@ -63,7 +63,7 @@ def _same(a: pd.DataFrame, b: pd.DataFrame) -> None:
             assert (x.astype(object).fillna("").astype(str) == y.astype(object).fillna("").astype(str)).all(), c
 
 
-@pytest.mark.parametrize("fmt, extra", [("csv", {}), ("parquet", {"market_effects": 0.05, "components": True, "portfolio_8760": True}),
+@pytest.mark.parametrize("fmt, extra", [("csv", {}), ("csv.zip", {"portfolio_8760": True}), ("parquet", {"market_effects": 0.05, "components": True, "portfolio_8760": True}),
                                         ("xlsx", {"apply_exclude_from_ce": True})])
 def test_parts_give_the_whole_jobs_files(tmp_path, fmt, extra):
     m, pc = _job(tmp_path)

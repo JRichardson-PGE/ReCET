@@ -177,7 +177,7 @@ def _run_settings(cfg: dict, label: str) -> dict:
     """A run's options as New run form values, so a rerun starts from the same settings."""
     out = {"acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
            "base_year": str(cfg.get("base_year") or ""), "market_effects": "0.05" if float(cfg.get("market_effects") or 0) > 0 else "0",
-           "output_format": str(cfg.get("output_format") or "csv"), "label": (f"{label} (edited)" if label else "")[:120],
+           "output_format": {"csv.zip": "csv"}.get(str(cfg.get("output_format") or "csv"), str(cfg.get("output_format") or "csv")), "label": (f"{label} (edited)" if label else "")[:120],
            "profile_years": " ".join(str(y) for y in cfg.get("profile_years") or [])}
     for f in SETTING_FLAGS:
         if cfg.get(f):

@@ -60,3 +60,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   does: a bare CSV is refused on New run and Edit inputs. The zip may hold only those two files (any case, .csv/.txt, top level or one folder; macOS/Windows
   extras skipped); each is copied out to `inputs/measures.csv` / `inputs/programcost.csv` (the zip is deleted), byte-counted against
   RECET_WEB_MAX_UNZIPPED_MB (1024). Uploads are capped at 150 MB per file (RECET_WEB_MAX_UPLOAD_MB, was 50); the edge nginx must allow it too.
+- 0.1.36 (2026-10-23, Jake): output format `csv.zip` (`outputs.table_path`, `_CsvZipStream`): each CSV written straight into `<table>.csv.zip`, byte-identical
+  to the plain CSV inside; `read_table` reads it. The web app always uses it for CSV. Parquet and xlsx are not zipped (10% and 3.5% smaller zipped; parquet with
+  zstd instead of snappy would be 71% smaller, not done). Web "Download all" / inputs.zip are built in `<state>/tmp` (`app.zip_to_file`, already-compressed files
+  stored) and streamed, never in memory; runner.cleanup removes stale ones.

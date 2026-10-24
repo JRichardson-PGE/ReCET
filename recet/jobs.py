@@ -5,7 +5,7 @@
 
 Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
 
-  measure_level_<acc>.csv        (or .xlsx / .parquet, per output_format) one row per measure: the raw input columns, the derived poc_* fields, pricing status, every output (see outputs.py)
+  measure_level_<acc>.csv        (or .csv.zip / .xlsx / .parquet, per output_format) one row per measure: the raw input columns, the derived poc_* fields, pricing status, every output (see outputs.py)
   portfolio_summary_<acc>.csv    totals and ratios overall, by IOU territory, by credited IOU and by program segment
   preflight.txt                  the input check that ran first
   preflight.json                 the same check as JSON (ok, stats, issues), read by the web app's Validate inputs panel
@@ -69,7 +69,7 @@ class RunConfig:
     base_year: int | None = None             # CET's "First Year" (default: earliest claim year)
     cet_outputs: str | None = None           # a CET *_outputs.csv to compare against
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
-    output_format: str = "csv"               # csv | parquet | xlsx
+    output_format: str = "csv"               # csv | csv.zip (each CSV inside a zip; the web app's choice) | parquet | xlsx
     preflight_only: bool = False
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
