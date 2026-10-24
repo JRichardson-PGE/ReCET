@@ -71,6 +71,7 @@ class RunConfig:
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
     output_format: str = "csv"               # csv | csv.zip (each CSV inside a zip; the web app's choice) | parquet | xlsx
     preflight_only: bool = False
+    parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
     subset_step: int = 1

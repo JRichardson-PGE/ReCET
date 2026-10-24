@@ -72,7 +72,7 @@ On the server it runs in Docker (`Dockerfile`, `docker-compose.yml`) behind the 
 read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.py`). Uploads are capped at 150 MB per file (`RECET_WEB_MAX_UPLOAD_MB`) and a job zip at
 1,024 MB unzipped (`RECET_WEB_MAX_UNZIPPED_MB`); a 1,000,000-row Measure.csv (603 MB) zips to 38 MB. Its CSV outputs
 are zipped too (`<table>.csv.zip`; the 1M measure-level CSV is 3.5 GB, 0.74 GB zipped), and "Download all" and the inputs download are built on disk and streamed, not
-held in memory. The edge nginx in front of it must allow the same
+held in memory. Parquet output is written in 200,000-row groups (`parquet_row_group`; the 1M measure-level parquet is 253 MB) and is not zipped. The edge nginx in front of it must allow the same
 upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC caches ahead of the first run;
 `recet-web users` and `recet-web reset-link EMAIL` manage accounts from the command line (also on the Users page for admins).
 

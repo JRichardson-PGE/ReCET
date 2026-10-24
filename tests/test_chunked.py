@@ -123,3 +123,18 @@ def test_preflight_in_parts_finds_errors_across_parts(tmp_path):
     assert errors(b) == errors(a)
     assert errors(b)[next(k for k in errors(b) if k[0] == "duplicate_id")][1] == [("Measure", 2, "CEInputID"), ("Measure", 30, "CEInputID")]
     assert ("Measure", 25, "IOU_AC_Territory") in errors(b)[next(k for k in errors(b) if k[0] == "bad_iou")][1]
+
+
+def test_parquet_parts_are_joined_into_full_row_groups(tmp_path):
+    """TableWriter gathers parquet parts into row groups of row_group_rows (every group full but the last), whatever the part size, and keeps every row."""
+    import pyarrow.parquet as pq
+    df = pd.DataFrame({"a": np.arange(1000), "b": [None] * 500 + ["x"] * 500})       # b is blank in the first parts: its type comes from the later ones
+    for rows, groups in ((150, [150] * 6 + [100]), (200, [200] * 5), (5000, [1000])):
+        w = outputs.TableWriter(tmp_path / f"t{rows}", "parquet", len(df), rows)
+        for i in range(0, len(df), 100):
+            w.write(df.iloc[i:i + 100])
+        p = w.close()
+        meta = pq.ParquetFile(p).metadata
+        assert [meta.row_group(i).num_rows for i in range(meta.num_row_groups)] == groups
+        pd.testing.assert_frame_equal(pd.read_parquet(p), df)
+        assert not list(tmp_path.glob(f"t{rows}.part*"))
