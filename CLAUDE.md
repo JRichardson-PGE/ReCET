@@ -73,5 +73,6 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   `.[fast]`; about 6x faster than zlib, files ~11% larger), else zlib 6. Booleans written True/False, timestamps to the second, zip entries dated now. The
   measure-level parquet is kept in `<run>/_results/` (`outputs.RESULTS_DIR`) and the Results tables read it (`outputs.results_source`); the web app hides it.
   pyarrow's number text differs from pandas' (0 vs 0.0, no exponent for small values) with identical values.
-  Also: Excel output is capped at `RunConfig.excel_max_rows` (50,000; writing is ~400 rows/s) per table; a longer table is written as `excel_fallback`
-  (csv; the web app csv.zip) via `outputs.ExcelLimit`, with a note in the log, RunResult.notes and run_settings.json; the other tables stay xlsx.
+  Also (Jake): Excel output is for jobs of up to `RunConfig.excel_max_rows` measures (50,000; writing is ~400 rows/s); a larger Excel job writes EVERY
+  table as `excel_fallback` (csv.zip), decided once the measure count is known (`jobs.run_format`, before any table is written), with a note in the log,
+  RunResult.notes and run_settings.json. `outputs.ExcelLimit` stays as a per-table guard.

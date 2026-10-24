@@ -602,7 +602,7 @@ def test_excel_runs_fall_back_to_zipped_csv_over_the_limit(web, tmp_path):
     app, ctx = web
     _user(ctx, "xl@example.com")
     c = _login(app, "xl@example.com")
-    assert "up to 50,000 rows a table" in c.get(f"{P}/runs/new").text
+    assert "up to 50,000 measures" in c.get(f"{P}/runs/new").text
     run_id = _start_run(c, tmp_path, output_format="xlsx")
     cfg = json.loads((ctx.runner.folder(run_id) / "config.json").read_text())
     assert cfg["output_format"] == "xlsx" and cfg["excel_fallback"] == "csv.zip"

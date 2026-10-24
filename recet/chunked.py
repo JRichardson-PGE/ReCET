@@ -104,6 +104,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         log(f"  part {i + 1}/{len(parts)}: rows {start + 1:,}-{start + n:,}, {len(measures):,} measures, {time.time() - tp:.0f}s")
         del measures, d, vals, ems, comps
     log(f"priced in {time.time() - t0:.0f}s")
+    used = jobs.run_format(cfg, n_measures, log)                 # before any table is written: an Excel run over the row limit writes every table as zipped CSV
+    if used != cfg.output_format:
+        result.notes.append(f"Excel output was chosen, but {n_measures:,} measures is over the {cfg.excel_max_rows:,}-row limit, so every table is "
+                            f"{dict(csv='CSV', parquet='parquet').get(used, 'zipped CSV')}")
+        cfg.output_format = used
 
     if cfg.components:
         log("\n== ACC components (each priced separately) ==")
