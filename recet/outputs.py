@@ -331,23 +331,57 @@ def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.Dat
     return per, cet_comparison_summary(sums, matched, len(frame), len(cet))
 
 
-FORMATS = ("csv", "parquet", "xlsx")
+FORMATS = ("csv", "csv.zip", "parquet", "xlsx")
+CSV_ZIP_LEVEL = 6          # zlib level for csv.zip: a 1,000,000-row measure-level CSV of 3.5 GB becomes 0.74 GB in about 45 s (level 1: 1.2 GB in 16 s)
+
+
+def table_path(path: Path, fmt: str) -> Path:
+    """The file a table named `path` (no suffix) is written to in format `fmt`: <name>.csv / .parquet / .xlsx, or <name>.csv.zip (a zip holding <name>.csv)."""
+    return path.with_name(path.name + ".csv.zip") if fmt == "csv.zip" else path.with_suffix("." + fmt)
+
+
+class _CsvZipStream:
+    """CSV text written straight into a zip member, part by part: the uncompressed CSV never reaches the disk. The member is the same bytes write_table's csv
+    gives (UTF-8 with a BOM); zip64, so it may pass 4 GB."""
+
+    def __init__(self, path: Path):
+        import io
+        import zipfile
+        self.zip = zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=CSV_ZIP_LEVEL)
+        self.member = self.zip.open(path.name[: -len(".zip")], "w", force_zip64=True)
+        self.text = io.TextIOWrapper(self.member, encoding="utf-8-sig", newline="")
+        self.rows = 0
+
+    def write(self, df: pd.DataFrame) -> None:
+        df.to_csv(self.text, index=False, header=not self.rows)
+        self.rows += max(len(df), 1)
+
+    def close(self) -> None:
+        self.text.flush()
+        self.text.detach()
+        self.member.close()
+        self.zip.close()
 EXCEL_MAX_ROWS = 1_048_575          # rows below the header
 
 
 def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv") -> Path:
-    """Write `df` as <path with suffix from fmt>. csv is UTF-8 with a BOM so Excel opens it directly; xlsx is one formatted sheet (see _write_xlsx). A table too
-    long for Excel is written as csv instead, with a warning."""
+    """Write `df` as <path with suffix from fmt> (table_path). csv is UTF-8 with a BOM so Excel opens it directly; csv.zip is the same CSV inside a zip (what
+    the web app writes: about a fifth of the size); xlsx is one formatted sheet (see _write_xlsx). A table too long for Excel is written as csv instead, with a
+    warning."""
     if fmt == "xlsx" and len(df) > EXCEL_MAX_ROWS:
         import warnings
         warnings.warn(f"{path.name}: {len(df):,} rows is more than Excel holds; written as csv instead", stacklevel=2)
         fmt = "csv"
-    path = path.with_suffix("." + fmt)
+    path = table_path(path, fmt)
     path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "parquet":
         df.to_parquet(path, index=False)
     elif fmt == "csv":
         df.to_csv(path, index=False, encoding="utf-8-sig")
+    elif fmt == "csv.zip":
+        z = _CsvZipStream(path)
+        z.write(df)
+        z.close()
     elif fmt == "xlsx":
         _write_xlsx(df, path)
     else:
@@ -437,12 +471,13 @@ class TableWriter:
             import warnings
             warnings.warn(f"{path.name}: {total_rows:,} rows is more than Excel holds; written as csv instead", stacklevel=2)
             fmt = "csv"
-        self.fmt, self.total = fmt, total_rows
-        self.path = path.with_suffix("." + fmt)
+        self.fmt, self.total, self.base = fmt, total_rows, path
+        self.path = table_path(path, fmt)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.cols: list[str] | None = None
         self.parts: list[Path] = []
         self.xlsx: _XlsxStream | None = None
+        self.csvzip: _CsvZipStream | None = None
         self.rows = 0
 
     def write(self, df: pd.DataFrame) -> None:
@@ -456,6 +491,10 @@ class TableWriter:
         if self.fmt == "csv":
             first = not self.rows
             df.to_csv(self.path, index=False, header=first, mode="w" if first else "a", encoding="utf-8-sig" if first else "utf-8")
+        elif self.fmt == "csv.zip":
+            if self.csvzip is None:
+                self.csvzip = _CsvZipStream(self.path)
+            self.csvzip.write(df)
         elif self.fmt == "xlsx":
             if self.xlsx is None:
                 self.xlsx = _XlsxStream(self.path, df, self.total)
@@ -469,6 +508,8 @@ class TableWriter:
     def close(self) -> Path:
         if self.fmt == "xlsx" and self.xlsx is not None:
             self.xlsx.close()
+        elif self.fmt == "csv.zip" and self.csvzip is not None:
+            self.csvzip.close()
         elif self.fmt == "parquet":
             import pyarrow as pa
             import pyarrow.parquet as pq
@@ -483,7 +524,7 @@ class TableWriter:
             for p in self.parts:
                 p.unlink()
         elif self.rows == 0:
-            write_table(pd.DataFrame(columns=self.cols or []), self.path, self.fmt)
+            write_table(pd.DataFrame(columns=self.cols or []), self.base, self.fmt)
         return self.path
 
 
@@ -494,4 +535,10 @@ def read_table(path: Path) -> pd.DataFrame:
         return pd.read_parquet(path)
     if path.suffix == ".xlsx":
         return pd.read_excel(path)
+    if path.suffix == ".zip":                                 # csv.zip: the one CSV inside
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            name = next(n for n in z.namelist() if n.lower().endswith(".csv"))
+            with z.open(name) as f:
+                return pd.read_csv(f, low_memory=False, encoding="utf-8-sig")
     return pd.read_csv(path, low_memory=False, encoding="utf-8-sig")

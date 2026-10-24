@@ -6,7 +6,6 @@ so the same paths work behind the edge nginx (which passes /ReCET/... through un
 """
 from __future__ import annotations
 
-import io
 import json
 import math
 import secrets
@@ -19,9 +18,10 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -226,6 +226,24 @@ async def save_upload(up: UploadFile, dest: Path, limit: int) -> int:
 
 BARE_CSV_MESSAGE = ("Upload Measure.csv and ProgramCost.csv together in one .zip file (ProgramCost.csv is optional), as CET takes them: "
                     "a CSV on its own is not accepted.")
+
+
+ALREADY_COMPRESSED = (".zip", ".parquet", ".xlsx", ".xlsm", ".gz")
+
+
+def zip_to_file(entries: list[tuple[Path, str]], tmp_dir: Path) -> Path:
+    """A .zip of `entries` ((file, name in the zip)) built in a temporary file under `tmp_dir`, never in memory: a 1,000,000-measure run's files are gigabytes.
+    Files that are already compressed (zips, parquet, Excel) are stored as they are; the rest are deflated. The caller deletes the file after sending it."""
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    out = tmp_dir / f"download_{secrets.token_hex(8)}.zip"
+    try:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+            for f, name in entries:
+                z.write(f, name, compress_type=zipfile.ZIP_STORED if f.suffix.lower() in ALREADY_COMPRESSED else zipfile.ZIP_DEFLATED)
+    except BaseException:
+        out.unlink(missing_ok=True)
+        raise
+    return out
 
 
 def new_run_id() -> str:
@@ -514,7 +532,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         fmt_ = str(form.get("output_format", "csv"))
         if fmt_ not in ("csv", "xlsx", "parquet"):
             return fail("Unknown output format.")
-        cfg["output_format"] = fmt_
+        cfg["output_format"] = "csv.zip" if fmt_ == "csv" else fmt_     # the web app always zips its CSVs: a fifth of the size to store and to download
         label = str(form.get("label", "")).strip()[:120]
 
         # --- inputs
@@ -610,13 +628,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         base = ctx.runner.folder(run_id) / "inputs"
         if run["status"] == "expired" or not base.is_dir():
             raise HTTPException(404)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for f in sorted(base.rglob("*")):
-                if f.is_file():
-                    z.write(f, str(f.relative_to(base)))
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="recet_{run_id}_inputs.zip"'})
+        entries = [(f, str(f.relative_to(base))) for f in sorted(base.rglob("*")) if f.is_file()]
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}_inputs.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
     def _files(run) -> list[tuple[str, int]]:
         p = ctx.result_path(run)
@@ -693,16 +707,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         base = ctx.result_path(run)
         if base is None:
             raise HTTPException(404)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for rel, _n in _files(run):
-                z.write(base / rel, rel)
-            log = ctx.runner.folder(run_id) / "log.txt"
-            if log.exists():
-                z.write(log, "log.txt")
-        buf.seek(0)
-        name = f"recet_{run_id}.zip"
-        return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        entries = [(base / rel, rel) for rel, _n in _files(run)]
+        log = ctx.runner.folder(run_id) / "log.txt"
+        if log.exists():
+            entries.append((log, "log.txt"))
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
     # ----------------------------------------------------------------------------------------------------------------- results
     def user_views(uid: int) -> dict[str, list[str]]:

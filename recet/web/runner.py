@@ -198,6 +198,12 @@ class Runner:
             shutil.rmtree(self.s.drafts_dir / row["id"], ignore_errors=True)
             self.db.run("DELETE FROM drafts WHERE id = ?", (row["id"],))
             n_drafts += 1
+        for f in (self.s.state_dir / "tmp").glob("download_*.zip"):           # download zips left by a client that disconnected before the file was removed
+            try:
+                if f.stat().st_mtime < now - 3600:
+                    f.unlink()
+            except OSError:
+                pass
         from . import auth
         auth.prune(self.db)
         return {"runs": n_runs, "drafts": n_drafts}
