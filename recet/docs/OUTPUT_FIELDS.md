@@ -1871,6 +1871,12 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 | `ElecPricingStatus_acc<A>`, `ElecPricingStatus_acc<B>`, `GasPricingStatus_acc<A>`, `GasPricingStatus_acc<B>` | The pricing status under each version (1.3). Text. | the measure-level columns of each run |
 | `metric`, `acc<A>`, `acc<B>`, `delta`, `pct` | The summary file: each non-ratio column's portfolio total under both versions. $ or metric tons; fraction. | `metric` = `c`; `acc<A>` = `SUM(<c>_acc<A>)`; `acc<B>` = `SUM(<c>_acc<B>)`; `delta` = `acc<B> - acc<A>`; `pct` = `delta / abs(acc<A>)` (blank where `acc<A>` is 0) |
 
+### 2.7b `_results/measure_level_acc<version>.parquet`
+
+When the output format is `csv` or `csv.zip`, the measure-level table is written as parquet first and the CSV is made from it; the parquet is kept in the run
+folder's `_results` folder, and the Results tables (window and web app) read it rather than the CSV. Same columns and values as the measure-level file. The web
+app does not list it for download.
+
 ### 2.8 `preflight.txt`
 
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape

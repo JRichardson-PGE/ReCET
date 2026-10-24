@@ -349,7 +349,9 @@ class App:
         check("preflight_only", "Preflight check only (do not price)", hint="Reads the inputs and reports what would and would not be priced.", where="right")
         row = sub(right, "right")
         ttk.Label(row, text="Output format:").pack(side="left")
-        ttk.Combobox(row, textvariable=self._var("output_format", tk.StringVar, "csv"), values=["csv", "xlsx", "parquet"], width=8, state="readonly").pack(side="left", padx=6)
+        ttk.Combobox(row, textvariable=self._var("output_format", tk.StringVar, "csv"), values=["csv", "csv.zip", "xlsx", "parquet"], width=8, state="readonly").pack(side="left", padx=6)
+        from .jobs import RunConfig
+        ttk.Label(row, text=f"xlsx: up to {RunConfig.excel_max_rows:,} measures; a larger job writes every file as csv.zip", style="Hint.TLabel").pack(side="left", padx=6)
 
         # --- Reference data tab
         f = self._section(tabs["data"], "Reference data folder (the large ACC and profile files)")

@@ -54,8 +54,12 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--base-year", type=int, help="CET's First Year (default: earliest claim year)")
     g.add_argument("--cet-outputs", help="a CET *_outputs.csv to compare against")
     g.add_argument("--compare-with", help="also run this other ACC version (built-in) and write a per-measure comparison")
-    g.add_argument("--format", dest="output_format", choices=["csv", "parquet", "xlsx"], help="table format of the outputs (xlsx: one formatted Excel file per table)")
+    g.add_argument("--format", dest="output_format", choices=["csv", "csv.zip", "parquet", "xlsx"],
+                   help="table format of the outputs (csv.zip: each CSV inside a zip, about a fifth of the size; xlsx: one formatted Excel file per table)")
     g.add_argument("--preflight-only", action="store_true", default=None, help="check the inputs and stop")
+    g.add_argument("--excel-max-rows", type=int, help="with --format xlsx, a job with more measures than this writes every table as --excel-fallback instead (default 50,000)")
+    g.add_argument("--excel-fallback", choices=["csv.zip", "csv", "parquet"], help="the format of every table of a job over --excel-max-rows (default csv.zip)")
+    g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
     g.add_argument("--chunk-size", type=int, help="run a job with more Measure rows than this in parts of this many, to bound memory (default 20,000; 0 = never)")
 
 

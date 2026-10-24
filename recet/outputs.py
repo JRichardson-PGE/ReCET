@@ -17,7 +17,9 @@ measure-level table -- one row per measure, column groups left to right:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -331,23 +333,193 @@ def compare_to_cet(frame: pd.DataFrame, cet_outputs: str | Path) -> tuple[pd.Dat
     return per, cet_comparison_summary(sums, matched, len(frame), len(cet))
 
 
-FORMATS = ("csv", "parquet", "xlsx")
-EXCEL_MAX_ROWS = 1_048_575          # rows below the header
+FORMATS = ("csv", "csv.zip", "parquet", "xlsx")
+PARQUET_ROW_GROUP = 200_000  # rows per row group when a run in parts joins its parquet parts (TableWriter); RunConfig.parquet_row_group
+CSV_BATCH_ROWS = 10_000      # rows formatted at a time when CSV is written from parquet (50,000 held 2.3 GB more at 1M rows; 10,000 holds 0.4 GB, as fast)
+RESULTS_DIR = "_results"     # a run's measure-level table as parquet when its output is CSV, kept for the Results tables (results_source)
 
 
-def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv") -> Path:
-    """Write `df` as <path with suffix from fmt>. csv is UTF-8 with a BOM so Excel opens it directly; xlsx is one formatted sheet (see _write_xlsx). A table too
-    long for Excel is written as csv instead, with a warning."""
-    if fmt == "xlsx" and len(df) > EXCEL_MAX_ROWS:
-        import warnings
-        warnings.warn(f"{path.name}: {len(df):,} rows is more than Excel holds; written as csv instead", stacklevel=2)
-        fmt = "csv"
-    path = path.with_suffix("." + fmt)
+def table_path(path: Path, fmt: str) -> Path:
+    """The file a table named `path` (no suffix) is written to in format `fmt`: <name>.csv / .parquet / .xlsx, or <name>.csv.zip (a zip holding <name>.csv)."""
+    return path.with_name(path.name + ".csv.zip") if fmt == "csv.zip" else path.with_suffix("." + fmt)
+
+
+def deflater() -> tuple[object, str]:
+    """(a function giving a fresh raw-deflate compressor, its name). ISA-L level 1 when the optional `isal` package is installed (about 6x faster than zlib
+    level 6, files about 11% larger: the 1,000,000-row measure-level CSV zips to 862 MB instead of 777 MB), else Python's zlib at level 6. Either is ordinary
+    deflate, readable by every zip tool."""
+    import zlib
+    try:
+        from isal import isal_zlib
+        return (lambda: isal_zlib.compressobj(1, isal_zlib.DEFLATED, -15)), "ISA-L level 1"
+    except ImportError:
+        return (lambda: zlib.compressobj(6, zlib.DEFLATED, -15)), "zlib level 6"
+
+
+def _csv_ready(batch):
+    """A record batch with the columns pyarrow would write differently from pandas made as pandas writes them: booleans as True / False (pyarrow writes
+    true / false) and timestamps as 2018-01-01 00:00:00 (pyarrow adds nanoseconds). Numbers are pyarrow's shortest round-trip text, so 1.0 is written 1 and
+    small values may be written without an exponent (7.04e-05 as 0.0000704...): the same numbers when read back, different text from pandas' to_csv."""
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    cols, changed = [], False
+    for f, col in zip(batch.schema, batch.columns):
+        if pa.types.is_boolean(f.type):
+            col, changed = pc.if_else(col, "True", "False"), True
+        elif pa.types.is_timestamp(f.type):                  # whole seconds first: strftime's %S carries the unit's fraction
+            col, changed = pc.strftime(pc.cast(col, pa.timestamp("s", f.type.tz), safe=False), format="%Y-%m-%d %H:%M:%S"), True
+        cols.append(col)
+    return pa.RecordBatch.from_arrays(cols, names=batch.schema.names) if changed else batch
+
+
+def write_csv(batches, path: Path, zipped: bool) -> Path:
+    """Write record batches (an iterable) as one CSV, UTF-8 with a BOM, at `path`; `zipped`: inside a zip at `path` holding <name without .zip>, dated now.
+    pyarrow formats each batch (about 8x faster than pandas' to_csv) on a second thread while this one compresses and writes the previous one, so the
+    formatting and the compression overlap; only two batches are held at a time. The uncompressed CSV never reaches the disk when zipped."""
+    import queue
+    import threading
+    import pyarrow as pa
+    import pyarrow.csv as pacsv
+    q: queue.Queue = queue.Queue(maxsize=2)
+    failed: list[BaseException] = []
+    stop = threading.Event()
+
+    def produce():
+        try:
+            header = True
+            for b in batches:
+                if stop.is_set():
+                    return
+                buf = pa.BufferOutputStream()
+                pacsv.write_csv(pa.Table.from_batches([_csv_ready(b)]), buf, pacsv.WriteOptions(include_header=header, quoting_style="needed"))
+                header = False
+                q.put(buf.getvalue())
+        except BaseException as exc:                        # handed to the writing thread, which raises it
+            failed.append(exc)
+        finally:
+            q.put(None)
+
+    th = threading.Thread(target=produce, name="recet-csv", daemon=True)
+    th.start()
+
+    def drain(out) -> None:
+        out.write(b"\xef\xbb\xbf")                          # BOM, so Excel reads UTF-8
+        while (chunk := q.get()) is not None:
+            out.write(chunk)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if zipped:
+            import time
+            import zipfile
+            info = zipfile.ZipInfo(path.name[: -len(".zip")], date_time=time.localtime()[:6])
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            make, _name = deflater()
+            with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z, z.open(info, "w", force_zip64=True) as m:
+                if hasattr(m, "_compressor"):                 # zipfile's own deflater replaced by the faster one (same deflate stream format)
+                    m._compressor = make()
+                drain(m)
+        else:
+            with open(path, "wb") as f:
+                drain(f)
+    except BaseException:
+        stop.set()
+        while th.is_alive():                                  # let the formatting thread finish so nothing is left writing
+            try:
+                q.get(timeout=0.1)
+            except queue.Empty:
+                pass
+        path.unlink(missing_ok=True)
+        raise
+    th.join()
+    if failed:
+        path.unlink(missing_ok=True)
+        raise failed[0]
+    return path
+
+
+def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool) -> Path:
+    """The parquet table at `parquet` as CSV (write_csv), read CSV_BATCH_ROWS rows at a time. Kept small on purpose, measured on the 1,000,000-row
+    measure-level table: read single-threaded through a 1 MB buffer with no read-ahead (pyarrow otherwise pre-reads whole row groups), and with pyarrow's
+    system allocator for the duration (its default, mimalloc, keeps freed memory), the conversion holds about 0.4 GB, against 2.3 GB with the defaults and
+    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop)."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    previous = pa.default_memory_pool()
+    pa.set_memory_pool(pa.system_memory_pool())
+    try:
+        pf = pq.ParquetFile(parquet, pre_buffer=False, buffer_size=1 << 20)
+        return write_csv(pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False), path, zipped)
+    finally:
+        pa.set_memory_pool(previous)
+
+
+def _frame_batches(df: pd.DataFrame):
+    import pyarrow as pa
+    t = pa.Table.from_pandas(df, preserve_index=False)
+    return t.to_batches(max_chunksize=CSV_BATCH_ROWS) or [pa.RecordBatch.from_pylist([], schema=t.schema)]
+
+
+def _remove(path: Path) -> None:
+    """Delete a temporary file, retrying for a moment if Windows still holds it (an antivirus scanner briefly locks newly written files); one that
+    still cannot be deleted is left for the run folder's cleanup rather than failing the run."""
+    import time
+    for attempt in range(10):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.1 * (attempt + 1))
+
+
+def results_source(folder: Path) -> Path | None:
+    """The file a run folder's Results tables read: the kept parquet of a CSV run (RESULTS_DIR), else its measure-level file; None if there is neither."""
+    folder = Path(folder)
+    kept = sorted((folder / RESULTS_DIR).glob("measure_level_*.parquet"))
+    if kept:
+        return kept[0]
+    files = sorted(folder.glob("measure_level_*.*"))
+    return files[0] if files else None
+
+
+EXCEL_MAX_ROWS = 1_048_575          # Excel's own limit: rows below the header
+EXCEL_ROW_LIMIT = 50_000            # ReCET's limit for an xlsx table (RunConfig.excel_max_rows): writing runs at about 400 rows/s for the 344-column
+                                    # measure-level table, so 50,000 rows take about 2 minutes and make about a 100 MB workbook; 1,000,000 would take 40 minutes
+
+
+@dataclass
+class ExcelLimit:
+    """How many rows an xlsx table may have, the format a longer table is written in instead (csv; the web app uses csv.zip), and where to say so."""
+    max_rows: int = EXCEL_ROW_LIMIT
+    fallback: str = "csv"
+    notify: Callable[[str], None] | None = None
+
+    def format_for(self, fmt: str, rows: int, name: str) -> str:
+        if fmt != "xlsx" or rows <= min(self.max_rows, EXCEL_MAX_ROWS):
+            return fmt
+        fallback = self.fallback if self.fallback in FORMATS and self.fallback != "xlsx" else "csv"
+        msg = (f"{name}: {rows:,} rows is more than the {min(self.max_rows, EXCEL_MAX_ROWS):,}-row limit for Excel output, so it is written as "
+               f"{'zipped CSV' if fallback == 'csv.zip' else fallback.upper() if fallback == 'csv' else fallback} instead")
+        if self.notify is not None:
+            self.notify(msg)
+        else:
+            import warnings
+            warnings.warn(msg, stacklevel=3)
+        return fallback
+
+
+def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv", excel: ExcelLimit | None = None) -> Path:
+    """Write `df` as <path with suffix from fmt> (table_path). csv is UTF-8 with a BOM so Excel opens it directly, formatted by pyarrow (write_csv); csv.zip
+    is the same CSV inside a zip (what the web app writes: about a fifth of the size); xlsx is one formatted sheet (see _write_xlsx). An xlsx table longer than
+    `excel.max_rows` (default EXCEL_ROW_LIMIT) is written in `excel.fallback` (default csv) instead, and `excel.notify` is told."""
+    fmt = (excel or ExcelLimit()).format_for(fmt, len(df), path.name)
+    path = table_path(path, fmt)
     path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "parquet":
         df.to_parquet(path, index=False)
-    elif fmt == "csv":
-        df.to_csv(path, index=False, encoding="utf-8-sig")
+    elif fmt in ("csv", "csv.zip"):
+        write_csv(_frame_batches(df), path, zipped=fmt == "csv.zip")
     elif fmt == "xlsx":
         _write_xlsx(df, path)
     else:
@@ -427,19 +599,29 @@ class _XlsxStream:
 
 class TableWriter:
     """write_table for a table that arrives in parts (a chunked run), holding one part at a time. `total_rows` (known before the first part) decides, as
-    write_table does, whether an xlsx table fits in Excel. Every part must have the first part's columns (in any order). csv parts are appended; xlsx rows are
-    streamed; parquet parts are written as separate files and joined at close() under one schema (a column blank in one part takes the type it has elsewhere)."""
+    write_table does, whether an xlsx table fits in Excel. Every part must have the first part's columns (in any order). xlsx rows are streamed. parquet parts
+    are written as separate files and joined at close() under one schema (a column blank in one part takes the type it has elsewhere), gathered into row groups
+    of `row_group_rows` rows. Bigger groups compress much better (a 1,000,000-row measure-level table: 666 MB in 20,000-row groups, 302 MB in 100,000, 253 MB
+    in 200,000) but each is held in memory while it is written (about 0.4 GB per 100,000 rows of the measure-level table), so the size is a setting:
+    RunConfig.parquet_row_group.
 
-    def __init__(self, path: Path, fmt: str, total_rows: int):
+    csv and csv.zip are written PARQUET FIRST: the parts are joined into a parquet file as above and that file is then written out as CSV by pyarrow (write_csv;
+    a 1,000,000-row table in about 30 s, against about 260 s for pandas). `keep_parquet` keeps that parquet in the run's RESULTS_DIR (the Results tables read
+    it: results_source); otherwise it is deleted."""
+
+    def __init__(self, path: Path, fmt: str, total_rows: int, row_group_rows: int = PARQUET_ROW_GROUP, keep_parquet: bool = False,
+                 excel: ExcelLimit | None = None):
         if fmt not in FORMATS:
             raise ValueError(f"unknown output format {fmt!r}; choose from {FORMATS}")
-        if fmt == "xlsx" and total_rows > EXCEL_MAX_ROWS:
-            import warnings
-            warnings.warn(f"{path.name}: {total_rows:,} rows is more than Excel holds; written as csv instead", stacklevel=2)
-            fmt = "csv"
-        self.fmt, self.total = fmt, total_rows
-        self.path = path.with_suffix("." + fmt)
+        self.excel = excel
+        fmt = (excel or ExcelLimit()).format_for(fmt, total_rows, path.name)
+        self.fmt, self.total, self.base = fmt, total_rows, path
+        self.row_group_rows = max(int(row_group_rows or PARQUET_ROW_GROUP), 1)
+        self.path = table_path(path, fmt)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.via_parquet = fmt in ("csv", "csv.zip")
+        self.keep_parquet = keep_parquet
+        self.parquet = (path.parent / RESULTS_DIR / f"{path.name}.parquet") if self.via_parquet else self.path
         self.cols: list[str] | None = None
         self.parts: list[Path] = []
         self.xlsx: _XlsxStream | None = None
@@ -453,37 +635,60 @@ class TableWriter:
                 raise ValueError(f"{self.path.name}: a part has different columns: extra {sorted(set(df.columns) - set(self.cols))}, "
                                  f"missing {sorted(set(self.cols) - set(df.columns))}")
             df = df[self.cols]
-        if self.fmt == "csv":
-            first = not self.rows
-            df.to_csv(self.path, index=False, header=first, mode="w" if first else "a", encoding="utf-8-sig" if first else "utf-8")
-        elif self.fmt == "xlsx":
+        if self.fmt == "xlsx":
             if self.xlsx is None:
                 self.xlsx = _XlsxStream(self.path, df, self.total)
             self.xlsx.append(df)
         else:
-            part = self.path.with_name(f"{self.path.stem}.part{len(self.parts):04d}.parquet")
+            self.parquet.parent.mkdir(parents=True, exist_ok=True)
+            part = self.parquet.with_name(f"{self.base.name}.part{len(self.parts):04d}.parquet")
             df.to_parquet(part, index=False)
             self.parts.append(part)
         self.rows += len(df)
 
+    def _join_parquet(self) -> None:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        if not self.parts:
+            self.parquet.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(columns=self.cols or []).to_parquet(self.parquet, index=False)
+            return
+        schemas = [pq.read_schema(p) for p in self.parts]
+        schema = pa.unify_schemas([s.remove_metadata() for s in schemas], promote_options="permissive").with_metadata(schemas[0].metadata)
+        plain = schema.remove_metadata()
+        with pq.ParquetWriter(self.parquet, schema) as w:
+            n, buf, rows = self.row_group_rows, [], 0
+            for p in self.parts:                                 # parts gathered into full row groups of n rows (about one group in memory)
+                buf.append(pq.read_table(p).replace_schema_metadata(None).cast(plain))
+                rows += buf[-1].num_rows
+                _remove(p)
+                if rows >= n:
+                    t = pa.concat_tables(buf)
+                    while t.num_rows >= n:
+                        w.write_table(t.slice(0, n).replace_schema_metadata(schema.metadata), row_group_size=n)
+                        t = t.slice(n)
+                    buf, rows = ([t] if t.num_rows else []), t.num_rows
+            if buf:
+                w.write_table(pa.concat_tables(buf).replace_schema_metadata(schema.metadata), row_group_size=n)
+        for p in self.parts:
+            _remove(p)
+
     def close(self) -> Path:
-        if self.fmt == "xlsx" and self.xlsx is not None:
-            self.xlsx.close()
-        elif self.fmt == "parquet":
-            import pyarrow as pa
-            import pyarrow.parquet as pq
-            if not self.parts:
-                pd.DataFrame(columns=self.cols or []).to_parquet(self.path, index=False)
-                return self.path
-            schemas = [pq.read_schema(p) for p in self.parts]
-            schema = pa.unify_schemas([s.remove_metadata() for s in schemas], promote_options="permissive").with_metadata(schemas[0].metadata)
-            with pq.ParquetWriter(self.path, schema) as w:
-                for p in self.parts:
-                    w.write_table(pq.read_table(p).replace_schema_metadata(None).cast(schema.remove_metadata()).replace_schema_metadata(schema.metadata))
-            for p in self.parts:
-                p.unlink()
-        elif self.rows == 0:
-            write_table(pd.DataFrame(columns=self.cols or []), self.path, self.fmt)
+        if self.fmt == "xlsx":
+            if self.xlsx is not None:
+                self.xlsx.close()
+            else:
+                write_table(pd.DataFrame(columns=self.cols or []), self.base, self.fmt, self.excel)
+            return self.path
+        self._join_parquet()
+        if self.via_parquet:
+            write_csv_from_parquet(self.parquet, self.path, zipped=self.fmt == "csv.zip")
+            if not self.keep_parquet:
+                self.parquet.unlink(missing_ok=True)
+                try:
+                    self.parquet.parent.rmdir()
+                except OSError:
+                    pass
         return self.path
 
 
@@ -494,4 +699,10 @@ def read_table(path: Path) -> pd.DataFrame:
         return pd.read_parquet(path)
     if path.suffix == ".xlsx":
         return pd.read_excel(path)
+    if path.suffix == ".zip":                                 # csv.zip: the one CSV inside
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            name = next(n for n in z.namelist() if n.lower().endswith(".csv"))
+            with z.open(name) as f:
+                return pd.read_csv(f, low_memory=False, encoding="utf-8-sig")
     return pd.read_csv(path, low_memory=False, encoding="utf-8-sig")

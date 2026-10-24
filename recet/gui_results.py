@@ -109,7 +109,7 @@ class ResultsTab:
 
             def work():
                 try:
-                    self._q.put(("frame", (run_dir, files[0], outputs.read_table(files[0]))))
+                    self._q.put(("frame", (run_dir, files[0], outputs.read_table(outputs.results_source(run_dir) or files[0]))))   # the kept parquet of a CSV run reads faster
                 except Exception as exc:                    # a damaged file: say so, keep the window running
                     self._q.put(("error", f"{files[0]}: {exc}"))
             threading.Thread(target=work, daemon=True).start()
