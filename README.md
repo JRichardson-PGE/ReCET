@@ -57,7 +57,8 @@ In the package (`recet/docs`, and **Help > Documentation** in the window): `USER
 
 ## Web app (jakemoto.com/ReCET)
 
-`recet/web` is the same tool as a password-protected web app: New run (upload a workbook or CET files), Runs (queue, log, results tables,
+`recet/web` is the same tool as a password-protected web app: New run (upload a workbook, or the CET files in one .zip: Measure.csv and an optional
+ProgramCost.csv, as CET takes them; a bare CSV is not accepted), Runs (queue, log, results tables,
 downloads, and "Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
 measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs (the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
 unretire codes there, and the changes reach Edit inputs' dropdowns and checks at once).
@@ -68,7 +69,9 @@ Input checks (preflight-only runs) go ahead of full runs in the queue. Accounts 
     recet-web serve                             # http://localhost:3000/ReCET (set RECET_WEB_SECURE_COOKIES=0 for plain http)
 
 On the server it runs in Docker (`Dockerfile`, `docker-compose.yml`) behind the jakemoto.com edge nginx, with the reference data folder mounted
-read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.py`). `recet-web warm-cache` builds the ACC caches ahead of the first run;
+read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.py`). Uploads are capped at 150 MB per file (`RECET_WEB_MAX_UPLOAD_MB`) and a job zip at
+1,024 MB unzipped (`RECET_WEB_MAX_UNZIPPED_MB`); a 1,000,000-row Measure.csv (603 MB) zips to 38 MB. The edge nginx in front of it must allow the same
+upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC caches ahead of the first run;
 `recet-web users` and `recet-web reset-link EMAIL` manage accounts from the command line (also on the Users page for admins).
 
 ## Command line

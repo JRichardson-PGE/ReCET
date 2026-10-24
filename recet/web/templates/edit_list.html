@@ -39,9 +39,8 @@ Larger jobs are edited offline (Excel) and run from <a href="{{ u('/runs/new') }
     <label>Name <input type="text" name="name" maxlength="120" placeholder="the file name"></label>
     <label class="file">Job workbook <input type="file" name="workbook" accept=".xlsx,.xlsm"></label>
     <p class="muted small">or</p>
-    <label class="file">Measure.csv <input type="file" name="measures" accept=".csv,.txt"></label>
-    <label class="file">ProgramCost.csv <span class="muted">(optional)</span> <input type="file" name="programcost" accept=".csv,.txt"></label>
-    <p class="muted small">A Measure.csv or ProgramCost.csv given with a workbook replaces that sheet. A workbook's other sheets (run parameters, profiles,
+    <label class="file">Job zip <span class="muted">(Measure.csv, optional ProgramCost.csv)</span> <input type="file" name="job_zip" accept=".zip"></label>
+    <p class="muted small">A job zip given with a workbook replaces the workbook's Measure sheet, and its ProgramCost sheet when the zip has a ProgramCost.csv. A workbook's other sheets (run parameters, profiles,
       programs ...) are kept and used when the draft runs. Up to {{ max_mb }} MB per file.</p>
     <button class="button primary">Upload and edit</button>
   </form>
