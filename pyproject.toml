@@ -27,7 +27,10 @@ web = [
     "python-multipart>=0.0.18",
     "argon2-cffi>=23.1",
     "markdown>=3.6",
+    "isal>=1.6",            # ISA-L: zips the web app's CSV outputs about 6x faster than zlib (outputs.deflater)
 ]
+# faster zipped-CSV output for the command line and the window too: pip install ".[fast]"
+fast = ["isal>=1.6"]
 excel = ["openpyxl>=3.1"]
 
 [project.scripts]

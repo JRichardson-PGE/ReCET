@@ -6,7 +6,6 @@ so the same paths work behind the edge nginx (which passes /ReCET/... through un
 """
 from __future__ import annotations
 
-import io
 import json
 import math
 import secrets
@@ -19,14 +18,15 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import __version__, versions
+from .. import __version__, outputs, versions
 from . import auth, jobzip
 from .config import Settings
 from .db import Database
@@ -226,6 +226,29 @@ async def save_upload(up: UploadFile, dest: Path, limit: int) -> int:
 
 BARE_CSV_MESSAGE = ("Upload Measure.csv and ProgramCost.csv together in one .zip file (ProgramCost.csv is optional), as CET takes them: "
                     "a CSV on its own is not accepted.")
+
+
+ALREADY_COMPRESSED = (".zip", ".parquet", ".xlsx", ".xlsm", ".gz")
+
+
+def zip_to_file(entries: list[tuple[Path, str]], tmp_dir: Path) -> Path:
+    """A .zip of `entries` ((file, name in the zip)) built in a temporary file under `tmp_dir`, never in memory: a 1,000,000-measure run's files are gigabytes.
+    Files that are already compressed (zips, parquet, Excel) are stored as they are; the rest are deflated. The caller deletes the file after sending it."""
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    out = tmp_dir / f"download_{secrets.token_hex(8)}.zip"
+    try:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+            for f, name in entries:
+                z.write(f, name, compress_type=zipfile.ZIP_STORED if f.suffix.lower() in ALREADY_COMPRESSED else zipfile.ZIP_DEFLATED)
+    except BaseException:
+        out.unlink(missing_ok=True)
+        raise
+    return out
+
+
+def _excel_max_rows() -> int:
+    from ..jobs import RunConfig
+    return RunConfig.excel_max_rows
 
 
 def new_run_id() -> str:
@@ -456,7 +479,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
         source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
-                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
+                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
 
     @app.get("/runs/new", response_class=HTMLResponse)
     async def new_run(request: Request, draft: str = ""):
@@ -514,7 +537,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         fmt_ = str(form.get("output_format", "csv"))
         if fmt_ not in ("csv", "xlsx", "parquet"):
             return fail("Unknown output format.")
-        cfg["output_format"] = fmt_
+        cfg["output_format"] = "csv.zip" if fmt_ == "csv" else fmt_     # the web app always zips its CSVs: a fifth of the size to store and to download
+        cfg["excel_fallback"] = "csv.zip"                               # an Excel table over the row limit is written as zipped CSV (outputs.ExcelLimit)
         label = str(form.get("label", "")).strip()[:120]
 
         # --- inputs
@@ -610,13 +634,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         base = ctx.runner.folder(run_id) / "inputs"
         if run["status"] == "expired" or not base.is_dir():
             raise HTTPException(404)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for f in sorted(base.rglob("*")):
-                if f.is_file():
-                    z.write(f, str(f.relative_to(base)))
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="recet_{run_id}_inputs.zip"'})
+        entries = [(f, str(f.relative_to(base))) for f in sorted(base.rglob("*")) if f.is_file()]
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}_inputs.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
     def _files(run) -> list[tuple[str, int]]:
         p = ctx.result_path(run)
@@ -624,7 +644,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return []
         out = []
         for f in sorted(p.rglob("*")):
-            if f.is_file() and "_prepared_inputs" not in f.parts and not f.name.startswith("_config"):
+            if f.is_file() and "_prepared_inputs" not in f.parts and outputs.RESULTS_DIR not in f.parts and not f.name.startswith("_config"):
                 out.append((str(f.relative_to(p)), f.stat().st_size))
         return out
 
@@ -693,16 +713,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         base = ctx.result_path(run)
         if base is None:
             raise HTTPException(404)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for rel, _n in _files(run):
-                z.write(base / rel, rel)
-            log = ctx.runner.folder(run_id) / "log.txt"
-            if log.exists():
-                z.write(log, "log.txt")
-        buf.seek(0)
-        name = f"recet_{run_id}.zip"
-        return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        entries = [(base / rel, rel) for rel, _n in _files(run)]
+        log = ctx.runner.folder(run_id) / "log.txt"
+        if log.exists():
+            entries.append((log, "log.txt"))
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
     # ----------------------------------------------------------------------------------------------------------------- results
     def user_views(uid: int) -> dict[str, list[str]]:
@@ -728,6 +744,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404)
         subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*"))
         measure_files = sorted(folder.glob("measure_level_*.*"))
+        source = outputs.results_source(folder)                # a CSV run's kept parquet (outputs.RESULTS_DIR) when there is one
         comparison = sorted(folder.glob("comparison_summary_*.*"))
         kw = dict(run=run, sub=sub, subruns=subruns, levels=rv.LEVELS, level=level, plain=None, plain_name="")
         if not measure_files:
@@ -738,7 +755,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             df = ctx.frame(plain_file)
             kw.update(plain=df, plain_name=plain_file.name)
             return ctx.render(request, "results.html", **kw, note="", table=None)
-        frame = ctx.frame(measure_files[0])
+        frame = ctx.frame(source)
         pas = rv.available_pas(frame)
         pa = pa if pa in pas else rv.ALL_PAS
         views = user_views(u["id"])
@@ -767,10 +784,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         base = ctx.result_path(run, sub) if sub else ctx.result_path(run)
-        files = sorted(base.glob("measure_level_*.*")) if base else []
-        if not files:
+        source = outputs.results_source(base) if base else None
+        if source is None:
             raise HTTPException(404)
-        frame = ctx.frame(files[0])
+        frame = ctx.frame(source)
         cat = rv.catalog(frame)
         views = user_views(request.state.user["id"])
         keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])

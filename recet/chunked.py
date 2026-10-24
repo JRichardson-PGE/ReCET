@@ -44,6 +44,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     from .pipeline import cost_tests, emissions
 
     tag = f"acc{acc.key}"
+    excel = jobs.excel_limit(cfg, result, log)
     spill = run_dir / "_parts" / "values"
     spill.mkdir(parents=True, exist_ok=True)
     base_year = cfg.base_year or min(int(str(v)[:4]) for v in values["ClaimYearQuarter"])
@@ -103,6 +104,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         log(f"  part {i + 1}/{len(parts)}: rows {start + 1:,}-{start + n:,}, {len(measures):,} measures, {time.time() - tp:.0f}s")
         del measures, d, vals, ems, comps
     log(f"priced in {time.time() - t0:.0f}s")
+    used = jobs.run_format(cfg, n_measures, log)                 # before any table is written: an Excel run over the row limit writes every table as zipped CSV
+    if used != cfg.output_format:
+        result.notes.append(f"Excel output was chosen, but {n_measures:,} measures is over the {cfg.excel_max_rows:,}-row limit, so every table is "
+                            f"{dict(csv='CSV', parquet='parquet').get(used, 'zipped CSV')}")
+        cfg.output_format = used
 
     if cfg.components:
         log("\n== ACC components (each priced separately) ==")
@@ -116,15 +122,15 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         for fuel, r in chk.items():
             table.loc[len(table)] = {"fuel": "Electric" if fuel == "Elec" else "Gas", "component": "(check) total minus sum of components",
                                      "portfolio_value_usd": r["portfolio_total"] - r["portfolio_sum_of_components"], "share_of_fuel_total": None}
-        result.files["components_summary"] = outputs.write_table(table, run_dir / f"components_summary_{tag}", cfg.output_format)
+        result.files["components_summary"] = outputs.write_table(table, run_dir / f"components_summary_{tag}", cfg.output_format, excel)
         del res_c, comps_all, comp_checks
 
     # ---- pass 2: program costs shared over the whole job, then the measure-level rows, part by part
     log("\n== writing results ==")
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
     cet = outputs.read_cet_outputs(cfg.cet_outputs) if cfg.cet_outputs else None
-    cet_writer = outputs.TableWriter(run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, n_measures) if cet is not None else None
+    cet_writer = outputs.TableWriter(run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, excel=excel) if cet is not None else None
     cet_sums: dict[str, tuple[float, float]] = {}
     matched = 0
     labels = {k: g.label for k, g in groups.items()}
@@ -153,7 +159,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         del measures, res, frame
     result.files["measure_level"] = writer.close()
     summary = summary_parts.result()
-    result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format)
+    result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
     result.frame = None
     result.notes.append(f"run in {len(parts)} parts of up to {cfg.chunk_size:,} measures: the measure-level table is in its file only")
@@ -163,9 +169,9 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         prof, unshaped, psum = profile8760.combine_profiles(profiles, years)
         if len(unshaped):
             log(f"  {len(unshaped)} measure(s) have no 8,760 shape and are left out of the profile (listed in the unshaped table)")
-        result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format)
+        result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format, excel)
         if len(unshaped):
-            result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format)
+            result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format, excel)
         for y, s in psum.items():
             log(f"  {y}: {s['in_profile_kwh']:,.0f} net kWh in the profile ({s['unshaped_kwh']:,.0f} kWh of unshaped measures left out); "
                 f"peak hour {s['peak_hour_of_year']} at {s['peak_hour_kwh']:,.0f} kWh")
@@ -174,7 +180,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         log(f"\n== comparison with CET outputs {cfg.cet_outputs} ==")
         result.files["cet_comparison_measures"] = cet_writer.close()
         csum = outputs.cet_comparison_summary(cet_sums, matched, n_measures, len(cet))
-        result.files["cet_comparison_summary"] = outputs.write_table(csum, run_dir / f"cet_comparison_summary_{tag}", cfg.output_format)
+        result.files["cet_comparison_summary"] = outputs.write_table(csum, run_dir / f"cet_comparison_summary_{tag}", cfg.output_format, excel)
         log(csum.attrs.get("matched", ""))
         log(csum.to_string(index=False, float_format=lambda v: f"{v:,.4f}" if abs(v) < 100 else f"{v:,.0f}"))
 

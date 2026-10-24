@@ -60,3 +60,19 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   does: a bare CSV is refused on New run and Edit inputs. The zip may hold only those two files (any case, .csv/.txt, top level or one folder; macOS/Windows
   extras skipped); each is copied out to `inputs/measures.csv` / `inputs/programcost.csv` (the zip is deleted), byte-counted against
   RECET_WEB_MAX_UNZIPPED_MB (1024). Uploads are capped at 150 MB per file (RECET_WEB_MAX_UPLOAD_MB, was 50); the edge nginx must allow it too.
+- 0.1.36 (2026-10-23, Jake): output format `csv.zip` (`outputs.table_path`, `_CsvZipStream`): each CSV written straight into `<table>.csv.zip`, byte-identical
+  to the plain CSV inside; `read_table` reads it. The web app always uses it for CSV. Parquet and xlsx are not zipped (10% and 3.5% smaller zipped; parquet with
+  zstd instead of snappy would be 71% smaller, not done). Web "Download all" / inputs.zip are built in `<state>/tmp` (`app.zip_to_file`, already-compressed files
+  stored) and streamed, never in memory; runner.cleanup removes stale ones.
+  Also: a run in parts joins its parquet parts into row groups of `RunConfig.parquet_row_group` (200,000; full groups, remainder carried): the 1M measure-level
+  parquet is 253 MB in 5 groups (was 666 MB in 50 groups of 20,000), peak 1.65 GB. docker-compose takes RECET_MEM_LIMIT (1400m; 3000m on a t4g.medium).
+  Timing note: the laptop ran about 1.7x slower from mid-afternoon 2026-10-23 (6 s vs 3.5 s per 20,000-row part on the same code), so compare runs only within
+  one sitting.
+  Also (same PR): CSV is written PARQUET FIRST. TableWriter(csv/csv.zip) joins its parts into parquet, then `write_csv_from_parquet` formats it with pyarrow
+  (8x faster than pandas' to_csv) on a second thread while the first compresses (`write_csv`); ISA-L level 1 when `isal` is installed (web extra and
+  `.[fast]`; about 6x faster than zlib, files ~11% larger), else zlib 6. Booleans written True/False, timestamps to the second, zip entries dated now. The
+  measure-level parquet is kept in `<run>/_results/` (`outputs.RESULTS_DIR`) and the Results tables read it (`outputs.results_source`); the web app hides it.
+  pyarrow's number text differs from pandas' (0 vs 0.0, no exponent for small values) with identical values.
+  Also (Jake): Excel output is for jobs of up to `RunConfig.excel_max_rows` measures (50,000; writing is ~400 rows/s); a larger Excel job writes EVERY
+  table as `excel_fallback` (csv.zip), decided once the measure count is known (`jobs.run_format`, before any table is written), with a note in the log,
+  RunResult.notes and run_settings.json. `outputs.ExcelLimit` stays as a per-table guard.

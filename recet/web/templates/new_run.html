@@ -58,7 +58,7 @@
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
     <label>Output format
-      <select name="output_format">{% for o, t in (('csv', 'CSV'), ('xlsx', 'Excel (one file per table)'), ('parquet', 'Parquet')) %}<option value="{{ o }}" {% if f.get('output_format') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+      <select name="output_format">{% for o, t in (('csv', 'CSV (each file zipped)'), ('xlsx', 'Excel (up to {:,} measures; a larger job: every file zipped CSV)'.format(excel_max_rows)), ('parquet', 'Parquet')) %}<option value="{{ o }}" {% if f.get('output_format') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
     <label>Name <span class="muted">(optional)</span> <input type="text" name="label" maxlength="120" value="{{ f.get('label', '') }}"></label>
   </div>
   {% set fresh = not f %}
