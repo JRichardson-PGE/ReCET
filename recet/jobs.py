@@ -70,6 +70,8 @@ class RunConfig:
     cet_outputs: str | None = None           # a CET *_outputs.csv to compare against
     compare_with: str | None = None          # another ACC version key: run it too and write a per-measure comparison
     output_format: str = "csv"               # csv | csv.zip (each CSV inside a zip; the web app's choice) | parquet | xlsx
+    excel_max_rows: int = 50_000             # an xlsx table with more rows than this is written as excel_fallback instead (outputs.ExcelLimit)
+    excel_fallback: str = "csv"              # csv | csv.zip (the web app) | parquet
     preflight_only: bool = False
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
@@ -205,6 +207,16 @@ def societal_available(groups: dict, acc, wanted: bool, result: RunResult, log: 
     return ok
 
 
+def excel_limit(cfg: RunConfig, result: RunResult, log: Log):
+    """The run's outputs.ExcelLimit: its notes (a table written as CSV instead of Excel) go to the run log and RunResult.notes."""
+    from . import outputs
+
+    def notify(msg: str) -> None:
+        result.notes.append(msg)
+        log(f"note: {msg}")
+    return outputs.ExcelLimit(cfg.excel_max_rows, cfg.excel_fallback, notify)
+
+
 def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_start: float, measures_priced: int, base_year: int, parts: dict | None = None) -> None:
     """run_settings.json: everything needed to reproduce the run. `parts`: how a chunked run split the job."""
     from . import __version__, paths
@@ -225,6 +237,8 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     }
     if parts:
         settings["parts"] = parts
+    if result.notes:
+        settings["notes"] = result.notes
     (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
     result.files["run_settings"] = run_dir / "run_settings.json"
 
@@ -260,6 +274,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
 def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: Log, t_start: float, parts, dtypes, values) -> RunResult:
     from . import components as comp_mod, outputs, profile8760, preflight, run_poc
     from .pipeline import emissions
+    excel = excel_limit(cfg, result, log)
 
     # ---- preflight
     log("\n== preflight ==")
@@ -336,7 +351,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         for fuel, r in chk.items():
             table.loc[len(table)] = {"fuel": "Electric" if fuel == "Elec" else "Gas", "component": "(check) total minus sum of components",
                                      "portfolio_value_usd": r["portfolio_total"] - r["portfolio_sum_of_components"], "share_of_fuel_total": None}
-        result.files["components_summary"] = outputs.write_table(table, run_dir / f"components_summary_{tag}", cfg.output_format)
+        result.files["components_summary"] = outputs.write_table(table, run_dir / f"components_summary_{tag}", cfg.output_format, excel)
 
     # ---- assemble and write
     log("\n== writing results ==")
@@ -349,20 +364,20 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
     result.frame = frame
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel)
     writer.write(frame)
     result.files["measure_level"] = writer.close()                   # csv / csv.zip: parquet first (kept for the Results tables), then CSV
     summary = outputs.summarize(frame, cfg.apply_exclude_from_ce)
-    result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format)
+    result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
 
     if cfg.portfolio_8760:
         years = cfg.profile_years or [base_year]
         log(f"\n== combined 8,760 electric profile, year(s) {years} ==")
         prof, unshaped, psum = profile8760.portfolio_profile(measures, years, log=log)
-        result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format)
+        result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format, excel)
         if len(unshaped):
-            result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format)
+            result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format, excel)
         for y, s in psum.items():
             log(f"  {y}: {s['in_profile_kwh']:,.0f} net kWh in the profile ({s['unshaped_kwh']:,.0f} kWh of unshaped measures left out); "
                 f"peak hour {s['peak_hour_of_year']} at {s['peak_hour_kwh']:,.0f} kWh")
@@ -370,8 +385,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     if cfg.cet_outputs:
         log(f"\n== comparison with CET outputs {cfg.cet_outputs} ==")
         per, csum = outputs.compare_to_cet(frame, cfg.cet_outputs)
-        result.files["cet_comparison_measures"] = outputs.write_table(per, run_dir / f"cet_comparison_measures_{tag}", cfg.output_format)
-        result.files["cet_comparison_summary"] = outputs.write_table(csum, run_dir / f"cet_comparison_summary_{tag}", cfg.output_format)
+        result.files["cet_comparison_measures"] = outputs.write_table(per, run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, excel)
+        result.files["cet_comparison_summary"] = outputs.write_table(csum, run_dir / f"cet_comparison_summary_{tag}", cfg.output_format, excel)
         log(csum.attrs.get("matched", ""))
         log(csum.to_string(index=False, float_format=lambda v: f"{v:,.4f}" if abs(v) < 100 else f"{v:,.0f}"))
 
@@ -406,10 +421,11 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         frames[key] = outputs.read_table(outputs.results_source(run_dir))
         results[key] = run_dir
     a, b = cfg.acc_version, cfg.compare_with
-    per, summ = outputs.compare_frames(frames[a], frames[b], f"acc{a}", f"acc{b}")
     res = RunResult(run_dir=folder)
-    res.files["comparison_measures"] = outputs.write_table(per, folder / f"comparison_acc{a}_vs_acc{b}", cfg.output_format)
-    res.files["comparison_summary"] = outputs.write_table(summ, folder / f"comparison_summary_acc{a}_vs_acc{b}", cfg.output_format)
+    excel = excel_limit(cfg, res, log)
+    per, summ = outputs.compare_frames(frames[a], frames[b], f"acc{a}", f"acc{b}")
+    res.files["comparison_measures"] = outputs.write_table(per, folder / f"comparison_acc{a}_vs_acc{b}", cfg.output_format, excel)
+    res.files["comparison_summary"] = outputs.write_table(summ, folder / f"comparison_summary_acc{a}_vs_acc{b}", cfg.output_format, excel)
     for key, d in results.items():
         res.files[f"run_acc{key}"] = d
     log("\n== portfolio comparison ==\n" + summ.to_string(index=False, float_format=lambda v: f"{v:,.3f}" if abs(v) < 100 else f"{v:,.0f}"))
