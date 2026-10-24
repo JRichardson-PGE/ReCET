@@ -596,3 +596,16 @@ def test_csv_outputs_are_zipped_and_downloads_stream_from_disk(web, tmp_path):
     assert inner.namelist() == ["measure_level_acc2026.csv"]
     assert "measures.csv" in zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/inputs.zip").content)).namelist()
     assert not list((ctx.s.state_dir / "tmp").glob("download_*.zip"))          # the temporary download files are removed after sending
+
+
+def test_excel_runs_fall_back_to_zipped_csv_over_the_limit(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "xl@example.com")
+    c = _login(app, "xl@example.com")
+    assert "up to 50,000 rows a table" in c.get(f"{P}/runs/new").text
+    run_id = _start_run(c, tmp_path, output_format="xlsx")
+    cfg = json.loads((ctx.runner.folder(run_id) / "config.json").read_text())
+    assert cfg["output_format"] == "xlsx" and cfg["excel_fallback"] == "csv.zip"
+    assert ctx.runner.work_once()
+    files = [f.name for f in ctx.result_path(ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))).iterdir()]
+    assert "measure_level_acc2026.xlsx" in files                                         # one measure: well within the limit

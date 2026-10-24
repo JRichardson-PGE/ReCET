@@ -17,7 +17,9 @@ measure-level table -- one row per measure, column groups left to right:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -469,17 +471,37 @@ def results_source(folder: Path) -> Path | None:
     return files[0] if files else None
 
 
-EXCEL_MAX_ROWS = 1_048_575          # rows below the header
+EXCEL_MAX_ROWS = 1_048_575          # Excel's own limit: rows below the header
+EXCEL_ROW_LIMIT = 50_000            # ReCET's limit for an xlsx table (RunConfig.excel_max_rows): writing runs at about 400 rows/s for the 344-column
+                                    # measure-level table, so 50,000 rows take about 2 minutes and make about a 100 MB workbook; 1,000,000 would take 40 minutes
 
 
-def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv") -> Path:
+@dataclass
+class ExcelLimit:
+    """How many rows an xlsx table may have, the format a longer table is written in instead (csv; the web app uses csv.zip), and where to say so."""
+    max_rows: int = EXCEL_ROW_LIMIT
+    fallback: str = "csv"
+    notify: Callable[[str], None] | None = None
+
+    def format_for(self, fmt: str, rows: int, name: str) -> str:
+        if fmt != "xlsx" or rows <= min(self.max_rows, EXCEL_MAX_ROWS):
+            return fmt
+        fallback = self.fallback if self.fallback in FORMATS and self.fallback != "xlsx" else "csv"
+        msg = (f"{name}: {rows:,} rows is more than the {min(self.max_rows, EXCEL_MAX_ROWS):,}-row limit for Excel output, so it is written as "
+               f"{'zipped CSV' if fallback == 'csv.zip' else fallback.upper() if fallback == 'csv' else fallback} instead")
+        if self.notify is not None:
+            self.notify(msg)
+        else:
+            import warnings
+            warnings.warn(msg, stacklevel=3)
+        return fallback
+
+
+def write_table(df: pd.DataFrame, path: Path, fmt: str = "csv", excel: ExcelLimit | None = None) -> Path:
     """Write `df` as <path with suffix from fmt> (table_path). csv is UTF-8 with a BOM so Excel opens it directly, formatted by pyarrow (write_csv); csv.zip
-    is the same CSV inside a zip (what the web app writes: about a fifth of the size); xlsx is one formatted sheet (see _write_xlsx). A table too long for Excel is written as csv instead, with a
-    warning."""
-    if fmt == "xlsx" and len(df) > EXCEL_MAX_ROWS:
-        import warnings
-        warnings.warn(f"{path.name}: {len(df):,} rows is more than Excel holds; written as csv instead", stacklevel=2)
-        fmt = "csv"
+    is the same CSV inside a zip (what the web app writes: about a fifth of the size); xlsx is one formatted sheet (see _write_xlsx). An xlsx table longer than
+    `excel.max_rows` (default EXCEL_ROW_LIMIT) is written in `excel.fallback` (default csv) instead, and `excel.notify` is told."""
+    fmt = (excel or ExcelLimit()).format_for(fmt, len(df), path.name)
     path = table_path(path, fmt)
     path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "parquet":
@@ -575,13 +597,12 @@ class TableWriter:
     a 1,000,000-row table in about 30 s, against about 260 s for pandas). `keep_parquet` keeps that parquet in the run's RESULTS_DIR (the Results tables read
     it: results_source); otherwise it is deleted."""
 
-    def __init__(self, path: Path, fmt: str, total_rows: int, row_group_rows: int = PARQUET_ROW_GROUP, keep_parquet: bool = False):
+    def __init__(self, path: Path, fmt: str, total_rows: int, row_group_rows: int = PARQUET_ROW_GROUP, keep_parquet: bool = False,
+                 excel: ExcelLimit | None = None):
         if fmt not in FORMATS:
             raise ValueError(f"unknown output format {fmt!r}; choose from {FORMATS}")
-        if fmt == "xlsx" and total_rows > EXCEL_MAX_ROWS:
-            import warnings
-            warnings.warn(f"{path.name}: {total_rows:,} rows is more than Excel holds; written as csv instead", stacklevel=2)
-            fmt = "csv"
+        self.excel = excel
+        fmt = (excel or ExcelLimit()).format_for(fmt, total_rows, path.name)
         self.fmt, self.total, self.base = fmt, total_rows, path
         self.row_group_rows = max(int(row_group_rows or PARQUET_ROW_GROUP), 1)
         self.path = table_path(path, fmt)
@@ -645,7 +666,7 @@ class TableWriter:
             if self.xlsx is not None:
                 self.xlsx.close()
             else:
-                write_table(pd.DataFrame(columns=self.cols or []), self.base, self.fmt)
+                write_table(pd.DataFrame(columns=self.cols or []), self.base, self.fmt, self.excel)
             return self.path
         self._join_parquet()
         if self.via_parquet:

@@ -104,3 +104,17 @@ def test_invalid_supplied_acc_stops_before_pricing(tmp_path):
     bad.to_parquet(tmp_path / "bad.parquet")
     with pytest.raises(overrides.OverrideError, match="not usable"):
         run_job(_cfg(tmp_path, acc_electric_file=str(tmp_path / "bad.parquet"), run_name="badacc"), log=lambda s: None)
+
+
+def test_an_excel_table_over_the_row_limit_is_written_as_csv(tmp_path):
+    """excel_max_rows: the measure-level table (1 row here, limit 0) falls back to excel_fallback, the small tables stay in Excel, and the run says so."""
+    import json
+    lines = []
+    r = run_job(_cfg(tmp_path, output_format="xlsx", excel_max_rows=0, excel_fallback="csv.zip", run_name="xl"), log=lines.append)
+    assert r.files["measure_level"].name == "measure_level_acc2026.csv.zip"
+    notes = [n for n in r.notes if "limit for Excel output" in n]
+    assert notes and any("measure_level_acc2026" in n and "zipped CSV" in n for n in notes)
+    assert any("limit for Excel output" in str(line) for line in lines)
+    assert json.loads((r.run_dir / "run_settings.json").read_text())["notes"] == r.notes
+    small = run_job(_cfg(tmp_path, output_format="xlsx", run_name="xl2"), log=lambda s: None)                     # within the default limit: Excel
+    assert small.files["measure_level"].suffix == ".xlsx" and not small.notes

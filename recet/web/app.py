@@ -246,6 +246,11 @@ def zip_to_file(entries: list[tuple[Path, str]], tmp_dir: Path) -> Path:
     return out
 
 
+def _excel_max_rows() -> int:
+    from ..jobs import RunConfig
+    return RunConfig.excel_max_rows
+
+
 def new_run_id() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
 
@@ -474,7 +479,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
         source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
-                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
+                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
 
     @app.get("/runs/new", response_class=HTMLResponse)
     async def new_run(request: Request, draft: str = ""):
@@ -533,6 +538,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if fmt_ not in ("csv", "xlsx", "parquet"):
             return fail("Unknown output format.")
         cfg["output_format"] = "csv.zip" if fmt_ == "csv" else fmt_     # the web app always zips its CSVs: a fifth of the size to store and to download
+        cfg["excel_fallback"] = "csv.zip"                               # an Excel table over the row limit is written as zipped CSV (outputs.ExcelLimit)
         label = str(form.get("label", "")).strip()[:120]
 
         # --- inputs
