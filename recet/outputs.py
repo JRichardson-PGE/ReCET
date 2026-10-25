@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -63,7 +64,20 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
     blank = pd.Series("", index=measures.index, dtype=object)
     if not programcost_csv:
         return blank
-    pc = read_cet_csv(programcost_csv, dtype=str, keep_default_na=False)
+    if allocate_statewide:                          # depends on the allocation factors too (a run can supply its own): not cached
+        by_year, by_prg = _credited_maps.__wrapped__(str(programcost_csv), True, 0, 0)
+    else:
+        st = Path(programcost_csv).stat()
+        by_year, by_prg = _credited_maps(str(programcost_csv), False, st.st_size, st.st_mtime_ns)
+    vals = [by_year.get((p, int(y)), by_prg.get(p, "")) for p, y in zip(measures["prg_id"].astype(str).str.strip(), measures["claim_year"])]
+    return pd.Series(vals, index=measures.index, dtype=object)
+
+
+@lru_cache(maxsize=4)
+def _credited_maps(path: str, allocate_statewide: bool, size: int, mtime_ns: int) -> tuple[dict, dict]:
+    """credited_iou's (PrgID, PrgYear) -> PA and PrgID -> PA maps of one ProgramCost file, read once per file and version of it (a run asks once per part).
+    The maps are shared: do not change them."""
+    pc = read_cet_csv(path, dtype=str, keep_default_na=False)
     if allocate_statewide:
         from .pipeline.statewide_allocation import allocate_program_costs
         pc, _ = allocate_program_costs(pc)
@@ -71,8 +85,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
                    PrgYear=pd.to_numeric(pc["PrgYear"], errors="coerce").astype("Int64"))
     by_year = {(p, int(y)): a for p, y, a in zip(pc["PrgID"], pc["PrgYear"], pc["PA"]) if pd.notna(y)}
     by_prg = pc.drop_duplicates("PrgID").set_index("PrgID")["PA"].to_dict()
-    vals = [by_year.get((p, int(y)), by_prg.get(p, "")) for p, y in zip(measures["prg_id"].astype(str).str.strip(), measures["claim_year"])]
-    return pd.Series(vals, index=measures.index, dtype=object)
+    return by_year, by_prg
 
 
 def _aligned_raw(raw: pd.DataFrame, measures: pd.DataFrame) -> pd.DataFrame:
@@ -209,11 +222,11 @@ class SummaryParts:
         self.nonblank: dict[str, bool] = {}                      # group column -> some row is not blank
         self.cols: list[str] | None = None
 
-    def _add(self, key: tuple[str, str], g: pd.DataFrame) -> None:
-        part = g[self.cols].astype(float).sum(min_count=1).to_frame().T
+    def _add(self, key: tuple[str, str], sums, n: int) -> None:
+        part = pd.DataFrame([np.asarray(sums, dtype=float)], columns=self.cols)
         prev = self.sums.get(key)
         self.sums[key] = part if prev is None else prev.add(part, fill_value=0.0)      # NaN only where both are NaN
-        self.counts[key] = self.counts.get(key, 0) + len(g)
+        self.counts[key] = self.counts.get(key, 0) + n
 
     def add(self, frame: pd.DataFrame) -> None:
         if self.cols is None:
@@ -223,16 +236,20 @@ class SummaryParts:
             from . import programs
             flag = programs.is_true(frame[EXCLUDE_FLAG]).to_numpy()
             excluded, frame = frame[flag], frame[~flag]
-        self._add(("portfolio", "all measures"), frame)
+        x = frame[self.cols].astype(float)                       # the summed columns once; each grouping is one vectorised groupby (it looped over the groups)
+        self._add(("portfolio", "all measures"), x.sum(min_count=1), len(x))
         for col, group in self.GROUPS:
             self.present.setdefault(col, col in frame)
             if col in frame:
                 keys = frame[col].astype(str)
                 self.nonblank[col] = self.nonblank.get(col, False) or bool((keys != "").any())
-                for k, g in frame.groupby(keys.replace("", "(blank)"), sort=False):
-                    self._add((group, str(k)), g)
+                k = keys.replace("", "(blank)").to_numpy()
+                sums = x.groupby(k, sort=False).sum(min_count=1)
+                counts = pd.Series(k).value_counts(sort=False)
+                for key in sums.index:
+                    self._add((group, str(key)), sums.loc[key].to_numpy(), int(counts[key]))
         if excluded is not None and len(excluded):
-            self._add(self.EXCLUDED, excluded)
+            self._add(self.EXCLUDED, excluded[self.cols].astype(float).sum(min_count=1), len(excluded))
         elif excluded is not None:
             self.counts.setdefault(self.EXCLUDED, 0)
 
@@ -642,7 +659,7 @@ class TableWriter:
         else:
             self.parquet.parent.mkdir(parents=True, exist_ok=True)
             part = self.parquet.with_name(f"{self.base.name}.part{len(self.parts):04d}.parquet")
-            df.to_parquet(part, index=False)
+            df.to_parquet(part, index=False)       # with dictionary encoding: without it the write is ~0.2 s faster a part, but the join's peak is 0.4 GB higher
             self.parts.append(part)
         self.rows += len(df)
 

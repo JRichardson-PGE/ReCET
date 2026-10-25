@@ -14,10 +14,12 @@ SEPARATORS = {"|": "pipe", ",": "comma", "\t": "tab"}
 
 
 def _first_line(path: str | Path) -> str:
-    raw = Path(path).read_bytes()[:65536]
+    with open(path, "rb") as f:                         # the first 64 KB only (it read the whole file: 600 MB for a 1M-row Measure.csv, on every call)
+        raw = f.read(65536)
+    raw = raw.splitlines()[0] if raw else b""           # the header line alone, so a multi-byte character cut at 64 KB cannot spoil the decode
     for enc in ("utf-8-sig", "cp1252"):
         try:
-            return raw.decode(enc).splitlines()[0] if raw else ""
+            return raw.decode(enc)
         except UnicodeDecodeError:
             continue
     return ""
@@ -43,8 +45,34 @@ def header_columns(path: str | Path) -> list[str]:
     return [recet_name(c.strip().strip('"')) for c in head.split(sep)] if sep else [recet_name(head.strip())]
 
 
+PARTS_MARKER = ".recet_parts"     # in a folder of parts written by split_file: reads of its files are kept (see read_cet_csv)
+
+
 def read_cet_csv(path: str | Path, **kw) -> pd.DataFrame:
-    """pd.read_csv with the file's own delimiter (pipe if it cannot be told). Tries UTF-8 first, then cp1252. Column names are stripped."""
+    """pd.read_csv with the file's own delimiter (pipe if it cannot be told). Tries UTF-8 first, then cp1252. Column names are stripped.
+
+    A part written by split_file is read several times in a run in parts, the same way each time (preflight, pass 1, pass 2). Each distinct read of such a
+    file is kept beside it -- a text read (dtype=str) as parquet, any other as a pickle; both give back exactly the same frame -- and the next identical read
+    loads that instead of parsing the CSV again. The parts folder, kept reads included, is deleted when the run ends. Files elsewhere are always parsed."""
+    if (Path(path).parent / PARTS_MARKER).exists() and not any(callable(v) and not isinstance(v, type) for v in kw.values()):   # dtype=str is fine; a usecols function is not
+        import hashlib
+        key = hashlib.sha1(repr(sorted(kw.items())).encode()).hexdigest()[:12]
+        text = kw.get("dtype") is str                   # all text: parquet is ~40x smaller and quick to read; typed: pickle reads ~6x faster than parquet
+        cached = Path(path).with_name(f"{Path(path).stem}.{key}.{'parquet' if text else 'pkl'}")
+        if cached.exists():
+            return pd.read_parquet(cached) if text else pd.read_pickle(cached)
+        df = _read_cet_csv(path, **kw)
+        tmp = cached.with_name(cached.name + ".tmp")
+        if text:
+            df.to_parquet(tmp, index=False)
+        else:
+            df.to_pickle(tmp)
+        tmp.replace(cached)
+        return df
+    return _read_cet_csv(path, **kw)
+
+
+def _read_cet_csv(path: str | Path, **kw) -> pd.DataFrame:
     sep = detect_sep(path) or "|"
     kw.pop("sep", None)
     enc = kw.pop("encoding", "utf-8-sig")
@@ -92,8 +120,12 @@ def split_file(path: str | Path, rows: int, out_dir: str | Path) -> list[tuple[P
     sep = detect_sep(path) or "|"
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / PARTS_MARKER).write_text("parts written by recet.pipeline.delimited.split_file; reads of them are kept here as .pkl\n", encoding="utf-8")
+    enc = file_encoding(path)
+    if sep == "|" and not _has_quote(path):
+        return _split_lines(path, rows, out_dir, enc)
     parts, start = [], 0
-    reader = pd.read_csv(path, sep=sep, encoding=file_encoding(path), dtype=str, keep_default_na=False, chunksize=rows)
+    reader = pd.read_csv(path, sep=sep, encoding=enc, dtype=str, keep_default_na=False, chunksize=rows)
     for i, df in enumerate(reader):
         df.columns = [str(c).strip() for c in df.columns]
         df = to_recet(df)
@@ -104,13 +136,54 @@ def split_file(path: str | Path, rows: int, out_dir: str | Path) -> list[tuple[P
     return parts
 
 
+def _has_quote(path: str | Path) -> bool:
+    """True if the file has a double quote anywhere (pandas would then read a quoted field, which may hold a delimiter or a line break)."""
+    with open(path, "rb") as f:
+        while block := f.read(1 << 22):
+            if b'"' in block:
+                return True
+    return False
+
+
+def _split_lines(path: str | Path, rows: int, out_dir: Path, enc: str) -> list[tuple[Path, int, int]]:
+    """split_file for a pipe-delimited file with no quotes (CET's own format: text is unquoted), without parsing it: the header is rewritten with ReCET's
+    column names (stripped, legacy names renamed), and the data lines are copied as they are, `rows` to a part; a blank line is dropped, as pandas drops it.
+    A cp1252 file is re-encoded as UTF-8. Reading a part gives what reading the same rows of the original gives."""
+    from ..fieldnames import to_recet
+    parts: list[tuple[Path, int, int]] = []
+    start, i, n, out = 0, 0, 0, None
+    with open(path, "rb") as src:
+        head = src.readline().decode(enc).rstrip("\r\n")
+        cols = list(to_recet(pd.DataFrame(columns=[c.strip() for c in head.split("|")])).columns)
+        header = ("|".join(cols) + "\n").encode("utf-8")
+        for line in src:
+            if not line.strip(b"\r\n"):
+                continue
+            if out is None:
+                f = out_dir / f"part_{i:04d}.csv"
+                out = open(f, "wb")
+                out.write(header)
+            if not line.endswith(b"\n"):
+                line += b"\n"
+            out.write(line if enc == "utf-8-sig" else line.decode(enc).encode("utf-8"))
+            n += 1
+            if n == rows:
+                out.close()
+                parts.append((f, start, n))
+                start, i, n, out = start + n, i + 1, 0, None
+        if out is not None:
+            out.close()
+            parts.append((f, start, n))
+    return parts
+
+
 def part_dtypes(parts: list[tuple[Path, int, int]], values_of: tuple[str, ...] = ()) -> tuple[dict[str, str], dict[str, set]]:
     """The column types pandas would give the WHOLE file that `parts` (split_file) came from, worked out from each part's own types: a column that is blank
     throughout one part reads as float there, and as text in the whole file if any part has text in it. Returns (column -> dtype for read_cet_csv's
     `dtype`, column -> its distinct values for each column named in `values_of`, as read with the whole-file type). Reads one part at a time."""
     kinds: dict[str, list[str]] = {}
     for f, _start, _n in parts:
-        df = read_cet_csv(f, low_memory=False)
+        df = _read_cet_csv(f, low_memory=False)            # not kept (read_cet_csv): no later read uses these inferred types
         for c in df.columns:
             kinds.setdefault(c, []).append("empty" if df[c].isna().all() else str(df[c].dtype))
     dtypes = {}
@@ -127,7 +200,7 @@ def part_dtypes(parts: list[tuple[Path, int, int]], values_of: tuple[str, ...] =
     values: dict[str, set] = {c: set() for c in values_of if c in dtypes}
     if values:
         for f, _start, _n in parts:
-            df = read_cet_csv(f, low_memory=False, usecols=list(values), dtype={c: dtypes[c] for c in values})
+            df = _read_cet_csv(f, low_memory=False, usecols=list(values), dtype={c: dtypes[c] for c in values})
             for c in values:
                 values[c].update(df[c].tolist())
     return dtypes, values

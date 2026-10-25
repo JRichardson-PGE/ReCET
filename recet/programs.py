@@ -14,6 +14,7 @@ that uses it is `apply_exclude_from_ce` (outputs.summarize).
 """
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -40,6 +41,7 @@ class ProgramsError(ValueError):
 def set_user_programs(table: pd.DataFrame | None) -> None:
     global _USER
     _USER = table
+    _table_records.cache_clear()
 
 
 def _read(path: str | Path) -> pd.DataFrame:
@@ -85,8 +87,14 @@ def load_programs(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
     return df, notes
 
 
-def builtin() -> pd.DataFrame:
+@lru_cache(maxsize=1)
+def _builtin() -> pd.DataFrame:
     return _read(BUILTIN_CSV)
+
+
+def builtin() -> pd.DataFrame:
+    """The built-in table (a copy: it is read and cleaned once per process, since lookup() runs once per part of a large job)."""
+    return _builtin().copy()
 
 
 def table() -> pd.DataFrame:
@@ -98,35 +106,49 @@ def table() -> pd.DataFrame:
     return pd.concat([base[~base["PrgID"].isin(user["PrgID"])], user], ignore_index=True).fillna("")
 
 
+def _records(t: pd.DataFrame) -> tuple[list[str], dict[str, dict]]:
+    """(columns, PrgID -> its first row as a plain dict): a pandas row lookup per program cost ~2 ms, and lookup() runs once per part of a large job."""
+    recs: dict[str, dict] = {}
+    for r in t.to_dict("records"):
+        recs.setdefault(r["PrgID"], r)
+    return list(t.columns), recs
+
+
+@lru_cache(maxsize=1)
+def _table_records() -> tuple[list[str], dict[str, dict]]:
+    """_records(table()), kept until set_user_programs changes the table. lookup() copies a row before changing it."""
+    return _records(table())
+
+
 def lookup(prg_ids, programs: pd.DataFrame | None = None) -> pd.DataFrame:
     """One row per entry of `prg_ids` (same order): `Prg_MatchedOn` and `Prg_<column>` for every column of the table (blank when not found)."""
-    t = (table() if programs is None else programs).set_index("PrgID", drop=False)
-    cols = [c for c in t.columns]
+    cols, recs = _table_records() if programs is None else _records(programs)
     rows, matched = {}, {}
     ids = pd.Series(prg_ids, dtype=object).fillna("").astype(str).str.strip()
     for pid in ids.unique():
-        rec = t.loc[pid].to_dict() if pid in t.index else None
-        copies = t[t["PrgID"].isin([f"{i}_{pid}" for i in IOUS])] if pid.startswith("SW_") else t.iloc[0:0]
+        rec = dict(recs[pid]) if pid in recs else None
+        copies = [recs[f"{i}_{pid}"] for i in IOUS if f"{i}_{pid}" in recs] if pid.startswith("SW_") else []
         filled = False
         if len(copies):
             rec = rec or {c: "" for c in cols}
             for c in cols:
                 if c in ("PA", "PrgID") or rec.get(c, ""):
                     continue
-                vals = set(copies[c])
+                vals = {cp[c] for cp in copies}
                 if len(vals) == 1 and "" not in vals:
                     rec[c] = vals.pop()
                     filled = True
         if rec is None:
             matched[pid], rows[pid] = "(not found)", {c: "" for c in cols}
             continue
-        if pid not in t.index:
+        if pid not in recs:
             rec["PrgID"], rec["PA"] = pid, "SW"
-        matched[pid] = f"{pid} + agreeing IOU copies" if filled and pid in t.index else ("agreeing IOU copies" if filled else pid)
+        matched[pid] = f"{pid} + agreeing IOU copies" if filled and pid in recs else ("agreeing IOU copies" if filled else pid)
         rows[pid] = rec
-    out = pd.DataFrame([rows[p] for p in ids], columns=[c for c in cols if c != "PrgID"]).add_prefix(PREFIX)     # PrgID: the measure's own
-    out.insert(0, f"{PREFIX}MatchedOn", [matched[p] for p in ids])
-    return out.reset_index(drop=True)
+    codes, uniq = pd.factorize(ids)                 # one row per distinct PrgID, then repeated per entry (a part has ~100 programs and 20,000 measures)
+    out = pd.DataFrame([rows[p] for p in uniq], columns=[c for c in cols if c != "PrgID"]).add_prefix(PREFIX)     # PrgID: the measure's own
+    out.insert(0, f"{PREFIX}MatchedOn", [matched[p] for p in uniq])
+    return out.take(codes).reset_index(drop=True)
 
 
 def is_true(s: pd.Series) -> pd.Series:

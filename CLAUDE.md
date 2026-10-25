@@ -72,6 +72,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   (8x faster than pandas' to_csv) on a second thread while the first compresses (`write_csv`); ISA-L level 1 when `isal` is installed (web extra and
   `.[fast]`; about 6x faster than zlib, files ~11% larger), else zlib 6. Booleans written True/False, timestamps to the second, zip entries dated now. The
   measure-level parquet is kept in `<run>/_results/` (`outputs.RESULTS_DIR`) and the Results tables read it (`outputs.results_source`); the web app hides it.
+  pyarrow's number text differs from pandas' (0 vs 0.0, no exponent for small values) with identical values.
+  Also (Jake): Excel output is for jobs of up to `RunConfig.excel_max_rows` measures (50,000; writing is ~400 rows/s); a larger Excel job writes EVERY
+  table as `excel_fallback` (csv.zip), decided once the measure count is known (`jobs.run_format`, before any table is written), with a note in the log,
+  RunResult.notes and run_settings.json. `outputs.ExcelLimit` stays as a per-table guard.
 - 0.1.37 (2026-10-24, Jake): lifetime values priced per route. `engine.price_real_hourly` / `price_gas_benefit` no longer expand measures into one row per
   quarter: `_lifetime_values` writes value = scale_1st x A + scale_2nd x B, with A, B (the quarter sums of f(k) or 1 - f(k) x weight x discount x U, each quarter
   still discounted on its own) computed once per distinct (route, claim year, claim quarter, EUL, RUL). They now return ONE ROW PER MEASURE (measure_id plus
@@ -82,7 +86,19 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
-  pyarrow's number text differs from pandas' (0 vs 0.0, no exponent for small values) with identical values.
-  Also (Jake): Excel output is for jobs of up to `RunConfig.excel_max_rows` measures (50,000; writing is ~400 rows/s); a larger Excel job writes EVERY
-  table as `excel_fallback` (csv.zip), decided once the measure count is known (`jobs.run_format`, before any table is written), with a note in the log,
-  RunResult.notes and run_settings.json. `outputs.ExcelLimit` stays as a per-table guard.
+- 0.1.38 (2026-10-25, Jake): splitting and preflight. `delimited._first_line` read the WHOLE file to get its header (600 MB on a 1M Measure.csv, on every
+  separator check); it reads 64 KB now. `split_file` copies lines for a pipe-delimited file with no quotes (CET's format), rewriting only the header
+  (`_split_lines`; blank lines dropped, cp1252 re-encoded; anything else still goes through pandas): 35 -> 2 s. `read_cet_csv` keeps each distinct read
+  of a part (a folder with `PARTS_MARKER`, written by split_file) beside it -- text reads (dtype=str) as parquet, typed reads as pickle, both exact -- and
+  later identical reads load that: a part was parsed 7 times a run, now 3 (part_dtypes' inference reads are not kept). Preflight reads the raw text once
+  (`raw.mask(raw == "")` = the old na_values=[""] read). Also: `_nonblank_numeric_problems` tries one pyarrow cast per column first (exact to_numeric
+  check only when a value fails, or casts to NaN); `programs.lookup` uses plain dicts and builds one row per distinct PrgID (0.25 -> 0.09 s a part; the
+  built-in table is read once, `programs.builtin()` returns a copy); `outputs.credited_iou` reads the ProgramCost maps once per file (unallocated case).
+  The run log now times splitting, column types, preflight, pass 2 assembly, the final table write and the summary, and reports the parts folder's
+  disk use (1M job: 1.9 GB, including 1 GB of kept typed reads). 1M job, same sitting: 386 -> 313 s; before pricing 112 -> 79 s; peak memory before
+  pricing 0.78 -> 0.27 GB; outputs and preflight report identical to 0.1.37.
+  Also the writing stage (pass 2): `SummaryParts.add` sums each grouping with one vectorised groupby (it looped over the groups; summary equal to 1.5e-15),
+  `programs.lookup` keeps its row dicts until `set_user_programs` changes the table (`_table_records`), and `credited_iou` is read once per file. 1M job,
+  same sitting as main: writing stage 100 -> 62 s (parquet), 153 -> 112 s (csv.zip); whole run 391 -> 297 s / 436 -> 345 s; peak memory unchanged
+  (1.63 / 1.77 GB). Tried and dropped: temporary part files without dictionary encoding (0.2 s a part faster to write, but the join's peak 0.4 GB
+  higher). Left: compute_cost_tests (~0.2 s a part, spread over many column assignments) and the CSV conversion (~50 s of a csv.zip run).

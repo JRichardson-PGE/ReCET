@@ -105,6 +105,14 @@ class PreflightReport:
 
 def _nonblank_numeric_problems(df: pd.DataFrame, col: str) -> pd.Series:
     raw = df[col]
+    try:                                            # the usual case, every value a number: one vectorised cast instead of to_numeric's slow path on Arrow strings
+        import pyarrow as pa
+        import pyarrow.compute as pc
+        cast = pc.cast(pa.array(raw, type=pa.string(), from_pandas=True), pa.float64())
+        if not pc.any(pc.is_nan(cast)).as_py():     # a literal "nan" casts to NaN; to_numeric counts it a problem, so leave it to the exact check
+            return pd.Series(False, index=raw.index)
+    except Exception:                               # some value did not cast (or the column is not text): find which, exactly as before
+        pass
     parsed = pd.to_numeric(raw, errors="coerce")
     return raw.notna() & parsed.isna() & (raw.astype(str).str.strip() != "")
 
@@ -305,7 +313,9 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         return rep
     if sep != "|":
         rep.add("info", "not_pipe_delimited", f"Measure.csv is {delimited.describe(sep)}; it is read as such (the CET itself needs pipe-delimited files)")
-    df = delimited.read_cet_csv(p, low_memory=False, dtype=str, keep_default_na=False, na_values=[""])
+    raw = delimited.read_cet_csv(p, dtype=str, keep_default_na=False, low_memory=False)   # the read outputs.read_raw makes: a part is parsed once for both
+    df = raw.mask(raw == "")                                                            # blank -> NA (what na_values=[""] gave)
+    del raw
     rep.stats["measures"] = f"{len(df):,}"
     missing = [c for c in REQUIRED_MEASURE_COLUMNS if c not in df.columns]
     if missing:
