@@ -334,8 +334,11 @@ V_elec = SUM over k of  phased(k; S1e', S2e') * w(k) * DF(k) * SUM over hours i 
    y*(k) = the nearest ACC year to year(k)                 shape_year(k) = the calendar-aligned shape of C4.2
 ```
 
-Units: annual kWh x (share of the year in each hour) x $/kWh = $. *Implementation note:* the inner sum `U` does not depend on the measure's kWh, so the tool computes it once per (shape, IOU, sector, zone) route, pricing year and quarter and
-evaluates each measure's quarters with vectorised arithmetic; the result equals the per-measure loop to floating-point rounding (relative differences below 1e-14). Because the ACC's `total_avoided_cost` already contains transmission and distribution, there is no separate kW or T&D term on
+Units: annual kWh x (share of the year in each hour) x $/kWh = $. *Implementation note:* the inner sum `U` does not depend on the measure's kWh, so the tool computes it once per (shape, IOU, sector, zone) route, pricing year and quarter. The phased scale is the 1st-baseline
+quantity times f(k) plus the 2nd times 1 - f(k) (f = 1 before the RUL, 0 after, the blend in the quarter that holds it), so a measure's lifetime value is
+`scale_1st x A + scale_2nd x B`, where A and B are the sums over its quarters of f(k) (or 1 - f(k)) x weight x discount x U. A and B depend only on the route,
+claim year, claim quarter, EUL and RUL, so they are computed once for each distinct combination; every quarter is still discounted on its own. The result equals the
+per-measure loop to floating-point rounding (relative differences below 1e-14). Because the ACC's `total_avoided_cost` already contains transmission and distribution, there is no separate kW or T&D term on
 this route.
 
 **C5.2 Retired (2026-10-02): the TOU (H-factor) route.** TOU end uses are priced by C5.1 from their 8,760s in the library (C4.1). What follows is the formula the tool used
@@ -373,7 +376,7 @@ rate = Gen + TD from CET's table for the cost test
 ```
 
 
-**C5.4 Gas.** (Implementation note: as in C5.1, the sum over a quarter's months depends only on the profile, IOU, gas sector and year, so the tool computes it once per route, year and quarter; the result equals the per-measure loop to rounding.)
+**C5.4 Gas.** (Implementation note: as in C5.1, the sum over a quarter's months depends only on the profile, IOU, gas sector and year, so the tool computes it once per route, year and quarter, and the lifetime sums once per route, claim year, claim quarter, EUL and RUL; the result equals the per-measure loop to rounding.)
 
 ```text
 V_gas = SUM over k of  w(k) * DF(k) * SUM over months m in quarter(k) of  gasshape(m) * phased(k; T1', T2') * ACg(y^(k), m)
