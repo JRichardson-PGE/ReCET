@@ -10,17 +10,29 @@ The PA of a measure (`pa_of`) is its program's administrator: the `PA` of its Pr
 Columns: `catalog(frame)` lists what a view can show - the run's additive output columns (benefits, costs, savings, emissions, bill impacts, components ...),
 the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, `poc_` fields, measure-level ratios, shares and statuses are not offered: they do not
 add up across measures. `DEFAULT_VIEW` is the built-in view; users save their own (`load_views` / `save_views`, kept in the tool's config file).
+
+Memory (`RunResults`): every level above the measure is built from the run's GROUP SUMS -- one row per (PA, PrgID, program name, sector, segment) with each
+summable column added up and the measure count -- not from the measure rows. For a results file they are computed by reading the file in batches of only the
+columns needed and kept beside it (`<RESULTS_DIR>/group_sums1_<file>.parquet`), so a 1,000,000-measure run is never loaded whole (it took about 4 GB). The measure
+level is offered only for a run of at most `MAX_RUN_MEASURE_ROWS` measures, and shows at most `MAX_MEASURE_ROWS` rows (pick one PA); its rows are read from the
+file the same way, filtered to the PA as they are read. A larger run's measure-level table is in its download only.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
 from . import outputs, paths, templates
 
 MAX_MEASURE_ROWS = 5000            # above this many measures (after the PA filter) the measure-level tab is turned off: open the measure-level file instead
+MAX_RUN_MEASURE_ROWS = 50_000      # a run with more measures than this has no measure-level tab at all (its measure-level table is in the download only)
+BATCH_ROWS = 20_000                # rows read at a time from a results file
+KEYS = ["_pa", "_prg", "_prgname", "_sector", "_segment"]      # the group-sum keys (names start with "_" so the catalog never offers them)
+COUNT = "_n"
+CUBE_VERSION = 1                   # in the kept group-sums file's name: change it when the group sums change, so old files are rebuilt
 LEVELS = [("measure", "Measure level"), ("program", "Program level"), ("sector", "Program sector level"), ("segment", "Program segment level"),
           ("portfolio", "Portfolio level")]
 ALL_PAS = "All PAs"
@@ -69,6 +81,7 @@ LABELS = {
     "PCTBen": ("PCT benefits ($)", "usd"), "PCTCost": ("PCT cost ($)", "usd"),
 }
 NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}
+_INPUTS = set(templates.MEASURE_COLUMNS)
 
 
 def pa_of(frame: pd.DataFrame) -> pd.Series:
@@ -86,14 +99,16 @@ def _is_ratio_column(c: str) -> bool:
     return "Ratio" in c or c.endswith("_ratio") or c.startswith("Lev")
 
 
+def _summable(c: str) -> bool:
+    """A column a group total may add up (when it is numeric): not an input, a poc_/Prg_ field, a share, a per-measure ratio or a group-sum key."""
+    return not (c in _INPUTS or c.startswith(("poc_", "Prg_", "_")) or c in NOT_ADDITIVE or _is_ratio_column(c))
+
+
 def catalog(frame: pd.DataFrame) -> dict[str, Column]:
     """Every column a view can show for this run, in a stable order: the default view's columns first, then ratios, derived sums, and the other additive outputs."""
-    inputs = set(templates.MEASURE_COLUMNS)
     sums: dict[str, Column] = {}
     for c in frame.columns:
-        if c in inputs or c.startswith(("poc_", "Prg_")) or c in NOT_ADDITIVE or _is_ratio_column(c):
-            continue
-        if not pd.api.types.is_numeric_dtype(frame[c]):
+        if not _summable(c) or not pd.api.types.is_numeric_dtype(frame[c]):
             continue
         label, fmt = LABELS.get(c, (c, _guess_fmt(c)))
         sums[c] = Column(c, label, "sum", fmt)
@@ -170,37 +185,202 @@ def _row_values(f: pd.DataFrame, cols: list[Column]) -> pd.DataFrame:
     return out
 
 
+# ----------------------------------------------------------------------------------------------------------------------------- group sums
+def _key_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Each measure's group-sum keys (KEYS): its PA, PrgID and program name (when the table has them), program sector and segment."""
+    k = pd.DataFrame({"_pa": pa_of(frame).to_numpy()}, index=frame.index)
+    if "PrgID" in frame:
+        k["_prg"] = frame["PrgID"].astype(str).to_numpy()
+    if "Prg_ProgramName" in frame:
+        k["_prgname"] = frame["Prg_ProgramName"].fillna("").astype(str).to_numpy()
+    k["_sector"] = _group_key(frame, "sector").to_numpy()
+    k["_segment"] = _group_key(frame, "segment").to_numpy()
+    return k
+
+
+def group_sums(frame: pd.DataFrame) -> pd.DataFrame:
+    """One row per distinct (PA, PrgID, program name, sector, segment): COUNT measures and every summable numeric column added up (NaN where it is NaN in
+    all of the group's measures, as a sum over the measures would be)."""
+    cols = [c for c in frame.columns if _summable(c) and pd.api.types.is_numeric_dtype(frame[c])]
+    k = _key_frame(frame)
+    keys = list(k.columns)
+    x = pd.concat([k, frame[cols].astype(float)], axis=1)
+    g = x.groupby(keys, sort=False, dropna=False)
+    out = g[cols].sum(min_count=1)
+    out[COUNT] = g.size()
+    return out.reset_index()
+
+
+def _combine(parts: list[pd.DataFrame]) -> pd.DataFrame:
+    """group_sums of a whole table from those of its batches."""
+    if len(parts) == 1:
+        return parts[0]
+    allp = pd.concat(parts, ignore_index=True)
+    keys = [c for c in KEYS if c in allp]
+    cols = [c for c in allp.columns if c not in keys]
+    return allp.groupby(keys, sort=False, dropna=False)[cols].sum(min_count=1).reset_index()
+
+
+KEY_SOURCES = {"CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", "PrgID", "Prg_ProgramName", "Prg_PrimarySector", "Prg_ProgramSegment"}
+
+
+def _needed_for_sums(schema) -> list[str]:
+    import pyarrow as pa
+    def num(t):
+        return pa.types.is_floating(t) or pa.types.is_integer(t) or pa.types.is_boolean(t)
+    return [f.name for f in schema if f.name in KEY_SOURCES or (_summable(f.name) and num(f.type))]
+
+
+def build_group_sums(path: Path) -> pd.DataFrame:
+    """group_sums of a results file, reading a parquet file in batches of only the needed columns (any other format is small enough to read whole)."""
+    path = Path(path)
+    if path.suffix.lower() != ".parquet":
+        return group_sums(outputs.read_table(path))
+    import pyarrow.parquet as pq
+    pf = pq.ParquetFile(path)
+    cols = _needed_for_sums(pf.schema_arrow)
+    parts = [group_sums(b.to_pandas()) for b in pf.iter_batches(batch_size=BATCH_ROWS, columns=cols, use_threads=False)]
+    return _combine(parts) if parts else group_sums(pf.schema_arrow.empty_table().select(cols).to_pandas())
+
+
+def _kept_path(path: Path) -> Path:
+    folder = path.parent if path.parent.name == outputs.RESULTS_DIR else path.parent / outputs.RESULTS_DIR
+    return folder / f"group_sums{CUBE_VERSION}_{path.name}.parquet"     # not "measure_level_*": results_source must never pick it
+
+
+def group_sums_for(path: Path) -> pd.DataFrame:
+    """build_group_sums(path), kept beside the run's results (outputs.RESULTS_DIR, which downloads leave out) and rebuilt when the file is newer."""
+    path = Path(path)
+    kept = _kept_path(path)
+    try:
+        if kept.exists() and kept.stat().st_mtime >= path.stat().st_mtime:
+            return pd.read_parquet(kept)
+    except (OSError, ValueError):
+        pass
+    return _keep(build_group_sums(path), kept)
+
+
+def _keep(sums: pd.DataFrame, kept: Path) -> pd.DataFrame:
+    try:
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        tmp = kept.with_name(kept.name + ".tmp")
+        sums.to_parquet(tmp, index=False)
+        tmp.replace(kept)
+    except OSError:                                  # a read-only results folder: use the sums without keeping them
+        pass
+    return sums
+
+
+def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None) -> None:
+    """Called at the end of a run: keep the group sums of its results file (outputs.results_source) so its Results page opens without reading it. From
+    `frame` when the run holds its measure-level table in memory, else read from the file (about 4 s and 0.4 GB for 1,000,000 measures)."""
+    source = outputs.results_source(run_dir)
+    if source is not None:
+        _keep(group_sums(frame), _kept_path(source)) if frame is not None else group_sums_for(source)
+
+
+RATIO_INPUTS = {"ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
+                "TaxCredits", "BillIncrElec", "BillIncrGas", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin",
+                "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin", "PCTBen", "PCTCost"}     # every column outputs._ratio_parts reads
+
+
+# ----------------------------------------------------------------------------------------------------------------------------- a run's results
+class RunResults:
+    """A run's Results tables: the group sums (every level above the measure, the PA list, the catalog) and, for the measure level, either the measure rows
+    in memory (`from_frame`) or the results file they are read from (`from_file`). See the module docstring."""
+
+    def __init__(self, sums: pd.DataFrame, frame: pd.DataFrame | None = None, path: Path | None = None):
+        self.sums, self.frame, self.path = sums, frame, path
+        self.n = int(sums[COUNT].sum()) if len(sums) else 0
+
+    @classmethod
+    def from_frame(cls, frame: pd.DataFrame) -> "RunResults":
+        return cls(group_sums(frame), frame=frame)
+
+    @classmethod
+    def from_file(cls, path: Path) -> "RunResults":
+        return cls(group_sums_for(path), path=Path(path))
+
+    def catalog(self) -> dict[str, Column]:
+        return catalog(self.sums)
+
+    def pas(self) -> list[str]:
+        return [ALL_PAS] + sorted(self.sums["_pa"].unique()) if len(self.sums) else [ALL_PAS]
+
+    def _of(self, pa: str) -> pd.DataFrame:
+        return self.sums if pa in (None, "", ALL_PAS) else self.sums[self.sums["_pa"] == pa]
+
+    def count(self, pa: str) -> int:
+        s = self._of(pa)
+        return int(s[COUNT].sum()) if len(s) else 0
+
+    def measure_level_available(self) -> bool:
+        """False for a run too large to show measure by measure at all (MAX_RUN_MEASURE_ROWS): its measure-level table is in the download only."""
+        return self.n <= MAX_RUN_MEASURE_ROWS
+
+    def measure_level_allowed(self, pa: str) -> bool:
+        return self.measure_level_available() and self.count(pa) <= MAX_MEASURE_ROWS
+
+    def table(self, level: str, pa: str, keys: list[str]) -> pd.DataFrame:
+        """The rows of one level for one PA, with identifier columns first and then `keys` (unknown keys are skipped). Values are numbers, unformatted.
+        The measure level must be allowed (measure_level_allowed): it raises otherwise."""
+        cat = self.catalog()
+        cols = [cat[k] for k in keys if k in cat]
+        if level == "measure":
+            if not self.measure_level_allowed(pa):
+                raise ValueError(f"the measure level is off for this run ({self.count(pa):,} measures)")
+            return _measure_table(self._measure_rows(pa, cols), cols)
+        s = self._of(pa)
+        if level == "portfolio":
+            label = "All PAs" if pa in (None, "", ALL_PAS) else pa
+            return pd.DataFrame([{"Portfolio": label, "Measures": int(s[COUNT].sum()) if len(s) else 0, **_values(s, cols)}])
+        key = {"program": "_prg", "sector": "_sector", "segment": "_segment"}[level]
+        name = {"program": "PrgID", "sector": "Program sector", "segment": "Program segment"}[level]
+        rows = []
+        if key in s:
+            for k, g in s.groupby(key, sort=True):
+                row = {name: k}
+                if level == "program":
+                    row["Program name"] = str(g["_prgname"].iloc[0]) if "_prgname" in g else ""
+                    row["PA"] = ", ".join(sorted(g["_pa"].unique()))
+                row["Measures"] = int(g[COUNT].sum())
+                row.update(_values(g, cols))
+                rows.append(row)
+        return pd.DataFrame(rows)
+
+    def _measure_rows(self, pa: str, cols: list[Column]) -> pd.DataFrame:
+        """The measure rows of one PA: from memory, or read from the results file in batches of only the columns the table uses."""
+        if self.frame is not None:
+            return filter_pa(self.frame, pa)
+        if self.path.suffix.lower() != ".parquet":
+            return filter_pa(outputs.read_table(self.path), pa)
+        import pyarrow.parquet as pq
+        pf = pq.ParquetFile(self.path)
+        want = {"CEInputID", "MeasDescription", "PrgID", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"}
+        for c in cols:
+            want |= set(c.parts) if c.kind == "derived" else (RATIO_INPUTS if c.kind == "ratio" else {c.key})
+        names = [n for n in pf.schema_arrow.names if n in want]
+        out = [filter_pa(b.to_pandas(), pa) for b in pf.iter_batches(batch_size=BATCH_ROWS, columns=names, use_threads=False)]
+        return pd.concat(out, ignore_index=True) if out else pf.schema_arrow.empty_table().select(names).to_pandas()
+
+
+def _measure_table(f: pd.DataFrame, cols: list[Column]) -> pd.DataFrame:
+    ids = pd.DataFrame({"CEInputID": f.get("CEInputID", pd.Series(index=f.index, dtype=object)),
+                        "Description": f.get("MeasDescription", pd.Series("", index=f.index)), "PrgID": f.get("PrgID", pd.Series("", index=f.index)),
+                        "PA": pa_of(f)})
+    return pd.concat([ids, _row_values(f, cols)], axis=1).reset_index(drop=True)
+
+
 def table(frame: pd.DataFrame, level: str, pa: str, keys: list[str]) -> pd.DataFrame:
-    """The rows of one level for one PA, with identifier columns first and then `keys` (unknown keys are skipped). Values are numbers, unformatted."""
-    cat = catalog(frame)
-    cols = [cat[k] for k in keys if k in cat]
-    f = filter_pa(frame, pa)
-    pas = pa_of(f)
+    """RunResults.from_frame(frame).table(...), without the measure-level size limits (a caller holding the whole frame decides that itself)."""
     if level == "measure":
-        ids = pd.DataFrame({"CEInputID": f.get("CEInputID", pd.Series(index=f.index, dtype=object)),
-                            "Description": f.get("MeasDescription", pd.Series("", index=f.index)), "PrgID": f.get("PrgID", pd.Series("", index=f.index)),
-                            "PA": pas})
-        return pd.concat([ids, _row_values(f, cols)], axis=1).reset_index(drop=True)
-    if level == "portfolio":
-        label = "All PAs" if pa in (None, "", ALL_PAS) else pa
-        return pd.DataFrame([{"Portfolio": label, "Measures": len(f), **_values(f, cols)}])
-    key = _group_key(f, level)
-    name = {"program": "PrgID", "sector": "Program sector", "segment": "Program segment"}[level]
-    rows = []
-    if key is not None:
-        for k, g in f.groupby(key, sort=True):
-            row = {name: k}
-            if level == "program":
-                row["Program name"] = str(g["Prg_ProgramName"].iloc[0]) if "Prg_ProgramName" in g else ""
-                row["PA"] = ", ".join(sorted(pas.loc[g.index].unique()))
-            row["Measures"] = len(g)
-            row.update(_values(g, cols))
-            rows.append(row)
-    return pd.DataFrame(rows)
+        cat = catalog(frame)
+        return _measure_table(filter_pa(frame, pa), [cat[k] for k in keys if k in cat])
+    return RunResults.from_frame(frame).table(level, pa, keys)
 
 
 def measure_level_allowed(frame: pd.DataFrame, pa: str) -> bool:
-    return len(filter_pa(frame, pa)) <= MAX_MEASURE_ROWS
+    return len(frame) <= MAX_RUN_MEASURE_ROWS and len(filter_pa(frame, pa)) <= MAX_MEASURE_ROWS
 
 
 def format_value(col: Column | None, v) -> str:

@@ -9,6 +9,10 @@
  · started {{ fmt_time(run.created_at) }}{% if run.owner_email != user.email %} · by {{ run.owner_email }}{% endif %}
  · deleted after {{ retention }} days</p>
 <p class="small">{{ run.inputs }}</p>
+<div id="run-progress" class="progress {% if not bar %}hidden{% endif %}">
+  <progress max="1" value="{{ bar.fraction if bar else 0 }}"></progress>
+  <span class="pct">{{ '{:.0%}'.format(bar.fraction) if bar else '' }}</span> <span class="small muted text">{{ bar.text if bar else '' }}</span>
+</div>
 <p id="run-position" class="muted">{% if position %}Waiting in the queue: number {{ position }}.{% endif %}</p>
 <p id="run-message" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
 {% if error %}<p class="alert">{{ error }}</p>{% endif %}

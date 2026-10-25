@@ -199,6 +199,22 @@ def test_a_run_from_upload_to_results(web, tmp_path):
     assert c.get(f"{P}/runs/{run_id}/files/..%2F..%2Frecet_web.sqlite3").status_code == 404
 
 
+
+def test_the_measure_level_is_off_for_a_run_too_large_to_show(web, tmp_path, monkeypatch):
+    from recet import results_view as rv
+    app, ctx = web
+    _user(ctx, "big@example.com")
+    c = _login(app, "big@example.com")
+    run_id = _start_run(c, tmp_path)
+    assert ctx.runner.work_once()
+    assert c.get(f"{P}/runs/{run_id}/results?level=program").status_code == 200       # makes the kept group sums, which downloads leave out
+    assert "group_sums" not in " ".join(zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/zip").content)).namelist())
+    monkeypatch.setattr(rv, "MAX_RUN_MEASURE_ROWS", 0)
+    page = c.get(f"{P}/runs/{run_id}/results?level=measure")
+    assert page.status_code == 200 and "Measure level (off:" in page.text and "in the downloads" in page.text
+    assert c.get(f"{P}/runs/{run_id}/results.csv?level=measure").status_code == 400
+    assert c.get(f"{P}/runs/{run_id}/results.csv?level=program").status_code == 200
+
 def test_runs_are_private_to_their_owner(web, tmp_path):
     app, ctx = web
     _user(ctx, "owner@example.com")
@@ -609,3 +625,26 @@ def test_excel_runs_fall_back_to_zipped_csv_over_the_limit(web, tmp_path):
     assert ctx.runner.work_once()
     files = [f.name for f in ctx.result_path(ctx.db.one("SELECT * FROM runs WHERE id = ?", (run_id,))).iterdir()]
     assert "measure_level_acc2026.xlsx" in files                                         # one measure: well within the limit
+
+
+def test_the_web_pages_show_a_running_runs_bar(web, tmp_path):
+    from recet import progress
+    app, ctx = web
+    _user(ctx, "p@example.com")
+    c = _login(app, "p@example.com")
+    run_id = _start_run(c, tmp_path)
+    assert c.get(f"{P}/runs/{run_id}/log").json()["progress"] is None                     # queued: no bar
+    ctx.db.run("UPDATE runs SET status = 'running' WHERE id = ?", (run_id,))
+    assert 'id="run-progress" class="progress hidden"' in c.get(f"{P}/runs/{run_id}").text   # running, before its first report
+    (ctx.runner.folder(run_id) / progress.FILE_NAME).write_text(json.dumps(
+        {"stage": "pricing", "label": "Pricing", "done": 12, "total": 50, "fraction": 0.4, "seconds_left": 240, "updated": 0}))
+    p = c.get(f"{P}/runs/{run_id}/log").json()["progress"]
+    assert p["fraction"] == 0.4 and p["text"] == "Pricing: part 12 of 50 · about 4 min left"
+    page = c.get(f"{P}/runs/{run_id}").text
+    assert 'value="0.4"' in page and "Pricing: part 12 of 50" in page and "progress hidden" not in page
+    runs = c.get(f"{P}/runs").text
+    assert 'value="0.4"' in runs and "about 4 min left" in runs and 'data-live="1"' in runs
+    ctx.db.run("UPDATE runs SET status = 'queued' WHERE id = ?", (run_id,))
+    assert ctx.runner.work_once()                                                          # a real run writes the file through the runner
+    assert progress.read(ctx.runner.folder(run_id) / progress.FILE_NAME)["stage"] == "done"
+    assert "<progress" not in c.get(f"{P}/runs").text                                     # finished: no bar

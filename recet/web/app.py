@@ -26,7 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import __version__, outputs, versions
+from .. import __version__, outputs, progress, versions
 from . import auth, jobzip
 from .config import Settings
 from .db import Database
@@ -165,6 +165,15 @@ class Ctx:
         except (OSError, ValueError):
             return None
 
+    def progress(self, run) -> dict | None:
+        """A running run's progress (recet/progress.py) with `text` added for the page; None for any other run or before its first report."""
+        if run["status"] != "running":
+            return None
+        p = progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME)
+        if p is not None:
+            p["text"] = progress.describe(p)
+        return p
+
     def result_path(self, run, sub: str = "") -> Path | None:
         if not run["result_dir"]:
             return None
@@ -175,15 +184,23 @@ class Ctx:
         return p
 
     def frame(self, path: Path):
-        """A results table, cached by path and modification time (a few recent ones)."""
+        """A small results table (a comparison or portfolio summary), cached by path and modification time (a few recent ones)."""
         from .. import outputs
-        key, mtime = str(path), path.stat().st_mtime
+        return self._cached(("frame", str(path)), path, lambda: outputs.read_table(path))
+
+    def results(self, path: Path):
+        """A run's Results tables (results_view.RunResults: group sums only, never the whole measure-level table), cached like frame()."""
+        from .. import results_view as rv
+        return self._cached(("results", str(path)), path, lambda: rv.RunResults.from_file(path))
+
+    def _cached(self, key, path: Path, make):
+        mtime = path.stat().st_mtime
         hit = self._frames.get(key)
         if hit and hit[0] == mtime:
             return hit[1]
-        f = outputs.read_table(path)
+        f = make()
         self._frames[key] = (mtime, f)
-        while len(self._frames) > 4:
+        while len(self._frames) > 8:
             self._frames.pop(next(iter(self._frames)))
         return f
 
@@ -465,7 +482,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         everyone = bool(all) and u["role"] == "admin"
         rows = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
                           + ("" if everyone else "WHERE r.user_id = ? ") + "ORDER BY r.created_at DESC LIMIT 200", () if everyone else (u["id"],))
-        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days)
+        bars = {r["id"]: ctx.progress(r) for r in rows if r["status"] == "running"}
+        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars)
 
     field_label = {fld: label for fld, _ext, label in UPLOADS.values()}
 
@@ -603,7 +621,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
         has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
         return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), files=_files(run),
-                          retention=s.retention_days, has_inputs=has_inputs, error=error)
+                          retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run))
 
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
     async def run_page(request: Request, run_id: str):
@@ -659,7 +677,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 data = f.read(256 * 1024)
             text, end = data.decode("utf-8", errors="replace"), max(0, offset) + len(data)
         return JSONResponse({"text": text, "offset": end, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]),
-                             "position": ctx.runner.position(run_id), "message": run["message"], "has_results": bool(run["result_dir"])})
+                             "position": ctx.runner.position(run_id), "message": run["message"], "has_results": bool(run["result_dir"]),
+                             "progress": ctx.progress(run)})
 
     @app.get("/runs/{run_id}/check")
     def run_check(request: Request, run_id: str):
@@ -755,11 +774,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             df = ctx.frame(plain_file)
             kw.update(plain=df, plain_name=plain_file.name)
             return ctx.render(request, "results.html", **kw, note="", table=None)
-        frame = ctx.frame(source)
-        pas = rv.available_pas(frame)
+        res = ctx.results(source)
+        pas = res.pas()
         pa = pa if pa in pas else rv.ALL_PAS
         views = user_views(u["id"])
-        cat = rv.catalog(frame)
+        cat = res.catalog()
         if columns:                                          # an unsaved choice from the column picker
             keys = [k for k in columns.split(",") if k in cat]
             view = ""
@@ -770,13 +789,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         level = level if level in levels_ok else "portfolio"
         note = ""
         table = None
-        if level == "measure" and not rv.measure_level_allowed(frame, pa):
+        measure_ok = res.measure_level_available()
+        if level == "measure" and not measure_ok:
+            note = (f"This run has {res.n:,} measures: the measure level is shown only for runs of up to {rv.MAX_RUN_MEASURE_ROWS:,}. "
+                    "Its measure-level table is in the downloads on the run page.")
+        elif level == "measure" and not res.measure_level_allowed(pa):
             note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA."
         else:
-            table = rv.table(frame, level, pa, keys)
+            table = res.table(level, pa, keys)
         shown = [cat[k] for k in keys if k in cat]
         kw.update(level=level, pa=pa, pas=pas, views=views, view=view, keys=keys, catalog=cat, shown=shown, file_name=measure_files[0].name,
-                  n_measures=len(frame))
+                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS)
         return ctx.render(request, "results.html", **kw, note=note, table=table, rv=rv)
 
     @app.get("/runs/{run_id}/results.csv")
@@ -787,15 +810,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         source = outputs.results_source(base) if base else None
         if source is None:
             raise HTTPException(404)
-        frame = ctx.frame(source)
-        cat = rv.catalog(frame)
+        res = ctx.results(source)
+        cat = res.catalog()
         views = user_views(request.state.user["id"])
         keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
-        pa = pa if pa in rv.available_pas(frame) else rv.ALL_PAS
+        pa = pa if pa in res.pas() else rv.ALL_PAS
         level = level if level in {k for k, _ in rv.LEVELS} else "portfolio"
-        if level == "measure" and not rv.measure_level_allowed(frame, pa):
+        if level == "measure" and not res.measure_level_allowed(pa):
             raise HTTPException(400, "The measure level is too large to show: download the measure-level file instead.")
-        t = rv.table(frame, level, pa, keys).rename(columns={k: c.label for k, c in cat.items()})
+        t = res.table(level, pa, keys).rename(columns={k: c.label for k, c in cat.items()})
         name = f"recet_{run_id}_{level}.csv"
         return Response(t.to_csv(index=False), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

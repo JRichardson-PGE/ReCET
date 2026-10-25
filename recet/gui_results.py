@@ -35,7 +35,7 @@ class ResultsTab:
     def __init__(self, app, parent: ttk.Frame):
         self.app = app
         self.parent = parent
-        self.frame: pd.DataFrame | None = None
+        self.frame: rv.RunResults | None = None              # the shown run (group sums; measure rows are read when the measure tab is shown)
         self.run_dir: Path | None = None
         self.plain: pd.DataFrame | None = None          # a comparison summary, shown as it is
         self.tables: dict[str, pd.DataFrame] = {}
@@ -109,7 +109,7 @@ class ResultsTab:
 
             def work():
                 try:
-                    self._q.put(("frame", (run_dir, files[0], outputs.read_table(outputs.results_source(run_dir) or files[0]))))   # the kept parquet of a CSV run reads faster
+                    self._q.put(("frame", (run_dir, files[0], rv.RunResults.from_file(outputs.results_source(run_dir) or files[0]))))   # group sums only: never the whole table
                 except Exception as exc:                    # a damaged file: say so, keep the window running
                     self._q.put(("error", f"{files[0]}: {exc}"))
             threading.Thread(target=work, daemon=True).start()
@@ -129,7 +129,7 @@ class ResultsTab:
                     run_dir, path, frame = val
                     self.frame, self.run_dir, self.plain = frame, run_dir, None
                     self.title.config(text=f"{path.name}   ({run_dir})")
-                    pas = rv.available_pas(frame)
+                    pas = frame.pas()
                     self.pa_box.config(values=pas, state="readonly")
                     if self.pa_var.get() not in pas:
                         self.pa_var.set(rv.ALL_PAS)
@@ -169,8 +169,8 @@ class ResultsTab:
         if self.frame is None:
             return
         pa, keys = self.pa_var.get(), self._view_keys()
-        n = len(rv.filter_pa(self.frame, pa))
-        allowed = rv.measure_level_allowed(self.frame, pa)
+        n = self.frame.count(pa)
+        allowed = self.frame.measure_level_allowed(pa)
         self.tables = {}
         for key, title in rv.LEVELS:
             frame = self.tab_frames[key]
@@ -183,17 +183,18 @@ class ResultsTab:
                     continue
             else:
                 self.nb.tab(frame, state="normal")
-            t = rv.table(self.frame, key, pa, keys)
+            t = self.frame.table(key, pa, keys)
             self.tables[key] = t
             self._fill(key, t)
-        note = "" if allowed else f"   Measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: use Open measure-level table."
+        note = ("" if allowed else f"   Measure level is off for runs above {rv.MAX_RUN_MEASURE_ROWS:,} measures: use Open measure-level table."
+                if not self.frame.measure_level_available() else f"   Measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: pick one PA or use Open measure-level table.")
         self.status.config(text=f"{n:,} measures{'' if pa == rv.ALL_PAS else ' for ' + pa}.{note}")
 
     def _fill(self, key: str, t: pd.DataFrame, plain: bool = False) -> None:
         s = self.sheets.get(key)
         if s is None:
             return
-        cat = rv.catalog(self.frame) if (self.frame is not None and not plain) else {}
+        cat = self.frame.catalog() if (self.frame is not None and not plain) else {}
         headers = [cat[c].label if c in cat else c for c in t.columns]
         rows = []
         for r in t.itertuples(index=False):
@@ -230,7 +231,7 @@ class ResultsTab:
                                          filetypes=[("Excel workbook", "*.xlsx"), ("CSV", "*.csv")])
         if not p:
             return
-        cat = rv.catalog(self.frame) if self.frame is not None else {}
+        cat = self.frame.catalog() if self.frame is not None else {}
         out = t.rename(columns={c: cat[c].label for c in t.columns if c in cat})
         try:
             outputs.write_table(out, Path(p).with_suffix(""), "csv" if p.lower().endswith(".csv") else "xlsx")
@@ -243,7 +244,7 @@ class ResultsTab:
         if self.frame is None:
             messagebox.showinfo("Edit views", "Load a run's results first: the columns you can choose come from the run.")
             return
-        ViewEditor(self, rv.catalog(self.frame))
+        ViewEditor(self, self.frame.catalog())
 
     def views_changed(self, current: str) -> None:
         self.view_box.config(values=list(self.views))
