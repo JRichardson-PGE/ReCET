@@ -21,6 +21,7 @@ the same, and RunResult.frame is None (the measure-level table is only in its fi
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -263,6 +264,8 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
         raise ValueError("no Measure.csv or job workbook given")
     cfg = RunConfig.from_dict(asdict(cfg))          # prepare() may fill in files from a workbook; leave the caller's config as it was
 
+    from . import progress
+    progress.report("preparing")
     run_dir = _run_folder(cfg, str(cfg.acc_version))
     result = RunResult(run_dir=run_dir)
     acc, user_profiles, user_gas = prepare(cfg, run_dir, log)
@@ -276,27 +279,31 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
         n_rows = delimited.count_rows(cfg.measures)
         if n_rows > cfg.chunk_size:
             log(f"splitting Measure.csv ({n_rows:,} rows) into parts of {cfg.chunk_size:,} rows")
+            progress.report("splitting")
             ts = time.time()
             parts = delimited.split_file(cfg.measures, cfg.chunk_size, parts_dir / "measures")
             tt = time.time()
             dtypes, values = delimited.part_dtypes(parts, ("ClaimYearQuarter", "ACCVersion"))
             log(f"  split into {len(parts)} parts in {tt - ts:.0f}s; column types of the whole file read in {time.time() - tt:.0f}s")
     try:
-        return _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
+        out = _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
     finally:
         if parts is not None:
             size = sum(f.stat().st_size for f in parts_dir.rglob("*") if f.is_file())
             log(f"(the parts folder, kept reads included, used {size / 1e6:,.0f} MB of disk; deleted)")
             shutil.rmtree(parts_dir, ignore_errors=True)
+    progress.report("done")
+    return out
 
 
 def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: Log, t_start: float, parts, dtypes, values) -> RunResult:
-    from . import components as comp_mod, outputs, profile8760, preflight, run_poc
+    from . import components as comp_mod, outputs, profile8760, preflight, progress, run_poc
     from .pipeline import emissions
     excel = excel_limit(cfg, result, log)
 
     # ---- preflight
     log("\n== preflight ==")
+    progress.report("preflight", 0, len(parts) if parts is not None else None)
     tp = time.time()
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
                                  apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes)
@@ -316,6 +323,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     # ---- load and price
     log("\n== loading ==")
+    progress.report("loading")
     measures, program = run_poc.load_job(cfg.measures, cfg.programcost, allocate_statewide=cfg.allocate_statewide)
     raw = outputs.read_raw(cfg.measures, cfg.allocate_statewide)
     if cfg.subset_step > 1:
@@ -343,6 +351,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     societal = societal_available(groups, acc, cfg.include_societal, result, log)
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
+    progress.report("pricing")
     t0 = time.time()
     parts, em_parts, comp_parts = [], [], []
     for k, g in groups.items():
@@ -390,6 +399,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
     result.frame = frame
+    progress.report("writing")
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel)
     writer.write(frame)
     result.files["measure_level"] = writer.close()                   # csv / csv.zip: parquet first (kept for the Results tables), then CSV
@@ -418,6 +428,9 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     # ---- record
     write_settings(cfg, acc, run_dir, result, t_start, len(measures), base_year)
+    progress.report("finishing")
+    from . import results_view
+    results_view.keep_group_sums(run_dir, frame)                     # the Results page then opens without reading the measure-level file
     log(f"\ndone in {time.time() - t_start:.0f}s -- results in {run_dir}")
     return result
 
@@ -425,7 +438,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
     """Run `cfg` (its acc_version, with any supplied ACC/profile files) and again against `cfg.compare_with` (built-in files; the same supplied PROFILES), each in its own
     process so nothing is shared between them, then write a per-measure comparison of the two."""
-    from . import outputs
+    from . import outputs, progress
     if not cfg.compare_with or cfg.compare_with == cfg.acc_version:
         raise ValueError("compare_with must name a different ACC version")
     folder = Path(cfg.out_dir) / (cfg.run_name.strip() or datetime.now().strftime("compare_%Y%m%d_%H%M%S"))
@@ -437,7 +450,9 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         cfg_path = folder / f"_config_acc{key}.json"
         cfg_path.write_text(sub.to_json(), encoding="utf-8")
         log(f"\n######## ACC version {key} ########")
-        proc = subprocess.Popen([sys.executable, "-m", "recet", "run", "--config", str(cfg_path)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        env = dict(os.environ, **{progress.SLICE_ENV: f"{0 if is_primary else 1}/2"})       # each run fills its half of the progress bar (progress.py)
+        proc = subprocess.Popen([sys.executable, "-m", "recet", "run", "--config", str(cfg_path)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                env=env)
         assert proc.stdout is not None
         for line in proc.stdout:
             log(line.rstrip("\n"))
@@ -447,6 +462,7 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         frames[key] = outputs.read_table(outputs.results_source(run_dir))
         results[key] = run_dir
     a, b = cfg.acc_version, cfg.compare_with
+    progress.report("comparing")
     used = run_format(cfg, max(len(f) for f in frames.values()), log)             # the two runs decided the same way for their own files
     if used != cfg.output_format:
         cfg = RunConfig.from_dict({**asdict(cfg), "output_format": used})
@@ -459,4 +475,5 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
         res.files[f"run_acc{key}"] = d
     log("\n== portfolio comparison ==\n" + summ.to_string(index=False, float_format=lambda v: f"{v:,.3f}" if abs(v) < 100 else f"{v:,.0f}"))
     log(f"\ncomparison files in {folder}")
+    progress.report("done")
     return res

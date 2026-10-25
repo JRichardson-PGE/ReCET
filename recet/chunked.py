@@ -40,7 +40,7 @@ def acc_groups(acc, versions_in_file: set) -> dict:
 def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values: dict, log: Log, t_start: float):
     """Price and write the job in `parts` (see the module docstring). `values`: the distinct ClaimYearQuarter and ACCVersion values of the whole file
     (delimited.part_dtypes). Fills and returns `result`."""
-    from . import components as comp_mod, jobs, outputs, profile8760, run_poc, runtime
+    from . import components as comp_mod, jobs, outputs, profile8760, progress, run_poc, runtime
     from .pipeline import cost_tests, emissions
 
     tag = f"acc{acc.key}"
@@ -68,6 +68,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     # ---- pass 1: every measure-level value, part by part
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + f", PAC, RIM, bill impacts) in {len(parts)} parts ==")
     t0 = time.time()
+    progress.report("pricing", 0, len(parts))
     totals, restated, n_measures = None, set(), 0
     comp_checks, profiles = [], []
     for i, (f, start, n) in enumerate(parts):
@@ -102,6 +103,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             profiles.append(profile8760.portfolio_profile(measures, years, log=lambda s: None))
         n_measures += len(measures)
         log(f"  part {i + 1}/{len(parts)}: rows {start + 1:,}-{start + n:,}, {len(measures):,} measures, {time.time() - tp:.0f}s")
+        progress.report("pricing", i + 1, len(parts))
         del measures, d, vals, ems, comps
     log(f"priced in {time.time() - t0:.0f}s")
     used = jobs.run_format(cfg, n_measures, log)                 # before any table is written: an Excel run over the row limit writes every table as zipped CSV
@@ -127,6 +129,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     # ---- pass 2: program costs shared over the whole job, then the measure-level rows, part by part
     log("\n== writing results ==")
+    progress.report("writing", 0, len(parts) + 1)                   # the parts, then finishing the measure-level file and the summary
     tw = time.time()
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
@@ -158,6 +161,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
                 pa, pb = cet_sums.get(c, (0.0, 0.0))
                 cet_sums[c] = (pa + a, pb + b)
         del measures, res, frame
+        progress.report("writing", i + 1, len(parts) + 1)
     tc = time.time()
     log(f"  program costs shared and {len(parts)} parts assembled in {tc - tw:.0f}s")
     result.files["measure_level"] = writer.close()
@@ -191,5 +195,10 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         log(csum.to_string(index=False, float_format=lambda v: f"{v:,.4f}" if abs(v) < 100 else f"{v:,.0f}"))
 
     jobs.write_settings(cfg, acc, run_dir, result, t_start, n_measures, base_year, parts={"chunk_size": cfg.chunk_size, "count": len(parts)})
+    progress.report("finishing")
+    tg = time.time()
+    from . import results_view
+    results_view.keep_group_sums(run_dir)                            # read back from the file in batches: the Results page then opens without reading it
+    log(f"(sums for the Results page kept in {time.time() - tg:.0f}s)")
     log(f"\ndone in {time.time() - t_start:.0f}s -- results in {run_dir}")
     return result

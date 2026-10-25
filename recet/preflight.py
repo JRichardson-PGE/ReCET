@@ -218,8 +218,10 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
             program = cost_tests.load_program_costs(Path(programcost_csv), allocate_statewide=allocate_statewide)
         except Exception as exc:
             rep.add("error", "program_costs_unreadable", f"could not read ProgramCost.csv: {exc}")
+    from . import progress
     reports = []
-    for f, start, _n in parts:
+    for k, (f, start, _n) in enumerate(parts):
+        progress.report("preflight", k, len(parts))
         r = _check(Path(f), programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
                    part=_Part(dtypes, None if program is None else set(program["PrgID"])))
         for i in r.issues:

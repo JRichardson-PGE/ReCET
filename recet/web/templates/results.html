@@ -34,7 +34,11 @@
 </form>
 <p class="tabs">
   {% for key, label in levels %}
+  {% if key == 'measure' and not measure_ok %}
+  <span class="off muted" title="Shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures: the measure-level table is in the run's downloads">{{ label }} (off: {{ '{:,}'.format(n_measures) }} measures)</span>
+  {% else %}
   <a class="{% if key == level %}on{% endif %}" href="?{{ {'level': key, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">{{ label }}</a>
+  {% endif %}
   {% endfor %}
 </p>
 {% if note %}<p class="alert">{{ note }}</p>{% endif %}

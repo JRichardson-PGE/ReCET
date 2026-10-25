@@ -117,3 +117,89 @@ def test_every_level_works_on_a_real_run(tmp_path):
     port = rv.table(frame, "portfolio", rv.ALL_PAS, ["TotalSystemBenefit", "FirstYearNetKWh"]).iloc[0]
     assert port["TotalSystemBenefit"] == pytest.approx(frame["TotalSystemBenefit"].sum())
     assert port["FirstYearNetKWh"] == pytest.approx(1000.0)            # 1 unit x 1,000 kWh x NTG 1, one year
+
+
+def _big(n: int = 120) -> pd.DataFrame:
+    """The four measures repeated, with new ids: enough rows for several read batches."""
+    f = pd.concat([_frame()] * (n // 4), ignore_index=True)
+    f["CEInputID"] = [f"M{i}" for i in range(len(f))]
+    return f
+
+
+@pytest.mark.parametrize("suffix", ["parquet", "csv"])
+def test_a_results_file_gives_the_tables_its_frame_gives(tmp_path, monkeypatch, suffix):
+    """RunResults.from_file reads the file in batches of only the needed columns; every level, PA and view equals the in-memory frame's."""
+    monkeypatch.setattr(rv, "BATCH_ROWS", 7)
+    f = _big()
+    path = tmp_path / f"measure_level_x.{suffix}"
+    f.to_parquet(path, index=False) if suffix == "parquet" else f.to_csv(path, index=False)
+    res, ref = rv.RunResults.from_file(path), rv.RunResults.from_frame(outputs.read_table(path))
+    keys = ["TotalExpenditures", "TRC_ratio", "PAC_ratio", "TotalCO2Lifecycle", "ElecBen", "FirstYearNetKWh"]
+    assert res.pas() == ref.pas() == [rv.ALL_PAS, "BAY", "PGE", "SCE"] and res.n == len(f)
+    assert list(res.catalog()) == list(rv.catalog(f))
+    for pa in res.pas():
+        for level, _ in rv.LEVELS:
+            pd.testing.assert_frame_equal(res.table(level, pa, keys), ref.table(level, pa, keys), check_dtype=False, rtol=1e-12)
+    for level in ("program", "sector", "segment", "portfolio"):     # and the frame-based function the desktop tab used before
+        pd.testing.assert_frame_equal(res.table(level, rv.ALL_PAS, keys), rv.table(f, level, rv.ALL_PAS, keys), check_dtype=False, rtol=1e-12)
+
+
+def test_group_sums_are_kept_beside_the_results_and_rebuilt_when_stale(tmp_path):
+    import os, time
+    path = tmp_path / "measure_level_x.parquet"
+    _big().to_parquet(path, index=False)
+    rv.RunResults.from_file(path)
+    kept = tmp_path / outputs.RESULTS_DIR / f"group_sums{rv.CUBE_VERSION}_measure_level_x.parquet.parquet"
+    assert kept.exists() and len(pd.read_parquet(kept)) < 20                # a few group rows, not 120 measures
+    f = _big()
+    f["TotalExpenditures"] = 1.0
+    f.to_parquet(path, index=False)
+    os.utime(path, (time.time() + 5, time.time() + 5))
+    assert rv.RunResults.from_file(path).table("portfolio", rv.ALL_PAS, ["TotalExpenditures"]).iloc[0]["TotalExpenditures"] == 120.0
+    csv_run = tmp_path / outputs.RESULTS_DIR / "measure_level_y.parquet"   # a CSV run's kept parquet: its group sums go in the same folder
+    _big().to_parquet(csv_run, index=False)
+    rv.RunResults.from_file(csv_run)
+    assert (tmp_path / outputs.RESULTS_DIR / f"group_sums{rv.CUBE_VERSION}_measure_level_y.parquet.parquet").exists()
+
+
+def test_no_measure_level_for_a_run_too_large_to_show(tmp_path, monkeypatch):
+    path = tmp_path / "measure_level_x.parquet"
+    _big().to_parquet(path, index=False)
+    res = rv.RunResults.from_file(path)
+    monkeypatch.setattr(rv, "MAX_RUN_MEASURE_ROWS", 100)
+    assert not res.measure_level_available() and not res.measure_level_allowed("BAY")      # even a PA with 30 measures
+    with pytest.raises(ValueError):
+        res.table("measure", "BAY", ["ElecBen"])
+    assert res.table("program", "BAY", ["ElecBen"])["Measures"].sum() == 30                 # the other levels are unaffected
+    monkeypatch.setattr(rv, "MAX_RUN_MEASURE_ROWS", 1000)
+    monkeypatch.setattr(rv, "MAX_MEASURE_ROWS", 40)
+    assert res.measure_level_available() and not res.measure_level_allowed(rv.ALL_PAS) and res.measure_level_allowed("BAY")
+    t = res.table("measure", "BAY", ["ElecBen", "TRC_ratio"])
+    assert len(t) == 30 and set(t["PA"]) == {"BAY"} and t["TRC_ratio"].tolist() == pytest.approx([2.0] * 30)
+
+
+def test_kept_group_sums_are_never_taken_for_the_results_file(tmp_path):
+    """results_source looks for measure_level_* files, also in RESULTS_DIR: the kept sums must not be one of them, for a parquet or a CSV run."""
+    run = tmp_path / "parquet_run"
+    run.mkdir()
+    _big().to_parquet(run / "measure_level_x.parquet", index=False)
+    rv.RunResults.from_file(outputs.results_source(run))
+    assert outputs.results_source(run) == run / "measure_level_x.parquet"
+    csv_run = tmp_path / "csv_run"
+    (csv_run / outputs.RESULTS_DIR).mkdir(parents=True)
+    _big().to_csv(csv_run / "measure_level_x.csv", index=False)
+    kept = csv_run / outputs.RESULTS_DIR / "measure_level_x.csv.parquet"
+    _big().to_parquet(kept, index=False)
+    rv.RunResults.from_file(outputs.results_source(csv_run))
+    assert outputs.results_source(csv_run) == kept and len(list((csv_run / outputs.RESULTS_DIR).glob("group_sums*"))) == 1
+
+
+def test_a_run_keeps_its_group_sums(tmp_path):
+    """keep_group_sums from the frame in memory gives the same sums the file gives, and the Results page then uses them."""
+    run = tmp_path / "run"
+    run.mkdir()
+    f = _big()
+    f.to_parquet(run / "measure_level_x.parquet", index=False)
+    rv.keep_group_sums(run, f)
+    kept = run / outputs.RESULTS_DIR / f"group_sums{rv.CUBE_VERSION}_measure_level_x.parquet.parquet"
+    pd.testing.assert_frame_equal(pd.read_parquet(kept), rv.build_group_sums(run / "measure_level_x.parquet"), check_dtype=False)

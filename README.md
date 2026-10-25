@@ -62,7 +62,11 @@ ProgramCost.csv, as CET takes them; a bare CSV is not accepted), Runs (queue, lo
 downloads, and "Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
 measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs (the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
 unretire codes there, and the changes reach Edit inputs' dropdowns and checks at once).
-Input checks (preflight-only runs) go ahead of full runs in the queue. Accounts are by invitation only.
+Input checks (preflight-only runs) go ahead of full runs in the queue. A running run shows a progress bar with its stage, parts done and an estimate of
+the time left on its page and in the runs list (`recet/progress.py`; the stages are weighted by their share of a 1,000,000-measure run on the server). The
+results tables are built from per-program sums kept beside the results (about 0.1 GB and under a second for a 1,000,000-measure run, against 6.9 GB
+committed to read the whole table), and the measure-level tab is off for runs of more than 50,000 measures (the table is in the downloads).
+Accounts are by invitation only.
 
     pip install -e ".[web]"
     recet-web create-admin you@example.com      # prints a one-time link to choose a password
