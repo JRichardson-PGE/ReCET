@@ -1879,7 +1879,7 @@ app does not list it for download.
 
 The same folder holds `group_sums1_<results file>.parquet`: for each distinct (PA, `PrgID`, program name, program sector, program segment), the number of
 measures and the sum of every additive numeric output. The Results tables build every level above the measure from it (ratios recomputed from the sums). The
-run writes it at the end; the Results tables rebuild it if it is missing or older than the results file. Not listed for download.
+run writes it at the end (a run in parts adds it up part by part as it writes them, so the file is not read back); the Results tables rebuild it if it is missing or older than the results file. Not listed for download.
 
 ### 2.8 `preflight.txt`
 
