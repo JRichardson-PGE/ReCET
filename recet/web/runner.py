@@ -3,6 +3,7 @@
     inputs/       the uploaded files (fixed names, never the uploader's)
     config.json   the RunConfig the web form produced
     log.txt       everything the run printed
+    progress.json the run's stage, parts done and time left (recet/progress.py), for the progress bar
     out/          the run's out_dir; `result_dir` (from the "results in ..." line) points inside it
 
 `Settings.workers` threads (default 1) each claim the oldest queued run and execute it exactly as the window does, `python -m recet run --config config.json`, in its
@@ -24,6 +25,7 @@ import threading
 import time
 from pathlib import Path
 
+from .. import progress
 from .config import Settings
 from .db import Database
 
@@ -125,7 +127,7 @@ class Runner:
     def execute(self, run_id: str) -> None:
         d = self.folder(run_id)
         log_path = d / "log.txt"
-        env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
+        env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", **{progress.ENV: str(d / progress.FILE_NAME)})
         cmd = [sys.executable, "-m", "recet", "run", "--config", str(d / "config.json")]
         result_dir: list[str] = []
         status, message, code = "failed", "", None

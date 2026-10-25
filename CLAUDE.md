@@ -86,6 +86,17 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.39 (2026-10-25, Jake): Results page and progress bar. The Results page read the whole measure-level table (1M run: 6.89 GB committed, 2.91 GB RAM,
+  too much for the server's 1.4 GB container). `results_view.RunResults` builds every level above the measure from group sums: one row per (PA, PrgID,
+  program name, sector, segment) with the summed additive columns and a count, read from the parquet in 20,000-row batches of only the needed columns and
+  kept as `_results/group_sums1_<file>.parquet` (never named measure_level_*: outputs.results_source globs that). The run writes it at the end
+  (`keep_group_sums`: from the frame in a one-piece run, from the file in a run in parts); the page rebuilds it when missing or older. 1M run: first build
+  3.8 s / 0.38 GiB, later loads 0.4 s / 0.08 GiB; tables equal the frame-based ones. The measure level streams only its columns, and is off above
+  `MAX_RUN_MEASURE_ROWS` (50,000) for the whole run (web tab disabled, CSV 400; desktop note) besides the 5,000-per-PA limit. Progress: `recet/progress.py`
+  writes `progress.json` (stage, parts done, fraction, seconds left) when RECET_PROGRESS_FILE is set (the web runner sets it; window and CLI unaffected);
+  stages weighted by the 0.1.38 server run (split 0.04, preflight 0.17, loading 0.03, pricing 0.48, writing 0.26); parts reported in preflight, pricing
+  and writing; a comparison gives each child RECET_PROGRESS_SLICE. Shown on the run page (updated with the log poll) and the runs list (reloads every 10 s
+  while a run is queued or running). Time left = elapsed x (1 - f) / f, none before 3% or 5 s. No email yet.
 - 0.1.38 (2026-10-25, Jake): splitting and preflight. `delimited._first_line` read the WHOLE file to get its header (600 MB on a 1M Measure.csv, on every
   separator check); it reads 64 KB now. `split_file` copies lines for a pipe-delimited file with no quotes (CET's format), rewriting only the header
   (`_split_lines`; blank lines dropped, cp1252 re-encoded; anything else still goes through pandas): 35 -> 2 s. `read_cet_csv` keeps each distinct read
