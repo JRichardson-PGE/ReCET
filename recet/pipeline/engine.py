@@ -28,7 +28,8 @@ HOURS_PER_YEAR = 8760
 
 @dataclass
 class BatchedPricingResult:
-    # one row per priced (measure_id, year, quarter), the discounted value in annual_value
+    # price_real_hourly: one row per priced measure, its lifetime discounted value in annual_value.
+    # price_real_hourly_per_measure: one row per priced (measure_id, year, quarter), the quarter's discounted value in annual_value.
     measure_year: pd.DataFrame
     portfolio_hourly: np.ndarray        # length HOURS_PER_YEAR, this run's aggregate
     n_batches: int
@@ -269,6 +270,46 @@ def _quarter_rows(claim_year: np.ndarray, claim_quarter: np.ndarray, eul_years: 
     return m_idx, year, quarter, weight, scale, discount
 
 
+def _lifetime_values(g_m: np.ndarray, claim_year: np.ndarray, claim_quarter: np.ndarray, eul_years: np.ndarray, rul_years: np.ndarray,
+                     scale_1st: np.ndarray, scale_2nd: np.ndarray, rqf_group: np.ndarray, base_year: int,
+                     fill_unit: Callable[[int, list[int]], np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    """Lifetime discounted value of each measure (one entry per measure in every input array; g_m = its route), without a row per measure-quarter.
+
+    The per-measure value is  SUM_k scale(k) * weight(k) * discount(k) * U(route, year_k, quarter_k)  (`_quarter_rows`), and scale(k) is the 1st-baseline quantity
+    times f(k) plus the 2nd times 1 - f(k), with f(k) = 1 before the RUL, 0 after and the blend in the quarter that holds it. So
+        value = scale_1st * A + scale_2nd * B,   A = SUM_k f(k) * weight(k) * discount(k) * U,   B = SUM_k (1 - f(k)) * weight(k) * discount(k) * U
+    where A and B depend only on (route, claim year, claim quarter, EUL, RUL) -- the route fixes the discount rate. Every quarter is still discounted on its own,
+    exactly as before; A and B are computed once per distinct key instead of once per measure.
+
+    fill_unit(g, years) -> array (len(years), 4): U for route g in each listed year's four quarters.
+    Returns (value per measure, has_life per measure: False where the EUL gives no quarter at all, which the per-measure versions leave without a row)."""
+    keys = np.column_stack([g_m, claim_year, claim_quarter, eul_years, rul_years]).astype(np.float64)
+    uniq, inverse = np.unique(keys, axis=0, return_inverse=True)
+    inverse = inverse.ravel()
+    n_keys = len(uniq)
+    k_g = uniq[:, 0].astype(np.int64)
+    k_idx, year, quarter, weight, f1, discount = _quarter_rows(
+        uniq[:, 1].astype(np.int64), uniq[:, 2].astype(np.int64), uniq[:, 3], uniq[:, 4], np.ones(n_keys), np.zeros(n_keys), rqf_group[k_g], base_year)
+    has_life = np.bincount(k_idx, minlength=n_keys) > 0
+    if not len(k_idx):
+        return np.zeros(len(g_m)), has_life[inverse]
+
+    # --- U(route, year, quarter), once per route and year
+    y0, y1 = int(year.min()), int(year.max())
+    unit = np.zeros((int(k_g.max()) + 1, y1 - y0 + 1, 4))
+    g_row = k_g[k_idx]
+    order = np.argsort(g_row, kind="stable")
+    for rows in np.split(order, np.flatnonzero(np.diff(g_row[order])) + 1):
+        g = int(g_row[rows[0]])
+        years = [int(y) for y in np.unique(year[rows])]
+        unit[g, [y - y0 for y in years]] = fill_unit(g, years)
+
+    wdu = weight * discount * unit[g_row, year - y0, quarter]
+    a = np.bincount(k_idx, weights=f1 * wdu, minlength=n_keys)
+    b = np.bincount(k_idx, weights=(1.0 - f1) * wdu, minlength=n_keys)
+    return scale_1st * a[inverse] + scale_2nd * b[inverse], has_life[inverse]
+
+
 def price_real_hourly(
     measures: pd.DataFrame,
     get_shape: Callable[[pd.Series], tuple[np.ndarray, int] | None],
@@ -287,11 +328,12 @@ def price_real_hourly(
         U = SUM over the hours of quarter(k) of  (calendar-aligned shape)(h) * (avoided cost of the nearest ACC year)(h)
     depends only on the measure's shape, its avoided-cost series (IOU and zone), the pricing year and the quarter -- never on how many kWh the measure saves. Real jobs
     have few of those: 169 distinct (shape, IOU, sector, zone) routes in a 5,518-measure job, 48 in a 73,024-measure filing. So U is computed once per (route, year,
-    quarter), and every measure's quarters are then expanded into flat arrays and evaluated with a handful of vectorised operations.
+    quarter), and the sum over quarters once per distinct (route, claim year, claim quarter, EUL, RUL) -- `_lifetime_values` -- with no row per measure-quarter.
 
     route_key: one hashable per measure (aligned with `measures`) naming its route; `get_shape`, `get_acc_years` and `get_discount_rate_qtr` are called once per route, on
-    that route's first measure, and must give the same answer for every measure of it. None = every measure is its own route. The result is the per-measure rows the
-    per-measure version returns (measure_id, year, quarter, annual_value), to rounding (the multiplications are ordered differently).
+    that route's first measure, and must give the same answer for every measure of it. None = every measure is its own route. The result has one row per priced
+    measure (measure_id, annual_value = its lifetime discounted value): the per-measure version's (measure_id, year, quarter, annual_value) rows summed by measure, to
+    rounding (the multiplications are ordered differently).
 
     need_portfolio_hourly / fallback_shape: the portfolio 8,760 accumulator and synthetic fallbacks need each measure's hourly array, so they run the per-measure
     version."""
@@ -307,12 +349,11 @@ def price_real_hourly(
     n_groups = int(codes.max()) + 1 if n else 0
     _, first_pos = np.unique(codes, return_index=True) if n else (None, np.array([], dtype=int))
 
-    # --- one shape / ACC series / rate per route
+    # --- one shape / ACC series / rate per route, read off the route's first measure (one row lookup for all of them, not one per route)
     shapes: dict[int, tuple[np.ndarray, int]] = {}
     acc: dict[int, dict[int, np.ndarray]] = {}
     rqf_group = np.ones(n_groups)
-    for g, pos in enumerate(first_pos):
-        rep = measures.iloc[pos]
+    for g, rep in enumerate(measures.iloc[first_pos].to_dict("records") if n else []):
         hit = get_shape(rep)
         if hit is None:
             continue
@@ -324,38 +365,32 @@ def price_real_hourly(
     matched = matched_group[codes] if n else np.zeros(0, dtype=bool)
     unmatched_ids = ids[~matched].tolist()
 
-    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "year": pd.Series(dtype=np.int64), "quarter": pd.Series(dtype=np.int64),
-                          "annual_value": pd.Series(dtype=float)})
+    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "annual_value": pd.Series(dtype=float)})
     if not matched.any():
         return BatchedPricingResult(measure_year=empty, portfolio_hourly=np.zeros(HOURS_PER_YEAR), n_batches=1, elapsed_seconds=time.perf_counter() - start,
                                     batch_size=n, n_real_shape=0, n_fallback_shape=0, unmatched_measure_ids=unmatched_ids)
 
-    # --- every matched measure's quarters as flat arrays
-    g_m = codes[matched]
-    m_idx, year, quarter, weight, scale, discount = _quarter_rows(
-        measures["claim_year"].to_numpy()[matched].astype(np.int64), measures["claim_quarter"].to_numpy()[matched].astype(np.int64),
-        measures["eul_years_exact"].to_numpy(dtype=np.float64)[matched], measures["rul_years_exact"].to_numpy(dtype=np.float64)[matched],
-        measures["shape_scale"].to_numpy(dtype=np.float64)[matched], measures["shape_scale_2nd"].to_numpy(dtype=np.float64)[matched], rqf_group[g_m], base_year)
+    once = getattr(shift_fn, "year_independent", False)       # the production shift (real_impact_profiles.shift_for_year) ignores the year: shift once per route
 
-    # --- U(route, year, quarter): the four quarterly sums of shape x price, once per route and year
-    y0, y1 = int(year.min()), int(year.max())
-    unit = np.zeros((n_groups, y1 - y0 + 1, 4))
-    g_row = g_m[m_idx]
-    order = np.argsort(g_row, kind="stable")
-    for rows in np.split(order, np.flatnonzero(np.diff(g_row[order])) + 1):
-        g = int(g_row[rows[0]])
+    def fill_unit(g: int, years: list[int]) -> np.ndarray:
+        """U(route g, year, quarter): the four quarterly sums of shape x price, against the nearest ACC year."""
         shape, represents_year = shapes[g]
         series = acc[g]
         available = sorted(series)
-        for y in np.unique(year[rows]):
-            y = int(y)
+        out = np.zeros((len(years), 4))
+        aligned = shift_fn(shape, years[0], represents_year) if once else None
+        for i, y in enumerate(years):
             nearest = min(available, key=lambda v: abs(v - y))
-            hourly = shift_fn(shape, y, represents_year) * series[nearest]
+            hourly = (aligned if once else shift_fn(shape, y, represents_year)) * series[nearest]
             for q, (lo, hi) in enumerate(QUARTER_BOUNDS):
-                unit[g, y - y0, q] = float(hourly[lo:hi].sum())
+                out[i, q] = float(hourly[lo:hi].sum())
+        return out
 
-    value = scale * weight * discount * unit[g_row, year - y0, quarter]
-    measure_year = pd.DataFrame({"measure_id": ids[matched][m_idx], "year": year, "quarter": quarter + 1, "annual_value": value})
+    value, has_life = _lifetime_values(
+        codes[matched], measures["claim_year"].to_numpy()[matched].astype(np.int64), measures["claim_quarter"].to_numpy()[matched].astype(np.int64),
+        measures["eul_years_exact"].to_numpy(dtype=np.float64)[matched], measures["rul_years_exact"].to_numpy(dtype=np.float64)[matched],
+        measures["shape_scale"].to_numpy(dtype=np.float64)[matched], measures["shape_scale_2nd"].to_numpy(dtype=np.float64)[matched], rqf_group, base_year, fill_unit)
+    measure_year = pd.DataFrame({"measure_id": ids[matched][has_life], "annual_value": value[has_life]})
     return BatchedPricingResult(measure_year=measure_year, portfolio_hourly=np.zeros(HOURS_PER_YEAR), n_batches=1, elapsed_seconds=time.perf_counter() - start,
                                 batch_size=n, n_real_shape=int(matched.sum()), n_fallback_shape=0, unmatched_measure_ids=unmatched_ids)
 
@@ -472,26 +507,26 @@ def price_gas_benefit(
 ) -> pd.DataFrame:
     """`price_gas_benefit_per_measure` (read its docstring for the mechanics) organised by distinct route, like `price_real_hourly`: the gas value of a quarter is
         therms(k) * U,   U = SUM over the quarter's months of  (monthly share)(m) * ($/therm of the covered year)(m),
-    and U depends only on the measure's profile, IOU, gas sector and the pricing year, so it is computed once per (route, year, quarter) and every measure's quarters are
-    evaluated as flat arrays. route_key: one hashable per measure naming its route (the callbacks are called once per route, on its first measure with gas savings, and
-    must give the same answer for every measure of it); None = every measure is its own route. Measures with no therms or no matching profile get no rows."""
+    and U depends only on the measure's profile, IOU, gas sector and the pricing year, so it is computed once per (route, year, quarter), and the sum over quarters once
+    per distinct (route, claim year, claim quarter, EUL, RUL) (`_lifetime_values`). route_key: one hashable per measure naming its route (the callbacks are called once
+    per route, on its first measure with gas savings, and must give the same answer for every measure of it); None = every measure is its own route.
+    Returns one row per priced measure (measure_id, gas_benefit = its lifetime discounted value): the per-measure version's rows summed by measure. Measures with no
+    therms or no matching profile get no row."""
     n = len(measures)
     therms_1st = measures["annual_net_therms_1st"].to_numpy(dtype=np.float64)
     therms_2nd = measures["annual_net_therms_2nd"].to_numpy(dtype=np.float64)
     has_gas = (therms_1st != 0) | (therms_2nd != 0)
-    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "year": pd.Series(dtype=np.int64), "quarter": pd.Series(dtype=np.int64), "gas_benefit": pd.Series(dtype=float)})
+    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "gas_benefit": pd.Series(dtype=float)})
     if not has_gas.any():
         return empty
     codes = np.arange(n) if route_key is None else pd.factorize(pd.Series(list(route_key), dtype=object))[0]
     n_groups = int(codes.max()) + 1
-    first_with_gas: dict[int, int] = {}
-    for pos in np.flatnonzero(has_gas):
-        first_with_gas.setdefault(int(codes[pos]), int(pos))
+    gas_pos = np.flatnonzero(has_gas)
+    groups_with_gas, first = np.unique(codes[gas_pos], return_index=True)              # each route's first measure with gas savings
     shapes: dict[int, np.ndarray] = {}
     acc: dict[int, dict[int, np.ndarray]] = {}
     rqf_group = np.ones(n_groups)
-    for g, pos in first_with_gas.items():
-        rep = measures.iloc[pos]
+    for g, rep in zip(groups_with_gas.tolist(), measures.iloc[gas_pos[first]].to_dict("records")):
         shape = get_gas_shape(rep)
         if shape is None:
             continue
@@ -503,28 +538,21 @@ def price_gas_benefit(
     priced = has_gas & priced_group[codes]
     if not priced.any():
         return empty
-    g_m = codes[priced]
-    m_idx, year, quarter, weight, scale, discount = _quarter_rows(
-        measures["claim_year"].to_numpy()[priced].astype(np.int64), measures["claim_quarter"].to_numpy()[priced].astype(np.int64),
-        measures["eul_years_exact"].to_numpy(dtype=np.float64)[priced], measures["rul_years_exact"].to_numpy(dtype=np.float64)[priced],
-        therms_1st[priced], therms_2nd[priced], rqf_group[g_m], base_year)
-
-    y0, y1 = int(year.min()), int(year.max())
-    unit = np.zeros((n_groups, y1 - y0 + 1, 4))
-    g_row = g_m[m_idx]
-    order = np.argsort(g_row, kind="stable")
-    for rows in np.split(order, np.flatnonzero(np.diff(g_row[order])) + 1):
-        g = int(g_row[rows[0]])
+    def fill_unit(g: int, years: list[int]) -> np.ndarray:
         shape, series = shapes[g], acc[g]
         lo, hi = min(series), max(series)                                      # years outside the gas ACC use its first / last year
-        for y in np.unique(year[rows]):
-            y = int(y)
+        out = np.zeros((len(years), 4))
+        for i, y in enumerate(years):
             weighted = shape * series[min(max(y, lo), hi)]
             for q, (a, b) in enumerate(GAS_QUARTER_MONTHS):
-                unit[g, y - y0, q] = float(weighted[a:b].sum())
+                out[i, q] = float(weighted[a:b].sum())
+        return out
 
-    value = scale * weight * discount * unit[g_row, year - y0, quarter]
-    return pd.DataFrame({"measure_id": measures["measure_id"].to_numpy()[priced][m_idx], "year": year, "quarter": quarter + 1, "gas_benefit": value})
+    value, has_life = _lifetime_values(
+        codes[priced], measures["claim_year"].to_numpy()[priced].astype(np.int64), measures["claim_quarter"].to_numpy()[priced].astype(np.int64),
+        measures["eul_years_exact"].to_numpy(dtype=np.float64)[priced], measures["rul_years_exact"].to_numpy(dtype=np.float64)[priced],
+        therms_1st[priced], therms_2nd[priced], rqf_group, base_year, fill_unit)
+    return pd.DataFrame({"measure_id": measures["measure_id"].to_numpy()[priced][has_life], "gas_benefit": value[has_life]})
 
 
 def price_bill_impact_per_measure(

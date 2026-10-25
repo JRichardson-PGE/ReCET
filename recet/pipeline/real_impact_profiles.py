@@ -328,13 +328,18 @@ def get_shape(profile_id: int, climate_zone: str) -> np.ndarray | None:
     return zones.get("System")
 
 
+@lru_cache(maxsize=1)
+def _meta_index() -> dict[int, tuple]:
+    """profile id -> (represents_year, is_deer) from the catalog's first row for that id, built once (a scan of the catalog per lookup cost about 2 ms)."""
+    cat = _catalog().drop_duplicates("id", keep="first")
+    return dict(zip(cat["id"].tolist(), zip(cat["represents_year"].tolist(), cat["is_deer"].tolist())))
+
+
 def profile_meta(profile_id: int) -> dict:
-    cat = _catalog()
-    row = cat.loc[cat["id"] == profile_id]
-    if row.empty:
+    hit = _meta_index().get(profile_id)
+    if hit is None:
         return {"represents_year": DEFAULT_REPRESENTS_YEAR, "is_deer": False}
-    row = row.iloc[0]
-    return {"represents_year": int(row["represents_year"]), "is_deer": bool(row["is_deer"])}
+    return {"represents_year": int(hit[0]), "is_deer": bool(hit[1])}
 
 
 ACC_CALENDAR_YEAR = 2018
@@ -389,6 +394,9 @@ def shift_for_year(shape: np.ndarray, target_year: int, represents_year: int) ->
     the ACC's hourly data follow one calendar's weekdays in every forecast year (acc_calendar_year), so the correct shift does not depend on the year being
     priced (shift_to_acc)."""
     return shift_to_acc(shape, represents_year)
+
+
+shift_for_year.year_independent = True      # engine.price_real_hourly shifts each route once, not once per priced year
 
 
 def cedars_shift_for_year(shape: np.ndarray, target_year: int, represents_year: int) -> np.ndarray:

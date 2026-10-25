@@ -278,10 +278,23 @@ def test_grouped_engine_equals_the_per_measure_engine(seed):
     ref = engine.price_real_hourly_per_measure(*args)
     grouped = engine.price_real_hourly(*args, route_key=measures["route"])
     own_route = engine.price_real_hourly(*args)                                                    # every measure its own route
+    lifetime = ref.measure_year.groupby("measure_id", sort=False)["annual_value"].sum().reset_index()      # the grouped engine returns lifetime values per measure
     for got in (grouped, own_route):
-        pd.testing.assert_frame_equal(got.measure_year.reset_index(drop=True), ref.measure_year.reset_index(drop=True), check_dtype=False, rtol=1e-12, atol=1e-9)
+        pd.testing.assert_frame_equal(got.measure_year.reset_index(drop=True), lifetime, check_dtype=False, rtol=1e-12, atol=1e-9)
         assert got.unmatched_measure_ids == ref.unmatched_measure_ids and got.n_real_shape == ref.n_real_shape
     assert len(ref.unmatched_measure_ids) > 0 and ref.n_real_shape > 0
+
+
+def test_grouped_engine_shifts_per_year_when_the_shift_depends_on_the_year():
+    """The production shift ignores the priced year, so the grouped engine shifts each route once; a shift that does depend on the year (CEDARS' own rule,
+    cedars_shift_for_year) must still be applied year by year."""
+    from recet.pipeline.real_impact_profiles import cedars_shift_for_year, shift_for_year
+    assert shift_for_year.year_independent and not getattr(cedars_shift_for_year, "year_independent", False)
+    measures, shapes, acc = _engine_inputs(7)
+    args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], cedars_shift_for_year, lambda m: 0.019, 2028)
+    ref = engine.price_real_hourly_per_measure(*args).measure_year.groupby("measure_id", sort=False)["annual_value"].sum().reset_index()
+    pd.testing.assert_frame_equal(engine.price_real_hourly(*args, route_key=measures["route"]).measure_year.reset_index(drop=True), ref,
+                                  check_dtype=False, rtol=1e-12, atol=1e-9)
 
 
 def _gas_inputs(seed: int, n: int = 90):
@@ -306,8 +319,9 @@ def test_grouped_gas_engine_equals_the_per_measure_engine(seed):
     measures, shapes, acc = _gas_inputs(seed)
     args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], lambda m: 0.0191 + 0.0004 * m["route"], 2028)
     ref = engine.price_gas_benefit_per_measure(*args)
+    lifetime = ref.groupby("measure_id", sort=False)["gas_benefit"].sum().reset_index()
     for got in (engine.price_gas_benefit(*args, route_key=measures["route"]), engine.price_gas_benefit(*args)):
-        pd.testing.assert_frame_equal(got.reset_index(drop=True), ref.reset_index(drop=True), check_dtype=False, rtol=1e-12, atol=1e-9)
+        pd.testing.assert_frame_equal(got.reset_index(drop=True), lifetime, check_dtype=False, rtol=1e-12, atol=1e-9)
     assert len(ref) > 0 and set(ref["measure_id"]) < set(measures["measure_id"])                # some measures (no therms, no profile) are rightly absent
 
 
@@ -316,15 +330,32 @@ def test_grouped_gas_engine_with_nothing_to_price_is_empty_with_columns():
     none_priced = engine.price_gas_benefit(measures, lambda m: None, lambda m: acc[0], lambda m: 0.019, 2028, route_key=measures["route"])
     no_therms = engine.price_gas_benefit(measures.assign(annual_net_therms_1st=0.0, annual_net_therms_2nd=0.0), lambda m: shapes[0], lambda m: acc[0], lambda m: 0.019, 2028)
     for got in (none_priced, no_therms):
-        assert got.empty and list(got.columns) == ["measure_id", "year", "quarter", "gas_benefit"]
+        assert got.empty and list(got.columns) == ["measure_id", "gas_benefit"]
 
 
 def test_grouped_engine_with_nothing_priced_returns_an_empty_frame_with_columns():
     measures, shapes, acc = _engine_inputs(4)
     from recet.pipeline.real_impact_profiles import shift_for_year
     got = engine.price_real_hourly(measures, lambda m: None, lambda m: acc[0], shift_for_year, lambda m: 0.019, 2028, route_key=measures["route"])
-    assert got.measure_year.empty and list(got.measure_year.columns) == ["measure_id", "year", "quarter", "annual_value"]
+    assert got.measure_year.empty and list(got.measure_year.columns) == ["measure_id", "annual_value"]
     assert got.unmatched_measure_ids == measures["measure_id"].tolist()
+
+
+def test_lifetime_values_share_work_between_measures_and_keep_each_quarter_discounted():
+    """Measures with the same route, claim quarter, EUL and RUL share one lifetime sum; their values still scale with their own savings, and a measure whose EUL
+    gives no quarter is left without a row, as the per-measure engine leaves it."""
+    from recet.pipeline.real_impact_profiles import shift_for_year
+    measures, shapes, acc = _engine_inputs(6, n=40)
+    measures = pd.concat([measures, measures.assign(measure_id=measures["measure_id"] + "x", shape_scale=measures["shape_scale"] * 3,
+                                                    shape_scale_2nd=measures["shape_scale_2nd"] * 3)], ignore_index=True)
+    measures.loc[0, "eul_years_exact"] = 0.0
+    args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], shift_for_year, lambda m: 0.0191 + 0.0004 * m["route"], 2028)
+    got = engine.price_real_hourly(*args, route_key=measures["route"]).measure_year.set_index("measure_id")["annual_value"]
+    ref = engine.price_real_hourly_per_measure(*args).measure_year.groupby("measure_id")["annual_value"].sum()
+    assert "m0" not in got.index and "m0" not in ref.index
+    pd.testing.assert_series_equal(got.sort_index(), ref.sort_index(), check_names=False, rtol=1e-12, atol=1e-9)
+    tripled = [i for i in got.index if i.endswith("x") and i[:-1] in got.index]
+    assert tripled and np.allclose(got[tripled].to_numpy(), 3 * got[[i[:-1] for i in tripled]].to_numpy())
 
 
 def test_portfolio_accumulator_still_comes_from_the_per_measure_engine():

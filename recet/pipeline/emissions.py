@@ -85,8 +85,8 @@ def _hourly_co2_quarters(pa: str, target_sector: str, shape_key: str, climate_zo
     represents = resolved[1]
     rates = real_avoided_cost_v2.get_emission_rate_series(pa, climate_zone)
     out: list[tuple[int, float]] = []
+    shifted = real_impact_profiles.shift_for_year(shape, 0, represents)        # the shift does not depend on the priced year: once per route
     for year in sorted(rates):
-        shifted = real_impact_profiles.shift_for_year(shape, year, represents)
         weighted = shifted * rates[year]
         for q, (a, b) in enumerate(QUARTER_BOUNDS):
             out.append((year * 4 + q + 1, float(weighted[a:b].sum())))
