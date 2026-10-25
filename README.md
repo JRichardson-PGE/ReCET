@@ -117,6 +117,13 @@ How it came down, all on the same job:
 | 0.1.33 | in parts of 20,000 | 1.74 GB | 5.1 min |
 | 0.1.34 | in parts of 20,000, one BLAS thread, ACC series read in place | **0.96 GB** | 5.0 min |
 
+0.1.37 prices each measure's lifetime value per route instead of building a row per quarter of its life (CALCULATIONS.md C5.1), reads profile metadata from a
+cached index, reads each route's first measure in one lookup for all routes and shifts each route's profile once. Measured against 0.1.36 in the same sitting:
+pricing 173 -> 105 s, the whole run 298 -> 229 s (3.8 minutes), peak memory unchanged; every output equal to 2.2e-12. With 100,000-row parts pricing's own
+peak falls from 2.11 to 1.20 GB, but writing then peaks at 2.29 GB, so 20,000 stays the default. Since 0.1.36 the 1M run peaks at 1.65 GB
+because the measure-level parquet is joined into 200,000-row groups (`parquet_row_group`). On the web server (a t4g.small, 2 ARM vCPUs, 0.1.36, 50,000-row
+groups, zipped CSV) the same job took 13.1 minutes and peaked at 1.05 GiB in its container.
+
 As one piece the run expanded the whole job into about 54 million measure-quarter rows at once, more than the laptop's RAM, so part of it was paged to disk
 (the 7.4 GB first reported for it was the peak held in RAM, not what the run needed). In 0.1.34, `import recet` sets `OPENBLAS_NUM_THREADS=1` (numpy's BLAS
 reserved a 32 MB buffer per CPU thread, 0.5 GB here, and the pricing does not use its threads), and the ACC's hourly series are read straight from the

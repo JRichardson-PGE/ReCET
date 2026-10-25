@@ -72,6 +72,16 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   (8x faster than pandas' to_csv) on a second thread while the first compresses (`write_csv`); ISA-L level 1 when `isal` is installed (web extra and
   `.[fast]`; about 6x faster than zlib, files ~11% larger), else zlib 6. Booleans written True/False, timestamps to the second, zip entries dated now. The
   measure-level parquet is kept in `<run>/_results/` (`outputs.RESULTS_DIR`) and the Results tables read it (`outputs.results_source`); the web app hides it.
+- 0.1.37 (2026-10-24, Jake): lifetime values priced per route. `engine.price_real_hourly` / `price_gas_benefit` no longer expand measures into one row per
+  quarter: `_lifetime_values` writes value = scale_1st x A + scale_2nd x B, with A, B (the quarter sums of f(k) or 1 - f(k) x weight x discount x U, each quarter
+  still discounted on its own) computed once per distinct (route, claim year, claim quarter, EUL, RUL). They now return ONE ROW PER MEASURE (measure_id plus
+  annual_value / gas_benefit = the lifetime value; the *_per_measure references keep their per-quarter rows). Also `profile_meta` reads a cached id index
+  (it scanned the catalog per call); the grouped engines read each route's first measure with ONE `iloc[...].to_dict("records")` (callbacks get a dict, not a
+  Series); the grouped engine shifts each route's profile once when `shift_fn.year_independent` (set on `shift_for_year`; a year-dependent shift such as
+  cedars_shift_for_year is still applied year by year), and emissions shifts once per route. 1M job, 20,000-row parts, same sitting: pricing 173 -> 105 s,
+  whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
+  set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
+  ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
   pyarrow's number text differs from pandas' (0 vs 0.0, no exponent for small values) with identical values.
   Also (Jake): Excel output is for jobs of up to `RunConfig.excel_max_rows` measures (50,000; writing is ~400 rows/s); a larger Excel job writes EVERY
   table as `excel_fallback` (csv.zip), decided once the measure count is known (`jobs.run_format`, before any table is written), with a note in the log,

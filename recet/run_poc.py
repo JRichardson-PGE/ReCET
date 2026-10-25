@@ -34,7 +34,7 @@ from .pipeline.engine import (
 
 def _ids_in(df: pd.DataFrame | None) -> set:
     """The measure_ids present in a pricing result; empty when nothing was priced (such a frame has no columns at all)."""
-    return set() if df is None or df.empty else set(df["measure_id"].unique())          # unique first: the frame has a row per quarter
+    return set() if df is None or df.empty else set(df["measure_id"].unique())          # unique first: a per-measure engine frame has a row per quarter
 
 
 ROUTE_COLUMNS = ["shape_key", "PA", "target_sector", "climate_zone"]   # what decides a measure's electric shape and avoided-cost series
@@ -370,7 +370,7 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
     w = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]
     if w.empty:
         return _sum_by_measure(None, "annual_value", "water_value"), BatchedPricingResult(
-            measure_year=pd.DataFrame(columns=["measure_id", "year", "quarter", "annual_value"]), portfolio_hourly=np.zeros(8760), n_batches=0,
+            measure_year=pd.DataFrame(columns=["measure_id", "annual_value"]), portfolio_hourly=np.zeros(8760), n_batches=0,
             elapsed_seconds=0.0, batch_size=0)
     w = w.reset_index(drop=True).copy()
     w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
