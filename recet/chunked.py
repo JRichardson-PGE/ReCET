@@ -40,7 +40,7 @@ def acc_groups(acc, versions_in_file: set) -> dict:
 def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values: dict, log: Log, t_start: float):
     """Price and write the job in `parts` (see the module docstring). `values`: the distinct ClaimYearQuarter and ACCVersion values of the whole file
     (delimited.part_dtypes). Fills and returns `result`."""
-    from . import components as comp_mod, jobs, outputs, profile8760, progress, run_poc, runtime
+    from . import components as comp_mod, jobs, outputs, profile8760, progress, results_view, run_poc, runtime
     from .pipeline import cost_tests, emissions
 
     tag = f"acc{acc.key}"
@@ -133,6 +133,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     tw = time.time()
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
+    result_sums, result_columns = [], None
     cet = outputs.read_cet_outputs(cfg.cet_outputs) if cfg.cet_outputs else None
     cet_writer = outputs.TableWriter(run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, excel=excel) if cet is not None else None
     cet_sums: dict[str, tuple[float, float]] = {}
@@ -153,6 +154,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         frame = outputs.attach_programs(frame, measures["prg_id"])
         writer.write(frame)
         summary_parts.add(frame)
+        result_sums.append(results_view.group_sums(frame))           # the Results page's sums, a few hundred rows a part (results_view)
+        result_columns = result_columns or list(frame.columns)
         if cet is not None:
             per, sums, m = outputs.compare_to_cet_part(frame, cet)
             cet_writer.write(per)
@@ -196,9 +199,6 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     jobs.write_settings(cfg, acc, run_dir, result, t_start, n_measures, base_year, parts={"chunk_size": cfg.chunk_size, "count": len(parts)})
     progress.report("finishing")
-    tg = time.time()
-    from . import results_view
-    results_view.keep_group_sums(run_dir)                            # read back from the file in batches: the Results page then opens without reading it
-    log(f"(sums for the Results page kept in {time.time() - tg:.0f}s)")
+    results_view.keep_group_sums(run_dir, sums=results_view.combine_parts(result_sums, result_columns))   # added up part by part above: no read-back
     log(f"\ndone in {time.time() - t_start:.0f}s -- results in {run_dir}")
     return result

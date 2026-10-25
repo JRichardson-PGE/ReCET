@@ -150,13 +150,19 @@ def test_an_excel_job_in_parts_over_the_limit_writes_every_table_as_zipped_csv(t
     assert ok.files["measure_level"].suffix == ".xlsx"                                # exactly at the limit: Excel
 
 
-def test_runs_keep_the_results_group_sums(tmp_path):
-    """Both a run in one piece and a run in parts leave the kept Results sums beside their results, equal to the sums of the file itself."""
+def test_runs_keep_the_results_group_sums(tmp_path, monkeypatch):
+    """Both a run in one piece and a run in parts leave the kept Results sums beside their results, equal to the sums of the file itself. Neither reads
+    the file back to make them: the run in one piece sums its frame, the run in parts adds up each part's sums as it writes it."""
     from recet import results_view as rv
     m, pc = _job(tmp_path)
-    for chunk, fmt in ((0, "parquet"), (CHUNK, "parquet"), (CHUNK, "csv")):
-        run = run_job(_cfg(tmp_path, m, pc, run_name=f"r{chunk}{fmt}", chunk_size=chunk, output_format=fmt), log=lambda s: None).run_dir
+    for chunk, fmt, extra in ((0, "parquet", {}), (CHUNK, "parquet", {}), (CHUNK, "csv", {}), (CHUNK, "csv.zip", {"components": True, "market_effects": 0.05})):
+        def no_read_back(path):
+            raise AssertionError("the run read its results file back to make the group sums")
+        monkeypatch.setattr(rv, "group_sums_for", no_read_back)
+        run = run_job(_cfg(tmp_path, m, pc, run_name=f"r{chunk}{fmt}", chunk_size=chunk, output_format=fmt, **extra), log=lambda s: None).run_dir
+        monkeypatch.undo()
         src = outputs.results_source(run)
         kept = sorted((run / outputs.RESULTS_DIR).glob("group_sums*"))
         assert len(kept) == 1, kept
-        pd.testing.assert_frame_equal(pd.read_parquet(kept[0]), rv.build_group_sums(src), check_dtype=False)
+        pd.testing.assert_frame_equal(pd.read_parquet(kept[0]), rv.build_group_sums(src), check_dtype=False, rtol=1e-12)
+        assert rv.RunResults.from_file(src).sums.equals(pd.read_parquet(kept[0]))        # the page uses the kept sums as they are
