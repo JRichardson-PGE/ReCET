@@ -276,12 +276,17 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
         n_rows = delimited.count_rows(cfg.measures)
         if n_rows > cfg.chunk_size:
             log(f"splitting Measure.csv ({n_rows:,} rows) into parts of {cfg.chunk_size:,} rows")
+            ts = time.time()
             parts = delimited.split_file(cfg.measures, cfg.chunk_size, parts_dir / "measures")
+            tt = time.time()
             dtypes, values = delimited.part_dtypes(parts, ("ClaimYearQuarter", "ACCVersion"))
+            log(f"  split into {len(parts)} parts in {tt - ts:.0f}s; column types of the whole file read in {time.time() - tt:.0f}s")
     try:
         return _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
     finally:
         if parts is not None:
+            size = sum(f.stat().st_size for f in parts_dir.rglob("*") if f.is_file())
+            log(f"(the parts folder, kept reads included, used {size / 1e6:,.0f} MB of disk; deleted)")
             shutil.rmtree(parts_dir, ignore_errors=True)
 
 
@@ -292,8 +297,10 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     # ---- preflight
     log("\n== preflight ==")
+    tp = time.time()
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
                                  apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes)
+    log(f"checked in {time.time() - tp:.0f}s" + (f" ({len(parts)} parts)" if parts is not None else ""))
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
     result.files["preflight"] = run_dir / "preflight.txt"

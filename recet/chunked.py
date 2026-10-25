@@ -127,6 +127,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     # ---- pass 2: program costs shared over the whole job, then the measure-level rows, part by part
     log("\n== writing results ==")
+    tw = time.time()
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
     cet = outputs.read_cet_outputs(cfg.cet_outputs) if cfg.cet_outputs else None
@@ -157,9 +158,14 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
                 pa, pb = cet_sums.get(c, (0.0, 0.0))
                 cet_sums[c] = (pa + a, pb + b)
         del measures, res, frame
+    tc = time.time()
+    log(f"  program costs shared and {len(parts)} parts assembled in {tc - tw:.0f}s")
     result.files["measure_level"] = writer.close()
+    ts = time.time()
+    log(f"  measure-level table finished ({cfg.output_format}) in {ts - tc:.0f}s")
     summary = summary_parts.result()
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
+    log(f"  portfolio summary in {time.time() - ts:.0f}s")
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
     result.frame = None
     result.notes.append(f"run in {len(parts)} parts of up to {cfg.chunk_size:,} measures: the measure-level table is in its file only")
