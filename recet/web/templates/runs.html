@@ -8,7 +8,7 @@
 <p class="muted">Runs and their files are deleted {{ retention }} days after they start.
 {% if user.role == 'admin' %}{% if everyone %}<a href="{{ u('/runs') }}">Show only mine</a>{% else %}<a href="{{ u('/runs?all=1') }}">Show everyone's</a>{% endif %}{% endif %}</p>
 {% if runs %}
-<table class="list">
+<table class="list" id="runs-table" data-live="{{ 1 if bars or runs|selectattr('status', 'equalto', 'queued')|list else 0 }}">
   <thead><tr><th>Started</th><th>Run</th><th>ACC</th><th>Inputs</th>{% if everyone %}<th>Owner</th>{% endif %}<th>Status</th></tr></thead>
   <tbody>
   {% for r in runs %}
@@ -19,7 +19,8 @@
     <td class="nowrap">{{ r.acc_version }}{% if r.compare_with %} vs {{ r.compare_with }}{% endif %}</td>
     <td class="small">{{ r.inputs }}</td>
     {% if everyone %}<td class="small">{{ r.owner_email }}</td>{% endif %}
-    <td><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span></td>
+    <td><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span>
+        {% set b = bars.get(r.id) %}{% if b %}<div class="progress small" title="{{ b.text }}"><progress max="1" value="{{ b.fraction }}"></progress> {{ '{:.0%}'.format(b.fraction) }}{% if b.seconds_left is not none %} · {{ b.text.split(' · ')[-1] }}{% endif %}</div>{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>

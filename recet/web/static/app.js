@@ -75,6 +75,16 @@
           st.className = "status big s-" + d.status;
           var pos = document.getElementById("run-position");
           pos.textContent = d.position ? "Waiting in the queue: number " + d.position + "." : "";
+          var bar = document.getElementById("run-progress");
+          if (bar) {
+            var p = d.progress;
+            bar.classList.toggle("hidden", !p);
+            if (p) {
+              bar.querySelector("progress").value = p.fraction;
+              bar.querySelector(".pct").textContent = Math.round(p.fraction * 100) + "%";
+              bar.querySelector(".text").textContent = p.text || "";
+            }
+          }
           if (more) { setTimeout(poll, 50); return; }
           if (d.status === "queued" || d.status === "running") { setTimeout(poll, 1500); return; }
           if (live) { window.location.reload(); }
@@ -83,6 +93,10 @@
     };
     poll();
   }
+  // Runs list: while a run is queued or running, reload every 10 s to move its progress bar and status.
+  var runsTable = document.getElementById("runs-table");
+  if (runsTable && runsTable.dataset.live === "1") { setTimeout(function () { window.location.reload(); }, 10000); }
+
   // Docs > Value lists: find box, the "Show retired codes" switch and pages of codes (100 a page by default).
   var vlTable = document.getElementById("vl-table");
   if (vlTable) {
