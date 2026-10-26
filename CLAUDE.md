@@ -86,6 +86,22 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.42 (2026-10-26, Jake; 0.1.41 is the progress-estimate PR): CEDARS filing checks (Tier 2 item 9, BR-06.3 / BR-03.6, starts BR-03.1 / BR-03.3).
+  `recet/filing_rules.py` reads CEDARS' own source-of-truth files, shipped unchanged in `data/cet_rules/<set>_<effective date>/` (claims_2026-03-12 from
+  /cet_ui/spec/, budget_filing_2026-03-11 from /filings/spec/; re-downloaded 2026-10-26, the claims files unchanged, the budget-filing spec newer than the
+  copy in the research repo): validation_rules (reject), warning_rules (warning) and the spec's field constraints (NotEmpty, CedarsValueList, CedarsNumRange,
+  GreaterThanOrEqualTo, nvarchar length, numeric, bit, CedarsYearQuarter, StartsWith, a two-column primary key). 215 / 221 rules. IDs are content hashes
+  (V/W/S + 6 hex), the same in both sets for a shared rule. `RunConfig.filing_validation` ("" | claims | budget_filing) + `filing_year` (CLI, window, New run,
+  reruns, Edit inputs' Validate inputs): preflight adds `cet_reject` / `cet_warning` issues with cells, `cet_rule_not_checked` notes, the
+  `CET filing validation` stat, `PreflightReport.filing` (failing records) and `.filing_rules`; the run writes `filing_validation_<tag>` and the
+  measure-level columns FilingValidation (pass/warning/reject) and FilingRules. Nothing is blocked. `outside_cet_range` is skipped when the rules are on.
+  Choices (CEDARS' code is not published): a blank makes a comparison unknown (condition false, test fails), text case-insensitive, value lists by claim
+  year, AvoidedCostCombo checked against the profile library (exact end use + IOU + sector; not checked without it), UploadPA-YYYY a plain prefix (CEDARS
+  accepted "PGE-2028Q4-..."; a split-on-dash version gave 703 false rejects). Messages follow the one CEDARS wording seen. Found while building: the spec-line
+  regex dropped every nvarchar line (`\b` after ")"), caught by a test that counts the spec's constraints; tests also give every rule a passing and a
+  failing record. Checked on the 1M job (PG&E's accepted 2028-2031 filings): 0 measures rejected under either set, 139,612 with warnings (the
+  UnitMeaCost1stBaseline = 0 warning is the one CEDARS' own upload showed); budget filing rejects 282 ProgramCost rows because the job spans four years.
+  Cost at 1M, laptop, warm: preflight 28.6-30.1 s -> 38.0 s.
 - 0.1.41 (2026-10-26, Jake): progress estimate. Replaying `progress.fraction` over the 2026-10-26 server log (1M, csv.zip, 412 s) showed it ran low
   all run (-13% at preflight, -19% at pricing, -35% mid-writing) and sat at 98% saying "about 10 s left" for the 58 s the csv.zip conversion took (no
   report inside TableWriter.close). Now: `progress.plan(in_parts, format)` (called in run_job once the split is known) weights stages by their seconds in that
