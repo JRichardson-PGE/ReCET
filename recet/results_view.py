@@ -271,12 +271,24 @@ def _keep(sums: pd.DataFrame, kept: Path) -> pd.DataFrame:
     return sums
 
 
-def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None) -> None:
-    """Called at the end of a run: keep the group sums of its results file (outputs.results_source) so its Results page opens without reading it. From
-    `frame` when the run holds its measure-level table in memory, else read from the file (about 4 s and 0.4 GB for 1,000,000 measures)."""
+def combine_parts(parts: list[pd.DataFrame], columns) -> pd.DataFrame:
+    """group_sums of a whole table from the group_sums of its parts. `columns` (the table's columns, in order) orders the result as group_sums of the
+    whole table would be: a column a part skipped (e.g. all blank, so not numeric there) would otherwise move to the end."""
+    s = _combine(parts)
+    keys = [c for c in KEYS if c in s]
+    return s[keys + [c for c in columns if c in s and c not in keys and c != COUNT] + [COUNT]]
+
+
+def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None, sums: pd.DataFrame | None = None) -> None:
+    """Called at the end of a run, after its results file is written: keep the group sums of that file (outputs.results_source) so its Results page
+    opens without reading it. Given as `sums` by a run in parts (combine_parts of each part's group_sums, taken as the part is written), else from `frame`
+    when the run holds its measure-level table in memory, else read back from the file."""
     source = outputs.results_source(run_dir)
-    if source is not None:
-        _keep(group_sums(frame), _kept_path(source)) if frame is not None else group_sums_for(source)
+    if source is None:
+        return
+    if sums is None and frame is not None:
+        sums = group_sums(frame)
+    _keep(sums, _kept_path(source)) if sums is not None else group_sums_for(source)
 
 
 RATIO_INPUTS = {"ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
