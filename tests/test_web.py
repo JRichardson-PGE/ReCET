@@ -194,6 +194,16 @@ def test_a_run_from_upload_to_results(web, tmp_path):
     assert csv.status_code == 200 and "T1" in csv.text
     z = zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/zip").content))
     assert any(n.startswith("measure_level") for n in (p.rsplit("/", 1)[-1] for p in z.namelist()))
+    # the downloads: result files, the run log (not preflight.txt / .json) and the inputs
+    names = re.findall(r'<li><a href="[^"]*">([^<]+)</a>', page.text)
+    assert "run_log.txt" in names and "inputs.zip" in names and "preflight_findings.xlsx" in names
+    assert "preflight.txt" not in names and "preflight.json" not in names
+    run_log = c.get(f"{P}/runs/{run_id}/run_log.txt")
+    assert run_log.status_code == 200 and "PREFLIGHT:" in run_log.text and run_log.headers["content-disposition"].endswith(f'recet_{run_id}_run_log.txt"')
+    inputs = zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/inputs.zip").content))
+    assert any("measure" in n.lower() for n in inputs.namelist()), inputs.namelist()
+    _user(ctx, "other@example.com")
+    assert _login(app, "other@example.com").get(f"{P}/runs/{run_id}/run_log.txt").status_code == 404          # another user's run
     # files stay inside the run folder
     assert c.get(f"{P}/runs/{run_id}/files/../../recet_web.sqlite3").status_code == 404
     assert c.get(f"{P}/runs/{run_id}/files/..%2F..%2Frecet_web.sqlite3").status_code == 404
@@ -604,10 +614,11 @@ def test_csv_outputs_are_zipped_and_downloads_stream_from_disk(web, tmp_path):
     r = c.get(f"{P}/runs/{run_id}/zip")
     assert r.status_code == 200 and r.headers["content-disposition"].endswith(f'recet_{run_id}.zip"')
     z = zipfile.ZipFile(io.BytesIO(r.content))
-    assert "measure_level_acc2026.csv.zip" in z.namelist() and "log.txt" in z.namelist()
+    assert "measure_level_acc2026.csv.zip" in z.namelist() and "run_log.txt" in z.namelist() and "preflight_findings.xlsx" in z.namelist()
+    assert "preflight.txt" not in z.namelist() and "preflight.json" not in z.namelist()        # in the run log / preflight_findings.xlsx instead
     assert not [n for n in z.namelist() if n.startswith(outputs.RESULTS_DIR)]                  # the kept parquet is not downloaded again
     assert z.getinfo("measure_level_acc2026.csv.zip").compress_type == zipfile.ZIP_STORED       # already compressed: stored, not zipped twice
-    assert z.getinfo("log.txt").compress_type == zipfile.ZIP_DEFLATED
+    assert z.getinfo("run_log.txt").compress_type == zipfile.ZIP_DEFLATED
     inner = zipfile.ZipFile(io.BytesIO(z.read("measure_level_acc2026.csv.zip")))
     assert inner.namelist() == ["measure_level_acc2026.csv"]
     assert "measures.csv" in zipfile.ZipFile(io.BytesIO(c.get(f"{P}/runs/{run_id}/inputs.zip").content)).namelist()

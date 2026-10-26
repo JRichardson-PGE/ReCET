@@ -258,6 +258,24 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     result.files["run_settings"] = run_dir / "run_settings.json"
 
 
+def write_findings(rep, cfg: RunConfig, run_dir: Path) -> Path | None:
+    """preflight_findings.xlsx: the input check as a workbook to review (preflight.PreflightReport.write_xlsx), with each flagged cell's record ID. The IDs
+    are read (one column of the file) only when some finding points at that file. A workbook that cannot be written is left out; the run goes on."""
+    from .pipeline import delimited
+    tables = {t for i in rep.issues for t, _r, _c in i.cells}
+    measure_ids = program_ids = None
+    try:
+        if "Measure" in tables and cfg.measures and Path(cfg.measures).exists():
+            measure_ids = delimited.read_cet_csv(cfg.measures, dtype=str, keep_default_na=False, usecols=lambda c: c.strip() == "CEInputID")["CEInputID"].tolist()
+        if "ProgramCost" in tables and cfg.programcost and Path(cfg.programcost).exists():
+            pc = delimited.read_cet_csv(cfg.programcost, dtype=str, keep_default_na=False)
+            if {"PrgID", "PrgYear"} <= set(pc.columns):
+                program_ids = (pc["PrgID"] + " " + pc["PrgYear"]).tolist()
+        return rep.write_xlsx(run_dir / "preflight_findings.xlsx", measure_ids, program_ids)
+    except Exception:                               # e.g. an unreadable file: preflight.txt and the log still have every finding
+        return None
+
+
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     t_start = time.time()
     if not cfg.measures and not cfg.workbook:
@@ -311,6 +329,9 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
     result.files["preflight"] = run_dir / "preflight.txt"
+    findings = write_findings(rep, cfg, run_dir)
+    if findings is not None:
+        result.files["preflight_findings"] = findings
     log(rep.text())
     if not rep.ok:
         raise RuntimeError("preflight found blocking problems (see above); nothing was priced")

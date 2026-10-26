@@ -36,7 +36,7 @@
 <details class="card" open>
   <summary>Files</summary>
   <ul class="files">
-  {% for name, size in files %}<li><a href="{{ u('/runs/' + run.id + '/files/' + name) }}">{{ name }}</a> <span class="muted">{{ fmt_size(size) }}</span></li>{% endfor %}
+  {% for f in files %}<li><a href="{{ f.url }}">{{ f.name }}</a> <span class="muted">{{ fmt_size(f.size) }}{% if f.note %} · {{ f.note }}{% endif %}</span></li>{% endfor %}
   </ul>
 </details>
 {% endif %}

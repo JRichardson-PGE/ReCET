@@ -47,7 +47,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
    tests (SCB/SCH); include emissions; allocate statewide programs; leave Exclude_From_CE programs out of the summary; run a second ACC version and compare measure by measure; compare
    with a CET outputs file; preflight only.
 
-**Run** starts the job in its own process and streams the log. Results go to `<output folder>/<run name>_acc<version>/`; every run also writes `preflight.txt` and
+**Run** starts the job in its own process and streams the log. Results go to `<output folder>/<run name>_acc<version>/`; every run also writes `preflight.txt`, `preflight_findings.xlsx` (the input check as a workbook: findings and flagged cells) and
 `run_settings.json` so it can be reproduced. **Settings > Save settings** writes a JSON that `recet run --config job.json` reproduces.
 
 ## Documentation
