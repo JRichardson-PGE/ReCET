@@ -45,7 +45,8 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
    one replaces it; one that matches nothing is added.* Formats and matching rules: `recet/docs/INPUT_FORMATS.md` (Help > Input format guide).
 4. **Modes** - calculate ACC components separately; produce a combined 8760 electric load profile; apply 5% market effects (optionally to costs too); include societal
    tests (SCB/SCH); include emissions; allocate statewide programs; leave Exclude_From_CE programs out of the summary; run a second ACC version and compare measure by measure; compare
-   with a CET outputs file; preflight only.
+   with a CET outputs file; preflight only; CEDARS filing checks (Quarterly Claims or Budget filing: CEDARS' own upload checks, shipped as it publishes them in
+   `recet/data/cet_rules/`, flag the records it would reject or warn on; they are still priced; `recet/filing_rules.py`).
 
 **Run** starts the job in its own process and streams the log. Results go to `<output folder>/<run name>_acc<version>/`; every run also writes `preflight.txt` and
 `run_settings.json` so it can be reproduced. **Settings > Save settings** writes a JSON that `recet run --config job.json` reproduces.
@@ -87,6 +88,7 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
     recet run --measures Measure.csv --acc 2024 --compare-with 2026 --out results       # two runs + per-measure comparison
     recet run --measures Measure.csv --acc 2026 --profiles-8760 my_shapes.csv --acc-electric-file my_acc.parquet --components --portfolio-8760
     recet preflight --measures Measure.csv --acc 2026
+    recet preflight --measures Measure.csv --programcost ProgramCost.csv --acc 2026 --filing-validation budget_filing --filing-year 2028   # before a CEDARS upload
     recet template all --out templates
     recet check acc-electric my_acc.parquet
 

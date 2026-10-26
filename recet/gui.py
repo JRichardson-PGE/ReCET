@@ -88,6 +88,10 @@ def _check_file(name: str, path: str) -> tuple[bool, str]:
     return True, ""
 
 
+# the CEDARS filing checks choice (filing_rules.py): window label -> RunConfig.filing_validation
+FILING_CHOICES = {"none": "", "Quarterly Claims": "claims", "Budget filing": "budget_filing"}
+
+
 class App:
     OK, WARN, BAD = OK_COLOR, "#9a6700", BAD_COLOR
     CHECKED = ("workbook", "measures", "programcost", "profiles_8760_file", "profiles_gas_file", "run_parameters_file", "sw_factors_file", "programs_file",
@@ -348,6 +352,16 @@ class App:
         ttk.Button(row, text="Browse…", command=lambda: self.v["cet_outputs"].set(filedialog.askopenfilename() or self.v["cet_outputs"].get())).pack(side="left", padx=6)
         check("preflight_only", "Preflight check only (do not price)", hint="Reads the inputs and reports what would and would not be priced.", where="right")
         row = sub(right, "right")
+        ttk.Label(row, text="CEDARS filing checks:").pack(side="left")
+        ttk.Combobox(row, textvariable=self._var("filing_validation", tk.StringVar, "none"), values=list(FILING_CHOICES), width=16,
+                     state="readonly").pack(side="left", padx=6)
+        ttk.Label(row, text="Filing year:").pack(side="left")
+        ttk.Entry(row, textvariable=self._var("filing_year"), width=6).pack(side="left", padx=6)
+        row = sub(right, "right")
+        hint = ("Flags the records CEDARS' upload would reject or warn on (FilingValidation, FilingRules); they are still priced. "
+                "Filing year blank: each record's claim year.")
+        ttk.Label(row, text=hint, style="Hint.TLabel", wraplength=420, justify="left").pack(side="left")
+        row = sub(right, "right")
         ttk.Label(row, text="Output format:").pack(side="left")
         ttk.Combobox(row, textvariable=self._var("output_format", tk.StringVar, "csv"), values=["csv", "csv.zip", "xlsx", "parquet"], width=8, state="readonly").pack(side="left", padx=6)
         from .jobs import RunConfig
@@ -393,7 +407,8 @@ class App:
             include_societal=bool(g("include_societal")), emissions=bool(g("emissions")), allocate_statewide=bool(g("allocate_statewide")),
             apply_exclude_from_ce=bool(g("apply_exclude_from_ce")), base_year=int_or_none(g("base_year")),
             cet_outputs=blank(g("cet_outputs")) if g("compare_cet") else None,
-            compare_with=(blank(g("compare_with")) if g("compare") else None), output_format=str(g("output_format")) or "csv", preflight_only=bool(g("preflight_only")))
+            compare_with=(blank(g("compare_with")) if g("compare") else None), output_format=str(g("output_format")) or "csv", preflight_only=bool(g("preflight_only")),
+            filing_validation=FILING_CHOICES.get(str(g("filing_validation")), ""), filing_year=int_or_none(g("filing_year")))
 
     def apply_config(self, c: RunConfig) -> None:
         """Fill the window from a RunConfig. The input type follows what the config names (a workbook only -> Excel, a Measure.csv -> CET files); the boxes of
@@ -417,6 +432,7 @@ class App:
         s("emissions", c.emissions), s("allocate_statewide", c.allocate_statewide), s("apply_exclude_from_ce", c.apply_exclude_from_ce)
         s("compare", bool(c.compare_with)), s("compare_with", c.compare_with or ("2026" if c.acc_version == "2024" else "2024"))
         s("compare_cet", bool(c.cet_outputs)), s("cet_outputs", c.cet_outputs), s("output_format", c.output_format), s("preflight_only", c.preflight_only)
+        s("filing_validation", {v: k for k, v in FILING_CHOICES.items()}.get(c.filing_validation or "", "none")), s("filing_year", c.filing_year)
 
     # ------------------------------------------------------------------------------------------------------------------ input type
     def _set_input_mode(self, mode: str) -> None:

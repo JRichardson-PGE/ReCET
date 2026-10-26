@@ -25,10 +25,13 @@
     <button type="button" id="check-btn" disabled>Validate inputs</button>
     <label class="small">against the <select id="check-acc" aria-label="ACC version to check against"></select> ACC</label>
     <label class="small"><input type="checkbox" id="check-sw"> Split statewide (SW_) programs across the IOUs</label>
+    <label class="small">CEDARS filing checks <select id="check-filing" aria-label="CEDARS filing checks"><option value="">None</option>
+      <option value="claims">Quarterly Claims</option><option value="budget_filing">Budget filing</option></select></label>
   </div>
   <p class="muted small check-about">Runs the same input check a run makes before pricing (files, programs, profiles, gas profiles, ACC years) on the saved
     tables, so you see what would stop a run or leave measures unpriced. The cells it flags are outlined in the table, red for a problem that stops the run and
-    amber for a warning; editing a flagged cell clears its outline until the next check. Nothing is priced.</p>
+    amber for a warning; editing a flagged cell clears its outline until the next check. Nothing is priced. With CEDARS filing checks, the records CEDARS'
+    upload would reject or warn on are outlined in amber too, under the rule's ID.</p>
   <div id="check-result" class="check-result" hidden aria-live="polite"></div>
 </section>
 

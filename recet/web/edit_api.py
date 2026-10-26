@@ -178,7 +178,8 @@ def _run_settings(cfg: dict, label: str) -> dict:
     out = {"acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
            "base_year": str(cfg.get("base_year") or ""), "market_effects": "0.05" if float(cfg.get("market_effects") or 0) > 0 else "0",
            "output_format": {"csv.zip": "csv"}.get(str(cfg.get("output_format") or "csv"), str(cfg.get("output_format") or "csv")), "label": (f"{label} (edited)" if label else "")[:120],
-           "profile_years": " ".join(str(y) for y in cfg.get("profile_years") or [])}
+           "profile_years": " ".join(str(y) for y in cfg.get("profile_years") or []),
+           "filing_validation": str(cfg.get("filing_validation") or ""), "filing_year": str(cfg.get("filing_year") or "")}
     for f in SETTING_FLAGS:
         if cfg.get(f):
             out[f] = "on"
@@ -263,7 +264,8 @@ def check_defaults(ctx, draft_id: str) -> dict:
     accs = list(ctx.s.acc_versions)
     settings = (load_rerun(ctx, draft_id) or {}).get("settings", {})
     acc = settings.get("acc_version") if settings.get("acc_version") in accs else accs[-1]
-    return {"acc_versions": accs, "acc_version": acc, "allocate_statewide": bool(settings.get("allocate_statewide"))}
+    return {"acc_versions": accs, "acc_version": acc, "allocate_statewide": bool(settings.get("allocate_statewide")),
+            "filing_validation": str(settings.get("filing_validation") or "")}
 
 
 def last_check(ctx, draft_id: str) -> dict | None:
@@ -472,6 +474,13 @@ def register(app, ctx) -> None:
         by = str(settings.get("base_year") or "")
         if by.isdigit():
             cfg["base_year"] = int(by)
+        fv = str(body.get("filing_validation") or "")
+        if fv not in ("", "claims", "budget_filing"):
+            return JSONResponse({"error": "Unknown CEDARS filing checks choice."}, status_code=400)
+        cfg["filing_validation"] = fv
+        fy = str(settings.get("filing_year") or "")
+        if fv and fy.isdigit():
+            cfg["filing_year"] = int(fy)
         labels = {fld: label for fld, _ext, label in UPLOADS.values()}
         run_id = new_run_id()
         folder = ctx.runner.folder(run_id)
@@ -504,7 +513,7 @@ def register(app, ctx) -> None:
         if prev and ctx.runner.position(prev["run"]) is not None:
             ctx.runner.cancel(prev["run"])
         ctx.queue_run(request, u, run_id, cfg, f"Input check: {row['name']}"[:120], names)
-        check = {"run": run_id, "rev": rev, "acc_version": acc, "allocate_statewide": cfg["allocate_statewide"], "row_map": row_map}
+        check = {"run": run_id, "rev": rev, "acc_version": acc, "allocate_statewide": cfg["allocate_statewide"], "filing_validation": fv, "row_map": row_map}
         (_folder(ctx, draft_id) / "check.json").write_text(json.dumps(check), encoding="utf-8")
         return {**check, "status_url": ctx.u(f"/runs/{run_id}/check"), "run_url": ctx.u(f"/runs/{run_id}")}
 
