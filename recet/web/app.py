@@ -169,7 +169,7 @@ class Ctx:
         """A running run's progress (recet/progress.py) with `text` added for the page; None for any other run or before its first report."""
         if run["status"] != "running":
             return None
-        p = progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME)
+        p = progress.live(progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME))     # time left counted down since the last report
         if p is not None:
             p["text"] = progress.describe(p)
         return p
