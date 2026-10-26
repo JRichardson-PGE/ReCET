@@ -6,7 +6,9 @@ Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, wi
 * what the run will and will not be able to price: for every measure with electric savings whether an 8,760 profile (user-supplied or CEDARS library) or a TOU
   H-factor profile exists, for every measure with gas savings whether its monthly profile exists,
 * the ACC horizon: claim years before the first ACC year or measure lives that run past the last one,
-* PrgID alignment between Measure.csv and ProgramCost.csv, and statewide-program rows.
+* PrgID alignment between Measure.csv and ProgramCost.csv, and statewide-program rows,
+* optionally (`filing_rules`), CEDARS' own upload checks for a claims or a budget filing (filing_rules.py): the records CEDARS would reject or warn on, each
+  listed under the rule's ID, and kept on the report (`PreflightReport.filing`) for the run to flag in the measure-level table. They never stop the run.
 
 Severity: "error" = the run cannot proceed as is; "warning" = the run proceeds but some measures are unpriced or priced on a fallback; "info" = worth knowing.
 """
@@ -68,6 +70,8 @@ class PreflightReport:
     issues: list[Issue] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
     agg: dict = field(default_factory=dict)          # raw values behind some stats, for combining the reports of a file checked in parts (not reported)
+    filing: pd.DataFrame | None = None               # with filing_rules: one row per failing record (table, id, FilingValidation, FilingRules)
+    filing_rules: dict | None = None                 # with filing_rules: the rule set used (filing_rules.RuleSet.describe)
 
     def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None) -> None:
         self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS]))
@@ -93,7 +97,7 @@ class PreflightReport:
 
     def to_dict(self) -> dict:
         """The report as plain JSON values (the web app's Validate inputs panel reads it from preflight.json)."""
-        return {"ok": self.ok, "errors": len(self.errors), "stats": {str(k): str(v) for k, v in self.stats.items()},
+        return {"ok": self.ok, "errors": len(self.errors), "stats": {str(k): str(v) for k, v in self.stats.items()}, "filing_rules": self.filing_rules,
                 "issues": [{"severity": i.severity, "code": i.code, "message": i.message, "count": int(i.count or 0), "examples": [str(e) for e in i.examples],
                             "cells": [[str(tb), int(r), str(c)] for tb, r, c in i.cells]}
                            for i in self.issues]}
@@ -224,30 +228,87 @@ class _Part:
     program_ids: set | None
 
 
+@dataclass
+class _Filing:
+    """CEDARS' upload checks to apply (filing_rules.py): the rule set and the filing year (None: each record's own claim year, and for ProgramCost the
+    earliest claim year of the job)."""
+    rules: object
+    year: int | None
+
+
 def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = None, *, acc=None, allocate_statewide: bool = False,
                  base_year: int | None = None, apply_exclude_from_ce: bool = False, chunk_size: int | None = None,
-                 parts: list | None = None, dtypes: dict | None = None) -> PreflightReport:
+                 parts: list | None = None, dtypes: dict | None = None, filing_rules: str | None = None,
+                 filing_year: int | None = None) -> PreflightReport:
     """`acc` is a versions.ResolvedAcc (for the horizon and E3-version checks); the runtime must already be configured for it (runtime.apply) so that profile
     and TOU coverage reflect this run's user-supplied profiles.
 
     A Measure.csv with more than `chunk_size` rows is checked in parts of that size, so the check never holds the whole file: `parts` / `dtypes` are the
     file already split (delimited.split_file, delimited.part_dtypes; a run splits once and passes them), else it is split here into a temporary folder. The
     checks across rows (duplicate CEInputIDs, PrgID alignment with ProgramCost.csv) are made on the whole file, and the counts and stats are combined, so the
-    report is the one the whole file gives, except that a part's checks still run when another part has a blocking problem."""
+    report is the one the whole file gives, except that a part's checks still run when another part has a blocking problem.
+
+    `filing_rules` ("claims" or "budget_filing") also applies CEDARS' upload checks for that kind of filing (filing_rules.py); `filing_year` is the filing's
+    year for the rules that name it (default: each record's claim year, and the job's earliest claim year for ProgramCost)."""
+    from . import filing_rules as fr
+    filing = _Filing(fr.rule_set(filing_rules), filing_year) if filing_rules else None
     p = Path(measure_csv)
     if parts is None and chunk_size and p.exists() and delimited.detect_sep(p) and delimited.count_rows(p) > chunk_size:
         import tempfile
         with tempfile.TemporaryDirectory(prefix="recet_preflight_") as tmp:
             parts = delimited.split_file(p, chunk_size, tmp)
             dtypes = delimited.part_dtypes(parts)[0]
-            return _check_parts(p, parts, dtypes, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce)
-    if parts is not None and len(parts) > 1:
-        return _check_parts(p, parts, dtypes or {}, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce)
-    return _check(p, programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce)
+            rep = _check_parts(p, parts, dtypes, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing)
+    elif parts is not None and len(parts) > 1:
+        rep = _check_parts(p, parts, dtypes or {}, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing)
+    else:
+        rep = _check(p, programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
+                     filing=filing)
+    if filing is not None:
+        _finish_filing(rep, filing)
+    return rep
+
+
+def _filing_check(rep: PreflightReport, table: str, df: pd.DataFrame, ids: pd.Series, filing: _Filing, year: int | None) -> None:
+    """CEDARS' upload checks on one table (or one part of Measure.csv): an issue per failing rule, and the failing records kept in rep.agg["filing"]."""
+    from . import filing_rules as fr
+    from .fieldnames import recet_name
+    from .pipeline import real_impact_profiles
+    results, notes = fr.check_frame(filing.rules, table, df, fr.Context(year, real_impact_profiles.is_available()))
+    for res in results:
+        reject = res.rule.severity == "reject"
+        rows = np.flatnonzero(res.fail)
+        col = {"combo_value_list": "AC_Elec_Impact_Profile"}.get(res.rule.spec.get("rule"), recet_name(res.rule.field.split("+")[0].strip()))
+        eg = [f"{ids.iloc[i]}: {'(blank)' if res.actual is None or pd.isna(res.actual.iloc[i]) else res.actual.iloc[i]}" for i in rows[:5]]
+        rep.add("warning", "cet_reject" if reject else "cet_warning",
+                f"{res.message()} -- CEDARS {'rejects' if reject else 'warns on'} a {table} record that fails it", len(rows), eg, _cells(table, rows, col))
+    for n in notes:
+        rep.add("info", "cet_rule_not_checked", n)
+    rep.agg.setdefault("filing", []).append(fr.flags(results, ids).assign(table=table))
+
+
+def _filing_programcost(rep: PreflightReport, programcost_csv, filing: _Filing, first_claim_year: int | None) -> None:
+    if programcost_csv is None or not Path(programcost_csv).exists():
+        return
+    pc = delimited.read_cet_csv(programcost_csv, dtype=str, keep_default_na=False)
+    ids = (pc["PrgID"].astype(str) + " " + pc["PrgYear"].astype(str)) if {"PrgID", "PrgYear"} <= set(pc.columns) else pd.Series(range(len(pc))).astype(str)
+    _filing_check(rep, "ProgramCost", pc, ids, filing, filing.year or first_claim_year)
+
+
+def _finish_filing(rep: PreflightReport, filing: _Filing) -> None:
+    frames = rep.agg.pop("filing", [])
+    fl = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["id", "FilingValidation", "FilingRules", "table"])
+    rep.filing = fl[["table", "id", "FilingValidation", "FilingRules"]]
+    rep.filing_rules = filing.rules.describe()
+    m = fl[fl["table"] == "Measure"]
+    rej, warn = int((m["FilingValidation"] == "reject").sum()), int((m["FilingValidation"] == "warning").sum())
+    pcr = int(((fl["table"] == "ProgramCost") & (fl["FilingValidation"] == "reject")).sum())
+    rep.stats["CET filing validation"] = (f"{filing.rules.label}: {rej:,} measures CEDARS would reject, {warn:,} with warnings only"
+                                          + (f"; {pcr:,} ProgramCost rows it would reject" if pcr else ""))
 
 
 def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, allocate_statewide: bool, base_year: int | None,
-                 apply_exclude_from_ce: bool) -> PreflightReport:
+                 apply_exclude_from_ce: bool, filing: _Filing | None = None) -> PreflightReport:
     """check_inputs for a file split into `parts` ((file, first row, rows) each): each part is checked on its own, its Measure row numbers shifted to the whole
     file's, and the reports combined; duplicate CEInputIDs and the ProgramCost alignment are checked on the whole file."""
     from .pipeline import cost_tests
@@ -273,7 +334,7 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
     for k, (f, start, _n) in enumerate(parts):
         progress.report("preflight", k, len(parts))
         r = _check(Path(f), programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
-                   part=_Part(dtypes, None if program is None else set(program["PrgID"])))
+                   part=_Part(dtypes, None if program is None else set(program["PrgID"])), filing=filing)
         for i in r.issues:
             i.cells = [(t, row + start if t == "Measure" else row, c) for t, row, c in i.cells]
         r.agg["no_cost_cells"] = [(t, row + start, c) for t, row, c in r.agg.get("no_cost_cells", [])]
@@ -291,6 +352,10 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
                 m.cells = (m.cells + i.cells)[:MAX_CELLS]
     rep.issues += list(merged.values())
     rep.stats.update(_merge_stats(reports, base_year))
+    if filing is not None:
+        rep.agg["filing"] = [f for r in reports for f in r.agg.get("filing", [])]
+        years = [int(str(r.stats["claim years"]).split("-")[0]) for r in reports if "claim years" in r.stats]
+        _filing_programcost(rep, programcost_csv, filing, min(years) if years else None)
     if programcost_csv is None:
         rep.add("info", "no_program_costs", "no ProgramCost.csv: NoAdmin and regular cost tests will be equal and WeightedProgramCost is 0")
     elif program is not None:
@@ -352,7 +417,7 @@ def _merge_stats(reports: list[PreflightReport], base_year: int | None) -> dict:
 
 
 def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = False, base_year: int | None = None, apply_exclude_from_ce: bool = False,
-           part: _Part | None = None) -> PreflightReport:
+           part: _Part | None = None, filing: _Filing | None = None) -> PreflightReport:
     """The check of one file. `part` = it is one part of a larger file (see _Part): the checks across the whole file are left to _check_parts."""
     rep = PreflightReport()
     p = Path(p)
@@ -376,6 +441,11 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     for col, why in OPTIONAL_MEASURE_COLUMNS.items():
         if col not in df.columns:
             rep.add("warning", "missing_optional_column", f"no {col} column: {why}")
+    if filing is not None:                          # CEDARS' own checks, on the file's text as given (filing_rules.py)
+        _filing_check(rep, "Measure", df, df["CEInputID"], filing, filing.year)
+        if part is None:                            # a file checked in parts: ProgramCost once, in _check_parts
+            cy = pd.to_numeric(df["ClaimYearQuarter"].astype("string").str[:4], errors="coerce")
+            _filing_programcost(rep, programcost_csv, filing, int(cy.min()) if cy.notna().any() else None)
 
     dupmask = df["CEInputID"].duplicated(keep=False) & df["CEInputID"].notna()
     dup = df["CEInputID"][df["CEInputID"].duplicated()]
@@ -407,7 +477,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
                 df["CEInputID"][blank2].tolist(), _cells("Measure", blank2, "UnitkWh2ndBaseline"))
     if rep.errors:
         return rep
-    for col, lo, hi, lo_open, hi_open in CET_RANGES:
+    for col, lo, hi, lo_open, hi_open in ([] if filing is not None else CET_RANGES):     # the filing rules check the same ranges, under their IDs
         v = pd.to_numeric(df[col], errors="coerce")
         bad = v.notna() & ((v <= lo) if lo_open else (v < lo)) | v.notna() & ((v >= hi) if hi_open else (v > hi))
         if bad.any():

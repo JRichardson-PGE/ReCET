@@ -145,6 +145,30 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
     return pd.concat([frame, meta], axis=1)
 
 
+def attach_filing(frame: pd.DataFrame, filing: pd.DataFrame) -> pd.DataFrame:
+    """FilingValidation (pass / warning / reject) and FilingRules (the failing rule IDs) appended to the measure-level table, from the preflight's failing
+    records (preflight.PreflightReport.filing). A measure priced as "<IOU>_<CEInputID>" (statewide allocation) takes its file record's flags."""
+    m = filing[filing["table"] == "Measure"]
+    status, rules = dict(zip(m["id"], m["FilingValidation"])), dict(zip(m["id"], m["FilingRules"]))
+    ids = frame["CEInputID"].astype(str)
+    own = ids.where(ids.isin(status.keys()), ids.str.partition("_")[2])
+    out = frame.copy()
+    out["FilingValidation"] = own.map(status).fillna("pass").to_numpy()
+    out["FilingRules"] = own.map(rules).fillna("").to_numpy()
+    return out
+
+
+def filing_table(filing: pd.DataFrame, rule_set: str) -> pd.DataFrame:
+    """The filing_validation table a run writes: every record that fails a CEDARS upload check, with the rule texts."""
+    from . import filing_rules
+    rs = filing_rules.rule_set(rule_set)
+    text = {r.id: r.text for r in rs.rules}
+    out = filing.rename(columns={"id": "record"}).copy()
+    out["rules_failed"] = out["FilingRules"].map(lambda ids: " | ".join(f"{i}: {text.get(i, '')}" for i in ids.split(", ") if i))
+    out.insert(0, "rule_set", rs.label)
+    return out
+
+
 EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 
 
@@ -456,20 +480,30 @@ def write_csv(batches, path: Path, zipped: bool) -> Path:
     return path
 
 
-def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool) -> Path:
+def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool, on_progress=None) -> Path:
     """The parquet table at `parquet` as CSV (write_csv), read CSV_BATCH_ROWS rows at a time. Kept small on purpose, measured on the 1,000,000-row
     measure-level table: read single-threaded through a 1 MB buffer with no read-ahead (pyarrow otherwise pre-reads whole row groups), and with pyarrow's
     system allocator for the duration (its default, mimalloc, keeps freed memory), the conversion holds about 0.4 GB, against 2.3 GB with the defaults and
-    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop)."""
+    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop). `on_progress(share)` is called after each batch is read (share 0-1)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
     previous = pa.default_memory_pool()
     pa.set_memory_pool(pa.system_memory_pool())
     try:
         pf = pq.ParquetFile(parquet, pre_buffer=False, buffer_size=1 << 20)
-        return write_csv(pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False), path, zipped)
+        batches = pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False)
+        if on_progress is not None:
+            batches = _counted(batches, max(1, -(-pf.metadata.num_rows // CSV_BATCH_ROWS)), on_progress)
+        return write_csv(batches, path, zipped)
     finally:
         pa.set_memory_pool(previous)
+
+
+def _counted(items, total: int, on_progress):
+    """`items`, calling on_progress(share done) after each one is taken."""
+    for i, x in enumerate(items):
+        yield x
+        on_progress(min(1.0, (i + 1) / total))
 
 
 def _frame_batches(df: pd.DataFrame):
@@ -663,7 +697,7 @@ class TableWriter:
             self.parts.append(part)
         self.rows += len(df)
 
-    def _join_parquet(self) -> None:
+    def _join_parquet(self, on_progress=None) -> None:
         import pyarrow as pa
         import pyarrow.parquet as pq
         if not self.parts:
@@ -675,7 +709,9 @@ class TableWriter:
         plain = schema.remove_metadata()
         with pq.ParquetWriter(self.parquet, schema) as w:
             n, buf, rows = self.row_group_rows, [], 0
-            for p in self.parts:                                 # parts gathered into full row groups of n rows (about one group in memory)
+            for k, p in enumerate(self.parts):                   # parts gathered into full row groups of n rows (about one group in memory)
+                if on_progress is not None:
+                    on_progress(k / len(self.parts))
                 buf.append(pq.read_table(p).replace_schema_metadata(None).cast(plain))
                 rows += buf[-1].num_rows
                 _remove(p)
@@ -690,16 +726,20 @@ class TableWriter:
         for p in self.parts:
             _remove(p)
 
-    def close(self) -> Path:
+    def close(self, on_progress=None) -> Path:
+        """Finish the file. `on_progress(joined, converted)` (each a share 0-1) is called as the parquet parts are joined and the CSV is written."""
         if self.fmt == "xlsx":
             if self.xlsx is not None:
                 self.xlsx.close()
             else:
                 write_table(pd.DataFrame(columns=self.cols or []), self.base, self.fmt, self.excel)
             return self.path
-        self._join_parquet()
+        self._join_parquet(None if on_progress is None else lambda j: on_progress(j, 0.0))
+        if on_progress is not None:
+            on_progress(1.0, 0.0)
         if self.via_parquet:
-            write_csv_from_parquet(self.parquet, self.path, zipped=self.fmt == "csv.zip")
+            write_csv_from_parquet(self.parquet, self.path, zipped=self.fmt == "csv.zip",
+                                   on_progress=None if on_progress is None else lambda c: on_progress(1.0, c))
             if not self.keep_parquet:
                 self.parquet.unlink(missing_ok=True)
                 try:
