@@ -1734,6 +1734,24 @@ Computed from CET's own columns, each reproduces CET's on every measure of CET j
 - Example B, `LevNetBenTRCGas`: (6990.5647 - 60271.7921 * (1 - 0)) / 9826.0534 = **-5.422444**
 - Example B, `LevNetBenRIMGas`: (6990.5647 - 32499.6332 * (1 - 0)) / 9826.0534 = **-2.596065**
 
+### 1.17 CEDARS filing checks (`FilingValidation`, `FilingRules`; only with "CEDARS filing checks")
+
+With **CEDARS filing checks** set to *Quarterly Claims* or *Budget filing* (`filing_validation`), preflight applies CEDARS' own upload checks for that filing to
+every record (`filing_rules.py`): the `validation_rules` and `warning_rules` files and the field constraints of the table spec that CEDARS publishes on its spec
+pages, shipped unchanged in the package (`recet/data/cet_rules/<set>_<effective date>/`). Two columns are added after the `Prg_` columns. They change no priced value:
+a record CEDARS would reject is still priced.
+
+| Column | Meaning |
+|---|---|
+| `FilingValidation` | `reject` if the record fails at least one validation rule or spec constraint (CEDARS would not accept the upload with it), `warning` if it fails only warning rules (CEDARS accepts it with a warning), else `pass`. |
+| `FilingRules` | The IDs of the rules the record fails, rejects first, comma-separated (blank for `pass`). An ID is `V` (validation rule), `W` (warning rule) or `S` (spec constraint) and six hex digits built from the rule's content, so a rule keeps its ID across the two sets and across versions. The rule texts are in `filing_validation_acc<version>` (2.10) and in `preflight.txt`. |
+
+How the rules are read, where CEDARS' own code is not published: a rule applies to the records its `Where` conditions select (all of them, or any for `Where_connector = any`);
+a blank value makes a comparison unknown, as in SQL, so a condition on it does not hold and a test on it fails; text compares case-insensitively; a value list is checked for the
+record's claim year. CET's `AvoidedCostCombo` list (22 MB) is not shipped: that rule is checked against the CEDARS impact-profile library (exact end use, IOU and target sector),
+and reported as not checked when the library is not installed. `UploadPA-YYYY` (budget filing `CEInputID`) is a prefix: a PA code, a dash and the filing year, as in
+`PGE-2028-...` or `PGE-2028Q4-...`. Checked on the 100,000 records of PG&E's 2028-2031 consolidated filings, which CEDARS accepted: no record is rejected under either set.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## 2. Other files in a run folder
@@ -1888,7 +1906,10 @@ source, water and gas measure counts, ACC year ranges), then every finding as `E
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
 `no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, `program_costs_unreadable` (a job checked in parts could not read `ProgramCost.csv`), and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
-`program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`).
+`program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`),
+and with CEDARS filing checks `cet_reject` (warning: the records failing one rule CEDARS rejects on, the message starting with the rule's ID), `cet_warning` (the same for a
+CEDARS warning rule) and `cet_rule_not_checked` (info: a rule ReCET could not check, and why). With filing checks on, `outside_cet_range` is not reported: the spec's ranges are
+checked under their own IDs. The statistics then end with `CET filing validation` (the rule set, and how many measures CEDARS would reject or warn on).
 Errors stop the run; warnings and info do not.
 
 ### 2.8b `preflight_findings.xlsx`
@@ -1917,6 +1938,20 @@ Everything needed to reproduce the run.
 | `supplied_files` | Each supplied profile / ACC file with its path and size. |
 | `inputs` | The measure and program-cost paths, the number of measures priced, and the First Year used. |
 | `totals` | The portfolio totals (the first row of the portfolio summary). |
+| `filing_validation` | With CEDARS filing checks: the rule set used (`rule_set`, `label`, `effective_date`), its number of rules, rejects and warnings, and the CEDARS files it was read from (BRD BR-03.3). |
+
+### 2.10 `filing_validation_acc<version>` (with CEDARS filing checks)
+
+One row per record that fails at least one CEDARS upload check (1.17), written by preflight, so a preflight-only run has it too.
+
+| Column | Meaning |
+|---|---|
+| `rule_set` | The rule set and its effective date, e.g. `Quarterly Claims rules of 2026-03-12`. |
+| `table` | `Measure` or `ProgramCost`. |
+| `record` | The `CEInputID`, or for `ProgramCost` the `PrgID` and `PrgYear`. |
+| `FilingValidation` | `reject` or `warning`, as in 1.17. |
+| `FilingRules` | The failing rule IDs. |
+| `rules_failed` | Each failing rule's ID and text, separated by ` \| `. |
 
 Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of any supplied ACC that was not already Parquet) and, from the GUI, `_gui_job.json` in the output folder (the settings the GUI launched the run with).
 

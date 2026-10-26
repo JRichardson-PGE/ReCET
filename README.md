@@ -45,7 +45,8 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
    one replaces it; one that matches nothing is added.* Formats and matching rules: `recet/docs/INPUT_FORMATS.md` (Help > Input format guide).
 4. **Modes** - calculate ACC components separately; produce a combined 8760 electric load profile; apply 5% market effects (optionally to costs too); include societal
    tests (SCB/SCH); include emissions; allocate statewide programs; leave Exclude_From_CE programs out of the summary; run a second ACC version and compare measure by measure; compare
-   with a CET outputs file; preflight only.
+   with a CET outputs file; preflight only; CEDARS filing checks (Quarterly Claims or Budget filing: CEDARS' own upload checks, shipped as it publishes them in
+   `recet/data/cet_rules/`, flag the records it would reject or warn on; they are still priced; `recet/filing_rules.py`).
 
 **Run** starts the job in its own process and streams the log. Results go to `<output folder>/<run name>_acc<version>/`; every run also writes `preflight.txt`, `preflight_findings.xlsx` (the input check as a workbook: findings and flagged cells) and
 `run_settings.json` so it can be reproduced. **Settings > Save settings** writes a JSON that `recet run --config job.json` reproduces.
@@ -63,7 +64,8 @@ downloads, and "Edit inputs and rerun", which opens a run's inputs and settings 
 measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs (the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
 unretire codes there, and the changes reach Edit inputs' dropdowns and checks at once).
 Input checks (preflight-only runs) go ahead of full runs in the queue. A running run shows a progress bar with its stage, parts done and an estimate of
-the time left on its page and in the runs list (`recet/progress.py`; the stages are weighted by their share of a 1,000,000-measure run on the server). The
+the time left on its page and in the runs list (`recet/progress.py`; the stages are weighted by their share of a 1,000,000-measure run on the server, by output
+format, and the time left counts down between updates; each update is also kept in the run folder's `progress_log.jsonl`). The
 results tables are built from per-program sums kept beside the results (about 0.1 GB and under a second for a 1,000,000-measure run, against 6.9 GB
 committed to read the whole table), and the measure-level tab is off for runs of more than 50,000 measures (the table is in the downloads).
 Accounts are by invitation only.
@@ -86,6 +88,7 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
     recet run --measures Measure.csv --acc 2024 --compare-with 2026 --out results       # two runs + per-measure comparison
     recet run --measures Measure.csv --acc 2026 --profiles-8760 my_shapes.csv --acc-electric-file my_acc.parquet --components --portfolio-8760
     recet preflight --measures Measure.csv --acc 2026
+    recet preflight --measures Measure.csv --programcost ProgramCost.csv --acc 2026 --filing-validation budget_filing --filing-year 2028   # before a CEDARS upload
     recet template all --out templates
     recet check acc-electric my_acc.parquet
 

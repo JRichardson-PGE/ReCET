@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import time
 import zipfile
 
 import pytest
@@ -165,12 +166,24 @@ def test_bad_options_are_refused(web, tmp_path):
     _user(ctx, "g@example.com")
     c = _login(app, "g@example.com")
     files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
-    for bad in ({"acc_version": "2021"}, {"market_effects": "0.5"}, {"compare_with": "2026"}):
+    for bad in ({"acc_version": "2021"}, {"market_effects": "0.5"}, {"compare_with": "2026"}, {"filing_validation": "monthly"}, {"filing_year": "28"}):
         data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", **bad}
         assert c.post(f"{P}/runs", data=data, files=files).status_code == 400
     r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files"},
                files={"job_zip": ("evil.exe", b"x", "application/octet-stream")})
     assert r.status_code == 400
+
+
+def test_a_run_can_apply_cedars_filing_checks(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "fv@example.com")
+    c = _login(app, "fv@example.com")
+    assert 'name="filing_validation"' in c.get(f"{P}/runs/new").text
+    run_id = _start_run(c, tmp_path, filing_validation="budget_filing", filing_year="2028")
+    cfg = json.loads((ctx.runner.folder(run_id) / "config.json").read_text())
+    assert cfg["filing_validation"] == "budget_filing" and cfg["filing_year"] == 2028
+    plain = json.loads((ctx.runner.folder(_start_run(c, tmp_path)) / "config.json").read_text())
+    assert plain.get("filing_validation", "") == "" and plain.get("filing_year") is None
 
 
 def test_a_run_from_upload_to_results(web, tmp_path):
@@ -452,6 +465,16 @@ def test_validate_inputs_from_the_editor(web, tmp_path):
     rep = c.get(chk["status_url"]).json()["report"]
     assert ["Measure", 0, "NTGRkWh"] in [cell for i in rep["issues"] if i["code"] == "outside_cet_range" for cell in i["cells"]]
     assert c.get(f"{P}/edit/api/{draft}").json()["check"]["row_map"] == chk["row_map"]
+    # with CEDARS filing checks the same cell is flagged under the spec rule's ID, and the page remembers the choice
+    assert c.post(f"{P}/edit/api/{draft}/check", json={**body, "rev": saved["rev"], "filing_validation": "monthly"},
+                  headers={"X-CSRF-Token": csrf}).status_code == 400
+    chk = c.post(f"{P}/edit/api/{draft}/check", json={**body, "rev": saved["rev"], "filing_validation": "claims"}, headers={"X-CSRF-Token": csrf}).json()
+    assert chk["filing_validation"] == "claims"
+    assert ctx.runner.work_once()
+    rep = c.get(chk["status_url"]).json()["report"]
+    ntgr = [i for i in rep["issues"] if i["code"] == "cet_reject" and "NTGRkWh should be in (0, 1.5]" in i["message"]]
+    assert ntgr and ["Measure", 0, "NTGRkWh"] in ntgr[0]["cells"] and rep["filing_rules"]["rule_set"] == "claims"
+    assert c.get(f"{P}/edit/api/{draft}").json()["check"]["filing_validation"] == "claims"
 
 
 def test_drafts_are_private(web):
@@ -648,7 +671,7 @@ def test_the_web_pages_show_a_running_runs_bar(web, tmp_path):
     ctx.db.run("UPDATE runs SET status = 'running' WHERE id = ?", (run_id,))
     assert 'id="run-progress" class="progress hidden"' in c.get(f"{P}/runs/{run_id}").text   # running, before its first report
     (ctx.runner.folder(run_id) / progress.FILE_NAME).write_text(json.dumps(
-        {"stage": "pricing", "label": "Pricing", "done": 12, "total": 50, "fraction": 0.4, "seconds_left": 240, "updated": 0}))
+        {"stage": "pricing", "label": "Pricing", "done": 12, "total": 50, "fraction": 0.4, "seconds_left": 245, "updated": time.time()}))
     p = c.get(f"{P}/runs/{run_id}/log").json()["progress"]
     assert p["fraction"] == 0.4 and p["text"] == "Pricing: part 12 of 50 · about 4 min left"
     page = c.get(f"{P}/runs/{run_id}").text

@@ -91,6 +91,33 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and
   `preflight.json` (still written: the runner finds a failed run's folder by preflight.txt, the Validate inputs panel reads the JSON), and adds `run_log.txt`
   (the run's log.txt, route `/runs/{id}/run_log.txt`) and `inputs.zip`. Download everything carries `run_log.txt` (was `log.txt`).
+- 0.1.42 (2026-10-26, Jake; 0.1.41 is the progress-estimate PR): CEDARS filing checks (Tier 2 item 9, BR-06.3 / BR-03.6, starts BR-03.1 / BR-03.3).
+  `recet/filing_rules.py` reads CEDARS' own source-of-truth files, shipped unchanged in `data/cet_rules/<set>_<effective date>/` (claims_2026-03-12 from
+  /cet_ui/spec/, budget_filing_2026-03-11 from /filings/spec/; re-downloaded 2026-10-26, the claims files unchanged, the budget-filing spec newer than the
+  copy in the research repo): validation_rules (reject), warning_rules (warning) and the spec's field constraints (NotEmpty, CedarsValueList, CedarsNumRange,
+  GreaterThanOrEqualTo, nvarchar length, numeric, bit, CedarsYearQuarter, StartsWith, a two-column primary key). 215 / 221 rules. IDs are content hashes
+  (V/W/S + 6 hex), the same in both sets for a shared rule. `RunConfig.filing_validation` ("" | claims | budget_filing) + `filing_year` (CLI, window, New run,
+  reruns, Edit inputs' Validate inputs): preflight adds `cet_reject` / `cet_warning` issues with cells, `cet_rule_not_checked` notes, the
+  `CET filing validation` stat, `PreflightReport.filing` (failing records) and `.filing_rules`; the run writes `filing_validation_<tag>` and the
+  measure-level columns FilingValidation (pass/warning/reject) and FilingRules. Nothing is blocked. `outside_cet_range` is skipped when the rules are on.
+  Choices (CEDARS' code is not published): a blank makes a comparison unknown (condition false, test fails), text case-insensitive, value lists by claim
+  year, AvoidedCostCombo checked against the profile library (exact end use + IOU + sector; not checked without it), UploadPA-YYYY a plain prefix (CEDARS
+  accepted "PGE-2028Q4-..."; a split-on-dash version gave 703 false rejects). Messages follow the one CEDARS wording seen. Found while building: the spec-line
+  regex dropped every nvarchar line (`\b` after ")"), caught by a test that counts the spec's constraints; tests also give every rule a passing and a
+  failing record. Checked on the 1M job (PG&E's accepted 2028-2031 filings): 0 measures rejected under either set, 139,612 with warnings (the
+  UnitMeaCost1stBaseline = 0 warning is the one CEDARS' own upload showed); budget filing rejects 282 ProgramCost rows because the job spans four years.
+  Cost at 1M, laptop, warm: preflight 28.6-30.1 s -> 38.0 s.
+- 0.1.41 (2026-10-26, Jake): progress estimate. Replaying `progress.fraction` over the 2026-10-26 server log (1M, csv.zip, 412 s) showed it ran low
+  all run (-13% at preflight, -19% at pricing, -35% mid-writing) and sat at 98% saying "about 10 s left" for the 58 s the csv.zip conversion took (no
+  report inside TableWriter.close). Now: `progress.plan(in_parts, format)` (called in run_job once the split is known) weights stages by their seconds in that
+  server run (`SECONDS_IN_PARTS` / `SECONDS_IN_ONE_PIECE`, the file stage by `FILE_SECONDS[format]`: csv.zip 58, parquet 18; csv 45 and xlsx 5 are guesses); a
+  skipped stage gets no weight (no "loading" in a run in parts). New "file" stage: chunked reports it from `TableWriter.close(on_progress)` as the parquet parts
+  are joined and the CSV batches written (`file_share`); writing's parts are now len(parts), not +1. The web pages count the time left down between reports
+  (`progress.live`; "almost done" at 0). Every report is also appended to `progress_log.jsonl` in the run folder (with `elapsed`), to check estimates against
+  the real finish. Same replay with the new weights: within 0-4% while more than 30 s are left, but in sample (the weights come from that run).
+  Pricing and writing are scaled by `OPTION_FACTORS[(societal, emissions)]` (100k laptop runs: pricing 20 / 12 / 17 / 10 s for both on / no SCT / no
+  emissions / neither); `replan(societal=False)` when the ACC has no SCT avoided costs. Before it, a no-SCT run's estimate was up to 73-83% high early on;
+  after, the bar's stage shares are within ~2 points of the time shares in all four cases (estimate within about +-20-30%, the misses in the first seconds).
 - 0.1.40 (2026-10-25, Jake): a run in parts adds up the Results page's group sums part by part in pass 2 (`results_view.group_sums` of each part's
   frame, `combine_parts` orders them as the whole table's) instead of reading the measure-level file back at the end. On the 0.1.39 server run that read-back
   was the run's memory peak (1.11-1.15 GiB of 1.367 GiB, in its last 7 s, on top of the ~1 GiB the process already held). 1M laptop run, csv.zip, 50,000-row

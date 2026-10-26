@@ -169,7 +169,7 @@ class Ctx:
         """A running run's progress (recet/progress.py) with `text` added for the page; None for any other run or before its first report."""
         if run["status"] != "running":
             return None
-        p = progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME)
+        p = progress.live(progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME))     # time left counted down since the last report
         if p is not None:
             p["text"] = progress.describe(p)
         return p
@@ -547,6 +547,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             cfg[flag] = form.get(flag) == "on"
         cfg["include_societal"] = form.get("include_societal") == "on"
         cfg["emissions"] = form.get("emissions") == "on"
+        fv = str(form.get("filing_validation", "")).strip()
+        if fv not in ("", "claims", "budget_filing"):
+            return fail("Unknown CEDARS filing checks choice.")
+        cfg["filing_validation"] = fv
+        fy = str(form.get("filing_year", "")).strip()
+        if fy:
+            if not fy.isdigit() or not 2000 <= int(fy) <= 2100:
+                return fail("Filing year must be a year such as 2028 (or blank for each record's claim year).")
+            cfg["filing_year"] = int(fy)
         if cfg["portfolio_8760"]:
             years = str(form.get("profile_years", "")).replace(",", " ").split()
             if not all(y.isdigit() and 2000 <= int(y) <= 2100 for y in years):

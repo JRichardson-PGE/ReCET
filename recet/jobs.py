@@ -74,6 +74,8 @@ class RunConfig:
     excel_max_rows: int = 50_000             # an xlsx table with more rows than this is written as excel_fallback instead (outputs.ExcelLimit)
     excel_fallback: str = "csv.zip"          # csv.zip | csv | parquet: every table of a run whose measures are over excel_max_rows (run_format)
     preflight_only: bool = False
+    filing_validation: str = ""              # "" | "claims" | "budget_filing": also apply CEDARS' upload checks for that filing (filing_rules.py); flags, never stops
+    filing_year: int | None = None           # the filing's year for the rules that name it (default: each record's claim year; ProgramCost: the earliest)
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
@@ -100,6 +102,8 @@ class RunResult:
     totals: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     frame: pd.DataFrame | None = None
+    filing: pd.DataFrame | None = None       # with filing_validation: the failing records (preflight.PreflightReport.filing)
+    filing_rules: dict | None = None         # with filing_validation: the rule set used
 
 
 def _size(p: str | Path | None) -> str:
@@ -252,6 +256,8 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     }
     if parts:
         settings["parts"] = parts
+    if result.filing_rules:
+        settings["filing_validation"] = result.filing_rules
     if result.notes:
         settings["notes"] = result.notes
     (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
@@ -303,6 +309,10 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
             tt = time.time()
             dtypes, values = delimited.part_dtypes(parts, ("ClaimYearQuarter", "ACCVersion"))
             log(f"  split into {len(parts)} parts in {tt - ts:.0f}s; column types of the whole file read in {time.time() - tt:.0f}s")
+    fmt = cfg.output_format
+    if fmt == "xlsx" and parts is not None and n_rows > cfg.excel_max_rows:
+        fmt = cfg.excel_fallback                                   # what run_format / outputs.ExcelLimit will write instead
+    progress.plan(parts is not None, fmt, cfg.include_societal, cfg.emissions)   # the bar's stage weights for this run (progress.py)
     try:
         out = _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
     finally:
@@ -324,7 +334,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     progress.report("preflight", 0, len(parts) if parts is not None else None)
     tp = time.time()
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
-                                 apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes)
+                                 apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes,
+                                 filing_rules=cfg.filing_validation or None, filing_year=cfg.filing_year)
     log(f"checked in {time.time() - tp:.0f}s" + (f" ({len(parts)} parts)" if parts is not None else ""))
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
@@ -332,6 +343,10 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     findings = write_findings(rep, cfg, run_dir)
     if findings is not None:
         result.files["preflight_findings"] = findings
+    if rep.filing is not None:                                       # CEDARS' upload checks: every failing record, and the rule set used
+        result.filing, result.filing_rules = rep.filing, rep.filing_rules
+        result.files["filing_validation"] = outputs.write_table(outputs.filing_table(rep.filing, cfg.filing_validation), run_dir / f"filing_validation_{tag}",
+                                                                cfg.output_format, excel)
     log(rep.text())
     if not rep.ok:
         raise RuntimeError("preflight found blocking problems (see above); nothing was priced")
@@ -371,6 +386,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
 
     societal = societal_available(groups, acc, cfg.include_societal, result, log)
+    if societal != cfg.include_societal:
+        progress.replan(societal=societal)
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
     progress.report("pricing")
     t0 = time.time()
@@ -419,6 +436,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         cols = [c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
+    if result.filing is not None:
+        frame = outputs.attach_filing(frame, result.filing)
     result.frame = frame
     progress.report("writing")
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel)
