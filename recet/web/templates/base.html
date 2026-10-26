@@ -12,12 +12,14 @@
 <header class="top">
   <a class="brand" href="{{ u('/') }}">ReCET</a>
   {% if user %}
-  <nav>
-    <a href="{{ u('/runs/new') }}">New run</a>
-    <a href="{{ u('/runs') }}">Runs</a>
-    <a href="{{ u('/edit') }}">Edit inputs</a>
-    <a href="{{ u('/docs') }}">Docs</a>
-    {% if user.role == 'admin' %}<a href="{{ u('/admin/users') }}">Users</a><a href="{{ u('/admin/audit') }}">Audit</a>{% endif %}
+  {% set here = request.url.path if request else '' %}
+  {% macro nav_link(path, text, on) %}<a href="{{ u(path) }}"{% if on %} aria-current="page"{% endif %}>{{ text }}</a>{% endmacro %}
+  <nav aria-label="Main">
+    {{ nav_link('/runs/new', 'New run', here.endswith('/runs/new')) }}
+    {{ nav_link('/runs', 'Runs', '/runs' in here and not here.endswith('/runs/new')) }}
+    {{ nav_link('/edit', 'Edit inputs', '/edit' in here) }}
+    {{ nav_link('/docs', 'Docs', '/docs' in here) }}
+    {% if user.role == 'admin' %}{{ nav_link('/admin/users', 'Users', '/admin/users' in here) }}{{ nav_link('/admin/audit', 'Audit', '/admin/audit' in here) }}{% endif %}
   </nav>
   <div class="who">
     <a href="{{ u('/account') }}" title="Change your password">{{ user.name or user.email }}</a>

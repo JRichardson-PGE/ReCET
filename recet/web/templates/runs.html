@@ -6,27 +6,38 @@
   <a class="button primary" href="{{ u('/runs/new') }}">New run</a>
 </div>
 <p class="muted">Runs and their files are deleted {{ retention }} days after they start.
-{% if user.role == 'admin' %}{% if everyone %}<a href="{{ u('/runs') }}">Show only mine</a>{% else %}<a href="{{ u('/runs?all=1') }}">Show everyone's</a>{% endif %}{% endif %}</p>
+{% if n_expired %}{% if show_expired %}<a href="{{ u('/runs' + ('?all=1' if everyone else '')) }}">Hide the {{ n_expired }} expired</a>{% else %}<a href="{{ u('/runs?expired=1' + ('&all=1' if everyone else '')) }}">Show the {{ n_expired }} expired</a>{% endif %}{% endif %}
+{% if user.role == 'admin' %}{% if everyone %}<a href="{{ u('/runs' + ('?expired=1' if show_expired else '')) }}">Show only mine</a>{% else %}<a href="{{ u('/runs?all=1' + ('&expired=1' if show_expired else '')) }}">Show everyone's</a>{% endif %}{% endif %}</p>
 {% if runs %}
-<table class="list" id="runs-table" data-live="{{ 1 if bars or runs|selectattr('status', 'equalto', 'queued')|list else 0 }}">
-  <thead><tr><th>Started</th><th>Run</th><th>ACC</th><th>Inputs</th>{% if everyone %}<th>Owner</th>{% endif %}<th>Status</th></tr></thead>
+<div class="hscroll">
+<table class="list" id="runs-table" data-live="{{ 1 if live_ids else 0 }}" data-url="{{ u('/runs/live') }}" data-ids="{{ live_ids|join(',') }}">
+  <thead><tr><th>Started</th><th>Run</th><th>ACC</th><th class="num">Measures</th><th>Inputs</th>{% if everyone %}<th>Owner</th>{% endif %}<th>Status</th></tr></thead>
   <tbody>
   {% for r in runs %}
-  <tr>
+  {% set x = extra.get(r.id, {}) %}
+  <tr data-id="{{ r.id }}" class="{% if r.status == 'expired' %}dim{% endif %}">
     <td class="nowrap">{{ fmt_time(r.created_at) }}</td>
     <td>{% if r.status != 'expired' %}<a href="{{ u('/runs/' + r.id) }}">{{ r.label or r.id }}</a>{% else %}{{ r.label or r.id }}{% endif %}
-        {% if r.preflight_only %}<span class="tag">preflight</span>{% endif %}</td>
+        {% if r.preflight_only %}<span class="tag">input check</span>{% endif %}
+        {% if x.settings %}<div class="small muted">{{ x.settings }}</div>{% endif %}</td>
     <td class="nowrap">{{ r.acc_version }}{% if r.compare_with %} vs {{ r.compare_with }}{% endif %}</td>
+    <td class="num nowrap">{{ '{:,}'.format(x.measures) if x.measures is not none else '' }}</td>
     <td class="small">{{ r.inputs }}</td>
     {% if everyone %}<td class="small">{{ r.owner_email }}</td>{% endif %}
-    <td><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span>
-        {% if waits.get(r.id) %}<div class="small muted">{{ waits[r.id] }}</div>{% endif %}
-        {% set b = bars.get(r.id) %}{% if b %}<div class="progress small" title="{{ b.text }}"><progress max="1" value="{{ b.fraction }}"></progress> {{ '{:.0%}'.format(b.fraction) }}{% if b.seconds_left is not none %} · {{ b.text.split(' · ')[-1] }}{% endif %}</div>{% endif %}</td>
+    <td class="status-cell"><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span>
+        {% if r.status in ('queued', 'running') %}
+        <div class="small muted live-wait">{{ waits.get(r.id, '') }}</div>
+        {% set b = bars.get(r.id) %}<div class="progress small {% if not b %}hidden{% endif %}" title="{{ b.text if b else '' }}"><progress max="1" value="{{ b.fraction if b else 0 }}" aria-label="Run progress"></progress> <span class="live-text">{% if b %}{{ '{:.0%}'.format(b.fraction) }}{% if b.seconds_left is not none %} · {{ b.text.split(' · ')[-1] }}{% endif %}{% endif %}</span></div>
+        {% endif %}
+        {% if x.took %}<div class="small muted">took {{ x.took }}</div>{% endif %}
+        {% if x.expires %}<div class="small muted">{{ x.expires }}</div>{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
-<p>No runs yet. <a href="{{ u('/runs/new') }}">Start one</a>, or build a small job on the <a href="{{ u('/edit') }}">Edit inputs</a> page.</p>
+<p>No runs {{ 'to show' if n_expired else 'yet' }}. <a href="{{ u('/runs/new') }}">Start one</a>, or build a small job on the <a href="{{ u('/edit') }}">Edit inputs</a> page.</p>
 {% endif %}
 {% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}
