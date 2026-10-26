@@ -102,6 +102,56 @@ class PreflightReport:
                             "cells": [[str(tb), int(r), str(c)] for tb, r, c in i.cells]}
                            for i in self.issues]}
 
+    def write_xlsx(self, path: Path, measure_ids=None, program_ids=None) -> Path:
+        """The report as a workbook a reviewer can open and filter: Summary (the result and the statistics), Findings (one row per finding, errors first)
+        and Cells (one row per flagged cell: its file, line, record ID and column). `measure_ids` / `program_ids` give each data row's CEInputID / PrgID + PrgYear,
+        in file order (blank when not given)."""
+        from openpyxl import Workbook
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.utils import get_column_letter
+        order = {"error": 0, "warning": 1, "info": 2}
+        issues = sorted(self.issues, key=lambda i: order.get(i.severity, 3))
+        counts = {s: sum(i.severity == s for i in issues) for s in order}
+        files = {"Measure": "Measure.csv", "ProgramCost": "ProgramCost.csv"}
+        ids = {"Measure": measure_ids, "ProgramCost": program_ids}
+
+        def rid(table, row):
+            s = ids.get(table)
+            return "" if s is None or not 0 <= row < len(s) else str(s[row])
+
+        summary = [("Result", "no blocking problems: the run can price" if self.ok else f"{counts['error']} blocking problem(s): the run stops before pricing"),
+                   ("Errors (stop the run)", counts["error"]), ("Warnings (the run goes on; some records are priced on a fallback or not at all)", counts["warning"]),
+                   ("Information", counts["info"]), *((str(k).strip(), str(v)) for k, v in self.stats.items()),
+                   ("Cells sheet", f"the flagged cells, up to {MAX_CELLS:,} per finding; Line is the line of the file (line 1 is the header)")]
+        findings = [(i.severity.upper(), i.code, i.count or None, i.message, "; ".join(map(str, i.examples))) for i in issues]
+        cells = [(i.severity.upper(), i.code, files.get(t, t), int(r) + 2, rid(t, int(r)), c) for i in issues for t, r, c in i.cells]
+        wb = Workbook()
+        head_font, head_fill = Font(name="Arial", bold=True, color="FFFFFF", size=10), PatternFill("solid", fgColor="1F3864")
+        sheets = (("Summary", ("Item", "Value"), summary, (60, 90)),
+                  ("Findings", ("Severity", "Code", "Records", "Message", "Examples"), findings, (10, 28, 10, 100, 60)),
+                  ("Cells", ("Severity", "Code", "File", "Line", "Record", "Column"), cells, (10, 28, 16, 9, 40, 28)))
+        for k, (name, header, rows, widths) in enumerate(sheets):
+            ws = wb.active if k == 0 else wb.create_sheet()
+            ws.title = name
+            ws.append(list(header))
+            for cell in ws[1]:
+                cell.font, cell.fill, cell.alignment = head_font, head_fill, Alignment(vertical="center")
+            for row in rows:
+                ws.append([ILLEGAL_CHARACTERS_RE.sub("", v) if isinstance(v, str) else v for v in row])
+            for j, w in enumerate(widths, start=1):
+                ws.column_dimensions[get_column_letter(j)].width = w
+            ws.freeze_panes = "A2"
+            if rows:
+                ws.auto_filter.ref = f"A1:{get_column_letter(len(header))}{len(rows) + 1}"
+            if name == "Findings":
+                for row in ws.iter_rows(min_row=2, min_col=4, max_col=5):
+                    for cell in row:
+                        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        path = Path(path)
+        wb.save(path)
+        return path
+
     def to_frame(self) -> pd.DataFrame:
         return pd.DataFrame([{"severity": i.severity, "code": i.code, "count": i.count, "message": i.message, "examples": "; ".join(map(str, i.examples))}
                              for i in self.issues])

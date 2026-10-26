@@ -86,6 +86,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.43 (2026-10-26, Jake; 0.1.41 / 0.1.42 are the progress-estimate and filing-checks PRs): run downloads. Every run writes `preflight_findings.xlsx`
+  (`PreflightReport.write_xlsx`, `jobs.write_findings`): Summary, Findings (errors first) and Cells (file, line = data row + 2, record ID, column; IDs read
+  from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and
+  `preflight.json` (still written: the runner finds a failed run's folder by preflight.txt, the Validate inputs panel reads the JSON), and adds `run_log.txt`
+  (the run's log.txt, route `/runs/{id}/run_log.txt`) and `inputs.zip`. Download everything carries `run_log.txt` (was `log.txt`).
 - 0.1.42 (2026-10-26, Jake; 0.1.41 is the progress-estimate PR): CEDARS filing checks (Tier 2 item 9, BR-06.3 / BR-03.6, starts BR-03.1 / BR-03.3).
   `recet/filing_rules.py` reads CEDARS' own source-of-truth files, shipped unchanged in `data/cet_rules/<set>_<effective date>/` (claims_2026-03-12 from
   /cet_ui/spec/, budget_filing_2026-03-11 from /filings/spec/; re-downloaded 2026-10-26, the claims files unchanged, the budget-filing spec newer than the

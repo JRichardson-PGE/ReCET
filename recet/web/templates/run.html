@@ -25,7 +25,6 @@
   {% if run.result_dir %}<a class="button" href="{{ u('/runs/' + run.id + '/zip') }}">Download everything (.zip)</a>{% endif %}
   {% if has_inputs %}
   <form method="post" action="{{ u('/runs/' + run.id + '/edit') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button title="Opens this run's inputs in Edit inputs as a new draft, with this run's settings, to change and run again">Edit inputs and rerun</button></form>
-  <a class="button" href="{{ u('/runs/' + run.id + '/inputs.zip') }}">Download inputs (.zip)</a>
   {% endif %}
   {% if run.status not in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/delete') }}" class="confirm" data-confirm="Delete this run and its files?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Delete</button></form>
@@ -36,7 +35,7 @@
 <details class="card" open>
   <summary>Files</summary>
   <ul class="files">
-  {% for name, size in files %}<li><a href="{{ u('/runs/' + run.id + '/files/' + name) }}">{{ name }}</a> <span class="muted">{{ fmt_size(size) }}</span></li>{% endfor %}
+  {% for f in files %}<li><a href="{{ f.url }}">{{ f.name }}</a> <span class="muted">{{ fmt_size(f.size) }}{% if f.note %} · {{ f.note }}{% endif %}</span></li>{% endfor %}
   </ul>
 </details>
 {% endif %}

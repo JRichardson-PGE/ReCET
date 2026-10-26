@@ -629,7 +629,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
         has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
-        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), files=_files(run),
+        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), files=_downloads(run),
                           retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run))
 
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
@@ -665,14 +665,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
         return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}_inputs.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
+    # result files not listed for download: preflight.txt is in the run log (run_log.txt), preflight.json is for the app (preflight_findings.xlsx is the readable form)
+    HIDDEN_RESULT_FILES = {"preflight.txt", "preflight.json"}
+
     def _files(run) -> list[tuple[str, int]]:
+        """The run's result files (path relative to its result folder, size)."""
         p = ctx.result_path(run)
         if p is None:
             return []
         out = []
         for f in sorted(p.rglob("*")):
-            if f.is_file() and "_prepared_inputs" not in f.parts and outputs.RESULTS_DIR not in f.parts and not f.name.startswith("_config"):
+            if (f.is_file() and "_prepared_inputs" not in f.parts and outputs.RESULTS_DIR not in f.parts and not f.name.startswith("_config")
+                    and f.name not in HIDDEN_RESULT_FILES):
                 out.append((str(f.relative_to(p)), f.stat().st_size))
+        return out
+
+    def _downloads(run) -> list[dict]:
+        """The run page's downloads: the result files, the run log, and the run's inputs as a zip."""
+        out = [{"name": n, "size": z, "url": ctx.u(f"/runs/{run['id']}/files/{n}")} for n, z in _files(run)]
+        log = ctx.runner.folder(run["id"]) / "log.txt"
+        if run["status"] not in ("queued", "running", "expired") and log.exists():
+            out.append({"name": "run_log.txt", "size": log.stat().st_size, "url": ctx.u(f"/runs/{run['id']}/run_log.txt"),
+                        "note": "everything the run printed, the input check included"})
+        inputs = ctx.runner.folder(run["id"]) / "inputs"
+        if run["status"] != "expired" and inputs.is_dir() and any(f.is_file() for f in inputs.rglob("*")):
+            out.append({"name": "inputs.zip", "size": sum(f.stat().st_size for f in inputs.rglob("*") if f.is_file()),
+                        "url": ctx.u(f"/runs/{run['id']}/inputs.zip"), "note": "the files this run was given (size before zipping)"})
         return out
 
     @app.get("/runs/{run_id}/log")
@@ -735,6 +753,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404)
         return FileResponse(f, filename=f.name)
 
+    @app.get("/runs/{run_id}/run_log.txt")
+    async def run_log_file(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id)
+        log = ctx.runner.folder(run_id) / "log.txt"
+        if run["status"] == "expired" or not log.is_file():
+            raise HTTPException(404)
+        return FileResponse(log, media_type="text/plain; charset=utf-8", filename=f"recet_{run_id}_run_log.txt")
+
     @app.get("/runs/{run_id}/zip")
     async def run_zip(request: Request, run_id: str):
         run = ctx.run_for(request, run_id)
@@ -744,7 +770,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         entries = [(base / rel, rel) for rel, _n in _files(run)]
         log = ctx.runner.folder(run_id) / "log.txt"
         if log.exists():
-            entries.append((log, "log.txt"))
+            entries.append((log, "run_log.txt"))
         z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
         return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}.zip", background=BackgroundTask(z.unlink, missing_ok=True))
 
