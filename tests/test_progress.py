@@ -48,6 +48,15 @@ def test_the_weights_follow_the_societal_and_emissions_options():
     assert progress.fraction("preflight", 5, 5) < f                              # a lighter pricing stage only moves the bar forward
 
 
+def test_filing_checks_lengthen_preflight():
+    progress.plan(True, "csv.zip")
+    plain = progress._weights["preflight"]
+    progress.plan(True, "csv.zip", filing=True)
+    assert progress._weights["preflight"] > plain and sum(progress._weights.values()) == pytest.approx(1.0)
+    progress.replan(societal=False)
+    assert progress._plan["filing"] is True                                      # replan keeps it
+
+
 def test_the_file_stage_moves_with_the_join_and_the_csv():
     assert progress.file_share(0.5, 0.0, "parquet") == 0.5 and progress.file_share(1.0, 1.0, "parquet") == 1.0
     assert progress.file_share(1.0, 0.0, "csv.zip") == pytest.approx(18 / 58)

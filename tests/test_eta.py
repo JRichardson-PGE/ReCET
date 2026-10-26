@@ -21,6 +21,7 @@ def test_the_model_follows_size_and_options():
     assert eta.model_seconds(dict(BIG, compare=True)) == pytest.approx(2 * full)
     assert eta.model_seconds(dict(BIG, preflight_only=True)) == pytest.approx(eta.OVERHEAD_SECONDS + 3 + 15 + 70, abs=1)
     assert eta.model_seconds(None) == eta.model_seconds(dict(BIG, measures=None)) == eta.UNKNOWN_SECONDS
+    assert eta.model_seconds(dict(BIG, filing=True)) == pytest.approx(full + 8)                 # CEDARS filing checks: 8 s more preflight
 
 
 def test_describe():

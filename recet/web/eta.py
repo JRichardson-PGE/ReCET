@@ -52,7 +52,7 @@ def _saved(folder: Path) -> dict | None:
 
 
 def size(folder: Path) -> dict | None:
-    """The run's size and the options that change its time: {"measures", "preflight_only", "compare", "include_societal", "emissions", "output_format"},
+    """The run's size and the options that change its time: {"measures", "preflight_only", "compare", "include_societal", "emissions", "output_format", "filing"},
     read from its config.json and inputs once and kept in estimate.json. None when the run has no config."""
     p = folder / ESTIMATE_FILE
     saved = _saved(folder)
@@ -63,7 +63,8 @@ def size(folder: Path) -> dict | None:
     except (OSError, ValueError):
         return None
     out = {"measures": _count_measures(cfg), "preflight_only": bool(cfg.get("preflight_only")), "compare": bool(cfg.get("compare_with")),
-           "include_societal": cfg.get("include_societal", True), "emissions": cfg.get("emissions", True), "output_format": cfg.get("output_format") or "csv.zip"}
+           "include_societal": cfg.get("include_societal", True), "emissions": cfg.get("emissions", True), "output_format": cfg.get("output_format") or "csv.zip",
+           "filing": bool(cfg.get("filing_validation"))}
     try:
         p.write_text(json.dumps(out), encoding="utf-8")
     except OSError:
@@ -81,6 +82,8 @@ def model_seconds(sz: dict | None) -> float:
     f_price, f_write = progress.OPTION_FACTORS[(bool(sz.get("include_societal", True)), bool(sz.get("emissions", True)))]
     secs["pricing"] *= f_price
     secs["writing"] *= f_write
+    if sz.get("filing"):                            # CEDARS filing checks lengthen preflight
+        secs["preflight"] += progress.FILING_PREFLIGHT_SECONDS
     if sz.get("preflight_only"):
         secs = {k: v for k, v in secs.items() if k in ("preparing", "splitting", "preflight")}
     per_million = sum(secs.values())
