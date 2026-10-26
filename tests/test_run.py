@@ -32,6 +32,20 @@ def test_supplied_acc_and_profile_drive_the_result(tmp_path):
     assert (r.run_dir / "run_settings.json").exists() and (r.run_dir / "preflight.txt").exists()
 
 
+def test_the_input_check_is_written_as_a_workbook(tmp_path):
+    from openpyxl import load_workbook
+    r = run_job(_cfg(tmp_path, measures=str(make_measure_csv(tmp_path / "M.csv", NTGRkWh="2")), preflight_only=True), log=lambda s: None)
+    wb = load_workbook(r.files["preflight_findings"], read_only=True)
+    assert wb.sheetnames == ["Summary", "Findings", "Cells"]
+    summary = {row[0]: row[1] for row in wb["Summary"].iter_rows(min_row=2, values_only=True)}
+    assert summary["Result"].startswith("no blocking problems") and summary["measures"] == "1"
+    findings = list(wb["Findings"].iter_rows(min_row=2, values_only=True))
+    assert ("WARNING", "outside_cet_range") in [(f[0], f[1]) for f in findings]
+    assert [f[0] for f in findings] == sorted((f[0] for f in findings), key=["ERROR", "WARNING", "INFO"].index)    # errors first
+    cells = list(wb["Cells"].iter_rows(min_row=2, values_only=True))
+    assert ("WARNING", "outside_cet_range", "Measure.csv", 2, "T1", "NTGRkWh") in cells      # line 2 = the first record; its CEInputID
+
+
 def test_replacement_uses_the_supplied_acc_not_the_builtin(tmp_path):
     cheap = run_job(_cfg(tmp_path, acc_electric_file=str(make_electric_acc(tmp_path / "a1.parquet", energy=20, ghg=0)), run_name="a"), log=lambda s: None)
     dear = run_job(_cfg(tmp_path, acc_electric_file=str(make_electric_acc(tmp_path / "a2.parquet", energy=200, ghg=0)), run_name="b"), log=lambda s: None)
@@ -111,7 +125,7 @@ def test_an_excel_job_over_the_limit_writes_every_table_as_zipped_csv(tmp_path):
     import json
     lines = []
     r = run_job(_cfg(tmp_path, output_format="xlsx", excel_max_rows=0, components=True, run_name="xl"), log=lines.append)
-    tables = {k: v.name for k, v in r.files.items() if k not in ("preflight", "run_settings")}
+    tables = {k: v.name for k, v in r.files.items() if k not in ("preflight", "preflight_findings", "run_settings")}   # the findings workbook is always xlsx
     assert tables and all(n.endswith(".csv.zip") for n in tables.values()), tables
     assert any("every table" in n and "zipped CSV" in n for n in r.notes)
     assert any("every table of this run is written as zipped CSV" in str(line) for line in lines)

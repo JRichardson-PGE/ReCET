@@ -165,7 +165,7 @@ The left box (**Modes**) holds the pricing switches; the right box (**Comparison
 | **Also run another ACC version and compare measure by measure** | Runs the job twice - the selected version and the one in **Compare with** - each in its own process, then writes `comparison_acc<A>_vs_acc<B>` (per-measure value, change and percent change of the key outputs) and a portfolio summary. Supplied ACC files apply to the first version only; supplied 8,760 and gas profiles apply to both, so the ACC is the only thing that differs. The second version must differ from the first. | C16.4 |
 | &nbsp;&nbsp;**Compare with** | The second built-in version (`2024` or `2026`). Defaults to the other one. | |
 | **Compare with a CET outputs file** | Matches your measures to a CET run's `*_outputs.csv` by ID and writes `cet_comparison_measures_*` (per measure: POC, CET, difference, ratio) and `cet_comparison_summary_*` (portfolio totals and POC/CET). Only meaningful when the job is run the way the CET run was: same First Year, ACC version and statewide allocation. Enter the file's path in the box below the checkbox. | C16.4 |
-| **Preflight check only (do not price)** | Reads and checks the inputs and stops: writes `preflight.txt` and reports what would and would not be priced (measures with no profile, unknown gas profile names, blank required values, values outside CET's ranges, program-cost mismatches, claim years outside the ACC's range). Takes seconds; use it first on a new file. | |
+| **Preflight check only (do not price)** | Reads and checks the inputs and stops: writes `preflight.txt` and `preflight_findings.xlsx` (the findings and every flagged cell, to filter in Excel) and reports what would and would not be priced (measures with no profile, unknown gas profile names, blank required values, values outside CET's ranges, program-cost mismatches, claim years outside the ACC's range). Takes seconds; use it first on a new file. | |
 | **Output format** | `csv` (UTF-8 with a byte-order mark so Excel opens it directly), `xlsx` (one formatted Excel file per table: bold frozen header with filters, sized columns, numbers stored as numbers; a table too long for Excel falls back to `csv`) or `parquet` (smaller and faster for large jobs). Applies to every table written. | |
 
 The window cannot set two things the command line and settings file can: `normalize_profiles` (rescale supplied profiles that do not sum to 1; the other choice is to stop with an error) and `subset_step` (a test hook).
@@ -209,7 +209,7 @@ off until you load one version's run folder.
 
 1. **Prepare.** Set the reference data folder; check any supplied ACC files (columns, 8,760 rows per block, consecutive years, components sum to the total); resolve the ACC version and its E3 tables; load supplied profiles (checked, rescaled if needed);
    point the pricing at these files. No CET-derived table is read.
-2. **Preflight.** Read `Measure.csv` (and `ProgramCost.csv`), report format problems and what will be priced, write `preflight.txt`. A blocking problem stops the run here; *Preflight only* stops here either way.
+2. **Preflight.** Read `Measure.csv` (and `ProgramCost.csv`), report format problems and what will be priced, write `preflight.txt` and `preflight_findings.xlsx`. A blocking problem stops the run here; *Preflight only* stops here either way.
 3. **Load.** Derive the `poc_*` pricing fields (C1); with statewide allocation, split the statewide programs first.
 4. **Price.** Electric (every measure on its 8,760 profile, aligned once to the ACC's weekdays), gas and water energy for the TRC rows, then for `SCT Base` and `SCT High` when the ACC has them; participant costs; bill impacts; other benefits and costs; program costs; the cost tests and ratios (C5-C12). Then emissions.
 5. **Components** (if on), then **assemble and write** the measure-level table, the portfolio summary and any optional files; **combined 8760 profile** and **CET comparison** if requested.
@@ -290,7 +290,7 @@ started from the window, start in about a second. Nothing in the cache is ever t
 
 ## Reading the results
 
-* Start with `preflight.txt` and the `...PricingStatus` columns: a benefit of 0 can mean "no savings" or "could not price".
+* Start with `preflight_findings.xlsx` (or `preflight.txt`) and the `...PricingStatus` columns: a benefit of 0 can mean "no savings" or "could not price".
 * `measure_level_acc<version>.csv` is the main table; [OUTPUT_FIELDS.md](OUTPUT_FIELDS.md) gives each column's complete formula in terms of the input fields, with a worked number, and [CALCULATIONS.md](CALCULATIONS.md) explains the method. Two worked examples with every intermediate are in section 3 of the output-field reference.
 * `portfolio_summary_acc<version>.csv` has the portfolio, per-IOU and per-administering-IOU totals and ratios on CET's receipt definition.
 * Which results are validated against CET, where the tool deliberately differs, and what it cannot do are listed in [CALCULATIONS.md](CALCULATIONS.md#c17-validation-deliberate-differences-from-cet-and-limitations).

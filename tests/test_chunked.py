@@ -143,7 +143,7 @@ def test_parquet_parts_are_joined_into_full_row_groups(tmp_path):
 def test_an_excel_job_in_parts_over_the_limit_writes_every_table_as_zipped_csv(tmp_path):
     m, pc = _job(tmp_path)
     r = run_job(_cfg(tmp_path, m, pc, run_name="xl", chunk_size=CHUNK, output_format="xlsx", excel_max_rows=N - 1, portfolio_8760=True), log=lambda s: None)
-    tables = {k: v.name for k, v in r.files.items() if k not in ("preflight", "run_settings")}
+    tables = {k: v.name for k, v in r.files.items() if k not in ("preflight", "preflight_findings", "run_settings")}   # the findings workbook is always xlsx
     assert set(tables) >= {"measure_level", "portfolio_summary", "portfolio_8760"} and all(n.endswith(".csv.zip") for n in tables.values()), tables
     assert any("every table" in n for n in r.notes)
     ok = run_job(_cfg(tmp_path, m, pc, run_name="xl_ok", chunk_size=CHUNK, output_format="xlsx", excel_max_rows=N), log=lambda s: None)

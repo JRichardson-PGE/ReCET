@@ -86,6 +86,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.43 (2026-10-26, Jake; 0.1.41 / 0.1.42 are the progress-estimate and filing-checks PRs): run downloads. Every run writes `preflight_findings.xlsx`
+  (`PreflightReport.write_xlsx`, `jobs.write_findings`): Summary, Findings (errors first) and Cells (file, line = data row + 2, record ID, column; IDs read
+  from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and
+  `preflight.json` (still written: the runner finds a failed run's folder by preflight.txt, the Validate inputs panel reads the JSON), and adds `run_log.txt`
+  (the run's log.txt, route `/runs/{id}/run_log.txt`) and `inputs.zip`. Download everything carries `run_log.txt` (was `log.txt`).
 - 0.1.40 (2026-10-25, Jake): a run in parts adds up the Results page's group sums part by part in pass 2 (`results_view.group_sums` of each part's
   frame, `combine_parts` orders them as the whole table's) instead of reading the measure-level file back at the end. On the 0.1.39 server run that read-back
   was the run's memory peak (1.11-1.15 GiB of 1.367 GiB, in its last 7 s, on top of the ~1 GiB the process already held). 1M laptop run, csv.zip, 50,000-row
