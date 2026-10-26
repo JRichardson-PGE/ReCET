@@ -26,6 +26,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -173,11 +174,12 @@ def supplied_path(ctx, draft_id: str, name: str) -> Path | None:
     return p if p.is_file() and p.is_relative_to((_folder(ctx, draft_id) / "supplied").resolve()) else None
 
 
-def _run_settings(cfg: dict, label: str) -> dict:
+def _run_settings(cfg: dict, label: str, suffix: str = "edited") -> dict:
     """A run's options as New run form values, so a rerun starts from the same settings."""
     out = {"acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
            "base_year": str(cfg.get("base_year") or ""), "market_effects": "0.05" if float(cfg.get("market_effects") or 0) > 0 else "0",
-           "output_format": {"csv.zip": "csv"}.get(str(cfg.get("output_format") or "csv"), str(cfg.get("output_format") or "csv")), "label": (f"{label} (edited)" if label else "")[:120],
+           "output_format": {"csv.zip": "csv"}.get(str(cfg.get("output_format") or "csv"), str(cfg.get("output_format") or "csv")),
+           "label": (f"{label} ({suffix})" if label else "")[:120],
            "profile_years": " ".join(str(y) for y in cfg.get("profile_years") or []),
            "filing_validation": str(cfg.get("filing_validation") or ""), "filing_year": str(cfg.get("filing_year") or "")}
     for f in SETTING_FLAGS:
@@ -186,28 +188,53 @@ def _run_settings(cfg: dict, label: str) -> dict:
     return out
 
 
-def draft_from_run(ctx, run, user) -> str:
-    """A new draft (owned by `user`) holding the Measure and ProgramCost tables a run used, its job workbook (whose other sheets still apply), its supplied
-    files and its settings. Raises editor.EditorError when the run's files are gone or the job is too big for the editor."""
+JOB_FIELDS = ("workbook", "measures", "programcost")      # the RunConfig fields of a job's own files (a workbook, or the zip's Measure.csv / ProgramCost.csv)
+
+
+def run_inputs(ctx, run) -> tuple[dict, dict[str, Path], dict[str, Path]] | None:
+    """(config, job files, supplied files) of a run whose folder still exists, else None. Only the run's own inputs count (files in its inputs folder), never
+    a server default; job files are keyed by JOB_FIELDS and supplied ones by CARRY_FIELDS."""
     run_folder = ctx.runner.folder(run["id"])
     inputs = (run_folder / "inputs").resolve()
-    cfg_path = run_folder / "config.json"
-    if not cfg_path.exists():
-        raise editor.EditorError("this run's files have been deleted, so its inputs cannot be edited")
-    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    try:
+        cfg = json.loads((run_folder / "config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
     def own(field: str) -> Path | None:
-        """The run's file for a field, only if it is one of the run's own inputs (not a server default)."""
         v = cfg.get(field)
         if not v:
             return None
         p = Path(v).resolve()
         return p if p.is_file() and p.is_relative_to(inputs) else None
 
+    job = {f: p for f in JOB_FIELDS if (p := own(f)) is not None}
+    supplied = {f: p for f in CARRY_FIELDS if (p := own(f)) is not None}
+    return cfg, job, supplied
+
+
+def link_or_copy(src: Path, dest: Path) -> None:
+    """`dest` as a hard link to `src` (a 1,000,000-measure Measure.csv is 600 MB), or a copy where links are not possible. Run folders are deleted
+    separately, and deleting one link leaves the other."""
+    import os
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(src, dest)
+    except OSError:
+        shutil.copyfile(src, dest)
+
+
+def draft_from_run(ctx, run, user) -> str:
+    """A new draft (owned by `user`) holding the Measure and ProgramCost tables a run used, its job workbook (whose other sheets still apply), its supplied
+    files and its settings. Raises editor.EditorError when the run's files are gone or the job is too big for the editor."""
+    got = run_inputs(ctx, run)
+    if got is None:
+        raise editor.EditorError("this run's files have been deleted, so its inputs cannot be edited")
+    cfg, job_files, supplied_files = got
     n = ctx.db.one("SELECT COUNT(*) n FROM drafts WHERE user_id = ?", (user["id"],))["n"]
     if n >= MAX_DRAFTS_PER_USER:
         raise editor.EditorError(f"you have {n} drafts; delete some on the Edit inputs page first (the limit is {MAX_DRAFTS_PER_USER})")
-    wb, meas, pcost = own("workbook"), own("measures"), own("programcost")
+    wb, meas, pcost = (job_files.get(f) for f in JOB_FIELDS)
     if wb is None and meas is None:
         raise editor.EditorError("this run's input files are missing")
     job = editor.load_tables(str(meas) if meas else None, str(pcost) if pcost else None, str(wb) if wb else None)
@@ -218,13 +245,11 @@ def draft_from_run(ctx, run, user) -> str:
         if wb is not None:
             shutil.copyfile(wb, folder / "base.xlsx")
         supplied = {}
-        for f in CARRY_FIELDS:
-            p = own(f)
-            if p is not None:
-                (folder / "supplied").mkdir(exist_ok=True)
-                name = f"{f}{p.suffix.lower()}"
-                shutil.copyfile(p, folder / "supplied" / name)
-                supplied[f] = name
+        for f, p in supplied_files.items():
+            (folder / "supplied").mkdir(exist_ok=True)
+            name = f"{f}{p.suffix.lower()}"
+            shutil.copyfile(p, folder / "supplied" / name)
+            supplied[f] = name
         label = run["label"] or ""
         (folder / "rerun.json").write_text(json.dumps({"run": run["id"], "settings": _run_settings(cfg, label), "supplied": supplied}), encoding="utf-8")
         _write(folder, 1, job.measures, job.programcost)
@@ -233,8 +258,10 @@ def draft_from_run(ctx, run, user) -> str:
         raise
     title = label or f"Run {run['id']}"
     now = time.time()
+    # the date in the name: several drafts made from one run were otherwise indistinguishable on the drafts list
+    stamp = datetime.fromtimestamp(now).strftime("%b %d %H:%M")
     ctx.db.run("INSERT INTO drafts (id, user_id, name, source, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-               (draft_id, user["id"], f"{title} (edited)"[:120], f"inputs of run {title}"[:500], now, now))
+               (draft_id, user["id"], f"{title} (edited {stamp})"[:120], f"inputs of run {title}"[:500], now, now))
     return draft_id
 
 

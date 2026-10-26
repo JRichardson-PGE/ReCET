@@ -17,7 +17,7 @@ from dataclasses import fields as dc_fields
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -36,12 +36,21 @@ HERE = Path(__file__).resolve().parent
 SESSION_COOKIE = "recet_session"
 LOGIN_CSRF_COOKIE = "recet_login_csrf"
 DOCS_DIR = HERE.parent / "docs"
-DOC_ORDER = ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]
+DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "USER_GUIDE.md", "README.md"]
+# what the Docs pages call each document (the file names are for the repository and the desktop window)
+DOC_TITLES = {"WEB_GUIDE.md": "Getting started on the web", "INPUT_FORMATS.md": "Input formats", "INPUT_FIELDS.md": "Input fields",
+              "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "USER_GUIDE.md": "Desktop and command line",
+              "README.md": "About these documents"}
+DOCS_HOME = "WEB_GUIDE.md"
 
 
 def doc_names() -> list[str]:
     """The Docs pages' documents, in reading order."""
     return [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
+
+
+def doc_title(name: str) -> str:
+    return DOC_TITLES.get(name, name.removesuffix(".md").replace("_", " ").capitalize())
 
 
 # Upload fields of the New run form: field -> (RunConfig field, accepted extensions, label)
@@ -64,6 +73,9 @@ TEMPLATE_FILES = {
     "profiles-8760": ("template_electric_8760_profiles.csv", "8,760 electric profiles"),
     "profiles-gas": ("template_gas_monthly_profiles.csv", "Gas monthly profiles"),
 }
+# the template offered beside each upload on the New run page: upload field -> TEMPLATE_FILES key
+UPLOAD_TEMPLATES = {"workbook": "workbook", "job_zip": "measure", "profiles_8760": "profiles-8760", "profiles_gas": "profiles-gas",
+                    "run_parameters": "run-parameters", "sw_factors": "sw-factors", "programs": "programs"}
 STATUS_TEXT = {"queued": "Queued", "running": "Running", "finished": "Finished", "failed": "Failed", "cancelled": "Stopped", "expired": "Expired"}
 
 
@@ -79,7 +91,8 @@ class Ctx:
         self.db = Database(s.db_path)
         self.runner = Runner(s, self.db)
         self.templates = Jinja2Templates(directory=str(HERE / "templates"))
-        self.templates.env.globals.update(u=self.u, version=__version__, zip=zip, status_text=STATUS_TEXT, fmt_time=fmt_time, fmt_size=fmt_size)
+        self.templates.env.globals.update(u=self.u, version=__version__, zip=zip, status_text=STATUS_TEXT, fmt_time=fmt_time, fmt_size=fmt_size,
+                                          acc_label=acc_name, doc_title=doc_title)
         self._frames: dict[str, tuple[float, object]] = {}
 
     def u(self, path: str = "/") -> str:
@@ -193,6 +206,52 @@ class Ctx:
             return None
         return p
 
+    def run_config(self, run) -> dict | None:
+        """The run's config.json (every RunConfig field), or None once its folder is gone."""
+        try:
+            return json.loads((self.runner.folder(run["id"]) / "config.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def run_size(self, run) -> dict | None:
+        """The run's size as the queue estimate counted it (eta.size: measures and the options that change its time), or None once its folder is gone."""
+        folder = self.runner.folder(run["id"])
+        return eta.size(folder) if (folder / "config.json").exists() else None
+
+    # the run page's headline numbers: (column key, label)
+    HEADLINE = [("TotalSystemBenefit", "Total system benefit"), ("TotalExpenditures", "Budget"), ("TRC_ratio", "TRC"), ("PAC_ratio", "PAC"),
+                ("RIM_ratio", "RIM"), ("SCB_ratio", "SCT Base")]
+
+    def headline(self, run) -> list[dict]:
+        """A finished run's portfolio numbers for its run page: [{"name": "" or "ACC 2024" (a comparison's runs), "tiles": [{label, value, help}]}].
+        Read from the Results page's group sums, so never the whole measure-level table; empty when the run wrote no results."""
+        from .. import results_view as rv
+        base = self.result_path(run)
+        if base is None:
+            return []
+        folders = [base] if any(base.glob("measure_level_*.*")) else sorted({p.parent for p in base.glob("*/measure_level_*.*")
+                                                                             if p.parent.name != outputs.RESULTS_DIR})
+        out = []
+        for folder in folders:
+            source = outputs.results_source(folder)
+            if source is None:
+                continue
+            try:
+                res = self.results(source)
+                cat = res.catalog()
+                keys = [k for k, _ in self.HEADLINE if k in cat]
+                t = res.table("portfolio", rv.ALL_PAS, keys)
+            except Exception:                                    # the run page must open whatever state the results are in
+                continue
+            if not len(t):
+                continue
+            row = t.iloc[0]
+            labels = dict(self.HEADLINE)
+            tiles = [{"label": "Measures", "value": f"{res.n:,}", "help": "measures priced in this run"}]
+            tiles += [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys]
+            out.append({"name": "" if folder == base else str(folder.relative_to(base)).replace("run_acc", "ACC "), "tiles": tiles})
+        return out
+
     def frame(self, path: Path):
         """A small results table (a comparison or portfolio summary), cached by path and modification time (a few recent ones)."""
         from .. import outputs
@@ -225,6 +284,84 @@ def fmt_size(n: int) -> str:
             return f"{n:,.0f} {unit}" if unit == "B" else f"{n:,.1f} {unit}"
         n /= 1024
     return str(n)
+
+
+# input-check findings that leave measures unpriced (preflight.py): shown on the run page, not only in the log
+UNPRICED_CODES = ("no_electric_profile", "no_electric_profile_2nd", "no_water_profile", "no_gas_profile")
+SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+
+
+def check_summary(report: dict | None) -> dict | None:
+    """The run page's Input check card from a run's preflight.json: counts by severity, the findings (errors first) and those that leave measures unpriced."""
+    if not report:
+        return None
+    issues = sorted(report.get("issues") or [], key=lambda i: SEVERITY_ORDER.get(i.get("severity"), 3))
+    n = {k: sum(1 for i in issues if i.get("severity") == k) for k in SEVERITY_ORDER}
+    unpriced = [i for i in issues if i.get("code") in UNPRICED_CODES and i.get("count")]
+    return {"n": n, "issues": issues, "unpriced": unpriced, "stats": report.get("stats") or {}}
+
+
+FORMAT_NAMES = {"csv": "CSV", "csv.zip": "CSV", "xlsx": "Excel", "parquet": "Parquet"}
+FILING_NAMES = {"claims": "Quarterly Claims checks", "budget_filing": "Budget filing checks"}
+
+
+def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
+    """A run's settings in one line, for the run page and the runs list: "1,000,000 measures · First Year 2028 · market effects 5% · SCT on ..."."""
+    if not cfg:
+        return ""
+    parts = []
+    if size and size.get("measures") is not None:
+        parts.append(f"{size['measures']:,} measure{'' if size['measures'] == 1 else 's'}")
+    parts.append(f"First Year {cfg['base_year']}" if cfg.get("base_year") else "First Year = earliest claim year")
+    parts.append(f"market effects {float(cfg.get('market_effects') or 0):.0%}")
+    if not cfg.get("preflight_only"):
+        parts.append("SCT on" if cfg.get("include_societal", True) else "SCT off")
+        parts.append("emissions on" if cfg.get("emissions", True) else "emissions off")
+    if cfg.get("filing_validation"):
+        parts.append(FILING_NAMES.get(cfg["filing_validation"], cfg["filing_validation"]) + (f" ({cfg['filing_year']})" if cfg.get("filing_year") else ""))
+    if cfg.get("allocate_statewide"):
+        parts.append("statewide programs split")
+    if cfg.get("apply_exclude_from_ce"):
+        parts.append("Exclude_From_CE left out of the summary")
+    if cfg.get("components"):
+        parts.append("ACC components priced separately")
+    if cfg.get("portfolio_8760"):
+        parts.append("combined 8,760 profile")
+    if not cfg.get("preflight_only"):
+        parts.append(FORMAT_NAMES.get(str(cfg.get("output_format") or ""), str(cfg.get("output_format") or "")) + " output")
+    return " · ".join(p for p in parts if p)
+
+
+def rerun_stem(run) -> str:
+    """The name a "Rerun with different settings" starts from: the earlier run's name without the ACC part a blank name gave it, plus "(rerun)"."""
+    import re
+    base = re.sub(r" · \d{4} ACC.*$", "", run["label"] or "") or f"run {run['id']}"
+    return base if base.endswith("(rerun)") else f"{base} (rerun)"
+
+
+def fmt_duration(seconds: float) -> str:
+    """A run's time: "45 s", "6 min 47 s", "1 h 12 min"."""
+    s = int(round(max(seconds, 0)))
+    if s < 60:
+        return f"{s} s"
+    if s < 3600:
+        return f"{s // 60} min {s % 60} s"
+    return f"{s // 3600} h {s % 3600 // 60} min"
+
+
+def acc_name(key) -> str:
+    """An ACC version key as users see it, both names (BR-11.7): "2024 ACC (Avoided Cost Version 2026)"; a key the package does not know, as given."""
+    v = versions.BUILTIN.get(str(key or ""))
+    return v.label if v is not None else (f"{key} ACC" if key else "")
+
+
+def expires_text(run, retention_days: int, now: float | None = None) -> str:
+    """When the run's files are deleted, for the run page and the runs list: "deleted in 5 days", "deleted within a day"; "" once expired."""
+    if run["status"] == "expired":
+        return ""
+    left = run["created_at"] + retention_days * 86400 - (time.time() if now is None else now)
+    days = int(left // 86400)
+    return "deleted within a day" if days < 1 else f"deleted in {days} day{'' if days == 1 else 's'}"
 
 
 def _safe_next(prefix: str, nxt: str | None) -> str:
@@ -486,39 +623,96 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx.need_user(request)
         return ctx.redirect("/runs")
 
+    def visible_runs(u, everyone: bool, where: str = "", args: tuple = ()) -> list:
+        return ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id WHERE 1=1 "
+                          + ("" if everyone else "AND r.user_id = ? ") + where + " ORDER BY r.created_at DESC LIMIT 200",
+                          (() if everyone else (u["id"],)) + args)
+
     @app.get("/runs", response_class=HTMLResponse)
-    async def runs_list(request: Request, all: int = 0):
+    async def runs_list(request: Request, all: int = 0, expired: int = 0):
         u = ctx.need_user(request)
         everyone = bool(all) and u["role"] == "admin"
-        rows = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
-                          + ("" if everyone else "WHERE r.user_id = ? ") + "ORDER BY r.created_at DESC LIMIT 200", () if everyone else (u["id"],))
+        rows = visible_runs(u, everyone, "" if expired else "AND r.status != 'expired'")
+        n_expired = ctx.db.one("SELECT COUNT(*) n FROM runs WHERE status = 'expired'" + ("" if everyone else " AND user_id = ?"),
+                               () if everyone else (u["id"],))["n"]
         bars = {r["id"]: ctx.progress(r) for r in rows if r["status"] == "running"}
         waits = {k: eta.describe(v) for k, v in ctx.queue_eta().items()} if any(r["status"] == "queued" for r in rows) else {}
-        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits)
+        extra = {}
+        for r in rows:
+            folder = ctx.runner.folder(r["id"])
+            size = eta.known_size(folder) if r["status"] != "expired" else None
+            took = r["finished_at"] - r["started_at"] if r["finished_at"] and r["started_at"] else None
+            extra[r["id"]] = {"measures": (size or {}).get("measures"), "took": fmt_duration(took) if took is not None else "",
+                              "expires": expires_text(r, s.retention_days) if r["status"] not in ("queued", "running") else "",
+                              "settings": settings_summary(ctx.run_config(r)) if r["status"] != "expired" else ""}
+        live_ids = [r["id"] for r in rows if r["status"] in ("queued", "running")]
+        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
+                          n_expired=n_expired, show_expired=bool(expired), live_ids=live_ids)
+
+    @app.get("/runs/live")
+    async def runs_live(request: Request, ids: str = ""):
+        """The runs list's live cells for the given queued or running runs (the page updates them in place instead of reloading)."""
+        u = ctx.need_user(request)
+        wanted = [i for i in ids.split(",") if i][:50]
+        if not wanted:
+            return JSONResponse({})
+        rows = visible_runs(u, u["role"] == "admin", f"AND r.id IN ({','.join('?' * len(wanted))})", tuple(wanted))
+        waits = {k: eta.describe(v) for k, v in ctx.queue_eta().items()} if any(r["status"] == "queued" for r in rows) else {}
+        out = {}
+        for r in rows:
+            p = ctx.progress(r)
+            out[r["id"]] = {"status": r["status"], "status_text": STATUS_TEXT.get(r["status"], r["status"]), "wait": waits.get(r["id"], ""),
+                            "progress": {"fraction": p["fraction"], "text": p["text"]} if p else None}
+        return JSONResponse(out)
 
     field_label = {fld: label for fld, _ext, label in UPLOADS.values()}
+
+    JOB_FILE_LABELS = {"workbook": "Job workbook", "measures": "Measure.csv", "programcost": "ProgramCost.csv"}
 
     def new_run_page(request: Request, status_code=200, **kw):
         from .. import editor
         from . import edit_api
         draft = kw.pop("draft", None)
+        from_run = kw.pop("from_run", None)            # "Rerun with different settings": a run whose files and settings the page starts from
         rerun = edit_api.load_rerun(ctx, draft["id"]) if draft is not None else None
         kw.setdefault("error", "")
-        kw.setdefault("form", dict(rerun["settings"]) if rerun else {})
-        carried = [(f, field_label.get(f, f)) for f in (rerun or {}).get("supplied", {})]
-        source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],)) if rerun else None
+        carried, job_files = [], []
+        source_run = None
+        if rerun:
+            kw.setdefault("form", dict(rerun["settings"]))
+            carried = [(f, field_label.get(f, f)) for f in rerun.get("supplied", {})]
+            source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],))
+        elif from_run is not None:
+            cfg, job, supplied = edit_api.run_inputs(ctx, from_run)
+            # the name is left blank: the new run is then named after the earlier one and the ACC it is priced on (an ACC carried in a prefilled
+            # name would be wrong as soon as the ACC is changed)
+            kw.setdefault("form", {**edit_api._run_settings(cfg, "", "rerun"), "label": ""})
+            carried = [(f, field_label.get(f, f)) for f in supplied]
+            job_files = [JOB_FILE_LABELS[f] for f in job]
+            source_run = from_run
+        kw.setdefault("form", {})
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
-                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried, source_run=source_run, **kw)
+                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
+                          source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
+
+    def source_run_for(request: Request, run_id: str):
+        """The run a "Rerun with different settings" starts from: one this user may see, whose files still exist (else 404 / a 400 page saying so)."""
+        from . import edit_api
+        run = ctx.run_for(request, run_id)
+        got = edit_api.run_inputs(ctx, run) if run["status"] != "expired" else None
+        if got is None or not got[1]:
+            raise HTTPException(400, "That run's files have been deleted, so it cannot be rerun. Start a new run with the files instead.")
+        return run
 
     @app.get("/runs/new", response_class=HTMLResponse)
-    async def new_run(request: Request, draft: str = ""):
+    async def new_run(request: Request, draft: str = "", source: str = Query("", alias="from")):
         u = ctx.need_user(request)
         d = None
         if draft:
             d = ctx.db.one("SELECT * FROM drafts WHERE id = ? AND user_id = ?", (draft, u["id"]))
             if d is None:
                 raise HTTPException(404)
-        return new_run_page(request, draft=d)
+        return new_run_page(request, draft=d, from_run=source_run_for(request, source) if source and d is None else None)
 
     @app.post("/runs")
     async def create_run(request: Request):
@@ -530,9 +724,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         draft = ctx.db.one("SELECT * FROM drafts WHERE id = ? AND user_id = ?", (draft_id, u["id"])) if draft_id else None
         if draft_id and draft is None:
             raise HTTPException(404)
+        from_id = str(form.get("from_run", "")).strip()
+        from_run = source_run_for(request, from_id) if from_id and draft is None else None
 
         def fail(msg: str):
-            return new_run_page(request, status_code=400, error=msg, form=values, draft=draft)
+            return new_run_page(request, status_code=400, error=msg, form=values, draft=draft, from_run=from_run)
 
         # --- options
         cfg: dict = {}
@@ -597,6 +793,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ups.pop("workbook", None)
             if "job_zip" not in ups:
                 return fail("Choose a job zip holding Measure.csv and, optionally, ProgramCost.csv (or switch to a job workbook).")
+        elif mode == "from_run":
+            if from_run is None:
+                return fail("Choose a job workbook or a job zip.")
+            ups.pop("workbook", None)
+            ups.pop("job_zip", None)
         else:
             ups.pop("workbook", None)
             ups.pop("job_zip", None)
@@ -619,6 +820,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     continue
                 cfg[UPLOADS[k][0]] = str(dest)
                 names.append(f"{UPLOADS[k][2]}: {Path(up.filename).name}")
+            if from_run is not None:                         # Rerun with different settings: the earlier run's files, linked (not uploaded again)
+                from . import edit_api
+                _cfg, job, supplied = edit_api.run_inputs(ctx, from_run)
+                title = from_run["label"] or from_run["id"]
+                if mode == "from_run":
+                    for f, p in job.items():
+                        dest = folder / "inputs" / f"from_run_{p.name}"
+                        edit_api.link_or_copy(p, dest)
+                        cfg[f] = str(dest)
+                    names.insert(0, f"Job: the files of run {title} ({', '.join(JOB_FILE_LABELS[f] for f in job)})")
+                for f, p in supplied.items():
+                    if cfg.get(f) or form.get(f"keep_{f}") != "on":
+                        continue
+                    dest = folder / "inputs" / f"carried_{f}{p.suffix.lower()}"
+                    edit_api.link_or_copy(p, dest)
+                    cfg[f] = str(dest)
+                    names.append(f"{field_label.get(f, f)}: from run {title}")
             if draft is not None:
                 from . import edit_api
                 names += edit_api.carry_supplied(ctx, draft["id"], folder, cfg, field_label, lambda fld: form.get(f"keep_{fld}") == "on")
@@ -635,14 +853,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             shutil.rmtree(folder, ignore_errors=True)
             return fail(str(exc))
 
+        if not label:                       # a name to tell runs apart on the list: the job's file (or draft, or earlier run) and the ACC
+            stem = (draft["name"] if draft is not None else
+                    Path(ups["workbook"].filename).stem if "workbook" in ups else
+                    Path(ups["job_zip"].filename).stem if "job_zip" in ups else
+                    rerun_stem(from_run) if from_run is not None else "")
+            label = (f"{stem} · " if stem else "") + f"{acc} ACC" + (f" vs {cmp_}" if cmp_ else "") + (" · input check" if cfg.get("preflight_only") else "")
+            label = label[:120]
         ctx.queue_run(request, u, run_id, cfg, label, names)
         return ctx.redirect(f"/runs/{run_id}")
 
     def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
+        from .. import editor
         has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
         wait = eta.describe(ctx.queue_eta().get(run["id"])) if run["status"] == "queued" else ""
+        size = ctx.run_size(run) if has_inputs else None
+        n = (size or {}).get("measures")
+        editable = n is None or n <= editor.MAX_EDIT_ROWS
+        check = check_summary(ctx.preflight_report(run)) if run["status"] not in ("queued", "expired") else None
+        headline = ctx.headline(run) if run["status"] == "finished" and run["result_dir"] else []
         return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
-                          retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run))
+                          retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run),
+                          settings=settings_summary(ctx.run_config(run), size) if has_inputs else "", editable=editable, n_measures=n,
+                          max_edit_rows=editor.MAX_EDIT_ROWS, check=check, headline=headline, expires=expires_text(run, s.retention_days))
 
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
     async def run_page(request: Request, run_id: str):
@@ -809,7 +1042,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         folder = ctx.result_path(run, sub) if sub else base
         if folder is None:
             raise HTTPException(404)
-        subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*"))
+        # a comparison's runs are sub-folders with a measure-level table; the kept results parquet's folder (outputs.RESULTS_DIR) is not one
+        subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*") if p.parent.name != outputs.RESULTS_DIR)
         measure_files = sorted(folder.glob("measure_level_*.*"))
         source = outputs.results_source(folder)                # a CSV run's kept parquet (outputs.RESULTS_DIR) when there is one
         comparison = sorted(folder.glob("comparison_summary_*.*"))
@@ -847,8 +1081,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             table = res.table(level, pa, keys)
         shown = [cat[k] for k in keys if k in cat]
         kw.update(level=level, pa=pa, pas=pas, views=views, view=view, keys=keys, catalog=cat, shown=shown, file_name=measure_files[0].name,
-                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS)
+                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS,
+                  tiles=results_tiles(res, cat, pa), chart=sector_chart(res, cat, pa), groups=picker_groups(cat), labels={k: rv.display_label(c) for k, c in cat.items()})
         return ctx.render(request, "results.html", **kw, note=note, table=table, rv=rv)
+
+    def results_tiles(res, cat, pa) -> list[dict]:
+        """The Results page's headline numbers for the chosen PA: measures, then Ctx.HEADLINE's columns that this run has."""
+        from .. import results_view as rv
+        keys = [k for k, _ in Ctx.HEADLINE if k in cat]
+        t = res.table("portfolio", pa, keys)
+        if not len(t):
+            return []
+        row, labels = t.iloc[0], dict(Ctx.HEADLINE)
+        return ([{"label": "Measures", "value": f"{int(row['Measures']):,}", "help": "measures in the table below"}]
+                + [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys])
+
+    def sector_chart(res, cat, pa, limit: int = 12) -> dict | None:
+        """Total system benefit by program sector, as bars for the Results page (widths in percent of the largest value; negative bars marked)."""
+        from .. import results_view as rv
+        key = "TotalSystemBenefit"
+        if key not in cat:
+            return None
+        t = res.table("sector", pa, [key])
+        if len(t) < 2 or key not in t:
+            return None
+        t = t.sort_values(key, ascending=False).head(limit)
+        top = max(float(t[key].abs().max()), 1e-9)
+        bars = [{"name": str(r["Program sector"]) or "(blank)", "value": rv.format_value(cat[key], r[key]),
+                 "pct": round(100 * abs(float(r[key])) / top, 1), "neg": float(r[key]) < 0} for _, r in t.iterrows()]
+        return {"title": "Total system benefit by program sector", "bars": bars}
+
+    def picker_groups(cat) -> list[tuple[str, list]]:
+        """The column picker's groups, in rv.GROUP_ORDER: [(group, [(key, label, help)])]."""
+        from .. import results_view as rv
+        out: dict[str, list] = {g: [] for g in rv.GROUP_ORDER}
+        for k, c in cat.items():
+            out[rv.column_group(c)].append((k, rv.display_label(c), c.help or f"Output column {k}, summed over the measures in each row."))
+        return [(g, items) for g, items in out.items() if items]
 
     @app.get("/runs/{run_id}/results.csv")
     async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = ""):
@@ -913,7 +1182,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/docs")
     async def docs_index(request: Request):
         ctx.need_user(request)
-        return ctx.redirect("/docs/README.md")   # a redirect, not a render, so the README's relative links resolve under /docs/
+        return ctx.redirect("/docs/" + DOCS_HOME)   # a redirect, not a render, so the document's relative links resolve under /docs/
 
     @app.get("/docs/{name}", response_class=HTMLResponse)
     async def doc(request: Request, name: str):
@@ -923,7 +1192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if p.suffix != ".md" or not p.is_file() or p.parent != DOCS_DIR.resolve():
             raise HTTPException(404)
         html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
-        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=name.removesuffix(".md").replace("_", " ").title(), current=name)
+        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=doc_title(name), current=name)
 
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz():

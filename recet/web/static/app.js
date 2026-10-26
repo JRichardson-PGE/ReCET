@@ -22,16 +22,71 @@
   if (mode) {
     var sync = function () {
       var v = (mode.querySelector("input:checked") || {}).value || "workbook";
-      document.querySelectorAll(".mode-workbook").forEach(function (x) { x.classList.toggle("hidden", v !== "workbook"); });
-      document.querySelectorAll(".mode-files").forEach(function (x) { x.classList.toggle("hidden", v !== "files"); });
+      ["workbook", "files", "from_run"].forEach(function (m) {
+        document.querySelectorAll(".mode-" + m).forEach(function (x) { x.classList.toggle("hidden", v !== m); });
+      });
     };
     mode.addEventListener("change", sync);
     sync();
   }
+  // New run: "Compare with" cannot be the ACC already chosen; the filing year matters only with filing checks.
+  var accSel = document.getElementById("acc-version"), cmpSel = document.getElementById("compare-with");
+  if (accSel && cmpSel) {
+    var syncCompare = function () {
+      Array.prototype.forEach.call(cmpSel.options, function (o) { o.disabled = !!o.value && o.value === accSel.value; o.hidden = o.disabled; });
+      if (cmpSel.value === accSel.value) cmpSel.value = "";
+    };
+    accSel.addEventListener("change", syncCompare);
+    syncCompare();
+  }
+  var filingSel = document.getElementById("filing-validation");
+  if (filingSel) {
+    var syncFiling = function () {
+      document.querySelectorAll(".filing-year").forEach(function (x) { x.classList.toggle("hidden", !filingSel.value); });
+    };
+    filingSel.addEventListener("change", syncFiling);
+    syncFiling();
+  }
+
+  // New run: send the form with a visible upload percentage (a job zip can be 150 MB). The server answers with a redirect to the new run's page, or with
+  // the New run page again saying what was wrong; that page replaces this one.
   var runForm = document.getElementById("run-form");
-  if (runForm) runForm.addEventListener("submit", function () {
-    var b = runForm.querySelector("button.primary");
-    if (b) { b.disabled = true; b.textContent = "Uploading…"; }
+  if (runForm) runForm.addEventListener("submit", function (e) {
+    var by = e.submitter;
+    if (by && by.name) {                    // the button pressed (Start run / Check inputs only) is sent as a field: a disabled button would not be
+      var keep = document.createElement("input");
+      keep.type = "hidden"; keep.name = by.name; keep.value = by.value;
+      runForm.appendChild(keep);
+    }
+    runForm.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+    if (by) by.textContent = "Uploading…";
+    var hasFile = Array.prototype.some.call(runForm.querySelectorAll("input[type=file]"), function (i) { return i.files && i.files.length; });
+    if (!hasFile || !window.XMLHttpRequest || !window.FormData) return;          // no file to watch: the browser's own submit
+    e.preventDefault();
+    var box = document.getElementById("upload-progress"), bar = box.querySelector("progress"), text = box.querySelector(".text");
+    box.hidden = false;
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", runForm.action);
+    xhr.upload.addEventListener("progress", function (p) {
+      if (!p.lengthComputable) return;
+      bar.value = p.loaded / p.total;
+      text.textContent = p.loaded < p.total
+        ? "Uploading " + Math.round(100 * p.loaded / p.total) + "% (" + (p.loaded / 1048576).toFixed(0) + " of " + (p.total / 1048576).toFixed(0) + " MB)"
+        : "Uploaded; unpacking and queueing the run…";
+    });
+    xhr.addEventListener("load", function () {
+      var done = xhr.responseURL && xhr.responseURL.indexOf("/runs/new") < 0 && xhr.responseURL !== runForm.action;
+      if (done && xhr.status < 400) { window.location.href = xhr.responseURL; return; }
+      document.open();                       // the New run page again, with the error and the values given
+      document.write(xhr.responseText);
+      document.close();
+    });
+    xhr.addEventListener("error", function () {
+      text.textContent = "The upload failed (connection lost). Check the connection and try again.";
+      runForm.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+      if (by) by.textContent = by.value === "on" ? "Check inputs only" : "Start run";
+    });
+    xhr.send(new FormData(runForm));
   });
 
   // Results: selects submit their form; the column picker sends the ticked columns.
@@ -93,9 +148,114 @@
     };
     poll();
   }
-  // Runs list: while a run is queued or running, reload every 10 s to move its progress bar and status.
+  // Runs list: while a run is queued or running, update its status, wait and progress cells every few seconds (no page reload, so the page keeps its
+  // scroll and selection); reload once when one of them finishes, to show its links and times.
   var runsTable = document.getElementById("runs-table");
-  if (runsTable && runsTable.dataset.live === "1") { setTimeout(function () { window.location.reload(); }, 10000); }
+  if (runsTable && runsTable.dataset.live === "1") {
+    var liveIds = runsTable.dataset.ids;
+    var tick = function () {
+      fetch(runsTable.dataset.url + "?ids=" + encodeURIComponent(liveIds), { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (d) {
+          var ended = false;
+          Object.keys(d).forEach(function (id) {
+            var x = d[id], row = runsTable.querySelector('tr[data-id="' + id + '"]');
+            if (!row) return;
+            if (x.status !== "queued" && x.status !== "running") ended = true;
+            var st = row.querySelector(".status");
+            st.textContent = x.status_text;
+            st.className = "status s-" + x.status;
+            var wait = row.querySelector(".live-wait"), box = row.querySelector(".progress");
+            if (wait) wait.textContent = x.wait || "";
+            if (!box) return;
+            box.classList.toggle("hidden", !x.progress);
+            if (x.progress) {
+              box.querySelector("progress").value = x.progress.fraction;
+              box.title = x.progress.text;
+              var left = x.progress.text.split(" · ");
+              box.querySelector(".live-text").textContent = Math.round(x.progress.fraction * 100) + "%" + (left.length > 1 ? " · " + left[left.length - 1] : "");
+            }
+          });
+          if (ended) { window.location.reload(); return; }
+          setTimeout(tick, 4000);
+        })
+        .catch(function () { setTimeout(tick, 15000); });
+    };
+    setTimeout(tick, 4000);
+  }
+
+  // Results: sort a table by a column (click its header) and filter its rows by text. Numbers sort by the value in data-v, not the formatted text.
+  document.querySelectorAll("table.sortable").forEach(function (table) {
+    var body = table.tBodies[0];
+    if (!body) return;
+    var heads = table.tHead ? table.tHead.rows[0].cells : [];
+    Array.prototype.forEach.call(heads, function (th, col) {
+      th.classList.add("sort-head");
+      th.tabIndex = 0;
+      th.setAttribute("aria-sort", "none");
+      var sort = function () {
+        var dir = th.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
+        Array.prototype.forEach.call(heads, function (h) { h.setAttribute("aria-sort", "none"); });
+        th.setAttribute("aria-sort", dir);
+        var rows = Array.prototype.slice.call(body.rows), sign = dir === "ascending" ? 1 : -1;
+        var key = function (tr) {
+          var td = tr.cells[col];
+          if (!td) return "";
+          var v = td.dataset.v;
+          return v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : td.textContent.trim().toLowerCase();
+        };
+        rows.sort(function (a, b) {
+          var x = key(a), y = key(b);
+          if (typeof x === "number" && typeof y === "number") return sign * (x - y);
+          if (typeof x === "number") return -1;
+          if (typeof y === "number") return 1;
+          return sign * (x < y ? -1 : x > y ? 1 : 0);
+        });
+        rows.forEach(function (tr) { body.appendChild(tr); });
+      };
+      th.addEventListener("click", sort);
+      th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sort(); } });
+    });
+  });
+  document.querySelectorAll("input[data-filter]").forEach(function (box) {
+    var table = document.getElementById(box.dataset.filter), count = document.getElementById(box.dataset.count);
+    if (!table) return;
+    box.addEventListener("input", function () {
+      var q = box.value.trim().toLowerCase(), shown = 0, rows = table.tBodies[0].rows;
+      Array.prototype.forEach.call(rows, function (tr) {
+        var hit = !q || tr.textContent.toLowerCase().indexOf(q) >= 0;
+        tr.hidden = !hit;
+        if (hit) shown++;
+      });
+      if (count) count.textContent = q ? shown.toLocaleString() + " of " + rows.length.toLocaleString() + " rows" : "";
+    });
+  });
+
+  // Results: the column picker's search box, groups and Defaults / Clear buttons.
+  var pickFind = document.getElementById("pick-find");
+  if (pickFind) {
+    var labels = document.querySelectorAll(".pick label");
+    pickFind.addEventListener("input", function () {
+      var q = pickFind.value.trim().toLowerCase();
+      labels.forEach(function (l) { l.hidden = !!q && (l.textContent + " " + (l.title || "")).toLowerCase().indexOf(q) < 0; });
+      document.querySelectorAll(".pick-group").forEach(function (g) { g.hidden = !g.querySelector("label:not([hidden])"); });
+    });
+    document.querySelectorAll("[data-pick]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var defaults = (b.dataset.defaults || "").split(",");
+        document.querySelectorAll(".pick input[type=checkbox]").forEach(function (c) {
+          c.checked = b.dataset.pick === "defaults" ? defaults.indexOf(c.value) >= 0 : false;
+        });
+      });
+    });
+  }
+  // Results: the Columns button opens the picker above the table.
+  var colBtn = document.getElementById("columns-btn"), colPanel = document.getElementById("columns");
+  if (colBtn && colPanel) colBtn.addEventListener("click", function () {
+    colPanel.hidden = !colPanel.hidden;
+    colBtn.setAttribute("aria-expanded", colPanel.hidden ? "false" : "true");
+    if (!colPanel.hidden && pickFind) pickFind.focus();
+  });
 
   // Docs > Value lists: find box, the "Show retired codes" switch and pages of codes (100 a page by default).
   var vlTable = document.getElementById("vl-table");
