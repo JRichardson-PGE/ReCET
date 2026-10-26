@@ -86,6 +86,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.44 (2026-10-26, Jake): queued runs show when they should start and finish (`recet/web/eta.py`, BR-06.2). A run's size (measure rows; workbook
+  Measure sheet) is counted when it is queued and kept as `estimate.json`; its time = 10 s + the progress weights' seconds per 1M (format, SCT, emissions;
+  x2 for a comparison; preflight-only = the input-check stages) x measures / 1M, times a calibration = median actual/estimate over the last 10 finished
+  full runs of >= 20,000 measures (only runs with a kept estimate.json; clamped 0.25-4). `queue` walks the queue in claim order (input checks first) over
+  `workers` slots, each free when its running run's live time left runs out (else its estimate less its elapsed time). Shown on the run page (and its
+  poll, `wait`) and the runs list: "starts in about 6 min, done in about 13 min (estimated)".
 - 0.1.43 (2026-10-26, Jake; 0.1.41 / 0.1.42 are the progress-estimate and filing-checks PRs): run downloads. Every run writes `preflight_findings.xlsx`
   (`PreflightReport.write_xlsx`, `jobs.write_findings`): Summary, Findings (errors first) and Cells (file, line = data row + 2, record ID, column; IDs read
   from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and
