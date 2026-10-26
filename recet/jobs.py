@@ -312,7 +312,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     fmt = cfg.output_format
     if fmt == "xlsx" and parts is not None and n_rows > cfg.excel_max_rows:
         fmt = cfg.excel_fallback                                   # what run_format / outputs.ExcelLimit will write instead
-    progress.plan(parts is not None, fmt, cfg.include_societal, cfg.emissions)   # the bar's stage weights for this run (progress.py)
+    progress.plan(parts is not None, fmt, cfg.include_societal, cfg.emissions, bool(cfg.filing_validation))   # the bar's stage weights (progress.py)
     try:
         out = _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
     finally:
@@ -437,7 +437,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
     if result.filing is not None:
-        frame = outputs.attach_filing(frame, result.filing)
+        frame = outputs.attach_filing(frame, outputs.filing_lookup(result.filing))
     result.frame = frame
     progress.report("writing")
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel)

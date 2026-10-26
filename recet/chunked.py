@@ -141,6 +141,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     cet_sums: dict[str, tuple[float, float]] = {}
     matched = 0
     labels = {k: g.label for k, g in groups.items()}
+    filing = outputs.filing_lookup(result.filing) if result.filing is not None else None     # CEDARS filing checks: built once, attached to every part
     for i, (f, _start, _n) in enumerate(parts):
         measures = load(f)
         res = run_poc.apply_program_costs(pd.read_parquet(spill / f"values_{i:04d}.parquet"), measures, program, acc_version=acc.settings_acc,
@@ -154,8 +155,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
             frame = frame[[c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]]
         frame = outputs.attach_programs(frame, measures["prg_id"])
-        if result.filing is not None:
-            frame = outputs.attach_filing(frame, result.filing)
+        if filing is not None:
+            frame = outputs.attach_filing(frame, filing)
         writer.write(frame)
         summary_parts.add(frame)
         result_sums.append(results_view.group_sums(frame))           # the Results page's sums, a few hundred rows a part (results_view)
