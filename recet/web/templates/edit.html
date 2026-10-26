@@ -20,24 +20,31 @@
   Download <a href="{{ u('/edit/' + draft.id + '/download.xlsx') }}">job workbook</a> or <a href="{{ u('/edit/' + draft.id + '/download.zip') }}">CET files</a> ·
   <a href="{{ u('/edit') }}">All drafts</a></p>
 
-<section class="check-panel" id="check" aria-labelledby="check-btn">
+<section class="check-panel" id="check" aria-label="Input check">
+  <div class="status-bar">
+    <span class="issue-line" id="issue-summary" role="status" aria-live="polite">Checking the cells…</span>
+    <button type="button" class="link small" id="issues-toggle" aria-expanded="false" aria-controls="issues" hidden>Show the list</button>
+  </div>
+  <ul class="issues" id="issues" hidden></ul>
   <div class="check-bar">
     <button type="button" id="check-btn" disabled>Validate inputs</button>
     <label class="small">against the <select id="check-acc" aria-label="ACC version to check against"></select> ACC</label>
     <label class="small"><input type="checkbox" id="check-sw"> Split statewide (SW_) programs across the IOUs</label>
     <label class="small">CEDARS filing checks <select id="check-filing" aria-label="CEDARS filing checks"><option value="">None</option>
       <option value="claims">Quarterly Claims</option><option value="budget_filing">Budget filing</option></select></label>
+    <details class="check-about small"><summary>What does it check?</summary>
+      <p class="muted">The cells are checked every time the draft saves (the line above). Validate inputs adds the full check a run makes before pricing (files,
+        programs, profiles, gas profiles, ACC years) on the saved tables, so you see what would stop a run or leave measures unpriced. Nothing is priced. The
+        cells it flags are outlined in the table, red for a problem that stops the run and amber for a warning; hover a flagged cell to read why. Editing a
+        flagged cell clears its outline until the next check. With CEDARS filing checks, the records CEDARS' upload would reject or warn on are outlined in
+        amber too, under the rule's ID.</p></details>
   </div>
-  <p class="muted small check-about">Runs the same input check a run makes before pricing (files, programs, profiles, gas profiles, ACC years) on the saved
-    tables, so you see what would stop a run or leave measures unpriced. The cells it flags are outlined in the table, red for a problem that stops the run and
-    amber for a warning; editing a flagged cell clears its outline until the next check. Nothing is priced. With CEDARS filing checks, the records CEDARS'
-    upload would reject or warn on are outlined in amber too, under the rule's ID.</p>
   <div id="check-result" class="check-result" hidden aria-live="polite"></div>
 </section>
 
-<div class="tabs" role="tablist">
-  <button type="button" class="tab active" data-table="Measure" role="tab">Measure <span class="count" data-count="Measure"></span></button>
-  <button type="button" class="tab" data-table="ProgramCost" role="tab">ProgramCost <span class="count" data-count="ProgramCost"></span></button>
+<div class="tabs" role="tablist" aria-label="Tables">
+  <button type="button" class="tab active" data-table="Measure" role="tab" id="tab-Measure" aria-selected="true" aria-controls="grid-Measure">Measure <span class="count" data-count="Measure"></span></button>
+  <button type="button" class="tab" data-table="ProgramCost" role="tab" id="tab-ProgramCost" aria-selected="false" aria-controls="grid-ProgramCost">ProgramCost <span class="count" data-count="ProgramCost"></span></button>
 </div>
 <div class="editor-bar">
   <button type="button" data-action="add">Add row</button>
@@ -47,14 +54,16 @@
   <button type="button" data-action="undo" title="Ctrl+Z">Undo</button>
   <button type="button" data-action="redo" title="Ctrl+Y">Redo</button>
   <span class="sep"></span>
+  <label class="inline small">Go to column <input type="search" id="col-find" list="col-names" class="short" placeholder="name" autocomplete="off"></label>
+  <datalist id="col-names"></datalist>
+  <label class="inline small"><input type="checkbox" id="hide-noeff"> Hide no-effect columns</label>
+  <span class="sep"></span>
   <span class="legend"><span class="calc">changes results</span><span class="noeff">no effect</span>
     <span class="sw-error">stops the run</span><span class="sw-warning">runs, but check it</span></span>
 </div>
 <p class="help-line" id="help">Click a cell to see what its column means; hover a header for what it changes. Click a cell (or type) to edit; a cell with ▾ has a list to pick from; select a block and copy or paste with Excel.</p>
-<div id="grid-Measure" class="grid"></div>
-<div id="grid-ProgramCost" class="grid" hidden></div>
-<p class="issue-line" id="issue-summary"></p>
-<ul class="issues" id="issues"></ul>
+<div id="grid-Measure" class="grid" role="tabpanel" aria-labelledby="tab-Measure"></div>
+<div id="grid-ProgramCost" class="grid" role="tabpanel" aria-labelledby="tab-ProgramCost" hidden></div>
 <p class="muted small" id="profiles-note"></p>
 </div>
 {% endblock %}

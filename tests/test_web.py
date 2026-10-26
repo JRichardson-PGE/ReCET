@@ -222,6 +222,107 @@ def test_a_run_from_upload_to_results(web, tmp_path):
     assert c.get(f"{P}/runs/{run_id}/files/..%2F..%2Frecet_web.sqlite3").status_code == 404
 
 
+def test_the_run_page_shows_settings_the_input_check_and_headline_numbers(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "s@example.com")
+    c = _login(app, "s@example.com")
+    run_id = _start_run(c, tmp_path, base_year="2026", market_effects="0.05")
+    assert ctx.db.one("SELECT label FROM runs WHERE id = ?", (run_id,))["label"] == "job · 2026 ACC"      # a blank name: the input file and the ACC
+    assert ctx.runner.work_once()
+    page = c.get(f"{P}/runs/{run_id}").text
+    assert "1 measure · First Year 2026 · market effects 5%" in page and "CSV output" in page                     # the settings line
+    assert "Input check:" in page and "preflight_findings.xlsx in the files below" in page                       # the input check card
+    tiles = dict(re.findall(r'<span class="tile-label">([^<]+)</span><span class="tile-value">([^<]+)</span>', page))
+    assert tiles["Measures"] == "1" and tiles["Total system benefit"].startswith("$") and "TRC" in tiles
+    assert "Rerun with different settings" in page and "deleted in 6 days" in page
+    assert '<details class="card log-card" >' in page                                                            # a finished run's log is folded
+
+
+def test_a_measure_that_cannot_be_priced_is_shown_on_the_run_page(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "u@example.com")
+    c = _login(app, "u@example.com")
+    lines = make_measure_csv(tmp_path / "m.csv").read_text().splitlines()
+    head = lines[0].split("|")
+    row = lines[1].split("|")
+    row[head.index("AC_Elec_Impact_Profile")] = "No Such Profile"
+    run_id = c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "market_effects": "0", "output_format": "csv"},
+                    files={"job_zip": _job(("\n".join([lines[0], "|".join(row)]) + "\n").encode())}).headers["location"].rsplit("/", 1)[-1]
+    assert ctx.runner.work_once()
+    page = c.get(f"{P}/runs/{run_id}").text
+    assert "Not priced:" in page and "1 measures: electric measures with no 8,760 profile are NOT priced" in page
+
+
+def test_rerun_with_different_settings_reuses_the_runs_files(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "v@example.com")
+    _user(ctx, "w@example.com")
+    c = _login(app, "v@example.com")
+    first = _start_run(c, tmp_path, label="base", emissions="on")
+    assert ctx.runner.work_once()
+    assert _login(app, "w@example.com").get(f"{P}/runs/new?from={first}").status_code == 404                     # another user's run
+    page = c.get(f"{P}/runs/new?from={first}").text
+    assert f'name="from_run" value="{first}"' in page and 'value="from_run" checked' in page and 'name="label" maxlength="120" value=""' in page
+    assert 'name="emissions" checked' in page and "Measure.csv from run" in page
+    r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "from_run": first, "input_mode": "from_run", "acc_version": "2024", "market_effects": "0.05",
+                                  "output_format": "csv", "label": ""})
+    assert r.status_code == 303, r.text
+    second = r.headers["location"].rsplit("/", 1)[-1]
+    row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (second,))
+    assert row["label"] == "base (rerun) · 2024 ACC" and row["inputs"].startswith(f"Job: the files of run base")
+    cfg = json.loads((ctx.runner.folder(second) / "config.json").read_text())
+    assert cfg["measures"].startswith(str(ctx.runner.folder(second) / "inputs")) and cfg["market_effects"] == 0.05
+    assert ctx.runner.work_once()
+    assert ctx.db.one("SELECT status FROM runs WHERE id = ?", (second,))["status"] == "finished", c.get(f"{P}/runs/{second}/log").json()["text"]
+    # "Check inputs only" is the second submit button: its value is what the server reads
+    r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "from_run": first, "input_mode": "from_run", "acc_version": "2026", "market_effects": "0",
+                                  "output_format": "csv", "preflight_only": "on"})
+    assert ctx.db.one("SELECT preflight_only, label FROM runs WHERE id = ?", (r.headers["location"].rsplit("/", 1)[-1],))["preflight_only"] == 1
+    # once the earlier run's files are gone it cannot be rerun
+    ctx.runner.cleanup(now=time.time() + 8 * 86400)
+    assert c.get(f"{P}/runs/new?from={first}").status_code == 400
+
+
+def test_the_runs_list_hides_expired_runs_and_updates_live_ones(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "x@example.com")
+    c = _login(app, "x@example.com")
+    old = _start_run(c, tmp_path, label="old one")
+    assert ctx.runner.work_once()
+    ctx.runner.cleanup(now=time.time() + 8 * 86400)
+    queued = _start_run(c, tmp_path, label="waiting one")
+    page = c.get(f"{P}/runs").text
+    assert "waiting one" in page and "old one" not in page and "Show the 1 expired" in page and 'data-live="1"' in page
+    assert "old one" in c.get(f"{P}/runs?expired=1").text
+    live = c.get(f"{P}/runs/live?ids={queued},{old}").json()
+    assert live[queued]["status"] == "queued" and live[queued]["status_text"] == "Queued"
+    _user(ctx, "y@example.com")
+    assert _login(app, "y@example.com").get(f"{P}/runs/live?ids={queued}").json() == {}                         # not another user's runs
+
+
+def test_the_results_page_tiles_chart_sorting_and_column_groups(web, tmp_path):
+    app, ctx = web
+    _user(ctx, "z@example.com")
+    c = _login(app, "z@example.com")
+    run_id = _start_run(c, tmp_path)
+    assert ctx.runner.work_once()
+    page = c.get(f"{P}/runs/{run_id}/results").text
+    assert 'class="tile-label">Total system benefit<' in page and 'id="results-table"' in page and "data sortable" in page
+    assert '<legend>Ratios</legend>' in page and "Columns…" in page and 'data-filter="results-table"' in page
+    levels = re.findall(r'href="\?level=(\w+)', page)
+    assert levels[0] == "portfolio" and levels[-1] == "measure"                                                   # summary first
+
+
+def test_display_labels_name_output_columns_in_words():
+    from recet import results_view as rv
+    col = lambda k, fmt="usd": rv.Column(k, k, "sum", fmt)
+    assert rv.display_label(col("ElecSupplyCost_SB")) == "Electric supply cost (SCT Base) ($)"
+    assert rv.display_label(col("BillIncrElec")) == "Bill increase electric ($)"
+    assert rv.display_label(col("NetElecCO2Lifecycle", "tonnes")) == "Net electric CO2 lifecycle (t)"
+    assert rv.display_label(rv.Column("TRC_ratio", "TRC", "ratio", "ratio")) == "TRC"                          # a column with a label keeps it
+    assert rv.column_group(col("GasBen_SH")) == "Societal Cost Tests (SCT)" and rv.column_group(col("NetElecNOx", "lbs")) == "Emissions"
+
+
 
 def test_the_measure_level_is_off_for_a_run_too_large_to_show(web, tmp_path, monkeypatch):
     from recet import results_view as rv
@@ -366,7 +467,7 @@ def test_edit_inputs_of_a_finished_run_and_rerun(web, tmp_path):
     draft = r.headers["location"].split("draft=")[1]
     d = c.get(f"{P}/edit/api/{draft}").json()
     m = d["tables"]["Measure"]
-    assert d["name"] == "base case (edited)" and m["rows"][0][m["columns"].index("CEInputID")] == "T1"
+    assert d["name"].startswith("base case (edited ") and m["rows"][0][m["columns"].index("CEInputID")] == "T1"   # dated, so repeats differ
     # change a cell, then the New run page starts from the run's settings and offers its supplied file
     m["rows"][0][m["columns"].index("UnitkWh1stBaseline")] = "2000"
     edit_csrf = re.search(r'data-csrf="([^"]+)"', c.get(f"{P}/edit?draft={draft}").text).group(1)
@@ -513,11 +614,13 @@ def test_docs_pages_render(web):
     _user(ctx, "docs@example.com")
     c = _login(app, "docs@example.com")
     r = c.get(f"{P}/docs")
-    assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/README.md"
-    for name in ["README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
+    assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/WEB_GUIDE.md"     # the web guide is the Docs home
+    for name in ["WEB_GUIDE.md", "README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
         r = c.get(f"{P}/docs/{name}")
         assert r.status_code == 200, name
         assert f'href="{P}/docs/{name}" class="on"' in r.text, name
+    nav = c.get(f"{P}/docs/WEB_GUIDE.md").text
+    assert ">Getting started on the web<" in nav and ">Desktop and command line<" in nav and ">USER_GUIDE<" not in nav   # named by title
     assert c.get(f"{P}/docs/missing.md").status_code == 404
 
 

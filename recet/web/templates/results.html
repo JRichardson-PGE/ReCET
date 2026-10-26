@@ -15,14 +15,13 @@
 
 {% if plain is not none %}
 <h2>{{ plain_name }}</h2>
-<div class="scroll"><table class="data">
+<div class="scroll"><table class="data sortable">
   <thead><tr>{% for c in plain.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
-  <tbody>{% for r in plain.itertuples(index=False) %}<tr>{% for v in r %}<td class="{{ 'num' if v is number else '' }}">{{ '{:,.4f}'.format(v) if v is number and v == v and (v|abs) < 100 else ('{:,.0f}'.format(v) if v is number and v == v else ('' if v is number else v)) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  <tbody>{% for r in plain.itertuples(index=False) %}<tr>{% for v in r %}<td class="{{ 'num' if v is number else '' }}" {% if v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,.4f}'.format(v) if v is number and v == v and (v|abs) < 100 else ('{:,.0f}'.format(v) if v is number and v == v else ('' if v is number else v)) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
 </table></div>
 {% elif note and table is none and not catalog %}
 <p>{{ note }}</p>
 {% else %}
-<p class="muted small">{{ file_name }} · {{ '{:,}'.format(n_measures) }} measures. Every level above the measure is a sum of its measures; ratios are recomputed from the summed benefits and costs.</p>
 <form method="get" class="filters" id="filters">
   {% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% endif %}
   <input type="hidden" name="level" value="{{ level }}">
@@ -31,35 +30,27 @@
     {% if not view %}<option value="" selected>(unsaved columns)</option>{% endif %}
     {% for v in views %}<option {% if v == view %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
   {% if not view %}<input type="hidden" name="columns" value="{{ keys|join(',') }}">{% endif %}
+  <button type="button" id="columns-btn" aria-expanded="false" aria-controls="columns">Columns…</button>
 </form>
-<p class="tabs">
-  {% for key, label in levels %}
-  {% if key == 'measure' and not measure_ok %}
-  <span class="off muted" title="Shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures: the measure-level table is in the run's downloads">{{ label }} (off: {{ '{:,}'.format(n_measures) }} measures)</span>
-  {% else %}
-  <a class="{% if key == level %}on{% endif %}" href="?{{ {'level': key, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">{{ label }}</a>
-  {% endif %}
-  {% endfor %}
-</p>
-{% if note %}<p class="alert">{{ note }}</p>{% endif %}
-{% if table is not none %}
-<p class="small"><a href="{{ u('/runs/' + run.id + '/results.csv') }}?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">Download this table (CSV)</a></p>
-<div class="scroll"><table class="data">
-  <thead><tr>{% for c in table.columns %}<th title="{{ catalog[c].help if c in catalog else '' }}">{{ catalog[c].label if c in catalog else c }}</th>{% endfor %}</tr></thead>
-  <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog else '' }}">{{ rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table></div>
-{% if table|length == 0 %}<p class="muted">No rows for this PA at this level.</p>{% endif %}
-{% endif %}
+<p class="muted small">{{ file_name }} · {{ '{:,}'.format(n_measures) }} measures. Every level above the measure is a sum of its measures; ratios are recomputed from the summed benefits and costs.</p>
 
-<details class="card" id="columns">
-  <summary>Choose columns</summary>
+<section class="card" id="columns" hidden aria-label="Choose columns">
   <form method="get" id="pick">
     <input type="hidden" name="level" value="{{ level }}"><input type="hidden" name="pa" value="{{ pa }}">{% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% endif %}
     <input type="hidden" name="columns" value="{{ keys|join(',') }}" id="pick-columns">
-    <div class="pick">
-    {% for k, c in catalog.items() %}<label title="{{ c.help }}"><input type="checkbox" value="{{ k }}" {% if k in keys %}checked{% endif %}> {{ c.label }}</label>{% endfor %}
+    <div class="pick-tools">
+      <label class="inline">Find <input type="search" id="pick-find" placeholder="column name" autocomplete="off"></label>
+      <button type="button" data-pick="defaults" data-defaults="{{ rv.DEFAULT_VIEW|join(',') }}">Default columns</button>
+      <button type="button" data-pick="clear">Clear</button>
+      <button class="primary">Show these columns</button>
     </div>
-    <button>Show these columns</button>
+    <div class="pick">
+    {% for g, items in groups %}
+      <fieldset class="pick-group"><legend>{{ g }}</legend>
+      {% for k, label, help in items %}<label title="{{ help }}{{ ' [' + k + ']' if label != k }}"><input type="checkbox" value="{{ k }}" {% if k in keys %}checked{% endif %}> {{ label }}</label>{% endfor %}
+      </fieldset>
+    {% endfor %}
+    </div>
   </form>
   <form method="post" action="{{ u('/views') }}" class="inline" id="save-view">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -75,7 +66,49 @@
     <button class="danger">Delete view '{{ view }}'</button>
   </form>
   {% endif %}
+</section>
+
+{% if tiles %}
+<section class="tiles" aria-label="Portfolio results{{ ' for ' + pa if pa != rv.ALL_PAS }}">
+  {% for t in tiles %}<div class="tile" title="{{ t.help }}"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.value }}</span></div>{% endfor %}
+</section>
+{% endif %}
+{% if chart %}
+<details class="card chart-card" open>
+  <summary>{{ chart.title }}{{ ' (' + pa + ')' if pa != rv.ALL_PAS }}</summary>
+  <div class="bars" role="list">
+    {% for b in chart.bars %}
+    <div class="bar-row" role="listitem"><span class="bar-name">{{ b.name }}</span>
+      <span class="bar-track"><span class="bar {% if b.neg %}neg{% endif %}" style="width: {{ b.pct }}%"></span></span>
+      <span class="bar-value">{{ b.value }}</span></div>
+    {% endfor %}
+  </div>
 </details>
+{% endif %}
+
+<p class="tabs" role="navigation" aria-label="Level">
+  {% for key, label in levels|reverse %}
+  {% if key == 'measure' and not measure_ok %}
+  <span class="off muted" title="Shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures: the measure-level table is in the run's downloads">{{ label }} (off: {{ '{:,}'.format(n_measures) }} measures)</span>
+  {% else %}
+  <a class="{% if key == level %}on{% endif %}" {% if key == level %}aria-current="page"{% endif %} href="?{{ {'level': key, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">{{ label }}</a>
+  {% endif %}
+  {% endfor %}
+</p>
+{% if note %}<p class="note">{{ note }}</p>{% endif %}
+{% if table is not none %}
+<div class="table-tools">
+  <label class="inline small">Filter rows <input type="search" data-filter="results-table" data-count="filter-count" placeholder="program, PA, text…" autocomplete="off"></label>
+  <span class="small muted" id="filter-count"></span>
+  <span class="small muted">Click a column heading to sort.</span>
+  <a class="button" href="{{ u('/runs/' + run.id + '/results.csv') }}?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">Download this table (CSV)</a>
+</div>
+<div class="scroll"><table class="data sortable" id="results-table">
+  <thead><tr>{% for c in table.columns %}<th title="{{ catalog[c].help if c in catalog else '' }}" scope="col">{{ labels[c] if c in labels else c }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog or c == 'Measures' else '' }}" {% if (c in catalog or c == 'Measures') and v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,}'.format(v) if c == 'Measures' and v is number else rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% if table|length == 0 %}<p class="muted">No rows for this PA at this level.</p>{% endif %}
+{% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

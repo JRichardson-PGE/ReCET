@@ -5,31 +5,73 @@
   <h1>{{ run.label or 'Run ' + run.id }}</h1>
   <span class="status big s-{{ run.status }}" id="run-status">{{ status_text.get(run.status, run.status) }}</span>
 </div>
-<p class="muted">ACC {{ run.acc_version }}{% if run.compare_with %} vs {{ run.compare_with }}{% endif %}{% if run.preflight_only %} · preflight only{% endif %}
+<p class="muted">{{ acc_label(run.acc_version) }}{% if run.compare_with %} vs {{ acc_label(run.compare_with) }}{% endif %}{% if run.preflight_only %} · input check only{% endif %}
  · started {{ fmt_time(run.created_at) }}{% if run.owner_email != user.email %} · by {{ run.owner_email }}{% endif %}
- · deleted after {{ retention }} days</p>
-<p class="small">{{ run.inputs }}</p>
+ {% if expires %}· {{ expires }}{% endif %}{% if run.label %} · <span class="small">{{ run.id }}</span>{% endif %}</p>
+{% if settings %}<p class="small settings-line">{{ settings }}</p>{% endif %}
+<p class="small muted">{{ run.inputs }}</p>
 <div id="run-progress" class="progress {% if not bar %}hidden{% endif %}">
-  <progress max="1" value="{{ bar.fraction if bar else 0 }}"></progress>
+  <progress max="1" value="{{ bar.fraction if bar else 0 }}" aria-label="Run progress"></progress>
   <span class="pct">{{ '{:.0%}'.format(bar.fraction) if bar else '' }}</span> <span class="small muted text">{{ bar.text if bar else '' }}</span>
 </div>
 <p id="run-position" class="muted">{% if position %}Waiting in the queue: number {{ position }}{% if wait %}; {{ wait }}{% endif %}.{% endif %}</p>
 <p id="run-message" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
 {% if error %}<p class="alert">{{ error }}</p>{% endif %}
 
+{% for h in headline %}
+<section class="tiles" aria-label="Portfolio results{{ ' ' + h.name if h.name }}">
+  {% if h.name %}<h2 class="tiles-name">{{ h.name }}</h2>{% endif %}
+  {% for t in h.tiles %}<div class="tile" title="{{ t.help }}"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.value }}</span></div>{% endfor %}
+</section>
+{% endfor %}
+
 <div class="actions">
   {% if run.status in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/cancel') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Stop</button></form>
   {% endif %}
-  <a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>
+  {% if not run.preflight_only %}<a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>{% endif %}
   {% if run.result_dir %}<a class="button" href="{{ u('/runs/' + run.id + '/zip') }}">Download everything (.zip)</a>{% endif %}
   {% if has_inputs %}
+  <a class="button" href="{{ u('/runs/new?from=' + run.id) }}" title="A new run of the same files, starting from this run's settings: change any setting or file and start it">Rerun with different settings</a>
+  {% if editable %}
   <form method="post" action="{{ u('/runs/' + run.id + '/edit') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button title="Opens this run's inputs in Edit inputs as a new draft, with this run's settings, to change and run again">Edit inputs and rerun</button></form>
+  {% else %}
+  <button type="button" disabled title="The editor is for jobs of up to {{ '{:,}'.format(max_edit_rows) }} measures; this run has {{ '{:,}'.format(n_measures) }}. Use Rerun with different settings, or download inputs.zip below and edit the files in Excel.">Edit inputs and rerun</button>
+  <span class="small muted">The editor takes up to {{ '{:,}'.format(max_edit_rows) }} measures.</span>
+  {% endif %}
   {% endif %}
   {% if run.status not in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/delete') }}" class="confirm" data-confirm="Delete this run and its files?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Delete</button></form>
   {% endif %}
 </div>
+
+{% if check %}
+<details class="card check-card" {% if check.n.error or check.unpriced or run.preflight_only %}open{% endif %}>
+  <summary>Input check:
+    {% if check.n.error %}<span class="bad">{{ check.n.error }} problem{{ 's' if check.n.error != 1 }} stopped the run</span>
+    {% elif check.n.warning %}<span class="warn">{{ check.n.warning }} warning{{ 's' if check.n.warning != 1 }}</span>
+    {% else %}<span class="ok">no problems</span>{% endif %}
+    {% if check.n.info %}<span class="muted">· {{ check.n.info }} note{{ 's' if check.n.info != 1 }}</span>{% endif %}
+  </summary>
+  {% if check.unpriced %}
+  <div class="unpriced">
+    <p><strong>Not priced:</strong></p>
+    <ul>{% for i in check.unpriced %}<li>{{ '{:,}'.format(i['count']) }} measures: {{ i.message }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if check.stats %}<p class="check-stats">{% for k, v in check.stats.items() %}{{ k.strip() }}: {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+  {% if check.issues %}
+  <ul class="check-issues">
+    {% for i in check.issues %}
+    <li class="{{ i.severity }}"><span class="sev">{{ 'stops run' if i.severity == 'error' else i.severity }}</span>
+      {{ i.message }}{% if i['count'] %} ({{ '{:,}'.format(i['count']) }}){% endif %} <span class="code">{{ i.code }}</span>
+      {% if i.examples %}<span class="eg"> e.g. {{ i.examples|join(', ') }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <p class="small muted">Every finding, with the rows and cells it names, is in preflight_findings.xlsx in the files below.</p>
+</details>
+{% endif %}
 
 {% if files %}
 <details class="card" open>
@@ -40,7 +82,10 @@
 </details>
 {% endif %}
 
-<h2>Log</h2>
-<pre id="log" class="log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if run.status in ('queued', 'running') else 0 }}"></pre>
+{% set live = run.status in ('queued', 'running') %}
+<details class="card log-card" {% if live or run.status == 'failed' %}open{% endif %}>
+  <summary>Log</summary>
+  <pre id="log" class="log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if live else 0 }}"></pre>
+</details>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

@@ -307,22 +307,53 @@
     });
     var n = { error: 0, warning: 0, info: 0 };
     list.forEach(function (i) { n[i.severity]++; });
-    if (n.error) {
-      sum.textContent = n.error + " problem" + (n.error > 1 ? "s" : "") + " would stop the run" + (n.warning ? "; " + n.warning + " to check" : "") + ".";
-      sum.className = "issue-line error";
-    } else if (n.warning) {
-      sum.textContent = "Ready to run. " + n.warning + " cell" + (n.warning > 1 ? "s" : "") + " to check (the run goes ahead, but CET would reject the value or it is not priced).";
-      sum.className = "issue-line warning";
-    } else {
-      sum.textContent = "No problems found.";
-      sum.className = "issue-line";
-    }
+    st.cellCounts = n;
+    st.firstError = list.find(function (i) { return i.severity === "error"; }) || null;
     list.slice(0, 400).forEach(function (i) {
-      var li = el("li", i.severity, i.table + " row " + pos[i.table][i.rid] + ", " + i.column + ": " + i.message);
-      li.addEventListener("click", function () { goTo(i.table, i.rid, i.column); });
+      var li = el("li", i.severity);
+      var b = el("button", "link", i.table + " row " + pos[i.table][i.rid] + ", " + i.column);
+      b.type = "button";
+      b.title = "Show this cell";
+      b.addEventListener("click", function () { goTo(i.table, i.rid, i.column); });
+      li.appendChild(b);
+      li.appendChild(document.createTextNode(": " + i.message));
       ul.appendChild(li);
     });
     if (list.length > 400) ul.appendChild(el("li", "info", "… and " + (list.length - 400) + " more"));
+    var toggle = document.getElementById("issues-toggle");
+    toggle.hidden = !list.length;
+    if (!list.length) { ul.hidden = true; toggle.setAttribute("aria-expanded", "false"); }
+    toggle.textContent = (ul.hidden ? "Show" : "Hide") + " the " + (list.length === 1 ? "cell" : list.length.toLocaleString() + " cells");
+    renderSummary();
+  }
+
+  // One verdict for the page, from the cell checks (every save) and the latest Validate inputs check while it is for the saved tables. A Validate result
+  // for an older version of the tables never says the run can start (it said so above the grid while the cell checks below it found problems).
+  function renderSummary() {
+    var sum = document.getElementById("issue-summary"), n = st.cellCounts || { error: 0, warning: 0 };
+    var rep = chk.report, current = rep && chk.info && chk.info.rev === st.rev, v = current ? chk.reportCounts : null;
+    var plural = function (k, one, many) { return k.toLocaleString() + " " + (k === 1 ? one : many); };
+    var text, kind;
+    if (n.error) {
+      text = plural(n.error, "problem", "problems") + " in the cells would stop the run (outlined in red)" + (n.warning ? "; " + plural(n.warning, "cell", "cells") + " to check" : "") + ".";
+      kind = "error";
+    } else if (v && v.error) {
+      text = "Validate inputs found " + plural(v.error, "problem that stops", "problems that stop") + " the run: see below.";
+      kind = "error";
+    } else if (n.warning || (v && v.warning)) {
+      text = "Ready to run; " + (n.warning ? plural(n.warning, "cell", "cells") + " to check" : "")
+        + (n.warning && v && v.warning ? " and " : "") + (v && v.warning ? plural(v.warning, "warning", "warnings") + " from Validate inputs" : "")
+        + " (the run goes ahead, but CET would reject a value or some measures are not priced).";
+      kind = "warning";
+    } else if (v) {
+      text = "No problems found: the run can start (" + chk.info.acc_version + " ACC check of these tables).";
+      kind = "ok";
+    } else {
+      text = "No problems in the cells. Validate inputs runs the full check a run makes" + (rep ? " (the last one is for an older version of the tables)." : ".");
+      kind = "";
+    }
+    sum.textContent = text;
+    sum.className = "issue-line " + kind;
   }
 
   function goTo(t, rid, col) {
@@ -347,10 +378,57 @@
     st.current = t;
     TABLES.forEach(function (x) {
       document.getElementById("grid-" + x).hidden = x !== t;
-      document.querySelector('.tab[data-table="' + x + '"]').classList.toggle("active", x === t);
+      var tab = document.querySelector('.tab[data-table="' + x + '"]');
+      tab.classList.toggle("active", x === t);
+      tab.setAttribute("aria-selected", x === t ? "true" : "false");
     });
     st.grids[t].redraw(true);
+    fillColumnNames();
   }
+
+  // ------------------------------------------------------------------------------------------------------------ finding columns
+  function fillColumnNames() {
+    var dl = document.getElementById("col-names"), L = st.layout && st.layout[st.current];
+    if (!dl || !L) return;
+    dl.textContent = "";
+    L.pinned.concat(L.scroll).forEach(function (c) { var o = el("option"); o.value = c; dl.appendChild(o); });
+  }
+
+  var colFind = document.getElementById("col-find");
+  colFind.addEventListener("change", function () {
+    var t = st.current, g = st.grids[t], q = colFind.value.trim().toLowerCase();
+    if (!g || !q) return;
+    var L = st.layout[t], cols = L.pinned.concat(L.scroll);
+    var hit = cols.find(function (c) { return c.toLowerCase() === q; }) || cols.find(function (c) { return c.toLowerCase().indexOf(q) >= 0; });
+    if (!hit) { colFind.setCustomValidity("No column named like that"); colFind.reportValidity(); return; }
+    colFind.setCustomValidity("");
+    var col = g.getColumn(hit);
+    if (!col.isVisible()) col.show();
+    g.scrollToColumn(hit, "middle", false).catch(function () {}).then(function () {
+      var h = col.getElement();
+      h.classList.add("flash");
+      setTimeout(function () { h.classList.remove("flash"); }, 1200);
+      showHelp(t, hit);
+    });
+  });
+
+  document.getElementById("hide-noeff").addEventListener("change", function (e) {
+    TABLES.forEach(function (t) {
+      var g = st.grids[t];
+      if (!g) return;
+      (st.layout[t].no_effect || []).forEach(function (c) {
+        var col = g.getColumn(c);
+        if (col && st.layout[t].pinned.indexOf(c) < 0) { if (e.target.checked) col.hide(); else col.show(); }
+      });
+    });
+  });
+
+  document.getElementById("issues-toggle").addEventListener("click", function () {
+    var ul = document.getElementById("issues"), b = this;
+    ul.hidden = !ul.hidden;
+    b.setAttribute("aria-expanded", ul.hidden ? "false" : "true");
+    b.textContent = b.textContent.replace(/^(Show|Hide)/, ul.hidden ? "Show" : "Hide");
+  });
 
   function selectedRows(t) {
     var seen = new Set(), out = [];
@@ -424,7 +502,7 @@
   // Saves the draft, queues a preflight-only run of it (POST API/check), then polls the run's /check until it ends, lists what the check found and marks
   // the cells it names. The report names rows of the checked files; chk.info.row_map turns those into grid positions at the checked revision, and chk.snap
   // (the rows' _rids at that revision, taken when the check started or when the page loaded that revision) into rows, so the marks follow later edits.
-  var chk = { info: null, timer: null, started: 0, busy: false, snap: null, snapRun: null };
+  var chk = { info: null, timer: null, started: 0, busy: false, snap: null, snapRun: null, report: null, reportCounts: null };
   var chkBtn = document.getElementById("check-btn"), chkAcc = document.getElementById("check-acc"), chkSw = document.getElementById("check-sw");
   var chkFiling = document.getElementById("check-filing");
   var chkOut = document.getElementById("check-result");
@@ -499,8 +577,11 @@
   function staleNote() {
     var old = chkOut.querySelector(".check-stale");
     if (old) old.remove();
-    if (!chk.info || chk.info.rev == null || chk.info.rev === st.rev) return;
-    chkOut.insertBefore(el("p", "check-stale", "These results are for the tables before your latest edits. Validate again to check the current version."),
+    var stale = !!(chk.info && chk.info.rev != null && chk.info.rev !== st.rev);
+    chkOut.classList.toggle("stale", stale);
+    renderSummary();
+    if (!stale) return;
+    chkOut.insertBefore(el("p", "check-stale", "Out of date: these results are for the tables before your latest edits. Validate again to check the current version."),
                         chkOut.children[1] || null);
   }
 
@@ -523,6 +604,8 @@
     }
     var rep = j.report;
     setCheckMarks(rep);
+    chk.report = rep;
+    chk.reportCounts = null;
     if (!rep) {
       chkOut.appendChild(checkHead(j.status === "cancelled" ? "The check was stopped." : "The check could not run.", "bad"));
       if (j.message) chkOut.appendChild(el("p", "small", j.message));
@@ -532,10 +615,12 @@
     }
     var n = { error: 0, warning: 0, info: 0 };
     rep.issues.forEach(function (i) { n[i.severity] = (n[i.severity] || 0) + 1; });
-    var title = n.error ? n.error + (n.error === 1 ? " problem stops" : " problems stop") + " the run"
-      : (n.warning ? "The run can start; " + n.warning + (n.warning === 1 ? " warning" : " warnings") + " to look at"
-        : "No problems found: the run can start");
-    chkOut.appendChild(checkHead(title + " (" + j.acc_version + " ACC)", n.error ? "bad" : (n.warning ? "warn" : "ok")));
+    chk.reportCounts = n;
+    // what this check found, never a verdict on the run: the line above combines it with the cell checks
+    var title = "Validate inputs, " + j.acc_version + " ACC" + (j.created_at ? ", " + new Date(j.created_at * 1000).toLocaleTimeString() : "") + ": "
+      + (n.error ? n.error + (n.error === 1 ? " problem stops" : " problems stop") + " the run"
+        : (n.warning ? n.warning + (n.warning === 1 ? " warning" : " warnings") + " to look at" : "no problems found"));
+    chkOut.appendChild(checkHead(title, n.error ? "bad" : (n.warning ? "warn" : "ok")));
     var stats = Object.keys(rep.stats || {}).map(function (k) { return k + ": " + rep.stats[k]; });
     if (stats.length) chkOut.appendChild(el("p", "check-stats", stats.join(" · ")));
     if (rep.issues.length) {
@@ -612,6 +697,9 @@
     chkOut.textContent = "";
     chkOut.appendChild(checkHead("Saving and starting the check…", "muted"));
     setCheckMarks(null);
+    chk.report = null;
+    chk.reportCounts = null;
+    renderSummary();
     var ready = (st.dirty || st.saving) ? Promise.resolve(save()) : Promise.resolve(true), snap = null;
     ready.then(function (ok) {
       if (!ok) throw new Error("the draft could not be saved (see the message at the top)");
@@ -646,8 +734,17 @@
   }
   chkBtn.addEventListener("click", runCheck);
 
-  // Run: save first, then open the New run page for this draft
+  // Run: save first, then open the New run page for this draft. A draft with a cell problem that would stop the run is refused by the New run page,
+  // so say so here and show the first such cell instead.
   document.getElementById("run-link").addEventListener("click", function (e) {
+    if (st.cellCounts && st.cellCounts.error && st.firstError) {
+      e.preventDefault();
+      var sum = document.getElementById("issue-summary");
+      sum.textContent = "Fix the " + (st.cellCounts.error === 1 ? "problem" : st.cellCounts.error + " problems") + " outlined in red first: the run would be refused.";
+      sum.className = "issue-line error";
+      goTo(st.firstError.table, st.firstError.rid, st.firstError.column);
+      return;
+    }
     if (!st.dirty && !st.saving) return;
     e.preventDefault();
     Promise.resolve(save()).then(function (ok) { if (ok) window.location.href = RUN; });
@@ -678,6 +775,7 @@
           TABLES.forEach(function (x) { snap[x] = rowsOf(x).map(function (r) { return r.getData()._rid; }); });
           applyIssues(d.issues || [], snap);
           updateCounts();
+          fillColumnNames();
           st.dirty = false;
           st.loaded = true;
           setStatus("Saved", "ok");

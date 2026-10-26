@@ -125,6 +125,55 @@ def catalog(frame: pd.DataFrame) -> dict[str, Column]:
     return cols
 
 
+_WORDS = {"Elec": "electric", "Ben": "benefits", "Bens": "benefits", "Incr": "increase", "Reduc": "reduction", "Incents": "incentives", "Inc": "incentives",
+          "Thm": "therms", "Mark": "market", "Effect": "effects", "Rebatesand": "rebates and", "Qty": "quantity", "Meas": "measure", "Wtd": "weighted",
+          "Prg": "program", "Gen": "generation", "Seq": "sequestration"}
+_KEEP = {"PV", "CO2", "NOx", "PM10", "TRC", "PAC", "RIM", "PCT", "SCB", "SCH", "kWh", "kW", "IOU"}
+_SUFFIXES = [("_SB", " (SCT Base)"), ("_SH", " (SCT High)"), ("_sct", " (SCT)"), ("_SCT", " (SCT)"), ("_NoAdmin", " (no admin)"), ("NoAdmin", " (no admin)")]
+
+
+def display_label(col: Column) -> str:
+    """The web page's name for a column: its label when it has one, else its output-column name in words ("ElecSupplyCost_SB" -> "Electric supply cost
+    (SCT Base) ($)"). Only for display: downloads keep each column's label, which for these columns is the output-column name itself."""
+    if col.label != col.key:
+        return col.label
+    import re
+    base, tail = col.key, ""
+    for suf, words in _SUFFIXES:
+        if base.endswith(suf):
+            base, tail = base[: -len(suf)], words
+            break
+    toks = re.findall(r"CO2|NOx|PM10|TRC|PAC|RIM|SCB|SCH|PCT|IOU|PV|KWh|kWh|KW|kW|[A-Z][a-z]+|[a-z]+|[A-Z]+|\d+", base)
+    words = []
+    for t in toks:
+        t = {"KWh": "kWh", "KW": "kW"}.get(t, t)
+        words.append(t if t in _KEEP else _WORDS.get(t, t.lower()))
+    text = " ".join(words) or col.key
+    text = text[:1].upper() + text[1:] + tail
+    return text + {"usd": " ($)", "tonnes": " (t)", "lbs": " (lb)"}.get(col.fmt, "")
+
+
+GROUP_ORDER = ["Ratios", "Benefits and bill impacts", "Costs", "Savings", "Emissions", "Societal Cost Tests (SCT)", "Other"]
+
+
+def column_group(col: Column) -> str:
+    """The Results column picker's group for a column (one of GROUP_ORDER)."""
+    k = col.key
+    if col.kind == "ratio":
+        return "Ratios"
+    if any(x in k for x in ("CO2", "NOx", "PM10")):
+        return "Emissions"
+    if k.endswith(("_SB", "_SH", "_sct", "_SCT")) or k.startswith(("SCB", "SCH")):
+        return "Societal Cost Tests (SCT)"
+    if col.fmt in ("energy", "kw") or "Savings" in k:
+        return "Savings"
+    if "Ben" in k or "Bill" in k:
+        return "Benefits and bill impacts"
+    if any(x in k for x in ("Cost", "Incent", "Rebate", "Expenditure", "Tax", "Excess")):
+        return "Costs"
+    return "Other"
+
+
 def _guess_fmt(c: str) -> str:
     if "CO2" in c:
         return "tonnes"
