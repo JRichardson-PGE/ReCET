@@ -105,7 +105,7 @@
 </div>
 <div class="scroll"><table class="data sortable" id="results-table">
   <thead><tr>{% for c in table.columns %}<th title="{{ catalog[c].help if c in catalog else '' }}" scope="col">{{ labels[c] if c in labels else c }}</th>{% endfor %}</tr></thead>
-  <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog or c == 'Measures' else '' }}" {% if (c in catalog or c == 'Measures') and v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog or c == 'Measures' else '' }}" {% if (c in catalog or c == 'Measures') and v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,}'.format(v) if c == 'Measures' and v is number else rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
 </table></div>
 {% if table|length == 0 %}<p class="muted">No rows for this PA at this level.</p>{% endif %}
 {% endif %}

@@ -229,7 +229,8 @@ class Ctx:
         base = self.result_path(run)
         if base is None:
             return []
-        folders = [base] if any(base.glob("measure_level_*.*")) else sorted({p.parent for p in base.glob("*/measure_level_*.*")})
+        folders = [base] if any(base.glob("measure_level_*.*")) else sorted({p.parent for p in base.glob("*/measure_level_*.*")
+                                                                             if p.parent.name != outputs.RESULTS_DIR})
         out = []
         for folder in folders:
             source = outputs.results_source(folder)
@@ -329,6 +330,13 @@ def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
     if not cfg.get("preflight_only"):
         parts.append(FORMAT_NAMES.get(str(cfg.get("output_format") or ""), str(cfg.get("output_format") or "")) + " output")
     return " · ".join(p for p in parts if p)
+
+
+def rerun_stem(run) -> str:
+    """The name a "Rerun with different settings" starts from: the earlier run's name without the ACC part a blank name gave it, plus "(rerun)"."""
+    import re
+    base = re.sub(r" · \d{4} ACC.*$", "", run["label"] or "") or f"run {run['id']}"
+    return base if base.endswith("(rerun)") else f"{base} (rerun)"
 
 
 def fmt_duration(seconds: float) -> str:
@@ -676,7 +684,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],))
         elif from_run is not None:
             cfg, job, supplied = edit_api.run_inputs(ctx, from_run)
-            kw.setdefault("form", edit_api._run_settings(cfg, from_run["label"] or "", "rerun"))
+            # the name is left blank: the new run is then named after the earlier one and the ACC it is priced on (an ACC carried in a prefilled
+            # name would be wrong as soon as the ACC is changed)
+            kw.setdefault("form", {**edit_api._run_settings(cfg, "", "rerun"), "label": ""})
             carried = [(f, field_label.get(f, f)) for f in supplied]
             job_files = [JOB_FILE_LABELS[f] for f in job]
             source_run = from_run
@@ -847,7 +857,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             stem = (draft["name"] if draft is not None else
                     Path(ups["workbook"].filename).stem if "workbook" in ups else
                     Path(ups["job_zip"].filename).stem if "job_zip" in ups else
-                    (from_run["label"] or f"run {from_run['id']}") if from_run is not None else "")
+                    rerun_stem(from_run) if from_run is not None else "")
             label = (f"{stem} · " if stem else "") + f"{acc} ACC" + (f" vs {cmp_}" if cmp_ else "") + (" · input check" if cfg.get("preflight_only") else "")
             label = label[:120]
         ctx.queue_run(request, u, run_id, cfg, label, names)
@@ -1032,7 +1042,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         folder = ctx.result_path(run, sub) if sub else base
         if folder is None:
             raise HTTPException(404)
-        subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*"))
+        # a comparison's runs are sub-folders with a measure-level table; the kept results parquet's folder (outputs.RESULTS_DIR) is not one
+        subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*") if p.parent.name != outputs.RESULTS_DIR)
         measure_files = sorted(folder.glob("measure_level_*.*"))
         source = outputs.results_source(folder)                # a CSV run's kept parquet (outputs.RESULTS_DIR) when there is one
         comparison = sorted(folder.glob("comparison_summary_*.*"))

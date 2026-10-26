@@ -262,14 +262,14 @@ def test_rerun_with_different_settings_reuses_the_runs_files(web, tmp_path):
     assert ctx.runner.work_once()
     assert _login(app, "w@example.com").get(f"{P}/runs/new?from={first}").status_code == 404                     # another user's run
     page = c.get(f"{P}/runs/new?from={first}").text
-    assert f'name="from_run" value="{first}"' in page and 'value="from_run" checked' in page and 'value="base (rerun)"' in page
+    assert f'name="from_run" value="{first}"' in page and 'value="from_run" checked' in page and 'name="label" maxlength="120" value=""' in page
     assert 'name="emissions" checked' in page and "Measure.csv from run" in page
     r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "from_run": first, "input_mode": "from_run", "acc_version": "2024", "market_effects": "0.05",
                                   "output_format": "csv", "label": ""})
     assert r.status_code == 303, r.text
     second = r.headers["location"].rsplit("/", 1)[-1]
     row = ctx.db.one("SELECT * FROM runs WHERE id = ?", (second,))
-    assert row["label"] == "base · 2024 ACC" and row["inputs"].startswith(f"Job: the files of run base")
+    assert row["label"] == "base (rerun) · 2024 ACC" and row["inputs"].startswith(f"Job: the files of run base")
     cfg = json.loads((ctx.runner.folder(second) / "config.json").read_text())
     assert cfg["measures"].startswith(str(ctx.runner.folder(second) / "inputs")) and cfg["market_effects"] == 0.05
     assert ctx.runner.work_once()

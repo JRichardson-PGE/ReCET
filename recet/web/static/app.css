@@ -28,7 +28,7 @@ h2 { font-size: 1.1rem; margin: 1.2rem 0 .5rem; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 .nowrap { white-space: nowrap; }
-.hidden { display: none !important; }
+.hidden, [hidden] { display: none !important; }      /* [hidden]: a styled element (a button, a flex box) would otherwise ignore the attribute */
 .alert { background: color-mix(in srgb, var(--bad) 12%, transparent); border-left: 3px solid var(--bad); padding: .5rem .75rem; }
 .ok { color: var(--ok); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .9rem 1.1rem; margin: 1rem 0; }
@@ -74,7 +74,7 @@ tr.dim td { color: var(--muted); }
 .radios label, .checks label, .pick label { flex-direction: row; align-items: center; gap: .4rem; }
 .checks { display: flex; flex-direction: column; gap: .35rem; margin-top: .9rem; }
 label.file { margin: .5rem 0; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .8rem 1.2rem; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem 1.2rem; }
 details > summary { cursor: pointer; font-weight: 600; margin: .3rem 0; }
 .tabs { display: flex; gap: .3rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 0; margin: .8rem 0; }
 .tabs a { padding: .35rem .8rem; text-decoration: none; color: var(--fg); border: 1px solid transparent; border-bottom: none; border-radius: 5px 5px 0 0; }
