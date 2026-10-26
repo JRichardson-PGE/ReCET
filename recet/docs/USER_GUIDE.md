@@ -1,6 +1,7 @@
 # User guide
 
-How to run `recet`, what every control in the window does, the command line, and the common jobs. The other documents:
+How to run `recet` on your own computer, what every control in the desktop window does, the command line, and the common jobs. The web site is
+described in [WEB_GUIDE.md](WEB_GUIDE.md). The other documents:
 [INPUT_FORMATS.md](INPUT_FORMATS.md) (supplied-file formats and matching rules), [INPUT_FIELDS.md](INPUT_FIELDS.md) (every input field),
 [OUTPUT_FIELDS.md](OUTPUT_FIELDS.md) (every output field) and [CALCULATIONS.md](CALCULATIONS.md) (how each output is calculated).
 

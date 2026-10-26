@@ -51,6 +51,12 @@ def _saved(folder: Path) -> dict | None:
         return None
 
 
+def known_size(folder: Path) -> dict | None:
+    """The size kept in estimate.json, without counting anything: the runs list shows it for many runs at once, and a run queued before estimates were
+    kept would otherwise have its whole Measure file counted on a page view."""
+    return _saved(folder)
+
+
 def size(folder: Path) -> dict | None:
     """The run's size and the options that change its time: {"measures", "preflight_only", "compare", "include_societal", "emissions", "output_format", "filing"},
     read from its config.json and inputs once and kept in estimate.json. None when the run has no config."""
