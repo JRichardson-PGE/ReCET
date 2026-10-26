@@ -113,14 +113,19 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .grid.tabulator .tabulator-row .tabulator-cell.issue-error { outline: 2px solid var(--bad); outline-offset: -2px; }
 .grid.tabulator .tabulator-row .tabulator-cell.issue-warning { outline: 2px solid var(--warn); outline-offset: -2px; }
 .grid.tabulator .tabulator-row .tabulator-cell.issue-info { outline: 1px dashed var(--muted); outline-offset: -2px; }
-.issue-line { min-height: 1.5rem; font-size: .88rem; }
+.issue-line { font-size: .92rem; font-weight: 600; }
 .issue-line.error { color: var(--bad); }
 .issue-line.warning { color: var(--warn); }
-.issues { max-height: 12rem; overflow: auto; font-size: .82rem; margin: .4rem 0; padding-left: 1.2rem; }
-.issues li { cursor: pointer; }
+.issue-line.ok { color: var(--ok); }
+.status-bar { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: baseline; padding-bottom: .45rem; margin-bottom: .45rem; border-bottom: 1px solid var(--line); }
+.issues { max-height: 10rem; overflow: auto; font-size: .82rem; margin: 0 0 .45rem; padding-left: 1.2rem; }
 .issues li.error { color: var(--bad); }
 .issues li.warning { color: var(--warn); }
-.help-line { font-size: .82rem; color: var(--muted); min-height: 1.2rem; }
+.issues li button.link { font-size: inherit; }
+/* two lines, always: a longer description scrolls inside it, so clicking a cell never pushes the grid down */
+.help-line { font-size: .82rem; color: var(--muted); height: 2.6em; overflow-y: auto; margin: .3rem 0; }
+label.inline { flex-direction: row; align-items: center; gap: .35rem; }
+.grid.tabulator .tabulator-header .tabulator-col.flash { background: var(--accent); color: var(--accent-fg); }
 .saved { font-size: .8rem; color: var(--muted); }
 .draft-list { list-style: none; padding: 0; }
 .draft-list li { display: flex; gap: 1rem; align-items: center; padding: .35rem 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -129,7 +134,8 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 /* Edit inputs grid */
 .inline-form { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: .4rem 0; }
 .title-form { margin: .6rem 0; }
-.title-input { font-size: 1.35rem; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--fg); padding: .1rem .3rem; min-width: 16rem; }
+.title-input { font-size: 1.35rem; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--fg); padding: .1rem .3rem;
+               width: min(42rem, 80vw); }
 .title-input:hover, .title-input:focus { border-color: var(--line); }
 .tabs button.tab { border: 1px solid transparent; border-bottom: none; border-radius: 5px 5px 0 0; background: transparent; }
 .tabs button.tab.active { border-color: var(--line); background: var(--card); font-weight: 600; margin-bottom: -1px; }
@@ -183,8 +189,13 @@ div.tabulator-popup-container { background: var(--card); color: var(--fg); borde
 /* Edit inputs: Validate inputs panel */
 .check-panel { border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: .55rem .8rem; margin: .6rem 0; }
 .check-bar { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: center; }
+/* the page-wide `label` rule stacks a label's text over its control; here each label is one line */
+.check-bar label { flex-direction: row; align-items: center; gap: .3rem; }
 .check-bar select { margin: 0 .2rem; }
-.check-about { margin: .35rem 0 0; }
+.check-about summary { font-weight: 400; color: var(--accent); margin: 0; }
+.check-about p { margin: .35rem 0 0; flex-basis: 100%; }
+.check-about[open] { flex-basis: 100%; }
+.check-result.stale .check-title, .check-result.stale .check-issues { opacity: .55; }
 .check-result { border-top: 1px solid var(--line); margin-top: .55rem; padding-top: .5rem; }
 .check-head { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: baseline; }
 .check-title { font-weight: 600; }
