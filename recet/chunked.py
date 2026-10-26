@@ -57,6 +57,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if cfg.acc_electric_file or cfg.acc_gas_file:
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
     societal = jobs.societal_available(groups, acc, cfg.include_societal, result, log)
+    if societal != cfg.include_societal:
+        progress.replan(societal=societal)                       # an ACC with no societal avoided costs: pricing is shorter
     program = cost_tests.load_program_costs(Path(cfg.programcost), allocate_statewide=cfg.allocate_statewide) if cfg.programcost else None
     years = (cfg.profile_years or [base_year]) if cfg.portfolio_8760 else []
 
@@ -129,7 +131,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     # ---- pass 2: program costs shared over the whole job, then the measure-level rows, part by part
     log("\n== writing results ==")
-    progress.report("writing", 0, len(parts) + 1)                   # the parts, then finishing the measure-level file and the summary
+    progress.report("writing", 0, len(parts))                       # the parts; then the "file" stage finishes the measure-level file
     tw = time.time()
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
@@ -164,10 +166,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
                 pa, pb = cet_sums.get(c, (0.0, 0.0))
                 cet_sums[c] = (pa + a, pb + b)
         del measures, res, frame
-        progress.report("writing", i + 1, len(parts) + 1)
+        progress.report("writing", i + 1, len(parts))
     tc = time.time()
     log(f"  program costs shared and {len(parts)} parts assembled in {tc - tw:.0f}s")
-    result.files["measure_level"] = writer.close()
+    progress.report("file", 0, 1)
+    result.files["measure_level"] = writer.close(lambda j, c: progress.report("file", progress.file_share(j, c, writer.fmt), 1))
     ts = time.time()
     log(f"  measure-level table finished ({cfg.output_format}) in {ts - tc:.0f}s")
     summary = summary_parts.result()
