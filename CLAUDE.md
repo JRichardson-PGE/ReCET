@@ -90,8 +90,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   took 468 s (claims) and 483 s (budget filing) against 425 s without: preflight +7-8 s as expected, but assembly 57 -> 91 / 108 s, because
   `attach_filing` rebuilt dicts from all 139,612 flagged records and copied the 344-column part, in every part (~1 s a part on the laptop). Now
   `outputs.filing_lookup` indexes them once per run and `attach_filing` reindexes each part against it, in place (0.08 s a part). `progress.plan`
-  takes `filing` and adds FILING_PREFLIGHT_SECONDS (8) to preflight. Peak memory on those server runs: 1.101 / 1.095 GiB with checks, 1.028 without.
+  takes `filing` and adds FILING_PREFLIGHT_SECONDS (8) to preflight (the queue estimate too: eta.size keeps `filing`). Peak memory on those server runs: 1.101 / 1.095 GiB with checks, 1.028 without.
   Laptop 1M after the fix, same sitting: 189 s without checks, 195 s with claims checks (preflight 33 -> 36 s, assembly 22 -> 24 s).
+- 0.1.44 (2026-10-26, Jake): queued runs show when they should start and finish (`recet/web/eta.py`, BR-06.2). A run's size (measure rows; workbook
+  Measure sheet) is counted when it is queued and kept as `estimate.json`; its time = 10 s + the progress weights' seconds per 1M (format, SCT, emissions;
+  x2 for a comparison; preflight-only = the input-check stages) x measures / 1M, times a calibration = median actual/estimate over the last 10 finished
+  full runs of >= 20,000 measures (only runs with a kept estimate.json; clamped 0.25-4). `queue` walks the queue in claim order (input checks first) over
+  `workers` slots, each free when its running run's live time left runs out (else its estimate less its elapsed time). Shown on the run page (and its
+  poll, `wait`) and the runs list: "starts in about 6 min, done in about 13 min (estimated)".
 - 0.1.43 (2026-10-26, Jake; 0.1.41 / 0.1.42 are the progress-estimate and filing-checks PRs): run downloads. Every run writes `preflight_findings.xlsx`
   (`PreflightReport.write_xlsx`, `jobs.write_findings`): Summary, Findings (errors first) and Cells (file, line = data row + 2, record ID, column; IDs read
   from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and

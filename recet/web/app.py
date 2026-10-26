@@ -27,7 +27,7 @@ from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import __version__, outputs, progress, versions
-from . import auth, jobzip
+from . import auth, eta, jobzip
 from .config import Settings
 from .db import Database
 from .runner import Runner, write_config
@@ -150,6 +150,7 @@ class Ctx:
         (folder / "log.txt").write_text(f"recet {__version__}  -  {'preflight' if cfg.get('preflight_only') else 'run'}  -  ACC {acc}"
                                         + (f" vs {cmp_}" if cmp_ else "") + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
         inputs_text = "; ".join(names)
+        eta.size(folder)                                # count the job's measures once, for the queue's time estimates (eta.py)
         self.db.run("INSERT INTO runs (id, user_id, label, status, acc_version, compare_with, preflight_only, inputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
                     (run_id, u["id"], label, "queued", acc, cmp_ or None, int(bool(cfg.get("preflight_only"))), inputs_text, time.time()))
         self.db.audit("run queued", u, detail=f"{run_id}: ACC {acc}{' vs ' + cmp_ if cmp_ else ''}; {inputs_text}", ip=self.ip(request))
@@ -164,6 +165,15 @@ class Ctx:
             return json.loads(hits[0].read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
+
+    def queue_eta(self) -> dict[str, dict]:
+        """Every queued run's estimated start and finish (eta.py), from the running runs' progress and the queued runs' sizes."""
+        running = self.db.all("SELECT * FROM runs WHERE status = 'running'")
+        left = {}
+        for r in running:
+            p = self.progress(r)
+            left[r["id"]] = p.get("seconds_left") if p else None
+        return eta.queue(self.db, self.s.runs_dir, self.s.workers, left)
 
     def progress(self, run) -> dict | None:
         """A running run's progress (recet/progress.py) with `text` added for the page; None for any other run or before its first report."""
@@ -483,7 +493,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         rows = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
                           + ("" if everyone else "WHERE r.user_id = ? ") + "ORDER BY r.created_at DESC LIMIT 200", () if everyone else (u["id"],))
         bars = {r["id"]: ctx.progress(r) for r in rows if r["status"] == "running"}
-        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars)
+        waits = {k: eta.describe(v) for k, v in ctx.queue_eta().items()} if any(r["status"] == "queued" for r in rows) else {}
+        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits)
 
     field_label = {fld: label for fld, _ext, label in UPLOADS.values()}
 
@@ -629,7 +640,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
         has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
-        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), files=_downloads(run),
+        wait = eta.describe(ctx.queue_eta().get(run["id"])) if run["status"] == "queued" else ""
+        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
                           retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run))
 
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
@@ -705,6 +717,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             text, end = data.decode("utf-8", errors="replace"), max(0, offset) + len(data)
         return JSONResponse({"text": text, "offset": end, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]),
                              "position": ctx.runner.position(run_id), "message": run["message"], "has_results": bool(run["result_dir"]),
+                             "wait": eta.describe(ctx.queue_eta().get(run_id)) if run["status"] == "queued" else "",
                              "progress": ctx.progress(run)})
 
     @app.get("/runs/{run_id}/check")

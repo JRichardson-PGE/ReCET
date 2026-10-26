@@ -74,7 +74,7 @@
           st.textContent = d.status_text;
           st.className = "status big s-" + d.status;
           var pos = document.getElementById("run-position");
-          pos.textContent = d.position ? "Waiting in the queue: number " + d.position + "." : "";
+          pos.textContent = d.position ? "Waiting in the queue: number " + d.position + (d.wait ? "; " + d.wait : "") + "." : "";
           var bar = document.getElementById("run-progress");
           if (bar) {
             var p = d.progress;
