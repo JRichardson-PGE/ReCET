@@ -20,6 +20,7 @@
     <td class="small">{{ r.inputs }}</td>
     {% if everyone %}<td class="small">{{ r.owner_email }}</td>{% endif %}
     <td><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span>
+        {% if waits.get(r.id) %}<div class="small muted">{{ waits[r.id] }}</div>{% endif %}
         {% set b = bars.get(r.id) %}{% if b %}<div class="progress small" title="{{ b.text }}"><progress max="1" value="{{ b.fraction }}"></progress> {{ '{:.0%}'.format(b.fraction) }}{% if b.seconds_left is not none %} · {{ b.text.split(' · ')[-1] }}{% endif %}</div>{% endif %}</td>
   </tr>
   {% endfor %}
