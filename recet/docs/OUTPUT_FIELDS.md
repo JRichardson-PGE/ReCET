@@ -1912,6 +1912,19 @@ CEDARS warning rule) and `cet_rule_not_checked` (info: a rule ReCET could not ch
 checked under their own IDs. The statistics then end with `CET filing validation` (the rule set, and how many measures CEDARS would reject or warn on).
 Errors stop the run; warnings and info do not.
 
+### 2.8b `preflight_findings.xlsx`
+
+The same input check as a workbook to review and filter, written by every run (a preflight-only run and a run stopped by a blocking problem included):
+
+| Sheet | Columns |
+|---|---|
+| `Summary` | `Item`, `Value`: the result (whether the run can price), the number of errors, warnings and information findings, then the statistics of `preflight.txt`. |
+| `Findings` | `Severity` (`ERROR` stops the run, `WARNING`, `INFO`), `Code` (the codes of 2.8), `Records` (how many records it concerns), `Message`, `Examples`; errors first. |
+| `Cells` | One row per flagged cell: `Severity`, `Code`, `File` (`Measure.csv` or `ProgramCost.csv`), `Line` (the line of the file; line 1 is the header), `Record` (its `CEInputID`, or `PrgID` and `PrgYear`) and `Column`. Up to 5,000 cells per finding. |
+
+`preflight.json` holds the same report for the web app (its Validate inputs panel reads it). The web app's downloads leave `preflight.txt` and `preflight.json` out: the
+input check is in the run log (`run_log.txt`, everything the run printed) and in this workbook.
+
 ### 2.9 `run_settings.json`
 
 Everything needed to reproduce the run.
