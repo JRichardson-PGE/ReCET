@@ -29,7 +29,7 @@
   {% if run.status in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/cancel') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Stop</button></form>
   {% endif %}
-  <a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>
+  {% if not run.preflight_only %}<a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>{% endif %}
   {% if run.result_dir %}<a class="button" href="{{ u('/runs/' + run.id + '/zip') }}">Download everything (.zip)</a>{% endif %}
   {% if has_inputs %}
   <a class="button" href="{{ u('/runs/new?from=' + run.id) }}" title="A new run of the same files, starting from this run's settings: change any setting or file and start it">Rerun with different settings</a>

@@ -60,8 +60,10 @@ In the package (`recet/docs`, and **Help > Documentation** in the window): `USER
 
 `recet/web` is the same tool as a password-protected web app: New run (upload a workbook, or the CET files in one .zip: Measure.csv and an optional
 ProgramCost.csv, as CET takes them; a bare CSV is not accepted), Runs (queue, log, results tables,
-downloads, and "Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
-measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs (the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
+downloads, the input check and headline numbers on each run's page, "Rerun with different settings", which starts New run from a run's files and settings, and
+"Edit inputs and rerun", which opens a run's inputs and settings as a new draft), Edit inputs (the window's grid editor, up to 500
+measures, saved as you type, with a "Validate inputs" button that runs a run's full input check on the draft without pricing it and outlines the cells it flags) and Docs
+(`docs/WEB_GUIDE.md` first, then the documents below, plus a Value lists page showing every dropdown field's codes; admins can add, retire or
 unretire codes there, and the changes reach Edit inputs' dropdowns and checks at once).
 Input checks (preflight-only runs) go ahead of full runs in the queue. A queued run shows its place in the queue and when it should start and finish
 (`recet/web/eta.py`: estimated from its size and options, the running runs' own estimates, and how this server's recent runs compared with theirs). A running run shows a progress bar with its stage, parts done and an estimate of

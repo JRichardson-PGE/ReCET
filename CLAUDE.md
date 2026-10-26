@@ -86,6 +86,20 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.46 (2026-10-26, Jake): web usability pass (the plan is CEDARS-Research `UI_UPDATE_PLAN.md`). Edit inputs: one verdict line at the top of the check
+  panel combines the cell checks (every save) with the latest Validate inputs result, which never says "the run can start" once the tables changed; the cell
+  list is in the panel (was below the grid); Run these inputs shows the first blocking cell. Run page: Input check card from preflight.json
+  (`app.check_summary`; UNPRICED_CODES listed first), portfolio tiles from the group sums (`Ctx.headline`), one settings line (`settings_summary`, from
+  config.json), deletion date, log folded once ended. "Rerun with different settings" = `/runs/new?from=<run>`: the run's job files are hard-linked
+  (`edit_api.link_or_copy`) into the new run (`input_mode=from_run`), its supplied files kept unless unticked; Edit inputs and rerun is disabled above
+  editor.MAX_EDIT_ROWS (size from eta). A blank run name becomes "<file stem> · <ACC> ACC" (a rerun: "<name> (rerun) · ..."); drafts from a run are dated.
+  Runs list: expired hidden (`?expired=1`), measures from `eta.known_size` (never counts a file on a page view), run time, deletion date; live rows updated
+  from `/runs/live` (the page used to reload, and in fact never did: runs.html did not load app.js). New run: sections Pricing / Outputs / CEDARS filing checks,
+  Check inputs only is a submit button named preflight_only (app.js copies the pressed button into a hidden field: a disabled submitter is not sent), XHR
+  upload with a percentage. Results: tiles, TSB-by-sector bars, Portfolio level first, sortable / filterable tables (app.js, numbers sort by data-v),
+  column picker at the top in `results_view.GROUP_ORDER` groups with `display_label` names (display only: CSV downloads keep Column.label). The kept results
+  parquet's folder (outputs.RESULTS_DIR) is no longer offered as a comparison sub-run (it showed a "_results" tab on CSV runs). Docs home = `docs/WEB_GUIDE.md`,
+  documents named by title (`app.DOC_TITLES`). `[hidden]` is display:none !important (a styled button ignored the attribute).
 - 0.1.45 (2026-10-26, Jake; 0.1.44 is the queue-estimate PR): CEDARS filing checks in pass 2. The first server runs with them (0.1.43, 1M, csv.zip)
   took 468 s (claims) and 483 s (budget filing) against 425 s without: preflight +7-8 s as expected, but assembly 57 -> 91 / 108 s, because
   `attach_filing` rebuilt dicts from all 139,612 flagged records and copied the 344-column part, in every part (~1 s a part on the laptop). Now
