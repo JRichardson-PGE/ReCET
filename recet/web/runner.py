@@ -4,6 +4,7 @@
     config.json   the RunConfig the web form produced
     log.txt       everything the run printed
     progress.json the run's stage, parts done and time left (recet/progress.py), for the progress bar
+    progress_log.jsonl every progress report with the seconds since the run started, to check the estimates against the real finish
     out/          the run's out_dir; `result_dir` (from the "results in ..." line) points inside it
 
 `Settings.workers` threads (default 1) each claim the oldest queued run and execute it exactly as the window does, `python -m recet run --config config.json`, in its

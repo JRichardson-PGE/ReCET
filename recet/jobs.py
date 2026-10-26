@@ -291,6 +291,10 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
             tt = time.time()
             dtypes, values = delimited.part_dtypes(parts, ("ClaimYearQuarter", "ACCVersion"))
             log(f"  split into {len(parts)} parts in {tt - ts:.0f}s; column types of the whole file read in {time.time() - tt:.0f}s")
+    fmt = cfg.output_format
+    if fmt == "xlsx" and parts is not None and n_rows > cfg.excel_max_rows:
+        fmt = cfg.excel_fallback                                   # what run_format / outputs.ExcelLimit will write instead
+    progress.plan(parts is not None, fmt, cfg.include_societal, cfg.emissions)   # the bar's stage weights for this run (progress.py)
     try:
         out = _run(cfg, acc, run_dir, result, tag, log, t_start, parts, dtypes, values)
     finally:
@@ -361,6 +365,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
 
     societal = societal_available(groups, acc, cfg.include_societal, result, log)
+    if societal != cfg.include_societal:
+        progress.replan(societal=societal)
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + ", PAC, RIM, bill impacts) ==")
     progress.report("pricing")
     t0 = time.time()

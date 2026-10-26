@@ -102,6 +102,17 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   failing record. Checked on the 1M job (PG&E's accepted 2028-2031 filings): 0 measures rejected under either set, 139,612 with warnings (the
   UnitMeaCost1stBaseline = 0 warning is the one CEDARS' own upload showed); budget filing rejects 282 ProgramCost rows because the job spans four years.
   Cost at 1M, laptop, warm: preflight 28.6-30.1 s -> 38.0 s.
+- 0.1.41 (2026-10-26, Jake): progress estimate. Replaying `progress.fraction` over the 2026-10-26 server log (1M, csv.zip, 412 s) showed it ran low
+  all run (-13% at preflight, -19% at pricing, -35% mid-writing) and sat at 98% saying "about 10 s left" for the 58 s the csv.zip conversion took (no
+  report inside TableWriter.close). Now: `progress.plan(in_parts, format)` (called in run_job once the split is known) weights stages by their seconds in that
+  server run (`SECONDS_IN_PARTS` / `SECONDS_IN_ONE_PIECE`, the file stage by `FILE_SECONDS[format]`: csv.zip 58, parquet 18; csv 45 and xlsx 5 are guesses); a
+  skipped stage gets no weight (no "loading" in a run in parts). New "file" stage: chunked reports it from `TableWriter.close(on_progress)` as the parquet parts
+  are joined and the CSV batches written (`file_share`); writing's parts are now len(parts), not +1. The web pages count the time left down between reports
+  (`progress.live`; "almost done" at 0). Every report is also appended to `progress_log.jsonl` in the run folder (with `elapsed`), to check estimates against
+  the real finish. Same replay with the new weights: within 0-4% while more than 30 s are left, but in sample (the weights come from that run).
+  Pricing and writing are scaled by `OPTION_FACTORS[(societal, emissions)]` (100k laptop runs: pricing 20 / 12 / 17 / 10 s for both on / no SCT / no
+  emissions / neither); `replan(societal=False)` when the ACC has no SCT avoided costs. Before it, a no-SCT run's estimate was up to 73-83% high early on;
+  after, the bar's stage shares are within ~2 points of the time shares in all four cases (estimate within about +-20-30%, the misses in the first seconds).
 - 0.1.40 (2026-10-25, Jake): a run in parts adds up the Results page's group sums part by part in pass 2 (`results_view.group_sums` of each part's
   frame, `combine_parts` orders them as the whole table's) instead of reading the measure-level file back at the end. On the 0.1.39 server run that read-back
   was the run's memory peak (1.11-1.15 GiB of 1.367 GiB, in its last 7 s, on top of the ~1 GiB the process already held). 1M laptop run, csv.zip, 50,000-row

@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import time
 import zipfile
 
 import pytest
@@ -659,7 +660,7 @@ def test_the_web_pages_show_a_running_runs_bar(web, tmp_path):
     ctx.db.run("UPDATE runs SET status = 'running' WHERE id = ?", (run_id,))
     assert 'id="run-progress" class="progress hidden"' in c.get(f"{P}/runs/{run_id}").text   # running, before its first report
     (ctx.runner.folder(run_id) / progress.FILE_NAME).write_text(json.dumps(
-        {"stage": "pricing", "label": "Pricing", "done": 12, "total": 50, "fraction": 0.4, "seconds_left": 240, "updated": 0}))
+        {"stage": "pricing", "label": "Pricing", "done": 12, "total": 50, "fraction": 0.4, "seconds_left": 245, "updated": time.time()}))
     p = c.get(f"{P}/runs/{run_id}/log").json()["progress"]
     assert p["fraction"] == 0.4 and p["text"] == "Pricing: part 12 of 50 · about 4 min left"
     page = c.get(f"{P}/runs/{run_id}").text
