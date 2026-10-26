@@ -86,6 +86,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.45 (2026-10-26, Jake; 0.1.44 is the queue-estimate PR): CEDARS filing checks in pass 2. The first server runs with them (0.1.43, 1M, csv.zip)
+  took 468 s (claims) and 483 s (budget filing) against 425 s without: preflight +7-8 s as expected, but assembly 57 -> 91 / 108 s, because
+  `attach_filing` rebuilt dicts from all 139,612 flagged records and copied the 344-column part, in every part (~1 s a part on the laptop). Now
+  `outputs.filing_lookup` indexes them once per run and `attach_filing` reindexes each part against it, in place (0.08 s a part). `progress.plan`
+  takes `filing` and adds FILING_PREFLIGHT_SECONDS (8) to preflight. Peak memory on those server runs: 1.101 / 1.095 GiB with checks, 1.028 without.
+  Laptop 1M after the fix, same sitting: 189 s without checks, 195 s with claims checks (preflight 33 -> 36 s, assembly 22 -> 24 s).
 - 0.1.43 (2026-10-26, Jake; 0.1.41 / 0.1.42 are the progress-estimate and filing-checks PRs): run downloads. Every run writes `preflight_findings.xlsx`
   (`PreflightReport.write_xlsx`, `jobs.write_findings`): Summary, Findings (errors first) and Cells (file, line = data row + 2, record ID, column; IDs read
   from one column of the file only when a finding points at it: 2 s at 1M on the laptop). The web run page's Files list hides `preflight.txt` and

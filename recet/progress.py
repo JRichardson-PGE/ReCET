@@ -49,6 +49,7 @@ FILE_JOIN_SECONDS = 18                      # of the file stage, joining the par
 # 100,000-record runs on the laptop (2026-10-26, 20,000-row parts, csv.zip): pricing 20 s both on, 12 s no SCT, 17 s no emissions, 10 s neither;
 # writing the parts 6, 5, 4, 4 s
 OPTION_FACTORS = {(True, True): (1.0, 1.0), (False, True): (0.6, 0.85), (True, False): (0.85, 0.7), (False, False): (0.5, 0.7)}
+FILING_PREFLIGHT_SECONDS = 8                # CEDARS filing checks (filing_rules.py) in preflight: 1M server runs of 2026-10-26, 72 s without, 79-80 s with
 COMPARE_SHARE = 0.95                        # a comparison's two runs fill this much of the bar; comparing them the rest
 _T0 = time.time()
 _weights: dict[str, float] = {}
@@ -56,16 +57,18 @@ _start: dict[str, float] = {}
 _plan: dict = {}
 
 
-def plan(in_parts: bool, output_format: str = "csv.zip", societal: bool = True, emissions: bool = True) -> None:
+def plan(in_parts: bool, output_format: str = "csv.zip", societal: bool = True, emissions: bool = True, filing: bool = False) -> None:
     """Set the stage weights for this run: in parts or in one piece, the measure-level file's format, and whether it prices the societal tests and
     emissions (both shorten pricing and writing a lot: OPTION_FACTORS)."""
-    _plan.update(in_parts=in_parts, output_format=output_format, societal=societal, emissions=emissions)
+    _plan.update(in_parts=in_parts, output_format=output_format, societal=societal, emissions=emissions, filing=filing)
     secs = dict(SECONDS_IN_PARTS if in_parts else SECONDS_IN_ONE_PIECE)
     if in_parts:
         secs["file"] = FILE_SECONDS.get(output_format, FILE_SECONDS["csv.zip"])
     f_price, f_write = OPTION_FACTORS[(bool(societal), bool(emissions))]
     secs["pricing"] *= f_price
     secs["writing"] *= f_write
+    if filing:
+        secs["preflight"] += FILING_PREFLIGHT_SECONDS
     total = sum(secs.values())
     _weights.clear()
     _start.clear()
