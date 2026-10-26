@@ -145,17 +145,25 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
     return pd.concat([frame, meta], axis=1)
 
 
-def attach_filing(frame: pd.DataFrame, filing: pd.DataFrame) -> pd.DataFrame:
-    """FilingValidation (pass / warning / reject) and FilingRules (the failing rule IDs) appended to the measure-level table, from the preflight's failing
-    records (preflight.PreflightReport.filing). A measure priced as "<IOU>_<CEInputID>" (statewide allocation) takes its file record's flags."""
+def filing_lookup(filing: pd.DataFrame) -> pd.DataFrame:
+    """The preflight's failing Measure records (preflight.PreflightReport.filing) indexed by CEInputID, for attach_filing. Built once per run: a run in parts
+    attaches it to every part, and rebuilding it each time cost about 2 s a part on the server at 140,000 flagged records."""
     m = filing[filing["table"] == "Measure"]
-    status, rules = dict(zip(m["id"], m["FilingValidation"])), dict(zip(m["id"], m["FilingRules"]))
-    ids = frame["CEInputID"].astype(str)
-    own = ids.where(ids.isin(status.keys()), ids.str.partition("_")[2])
-    out = frame.copy()
-    out["FilingValidation"] = own.map(status).fillna("pass").to_numpy()
-    out["FilingRules"] = own.map(rules).fillna("").to_numpy()
-    return out
+    return m.drop_duplicates("id").set_index("id")[["FilingValidation", "FilingRules"]]
+
+
+def attach_filing(frame: pd.DataFrame, lookup: pd.DataFrame) -> pd.DataFrame:
+    """FilingValidation (pass / warning / reject) and FilingRules (the failing rule IDs) appended to the measure-level table, from `lookup` (filing_lookup).
+    A measure priced as "<IOU>_<CEInputID>" (statewide allocation) takes its file record's flags."""
+    ids = frame["CEInputID"].astype(str).to_numpy()
+    hit = lookup.reindex(ids)
+    missing = hit["FilingValidation"].isna().to_numpy()
+    if missing.any() and lookup.index.size:                    # "<IOU>_<CEInputID>": try the file's own ID
+        bare = pd.Series(ids[missing]).str.partition("_")[2].to_numpy()
+        hit.iloc[np.flatnonzero(missing)] = lookup.reindex(bare).to_numpy()
+    frame["FilingValidation"] = hit["FilingValidation"].fillna("pass").to_numpy()
+    frame["FilingRules"] = hit["FilingRules"].fillna("").to_numpy()
+    return frame
 
 
 def filing_table(filing: pd.DataFrame, rule_set: str) -> pd.DataFrame:
