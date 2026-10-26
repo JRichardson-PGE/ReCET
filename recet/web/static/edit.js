@@ -426,6 +426,7 @@
   // (the rows' _rids at that revision, taken when the check started or when the page loaded that revision) into rows, so the marks follow later edits.
   var chk = { info: null, timer: null, started: 0, busy: false, snap: null, snapRun: null };
   var chkBtn = document.getElementById("check-btn"), chkAcc = document.getElementById("check-acc"), chkSw = document.getElementById("check-sw");
+  var chkFiling = document.getElementById("check-filing");
   var chkOut = document.getElementById("check-result");
 
   function checkDefaults(d) {
@@ -435,6 +436,7 @@
     def.acc_versions.forEach(function (a) { var o = el("option", null, a); o.value = a; chkAcc.appendChild(o); });
     chkAcc.value = c.acc_version || def.acc_version;
     chkSw.checked = c.run ? !!c.allocate_statewide : !!def.allocate_statewide;
+    chkFiling.value = (c.run ? c.filing_validation : def.filing_validation) || "";
     chkBtn.disabled = false;
     if (c.run) {
       chk.info = c;
@@ -617,7 +619,7 @@
       return fetch(API + "/check", {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
-        body: JSON.stringify({ rev: st.rev, acc_version: chkAcc.value, allocate_statewide: chkSw.checked })
+        body: JSON.stringify({ rev: st.rev, acc_version: chkAcc.value, allocate_statewide: chkSw.checked, filing_validation: chkFiling.value })
       });
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });

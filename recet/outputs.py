@@ -145,6 +145,30 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
     return pd.concat([frame, meta], axis=1)
 
 
+def attach_filing(frame: pd.DataFrame, filing: pd.DataFrame) -> pd.DataFrame:
+    """FilingValidation (pass / warning / reject) and FilingRules (the failing rule IDs) appended to the measure-level table, from the preflight's failing
+    records (preflight.PreflightReport.filing). A measure priced as "<IOU>_<CEInputID>" (statewide allocation) takes its file record's flags."""
+    m = filing[filing["table"] == "Measure"]
+    status, rules = dict(zip(m["id"], m["FilingValidation"])), dict(zip(m["id"], m["FilingRules"]))
+    ids = frame["CEInputID"].astype(str)
+    own = ids.where(ids.isin(status.keys()), ids.str.partition("_")[2])
+    out = frame.copy()
+    out["FilingValidation"] = own.map(status).fillna("pass").to_numpy()
+    out["FilingRules"] = own.map(rules).fillna("").to_numpy()
+    return out
+
+
+def filing_table(filing: pd.DataFrame, rule_set: str) -> pd.DataFrame:
+    """The filing_validation table a run writes: every record that fails a CEDARS upload check, with the rule texts."""
+    from . import filing_rules
+    rs = filing_rules.rule_set(rule_set)
+    text = {r.id: r.text for r in rs.rules}
+    out = filing.rename(columns={"id": "record"}).copy()
+    out["rules_failed"] = out["FilingRules"].map(lambda ids: " | ".join(f"{i}: {text.get(i, '')}" for i in ids.split(", ") if i))
+    out.insert(0, "rule_set", rs.label)
+    return out
+
+
 EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 
 

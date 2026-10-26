@@ -152,6 +152,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
             frame = frame[[c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]]
         frame = outputs.attach_programs(frame, measures["prg_id"])
+        if result.filing is not None:
+            frame = outputs.attach_filing(frame, result.filing)
         writer.write(frame)
         summary_parts.add(frame)
         result_sums.append(results_view.group_sums(frame))           # the Results page's sums, a few hundred rows a part (results_view)

@@ -115,7 +115,7 @@ def _full_frame(tmp_path):
     tc.make_profiles(tmp_path / "profiles.csv")
     cfg = RunConfig(measures=str(tmp_path / "Measure.csv"), programcost=str(tmp_path / "ProgramCost.csv"), out_dir=str(tmp_path / "out"), run_name="all", acc_version="2026",
                     acc_electric_file=str(tmp_path / "acc.parquet"), acc_gas_file=str(tmp_path / "gas.csv"), profiles_8760_file=str(tmp_path / "profiles.csv"),
-                    components=True, portfolio_8760=True, market_effects=0.05)
+                    components=True, portfolio_8760=True, market_effects=0.05, filing_validation="claims")
     return run_job(cfg, log=lambda s: None).frame
 
 
@@ -146,7 +146,7 @@ def test_secondary_output_files_are_documented(tmp_path):
     from recet import outputs
     text = TEXT["OUTPUT_FIELDS.md"]
     for name in ("measure_level_acc", "portfolio_summary_acc", "components_summary_acc", "portfolio_8760_acc", "portfolio_8760_unshaped_acc", "cet_comparison_measures_acc",
-                 "cet_comparison_summary_acc", "comparison_acc", "comparison_summary_acc", "preflight.txt", "run_settings.json"):
+                 "cet_comparison_summary_acc", "comparison_acc", "comparison_summary_acc", "preflight.txt", "run_settings.json", "filing_validation_acc"):
         assert name in text, name
     summary_cols = ["group", "value", "measures", *outputs.SUMMARY_TOTALS, "TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio"]
     documented = first_cell_names("OUTPUT_FIELDS.md", "### 2.2 `portfolio_summary_acc<version>`", "### 2.3")
