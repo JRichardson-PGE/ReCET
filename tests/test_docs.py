@@ -264,3 +264,25 @@ def test_documents_are_packaged_and_listed_in_the_window():
     for _title, fname in gui.DOCUMENTS:
         assert (DOCS / fname).exists(), fname
     assert "docs/*.md" in (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------ the architecture document
+def test_architecture_module_map_lists_every_module():
+    """ARCHITECTURE.md section 4 names every module of the package, and names no module that does not exist."""
+    pkg = DOCS.parent
+    text = TEXT["ARCHITECTURE.md"]
+    section = text[text.index("## 4. Module map"):text.index("## 5. ")]
+    listed = first_cell_names("ARCHITECTURE.md", "## 4. Module map", "## 5. ")
+    modules = {p.relative_to(pkg).as_posix() for p in pkg.rglob("*.py") if p.name not in ("__init__.py", "__main__.py") and "__pycache__" not in p.parts}
+    assert not sorted(modules - listed), f"modules ARCHITECTURE.md section 4 does not list: {sorted(modules - listed)}"
+    assert not sorted(listed - modules), f"ARCHITECTURE.md section 4 lists modules that do not exist: {sorted(listed - modules)}"
+    assert section.count("\n| `") == len(modules)
+
+
+def test_architecture_lists_every_web_setting():
+    """Every RECET_WEB_* variable the web app reads is in ARCHITECTURE.md section 8.5."""
+    from recet.web import config
+    src = Path(config.__file__).read_text(encoding="utf-8")
+    names = set(re.findall(r'"(RECET_WEB_[A-Z_]+)"', src))
+    documented = first_cell_names("ARCHITECTURE.md", "### 8.5 Settings", "## 9. ")
+    assert names and not sorted(names - documented), f"web settings ARCHITECTURE.md 8.5 does not list: {sorted(names - documented)}"

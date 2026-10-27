@@ -30,7 +30,8 @@ THEME_KEY = "gui_theme"
 INPUTS_KEY = "gui_job_inputs"            # the Job tab's input type and the paths of BOTH types (the hidden type's paths are kept, not run)
 DOCS_DIR = Path(__file__).resolve().parent / "docs"
 DOCUMENTS = [("User guide", "USER_GUIDE.md"), ("Input formats (supplied files)", "INPUT_FORMATS.md"), ("Input field reference", "INPUT_FIELDS.md"),
-             ("Output field reference", "OUTPUT_FIELDS.md"), ("How every output is calculated", "CALCULATIONS.md")]
+             ("Output field reference", "OUTPUT_FIELDS.md"), ("How every output is calculated", "CALCULATIONS.md"),
+             ("System architecture", "ARCHITECTURE.md")]
 OK_COLOR, BAD_COLOR, MUTED = "#1a7f37", "#c62828", "#6b6b6b"
 try:
     import sv_ttk
