@@ -1,0 +1,427 @@
+# System architecture
+
+How ReCET is built: what it has to do (section 1), the pieces it is made of and how they fit together (sections 2-4), how a run flows through them
+(section 5), how the pricing core is laid out (section 6), where its data lives (section 7), the web app and its deployment (section 8), how it stays
+fast and small (section 9), how it is kept correct (section 10), and what it does not yet do (section 11).
+
+This document describes the system. The formulas are in [Calculations](CALCULATIONS.md) and [Output fields](OUTPUT_FIELDS.md), the inputs in
+[Input fields](INPUT_FIELDS.md) and [Input formats](INPUT_FORMATS.md), and the controls in the [web guide](WEB_GUIDE.md) and the
+[desktop and command-line guide](USER_GUIDE.md). Requirement IDs (BR-06.5 and so on) are those of the CEDARS Replacement BRD.
+
+## 1. Purpose, scope and requirements
+
+### 1.1 What ReCET is
+
+ReCET ("reset") is the rebuilt CEDARS Cost Effectiveness Tool. It takes the CET's own inputs (a `Measure.csv` and an optional `ProgramCost.csv`, or one
+Excel job workbook), prices every measure **hour by hour** on an Avoided Cost Calculator (ACC) release, and writes every CET measure-level output column
+plus summaries. It is a working prototype of the calculation core of a CEDARS replacement (BRD BR-06), offered three ways over one engine:
+
+| Interface | Entry point | Who it is for |
+|---|---|---|
+| Desktop window | `python -m recet`, `recet-gui` (`gui.py`) | an analyst on their own computer, with the reference data on a local or network drive |
+| Command line and Python | `recet run ...` (`cli.py`), `recet.jobs.run_job` | scripted and batch runs, research scripts, tests |
+| Web app | `recet-web serve` (`web/`), example.org/ReCET | invited users with a browser and nothing installed |
+
+### 1.2 Scope
+
+In scope: pricing (benefits, supply costs, participant costs, bill impacts, program costs, every cost test and ratio, emissions, savings and levelized
+values), input checking (format, pricing coverage, CEDARS' own filing rules, the ACC-for-program-year check), statewide allocation, supplied profiles and
+ACC files, comparisons between ACC versions, and the results views.
+
+Out of scope, by design: the CEDARS claims and budget-filing workflow (confirmation, reopening, Kiteworks PII handling), the Programs, Monthly Reports
+and Documents modules, and an integration API. ReCET reads the CEDARS Programs list and CEDARS' published rule files as data; it does not talk to
+CEDARS.
+
+### 1.3 Functional requirements and how they are met
+
+| Requirement | What it asks | How ReCET meets it | Status |
+|---|---|---|---|
+| CET parity | the CET's inputs in, the CET's outputs out | the 74 `Measure.csv` columns and `ProgramCost.csv` read as CET writes them (pipe-delimited; comma and tab also accepted); every CET measure-level output column written except `JobID` and `PA` | met; the deliberate differences are listed in C17 |
+| Hourly valuation, load shifting (BR-06.6) | value savings in the hour they occur; a measure that only moves load has value | each measure's 8,760 profile is multiplied by that hour's avoided cost **before** summing (C5.1); kWh-per-unit profiles (C4.5) | met |
+| ACC per measure (BR-06.5) | price records on the ACC that applies to them; flag the ones that are not | optional `ACCVersion` column (C3.5); the "Priced for" check flags records whose ACC does not normally apply to their program year (`versions.expected_accs`) | met |
+| Version labels (BR-11.7) | name each ACC release unambiguously | versions keyed and shown by ACC year ("2026 ACC"); CET's Avoided Cost Version numbers mapped on read (`versions.py`) | met |
+| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks | `run_poc.participant_cost_test` | met |
+| Filing checks (BR-06.3, BR-03.6, BR-03.3) | check a job against CEDARS' upload rules before upload | CEDARS' published claims and budget-filing rule files, shipped unchanged and versioned by effective date (`filing_rules.py`); failing records flagged, never blocked; the rule set used recorded in `run_settings.json` | met; multi-file batch upload dropped for ReCET |
+| Output templates and key metrics (BR-06.10) | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
+| Minimal input set (BR-06.15) | an exploratory run needs only the fields that change a result | descriptive columns may be left out (`templates.with_defaults`); a missing calculation column is still an error | met, except lifecycle savings as input (not built, by decision) |
+| Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); each run in its own process | partly met (section 11) |
+| Statewide allocation | split a statewide program across the IOUs | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15) | met |
+| Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
+| Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
+
+### 1.4 Nonfunctional requirements
+
+| Requirement | Target | Achieved | Where it comes from |
+|---|---|---|---|
+| Throughput (BRD NFR Performance) | 1,000,000 records on 8,760 profiles in 15 minutes or less | 7.4 minutes on the web server (0.1.50, zipped CSV, no filing checks); under 5 minutes on a 16-thread laptop | runs in parts (section 9), per-route pricing |
+| Memory | a 1,000,000-record run inside the server's 1.4 GB container | peak 1.01 GiB on the server; about 1 GB committed on the laptop | parts, memory-mapped ACC, one BLAS thread |
+| Accuracy | reproduce the CET where the CET is right | on four real CET runs (21,370 measures): gas benefit, participant costs, bill impacts and savings equal to 1.0000; TSB 1.0013 of CET's without the TOU end uses, whose CET T&D is a known CET error | C17 |
+| Reproducibility | a run can be repeated exactly | `run_settings.json` (every setting, file and version), inputs kept with the run, deterministic arithmetic, no sampling | `jobs.write_settings` |
+| Auditability | every number explained | documents checked by tests against the code (section 10) | `recet/docs`, `tests/` |
+| Security (web) | invitation-only, no account takeover, no cross-user access | argon2 passwords, hashed session and setup tokens, CSRF on every form, login rate limits, per-user run ownership, safe zip extraction (section 8.4) | `web/auth.py`, `web/jobzip.py` |
+| Portability | Windows, macOS, Linux; x86 and ARM | pure Python (numpy, pandas, pyarrow); the web image builds for arm64 and amd64 | `pyproject.toml`, `Dockerfile` |
+| Data hygiene | large files never in git; nothing derived is the only copy | reference data folder with a checksummed manifest; caches rebuildable and deletable | `paths.py`, `datapack.py` |
+
+## 2. System context
+
+```mermaid
+flowchart LR
+    analysts["Analysts<br/>desktop window, command line"] --> recet
+    users["Invited users<br/>browser"] --> recet
+    subgraph recet["ReCET"]
+        direction TB
+        ui["Interfaces"] --> job["Job layer"] --> core["Pricing core"] --> out["Outputs and Results views"]
+    end
+    acc["E3 ACC releases 2021 / 2022 / 2024 / 2026<br/>electric hourly, gas monthly<br/>(extracted and validated in CEDARS-Research)"] --> recet
+    cedars["CEDARS data<br/>impact-profile library (8,760s), Programs list,<br/>statewide factors, filing rule files"] --> recet
+    cet["CET tables, exported once<br/>run parameters (E3Settings), emissions,<br/>combustion type, rate schedules, value lists"] --> recet
+    recet --> files["Result files per run<br/>measure-level table, summaries, key metrics,<br/>field definitions, input check, run settings"]
+```
+
+Every outside source enters as a file, read at run time. Nothing is fetched from CEDARS, eTRM or E3 while a run is going: the research repository
+(CEDARS-Research) extracts and validates the ACC releases, and the CEDARS files are downloaded once and shipped or placed in the reference data folder.
+
+## 3. Layers
+
+```mermaid
+flowchart TB
+    IF["<b>Interfaces</b><br/>gui.py, gui_editor.py, gui_results.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
+    JOB["<b>Job layer</b><br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
+    CORE["<b>Pricing core</b><br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills, participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
+    DATA["<b>Data access</b><br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py, paths.py, datapack.py"]
+    OUT["<b>Outputs</b><br/>outputs.py: tables, summary, file formats<br/>results_view.py, key_metrics.py<br/>field_docs.py, output_templates.py"]
+    IF -->|"a RunConfig<br/>(window and web: in a child process)"| JOB
+    JOB --> CORE
+    CORE --> DATA
+    JOB --> OUT
+```
+
+Two rules hold across the layers:
+
+* **No UI code below the interfaces.** `editor.py` and `results_view.py` hold the logic of the Edit inputs and Results tabs with no tkinter, so the web
+  app reuses them and the tests exercise them.
+* **One run path.** The window, the command line and the web app all end in `jobs.run_job` (or `run_compare`) with a `RunConfig`. The window and the web
+  app start it as `python -m recet run --config config.json` in a separate process, so a run's memory and caches are its own, the interface stays
+  responsive, and Stop kills the process.
+
+## 4. Module map
+
+Every module in the package. Paths are relative to `recet/`.
+
+| Module | Layer | Responsibility |
+|---|---|---|
+| `gui.py` | interface | the desktop window: Job, Edit inputs, Supplied inputs, Options, Reference data, Log and Results tabs; runs jobs in a child process |
+| `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
+| `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
+| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data` |
+| `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
+| `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
+| `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
+| `web/eta.py` | interface | when a queued run should start and finish |
+| `web/jobzip.py` | interface | the job upload: one zip with `Measure.csv` and an optional `ProgramCost.csv`, extracted safely |
+| `web/auth.py` | interface | passwords, sessions, setup links, CSRF tokens, login rate limits |
+| `web/db.py` | interface | the SQLite store |
+| `web/config.py` | interface | the web app's settings from `RECET_WEB_*` environment variables |
+| `web/value_lists.py` | interface | the Docs > Value lists pages and admins' changes to the dropdown lists |
+| `web/cli.py` | interface | `recet-web serve`, `create-admin`, `reset-link`, `users`, `warm-cache` |
+| `jobs.py` | job | `RunConfig`, `run_job`, `run_compare`; the run folder and its files |
+| `chunked.py` | job | a large job run in parts, in two passes |
+| `progress.py` | job | stage and time-left reports for the progress bar |
+| `preflight.py` | job | the input check before any pricing |
+| `filing_rules.py` | job | CEDARS' claims and budget-filing rules as a versioned rule library |
+| `runtime.py` | job | points the pipeline at a run's ACC and supplied files; clears caches between runs |
+| `overrides.py` | job | loading and checking supplied files (profiles, ACC files, run parameters, factors) |
+| `versions.py` | job | the ACC versions, their files, labels, and which ACC applies to which filing |
+| `workbook.py` | job | a job as one Excel workbook |
+| `templates.py` | job | templates for every input; the CET header; the minimal input set |
+| `programs.py` | job | the CEDARS Programs list and the `Prg_*` columns |
+| `editor.py` | job | small-job table editing: loading, dropdown values, cell checks, saving |
+| `run_poc.py` | pricing | job-level orchestration of every pricing step and the cost tests (the module keeps its proof-of-concept name) |
+| `components.py` | pricing | each ACC component priced on its own (`ElecValue_*`, `GasValue_*`) |
+| `profile8760.py` | pricing | the portfolio's combined 8,760-hour savings profile |
+| `pipeline/engine.py` | pricing | the pricing engine: grouped versions and their per-measure references |
+| `pipeline/cost_tests.py` | pricing | program-cost weighting, cost tests, gross and NoAdmin variants, levelized values |
+| `pipeline/emissions.py` | pricing | CO2, NOx and PM10, ported from CET's CalcEmissions |
+| `pipeline/data_loading.py` | pricing | reading `Measure.csv` and deriving the pricing fields (C1) |
+| `pipeline/statewide_allocation.py` | pricing | splitting statewide programs across the IOUs |
+| `pipeline/discount_settings.py` | pricing | discount rates and base year per PA and ACC version |
+| `pipeline/rate_schedules.py` | pricing | retail rates for the bill impacts (RIM) |
+| `pipeline/acc_store.py` | data | the electric ACC as memory-mapped `(blocks, 8760)` arrays cached on disk |
+| `pipeline/real_avoided_cost_v2.py` | data | hourly price lookups by IOU, zone, cost test and year, including SCG routing |
+| `pipeline/real_impact_profiles.py` | data | the CEDARS impact-profile library: matching, shapes, calendar alignment |
+| `pipeline/system_zones.py` | data | the climate zone a `System` measure is priced in |
+| `pipeline/gas_avoided_cost.py` | data | the monthly gas ACC, by component |
+| `pipeline/gas_savings_profiles.py` | data | the monthly gas profiles |
+| `pipeline/delimited.py` | data | reading CET-format files; splitting a large file into parts |
+| `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
+| `paths.py` | data | where package data, the reference data folder and the cache are |
+| `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
+| `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
+| `key_metrics.py` | outputs | the key-metrics summary |
+| `field_docs.py` | outputs | each output column's definition and documentation link, read from these documents |
+| `output_templates.py` | outputs | named, ordered column lists for the measure-level file |
+
+## 5. A run, end to end
+
+### 5.1 Stages
+
+```mermaid
+flowchart TB
+    cfg(["RunConfig"]) --> prep["<b>prepare</b><br/>workbook sheets to files; supplied ACC, profile and parameter files checked and loaded;<br/>ACC version resolved (versions.resolve_acc); pipeline pointed at it (runtime.apply)"]
+    prep --> split{"more Measure.csv rows<br/>than chunk_size (20,000)?"}
+    split -->|"yes: split into parts (5.2)"| pre
+    split -->|no| pre
+    pre["<b>preflight</b><br/>format, profile coverage, ACC horizon, PrgID alignment,<br/>ACC-for-program-year check, optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
+    pre -->|"an error"| stop(["run stops; warnings never stop it"])
+    pre --> load["<b>load</b><br/>derived fields (C1); statewide allocation if on (C15); Programs metadata"]
+    load --> price["<b>price</b> each measure<br/>electric (C5.1), gas (C5.4), water energy (C5.5), societal (C5.6),<br/>bill impacts (C9), participant costs (C8), other benefits and costs (C7),<br/>emissions (C14), savings and discounted savings (C19);<br/>ACC components and the portfolio 8,760 if asked"]
+    price --> pc["<b>program costs</b><br/>ProgramCost.csv lines discounted and shared by each measure's<br/>share of its program's benefits (C11)"]
+    pc --> tests["<b>cost tests</b><br/>TRC, PAC, RIM, SCT Base / High, PCT, gross and NoAdmin,<br/>ratios, levelized values (C12, C19.6)"]
+    tests --> write["<b>write</b><br/>measure-level table (all columns kept in _results/), portfolio summary,<br/>key metrics, field definitions, CET comparison if supplied, run_settings.json"]
+```
+
+A two-version comparison (`run_compare`) runs the job twice, each in its own child process, then compares the two measure-level tables (C16.4).
+
+### 5.2 Runs in parts
+
+A job larger than `RunConfig.chunk_size` is never held in memory whole. Program costs are the one step that needs the whole job (a measure's share depends
+on every other measure in its program), so the run makes two passes:
+
+```mermaid
+flowchart TB
+    m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000 ... part_049"]
+    parts --> pf["preflight part by part; whole-file checks once"]
+    pf --> p1
+    subgraph P1["Pass 1, per part"]
+        p1["load the part"] --> v["price every measure-level value"] --> w1["write _parts/values/part_k"]
+        v --> tot["add the part's program benefit totals<br/>to the job's totals"]
+    end
+    w1 --> p2
+    tot --> share
+    subgraph P2["Pass 2, per part"]
+        p2["read part_k's values"] --> share["share program costs<br/>using the job's totals"] --> ct["cost tests"]
+        ct --> acc["append to the table writer and to the summary,<br/>key-metric and Results sums"]
+    end
+    acc --> join["join the parts into the output files; delete _parts"]
+```
+
+Anything that needs the whole job (a program-level share, a summary, a cross-row check) has a parts version, and `tests/test_chunked.py` checks that
+every output file of a run in parts equals the one-piece run's.
+
+## 6. The pricing core
+
+### 6.1 The electric route
+
+The general electric route (C5.1), which every electric measure takes:
+
+```mermaid
+flowchart TB
+    m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape, sums to 1"]
+    shape -->|"rotate once onto the ACC's weekdays (C4.2)"| aligned["aligned shape"]
+    acc["ACC hourly avoided cost<br/>for (IOU, zone, cost test, year)"] --> mult
+    aligned --> mult["multiply hour by hour:<br/>$ per annual kWh in each hour"]
+    mult --> q["sum within each ACC quarter<br/>2,160 / 2,184 / 2,208 / 2,208 hours"]
+    q --> d["x baseline phasing, 1st / 2nd baseline (C2.3)<br/>x quarterly discount at the PA's rate (C2.4)"]
+    d --> s["sum over the measure's quarters<br/>claim quarter to claim quarter + EUL, the last one prorated"]
+    s --> v["x annual net kWh = lifetime value"]
+```
+
+Multiplying each hour before summing is what lets a measure that only shifts load have value; the CET nets annual savings first and prices it at zero.
+
+### 6.2 Routes, not measures
+
+Most of a job's measures share a few thousand *routes*: the same profile, IOU, zone, cost test, claim year and quarter, EUL and RUL. The grouped engine
+(`engine.price_real_hourly`, `price_gas_benefit`) prices each distinct route once and scales the result per measure, so pricing cost follows the number
+of routes, not of measures or measure-quarters. Each pricing function also has a row-by-row `..._per_measure` reference that implements the formula
+directly; the tests require the two to agree.
+
+### 6.3 Gas, water and the rest
+
+Gas is monthly: a 12-value profile times the monthly gas ACC (C5.4), with no calendar alignment. Water energy is electric generation only (C5.5). Bill
+impacts, participant costs, other benefits and costs, and emissions are column-wise computations over the measure table, each with a row-by-row reference
+as well. The cost tests and program-cost sharing (`cost_tests.py`) are ported from the CET's CalcCE and CalcCost procedures, with the deliberate
+differences listed in C17.
+
+## 7. Data
+
+### 7.1 Three tiers
+
+| Tier | What | Where | Size | Changes |
+|---|---|---|---|---|
+| Package data | run parameters (CET E3Settings), emissions, combustion type and rate-schedule tables, gas ACCs, gas monthly profiles, statewide factors and field rules, the Programs list, System-zone catalog, value lists, CEDARS filing rule files | `recet/data/`, in git and in the package | megabytes | with a ReCET release |
+| Reference data | electric ACC hourly parquets (2021, 2022, 2024, 2026) and the CEDARS impact-profile library (catalog and 8,760s) | the *reference data folder*: `RECET_DATA`, `~/.recet/config.json`, or `--data-dir` | about 11 GB | rarely; `manifest.json` holds each file's size and SHA-256 |
+| Cache | the electric ACC as memory-mapped arrays, profile indexes | `~/.recet/cache` (`RECET_CACHE`; `RECET_NO_CACHE` turns it off) | a few GB | rebuilt on demand; never the only copy (`recet data clear-cache`) |
+
+Reference data never goes in git. `recet data status | verify | pack | unpack | build` (`datapack.py`) move it between machines; the web server mounts it
+read-only at `/data`.
+
+### 7.2 ACC versions
+
+A run names an ACC version by its year (`2021`, `2022`, `2024`, `2026`). The version selects the electric parquet, the gas table, the run parameters and the
+CET tables (`versions.py`). Supplied ACC files replace the built-in ones for that version or define a new one. A measure's optional `ACCVersion` column
+prices it on another version within the same run (C3.5). Each ACC's hours follow one calendar's weekdays (2018 for 2024 and 2026, 2020 for 2021 and
+2022), and every ACC year has 8,760 hours.
+
+### 7.3 The run folder
+
+```text
+  <out_dir>/<run name>_acc<version>/
+     measure_level_acc<v>.<fmt>         one row per measure (the output template's columns, or all)
+     portfolio_summary_acc<v>.<fmt>     totals and ratios overall and by IOU, credited PA and program segment
+     key_metrics_acc<v>.<fmt>           headline results with definitions; top programs, sectors and end uses
+     field_definitions_acc<v>.<fmt>     each column of the measure-level file with its definition and link
+     filing_validation_acc<v>.<fmt>     with CEDARS filing checks on: each failing record and rule
+     preflight.txt / .json / preflight_findings.xlsx      the input check
+     run_settings.json                  every setting, file, version and count needed to repeat the run
+     log.txt                            the run's log
+     _results/                          the full measure-level parquet and the Results page's per-program sums
+     _prepared_inputs/                  workbook sheets and supplied files as the run read them
+```
+
+Formats are `csv`, `csv.zip`, `parquet` and `xlsx` (Excel up to 50,000 measures; a larger Excel job writes zipped CSV). OUTPUT_FIELDS section 2 describes
+every file.
+
+## 8. The web app
+
+### 8.1 Deployment
+
+```mermaid
+flowchart TB
+    b["Browser"] -->|HTTPS| nginx["<b>Edge nginx</b> (edge-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
+    subgraph HOST["AWS EC2 t4g.small: 2 ARM vCPUs, 2 GiB"]
+        nginx -->|"docker network web"| srv
+        subgraph C["Container recet (1400m memory limit)"]
+            srv["<b>recet-web serve</b><br/>uvicorn + FastAPI<br/>pages, uploads, downloads"]
+            wk["<b>worker thread</b><br/>claims queued runs"]
+            jan["<b>janitor thread</b><br/>hourly clean-up"]
+            child["<b>run process</b><br/>python -m recet run<br/>--config config.json"]
+            wk --> child
+        end
+        state[("<b>recet_state</b> volume<br/>SQLite, runs, drafts,<br/>ACC cache")]
+        ref[("<b>/data</b> read-only<br/>reference data")]
+    end
+    srv --- state
+    jan --- state
+    child --- state
+    child --- ref
+```
+
+One server process holds the pages and the queue; every run is its own child process in its own process group, so a run's memory is released when it
+ends and Stop (or the time limit, `RECET_WEB_RUN_TIMEOUT`) kills it and anything it started. On a restart, runs left "running" are marked failed so their
+owners can start them again. The health check is `GET /healthz`.
+
+### 8.2 State
+
+The SQLite database (`recet_web.sqlite3`, WAL mode, a new connection per call) holds: `users`, `sessions` (hashed tokens), `setup_links` (hashed one-time
+tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `value_list_changes` and `audit` (sign-ins, runs, user
+changes). Everything else is files: `runs/<id>/` (`inputs/`, `config.json`, `log.txt`, `progress.json`, `progress_log.jsonl`, `estimate.json`, `out/`) and
+`drafts/<id>/` (`draft.json`, an optional base workbook, a rerun's settings and supplied files). Runs are kept `RECET_WEB_RETENTION_DAYS` (7) and untouched
+drafts `RECET_WEB_DRAFT_DAYS` (30).
+
+### 8.3 The queue
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant A as Web app
+    participant D as Database and<br/>run folder
+    participant W as Worker
+    participant R as Run process
+    U->>A: New run
+    A->>D: queued run,<br/>inputs, config
+    A-->>U: place in queue,<br/>expected finish
+    W->>D: claim next run<br/>(input checks first)
+    W->>R: recet run --config
+    R->>D: log, progress
+    U->>A: run page polls
+    A->>D: read progress
+    A-->>U: stage, time left
+    R-->>W: exit code
+    W->>D: finished / failed
+    U->>A: Results, downloads
+    A->>D: read sums, files
+```
+
+`RECET_WEB_WORKERS` (1 on the server) runs execute at once. A queued run's start and finish are estimated from its measure count and options, the
+running runs' own time left, and a calibration against this server's recent runs (`web/eta.py`).
+
+### 8.4 Security
+
+* Accounts are by invitation: an admin creates the account and the person chooses a password through a one-time setup link (72 hours). Passwords are
+  argon2 hashes, at least 10 characters.
+* A session cookie holds a random token; the database keeps only its SHA-256, so a copy of the database cannot be replayed as a cookie. Cookies are
+  HTTPS-only by default (`RECET_WEB_SECURE_COOKIES`). Disabling a user or resetting a password deletes their sessions.
+* Every form carries the session's CSRF token (the Edit inputs page sends it as a header).
+* Login is rate-limited: 5 failures per account or 20 per address in 15 minutes lock further attempts.
+* A run or draft belongs to its creator; other users get "not found", admins see everything.
+* Uploads are capped per file (`RECET_WEB_MAX_UPLOAD_MB`, 150) and a job zip by its unzipped size (`RECET_WEB_MAX_UNZIPPED_MB`, 1,024), counted as it is
+  extracted whatever the zip's headers claim. Only `Measure` and `ProgramCost` members are accepted, each written to a fixed name, so a crafted path cannot
+  write elsewhere. Uploaded files are stored under fixed names, never the uploader's.
+* The container runs as an unprivileged user with the reference data mounted read-only.
+
+### 8.5 Settings
+
+| Variable | Default | Effect |
+|---|---|---|
+| `RECET_WEB_STATE` | `~/.recet/web` (`/var/lib/recet/web` in the image) | database, runs, drafts |
+| `RECET_WEB_PREFIX` | `/ReCET` | the URL path every page, asset and cookie uses |
+| `RECET_WEB_SECURE_COOKIES` | 1 | session cookie over HTTPS only |
+| `RECET_WEB_TRUST_PROXY` | 1 | client address from `X-Real-IP` (the edge nginx) |
+| `RECET_WEB_WORKERS` | 1 | runs at once |
+| `RECET_WEB_ACC_VERSIONS` | `2024,2026` (`2021,2022,2024,2026` on the server) | ACC versions offered |
+| `RECET_WEB_RETENTION_DAYS` | 7 | days a run is kept |
+| `RECET_WEB_DRAFT_DAYS` | 30 | days an untouched draft is kept |
+| `RECET_WEB_MAX_UPLOAD_MB` | 150 | largest upload per file |
+| `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
+| `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
+| `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (e.g. `{"parquet_row_group": 50000}` on the small server) |
+| `RECET_MEM_LIMIT` | `1400m` | the container's memory limit (docker-compose) |
+| `RECET_DATA` | `/data` in the image | the reference data folder |
+| `RECET_HOME` | `~/.recet` | the config folder (and the web state's parent) |
+| `RECET_CACHE`, `RECET_NO_CACHE` | `~/.recet/cache` | where the cache is, or no cache |
+| `RECET_PROGRESS_FILE` | set by the runner | where a run writes its progress |
+
+## 9. Performance and memory design
+
+The target is 1,000,000 records on 8,760 profiles in 15 minutes inside the server's 1.4 GB container. What gets it there:
+
+| Technique | Where | Effect |
+|---|---|---|
+| Runs in parts of 20,000 measures, two passes | `chunked.py` | memory follows the part size, not the job size (1M: 17.8 GB committed as one piece, under 1 GB in parts) |
+| Price each route once | `engine.py` (C5.1) | pricing follows distinct routes, not measures or measure-quarters |
+| Column-wise computations | `engine.py`, `emissions.py` | bill impact, participant cost and emissions no longer loop over rows |
+| Memory-mapped ACC | `acc_store.py` | the ACC is read once into `(blocks, 8760)` arrays on disk; a run touches only the pages it needs, and series are read-only views, not copies |
+| One BLAS thread | `import recet` sets `OPENBLAS_NUM_THREADS=1` | avoids a per-thread buffer the pricing never uses (0.5 GB on a 16-thread laptop) |
+| Cheap splitting and reading | `delimited.py` | the header read is 64 KB; pipe files are split by copying lines; each part's reads are kept so it is parsed 3 times, not 7 |
+| Results from sums | `results_view.py` | the Results pages read per-program sums (about 0.1 GB) instead of the measure-level table (6.9 GB at 1M) |
+| Parquet first, CSV second | `outputs.py` | CSV is formatted from parquet with pyarrow on a second thread while the first compresses (ISA-L when installed) |
+
+Where a 1M run's time goes on the server (zipped CSV): pricing about half, writing about a quarter, input checks about a sixth. Pricing two parts at once
+would use the second vCPU but needs twice the pricing memory, so it waits for a bigger server.
+
+## 10. How correctness is kept
+
+* **Two implementations of every pricing step.** The grouped engines and their `..._per_measure` references; `tests/reference_calc.py` is a third,
+  independent loop implementation of every formula, which `tests/test_calcs.py` checks the tool against.
+* **Documents checked by tests.** Every column the tool writes, every setting, every command-line flag and every window control must be documented; every
+  cross-reference must resolve; the worked examples' numbers and arithmetic must be what a run produces (`tests/test_docs.py`, `test_output_docs.py`).
+  This document's module map and settings table are checked the same way.
+* **Parts equal one piece.** `tests/test_chunked.py` compares every output file of a run in parts with the one-piece run.
+* **Validation against real CET runs.** Four real CET runs of PG&E's 2028-2031 portfolio, re-checked whenever the engine changes (C17); the research repo
+  holds the scripts.
+* **Reproduce the CET unless it is wrong.** Where the CET's own data or code is in error, ReCET does not copy it, and each difference is documented
+  (C17).
+* **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
+
+## 11. Limits and what is not built
+
+* **BR-06.2 is only partly met.** Queue position, progress and time estimates are built; email on finish or failure, adding workers under heavy load, and
+  per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
+* **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
+  one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
+  managed database. The run path would not change: a worker still runs `recet run --config`.
+* **No API.** Users upload files and download results; nothing else can call ReCET except through Python (`recet.jobs`).
+* **No lifecycle-savings input** (BR-06.15): inputs stay the CET's per-unit annual values.
+* **Multi-file batch upload** (BR-06.3) is not built: one job zip holds one `Measure.csv`.
+* **No integration with CEDARS or eTRM.** Profiles, programs and rules are files refreshed by hand.

@@ -94,6 +94,8 @@ form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
 .doc th, .doc td { border: 1px solid var(--line); padding: .3rem .5rem; vertical-align: top; }
 .doc pre { background: var(--card); border: 1px solid var(--line); padding: .7rem; overflow-x: auto; }
 .doc code { font-size: .88em; }
+.doc .mermaid { margin: 1rem 0; overflow-x: auto; text-align: center; }
+.doc .mermaid svg { max-width: 100%; height: auto; }
 .vl-tools { display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; }
 .vl-tools label, .vl-year label { flex-direction: row; align-items: center; gap: .4rem; }
 .vl-year input { width: 6rem; }

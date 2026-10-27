@@ -652,13 +652,29 @@ def test_docs_pages_render(web):
     c = _login(app, "docs@example.com")
     r = c.get(f"{P}/docs")
     assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/WEB_GUIDE.md"     # the web guide is the Docs home
-    for name in ["WEB_GUIDE.md", "README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md"]:
+    for name in ["WEB_GUIDE.md", "README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "ARCHITECTURE.md"]:
         r = c.get(f"{P}/docs/{name}")
         assert r.status_code == 200, name
         assert f'href="{P}/docs/{name}" class="on"' in r.text, name
     nav = c.get(f"{P}/docs/WEB_GUIDE.md").text
     assert ">Getting started on the web<" in nav and ">Desktop and command line<" in nav and ">USER_GUIDE<" not in nav   # named by title
     assert c.get(f"{P}/docs/missing.md").status_code == 404
+
+
+def test_docs_pages_draw_mermaid_diagrams(web):
+    """A document with ```mermaid blocks loads the vendored Mermaid and docs.js (same origin: the CSP allows no other scripts); one without does not."""
+    app, ctx = web
+    _user(ctx, "diagrams@example.com")
+    c = _login(app, "diagrams@example.com")
+    page = c.get(f"{P}/docs/ARCHITECTURE.md")
+    assert page.status_code == 200 and ">System architecture<" in page.text
+    assert page.text.count('class="language-mermaid"') >= 5
+    assert f'src="{P}/static/vendor/mermaid/mermaid.min.js' in page.text and f'src="{P}/static/docs.js' in page.text
+    assert "script-src 'self'" in page.headers["content-security-policy"]
+    for asset in ("/static/vendor/mermaid/mermaid.min.js", "/static/docs.js"):
+        assert c.get(f"{P}{asset}").status_code == 200, asset
+    plain = c.get(f"{P}/docs/WEB_GUIDE.md").text
+    assert "mermaid.min.js" not in plain and "docs.js" not in plain
 
 
 def test_value_list_pages_and_admin_changes(web):
