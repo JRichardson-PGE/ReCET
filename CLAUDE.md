@@ -90,6 +90,8 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.51 (2026-10-27): `key_metrics.sums` grouped on the key columns first and builds the "PrgID - name" label only for the groups; it built it row by row
+  (`apply(axis=1)`), 0.9 s of every 50,000-row part (0.047 s now, same table). The 0.1.50 server run's pass 2 took 109 s against 0.1.43's 57 s because of it.
 - 0.1.50 (2026-10-27, Jake's field dictionary, CEDARS-Research `deliverables/recet_field_dictionary/ReCET_Field_Dictionary.xlsx`): output columns renamed and
   dropped, and the input / output definitions and units replaced by Jake's. `fieldnames.OUTPUT_RENAMES` (39: `POC_ACC` -> `Used_ACCVersion`, the kept `poc_`
   values -> `Used_Year`, `AC_kWh_1st_Baseline` ..., bills -> `LifecycleBill...`, emissions -> `FirstYear...` / `Lifecycle...` with PM10 -> `...ElecPM10`,
