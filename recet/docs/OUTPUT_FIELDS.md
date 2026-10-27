@@ -1752,6 +1752,19 @@ record's claim year. CET's `AvoidedCostCombo` list (22 MB) is not shipped: that 
 and reported as not checked when the library is not installed. `UploadPA-YYYY` (budget filing `CEInputID`) is a prefix: a PA code, a dash and the filing year, as in
 `PGE-2028-...` or `PGE-2028Q4-...`. Checked on the 100,000 records of PG&E's 2028-2031 consolidated filings, which CEDARS accepted: no record is rejected under either set.
 
+### 1.18 ACC check (`ACCCheck`)
+
+BRD BR-06.5: whether the ACC a measure was priced on normally applies to its program year (its claim year), for what the run is priced for (the run setting
+`acc_purpose`, "Priced for"). The ACC is the measure's `ACCVersion`, else the run's. Which ACCs apply comes from the table of budget filings and the ACC that
+prices each (`versions.BUDGET_FILING_ACC`, from CET's "Program year assignment to CET avoided cost version" table through 2027, then the schedule of
+expected filings): for *Quarterly Claims*, the ACC of the program year's final budget filing (one ACC per year, `versions.claims_acc`); for a named filing, that
+filing's ACC within its program years; for *Any filing* (the default), the ACC of any filing that covers the year (2028-2029: the 2024 or the 2026 ACC). Placed
+after the `Prg_` columns. It changes no priced value: a flagged measure is still priced on its ACC.
+
+| Column | Meaning |
+|---|---|
+| `ACCCheck` | `ok` if the ACC normally applies to the measure's program year; `not for this program year` if it does not (preflight lists these measures under `acc_not_for_program_year`, and `run_settings.json` counts them by ACC and program year under `acc_check`); `not checked` if the table says nothing about the year (before 2020, after the last filing, or claims after 2035) or the version is a label that names no ACC year. |
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## 2. Other files in a run folder
@@ -1940,6 +1953,7 @@ Everything needed to reproduce the run.
 | `inputs` | The measure and program-cost paths, the number of measures priced, and the First Year used. |
 | `totals` | The portfolio totals (the first row of the portfolio summary). |
 | `filing_validation` | With CEDARS filing checks: the rule set used (`rule_set`, `label`, `effective_date`), its number of rules, rejects and warnings, and the CEDARS files it was read from (BRD BR-03.3). |
+| `acc_check` | The ACC check (1.18, BRD BR-06.5): `purpose` and its `label` (what the run is priced for), the number of `measures`, how many were `flagged` (priced on an ACC that does not normally apply to their program year) and `not_checked`, and `by_acc_and_year`: one row per ACC version and program year with its `measures`, `status` (`ok`, `flagged` or `not checked`) and `expected_accs`. |
 
 ### 2.10 `filing_validation_acc<version>` (with CEDARS filing checks)
 
@@ -2334,6 +2348,7 @@ refer to.
 | `Prg_Exclude_From_Budget` | False | False |
 | `Prg_Exclude_From_CE` | False | False |
 | `Prg_Exclude_From_Statewide_Flag` | False | False |
+| `ACCCheck` | ok | ok |
 <!-- oa-all:end -->
 
 ### 3.6 Example A: the societal-test terms

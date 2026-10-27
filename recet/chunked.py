@@ -155,6 +155,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
             frame = frame[[c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]]
         frame = outputs.attach_programs(frame, measures["prg_id"])
+        frame = outputs.attach_acc_check(frame, measures, cfg.acc_purpose)
         if filing is not None:
             frame = outputs.attach_filing(frame, filing)
         writer.write(frame)

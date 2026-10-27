@@ -166,7 +166,8 @@ def test_bad_options_are_refused(web, tmp_path):
     _user(ctx, "g@example.com")
     c = _login(app, "g@example.com")
     files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
-    for bad in ({"acc_version": "2021"}, {"market_effects": "0.5"}, {"compare_with": "2026"}, {"filing_validation": "monthly"}, {"filing_year": "28"}):
+    for bad in ({"acc_version": "2021"}, {"market_effects": "0.5"}, {"compare_with": "2026"}, {"filing_validation": "monthly"}, {"filing_year": "28"},
+                {"acc_purpose": "no-such-filing"}):
         data = {"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", **bad}
         assert c.post(f"{P}/runs", data=data, files=files).status_code == 400
     r = c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files"},
@@ -184,6 +185,19 @@ def test_a_run_can_apply_cedars_filing_checks(web, tmp_path):
     assert cfg["filing_validation"] == "budget_filing" and cfg["filing_year"] == 2028
     plain = json.loads((ctx.runner.folder(_start_run(c, tmp_path)) / "config.json").read_text())
     assert plain.get("filing_validation", "") == "" and plain.get("filing_year") is None
+
+
+def test_a_run_says_what_it_is_priced_for(web, tmp_path):
+    """BR-06.5: 'Priced for' (any filing, Quarterly Claims, or one budget filing) is a run option, shown in the settings line."""
+    from recet.web import app as web_app
+    app, ctx = web
+    _user(ctx, "pf@example.com")
+    c = _login(app, "pf@example.com")
+    page = c.get(f"{P}/runs/new").text
+    assert 'name="acc_purpose"' in page and 'value="true-up-advice-letter-september-2027"' in page
+    cfg = json.loads((ctx.runner.folder(_start_run(c, tmp_path, acc_purpose="claims")) / "config.json").read_text())
+    assert cfg["acc_purpose"] == "claims"
+    assert "priced for Quarterly Claims" in web_app.settings_summary(cfg)
 
 
 def test_a_run_from_upload_to_results(web, tmp_path):

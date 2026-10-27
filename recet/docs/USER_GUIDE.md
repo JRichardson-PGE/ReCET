@@ -94,6 +94,7 @@ A file box takes a typed or pasted path, or **Browse...**.
 |---|---|
 | **Run against** | Which avoided-cost version to price on. Choose **2021**, **2022**, **2024** or **2026** (the ACC of that year; the 2021 and 2022 ACCs are TRC only, so their SCT columns stay blank) from the list, or type a **new label** (one word, no spaces, e.g. `2030-draft`) and give its files in section 3. A built-in version's electric ACC comes from the reference data folder; its gas ACC ships in the package. Everything derived from the version - discount rates, emission factors, retail rates - follows it (C3.3). |
 | **First Year (blank = earliest claim year)** | CET's *First Year*: the reference point of all discounting (C2.5). Blank uses the earliest `ClaimYearQuarter` year in the job. Set it to the value on the CET run you are matching - it is on the run form, not in the input files. A whole number such as `2028`. |
+| **Priced for** | What the run is for: *Any filing* (the default), *Quarterly Claims*, or one budget filing. ReCET then flags every record priced on an ACC that does not normally apply to its program year (claims use the ACC of the year's final budget filing; a budget filing uses its own ACC for its program years): the `ACCCheck` column, the `acc_not_for_program_year` finding in preflight, and counts by ACC and program year in `run_settings.json` (OUTPUT_FIELDS 1.18). Nothing is stopped. |
 
 ### 2b. Edit inputs tab: edit a small job cell by cell
 
