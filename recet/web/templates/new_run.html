@@ -76,25 +76,12 @@
   </div>
   <details class="info-box" id="acc-help">
     <summary>Which ACC applies to my filing?</summary>
-    <p class="small">The ACC is named by the year E3 released the calculator. A budget filing is priced on the ACC adopted for it; claims use the ACC of
-      the program year's final budget filing, so each program year has one. Rows marked <em>expected</em> are filings still to come.
-      ReCET has the {{ accs|map('string')|join(', ') }} ACCs; the others are shown for reference.</p>
-    <div class="info-tables">
-      <table class="list compact">
-        <caption>Budget filings</caption>
-        <thead><tr><th>Filing</th><th>Program years</th><th>ACC</th><th>Basis</th></tr></thead>
-        <tbody>{% for r in filing_acc %}<tr class="{% if r.acc|string not in accs %}dim{% endif %}"><td>{{ r.filing }}</td><td class="nowrap">{{ r.years }}</td>
-          <td class="nowrap">{{ r.acc }} ACC</td><td class="small">{{ r.basis }}</td></tr>{% endfor %}</tbody>
-      </table>
-      <table class="list compact">
-        <caption>Claims</caption>
-        <thead><tr><th>Program years</th><th>ACC</th><th>Final budget filing</th></tr></thead>
-        <tbody>{% for r in claims_acc %}<tr class="{% if r.acc|string not in accs %}dim{% endif %}"><td class="nowrap">{{ r.years }}</td><td class="nowrap">{{ r.acc }} ACC</td>
-          <td class="small">{{ r.basis.replace('final filing: ', '') }}{% if r.expected %} (expected){% endif %}</td></tr>{% endfor %}</tbody>
-      </table>
-    </div>
-    <p class="small muted">CET's Run CET page numbers the same versions differently: its Avoided Cost Version is the first program year an ACC applies to (the
-      2024 ACC is Avoided Cost Version 2026, the 2026 ACC will be 2028).</p>
+    <table class="list compact acc-map">
+      <thead><tr><th>ACC</th><th>Budget filings</th><th>Claims (program years)</th></tr></thead>
+      <tbody>{% for r in acc_map %}<tr class="{% if not r.builtin %}dim{% endif %}">
+        <td class="nowrap">{{ r.acc }}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed: not in ReCET yet.</p>
   </details>
   <div class="checks">
     <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about two thirds of the run time)</label>
