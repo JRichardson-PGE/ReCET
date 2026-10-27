@@ -76,6 +76,8 @@ class RunConfig:
     preflight_only: bool = False
     filing_validation: str = ""              # "" | "claims" | "budget_filing": also apply CEDARS' upload checks for that filing (filing_rules.py); flags, never stops
     filing_year: int | None = None           # the filing's year for the rules that name it (default: each record's claim year; ProgramCost: the earliest)
+    acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
+                                             # not normally apply to their program year are flagged (preflight, ACCCheck column, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
@@ -104,6 +106,7 @@ class RunResult:
     frame: pd.DataFrame | None = None
     filing: pd.DataFrame | None = None       # with filing_validation: the failing records (preflight.PreflightReport.filing)
     filing_rules: dict | None = None         # with filing_validation: the rule set used
+    acc_check: dict | None = None            # the ACC-for-program-year check (preflight.PreflightReport.acc_check)
 
 
 def _size(p: str | Path | None) -> str:
@@ -258,6 +261,8 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
         settings["parts"] = parts
     if result.filing_rules:
         settings["filing_validation"] = result.filing_rules
+    if result.acc_check:
+        settings["acc_check"] = result.acc_check
     if result.notes:
         settings["notes"] = result.notes
     (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
@@ -335,7 +340,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     tp = time.time()
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
                                  apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes,
-                                 filing_rules=cfg.filing_validation or None, filing_year=cfg.filing_year)
+                                 filing_rules=cfg.filing_validation or None, filing_year=cfg.filing_year, acc_purpose=cfg.acc_purpose)
     log(f"checked in {time.time() - tp:.0f}s" + (f" ({len(parts)} parts)" if parts is not None else ""))
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
@@ -343,6 +348,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     findings = write_findings(rep, cfg, run_dir)
     if findings is not None:
         result.files["preflight_findings"] = findings
+    result.acc_check = rep.acc_check
     if rep.filing is not None:                                       # CEDARS' upload checks: every failing record, and the rule set used
         result.filing, result.filing_rules = rep.filing, rep.filing_rules
         result.files["filing_validation"] = outputs.write_table(outputs.filing_table(rep.filing, cfg.filing_validation), run_dir / f"filing_validation_{tag}",
@@ -436,6 +442,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         cols = [c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
+    frame = outputs.attach_acc_check(frame, measures, cfg.acc_purpose)
     if result.filing is not None:
         frame = outputs.attach_filing(frame, outputs.filing_lookup(result.filing))
     result.frame = frame

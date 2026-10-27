@@ -300,7 +300,7 @@ def check_summary(report: dict | None) -> dict | None:
         i["impact_text"] = "; ".join(f"{v:,.0f} {k}" for k, v in (i.get("impact") or {}).items())
     n = {k: sum(1 for i in issues if i.get("severity") == k) for k in SEVERITY_ORDER}
     unpriced = [i for i in issues if i.get("code") in UNPRICED_CODES and i.get("count")]
-    return {"n": n, "issues": issues, "unpriced": unpriced, "stats": report.get("stats") or {}}
+    return {"n": n, "issues": issues, "unpriced": unpriced, "stats": report.get("stats") or {}, "acc": report.get("acc_check")}
 
 
 FORMAT_NAMES = {"csv": "CSV", "csv.zip": "CSV", "xlsx": "Excel", "parquet": "Parquet"}
@@ -319,6 +319,8 @@ def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
     if not cfg.get("preflight_only"):
         parts.append("SCT on" if cfg.get("include_societal", True) else "SCT off")
         parts.append("emissions on" if cfg.get("emissions", True) else "emissions off")
+    if cfg.get("acc_purpose"):
+        parts.append("priced for " + versions.acc_purpose_label(cfg["acc_purpose"]))
     if cfg.get("filing_validation"):
         parts.append(FILING_NAMES.get(cfg["filing_validation"], cfg["filing_validation"]) + (f" ({cfg['filing_year']})" if cfg.get("filing_year") else ""))
     if cfg.get("allocate_statewide"):
@@ -694,7 +696,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             source_run = from_run
         kw.setdefault("form", {})
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
-                          acc_map=versions.acc_summary(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
+                          acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
                           source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
 
@@ -766,6 +768,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not fy.isdigit() or not 2000 <= int(fy) <= 2100:
                 return fail("Filing year must be a year such as 2028 (or blank for each record's claim year).")
             cfg["filing_year"] = int(fy)
+        purpose = str(form.get("acc_purpose", "")).strip()
+        if purpose not in dict(versions.acc_purposes()):
+            return fail("Unknown 'Priced for' choice.")
+        cfg["acc_purpose"] = purpose
         if cfg["portfolio_8760"]:
             years = str(form.get("profile_years", "")).replace(",", " ").split()
             if not all(y.isdigit() and 2000 <= int(y) <= 2100 for y in years):

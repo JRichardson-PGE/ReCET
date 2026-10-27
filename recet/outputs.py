@@ -145,6 +145,23 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
     return pd.concat([frame, meta], axis=1)
 
 
+ACC_CHECK = "ACCCheck"
+
+
+def attach_acc_check(frame: pd.DataFrame, measures: pd.DataFrame, purpose: str = "") -> pd.DataFrame:
+    """ACCCheck appended to the measure-level table (BR-06.5): "ok" when the ACC the measure was priced on (its acc_version, already filled with the run's)
+    normally applies to its program year for `purpose` (versions.expected_accs), "not for this program year" when not, "not checked" when the table says
+    nothing about the year or the version names no ACC year. `measures` is aligned with `frame`."""
+    from . import versions
+    keys, years = measures["acc_version"].astype(str).to_numpy(), measures["claim_year"].astype(int).to_numpy()
+    status = {}
+    for k, y in set(zip(keys, years)):
+        a, exp = versions.acc_year_of(k), versions.expected_accs(int(y), purpose)
+        status[(k, y)] = "not checked" if a is None or exp is None else ("ok" if a in exp else "not for this program year")
+    frame[ACC_CHECK] = [status[(k, y)] for k, y in zip(keys, years)]
+    return frame
+
+
 def filing_lookup(filing: pd.DataFrame) -> pd.DataFrame:
     """The preflight's failing Measure records (preflight.PreflightReport.filing) indexed by CEInputID, for attach_filing. Built once per run: a run in parts
     attaches it to every part, and rebuilding it each time cost about 2 s a part on the server at 140,000 flagged records."""

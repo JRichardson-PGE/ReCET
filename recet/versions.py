@@ -116,6 +116,57 @@ def claims_acc() -> list[FilingAcc]:
     return rows
 
 
+def filing_key(f: FilingAcc) -> str:
+    """A filing's run-option key: its name in lower case, words joined by '-' ("2028-2035-application", "true-up-advice-letter-september-2027")."""
+    import re
+    return re.sub(r"[^a-z0-9]+", "-", f.filing.lower()).strip("-")
+
+
+FILINGS = {filing_key(f): f for f in BUDGET_FILING_ACC}
+ACC_PURPOSE_CLAIMS = "claims"
+
+
+def acc_purposes() -> list[tuple[str, str]]:
+    """[(key, label)] for the run option 'priced for' (BR-06.5): any filing, Quarterly Claims, or one budget filing."""
+    return ([("", "Any filing (the ACCs valid for the program year)"), (ACC_PURPOSE_CLAIMS, "Quarterly Claims")]
+            + [(k, f"{f.filing} ({f.years}, {f.acc} ACC)") for k, f in FILINGS.items()])
+
+
+def acc_purpose_label(purpose: str) -> str:
+    return dict(acc_purposes()).get(purpose or "", purpose)
+
+
+def expected_accs(year: int, purpose: str = "") -> set[int] | None:
+    """The ACC years that normally apply to a program year (TIER2_PLAN step 2, BR-06.5): for a named filing (a FILINGS key) its ACC, or none when the year
+    is outside the filing's program years; for claims the ACC of the year's final budget filing (claims_acc); with no purpose the ACC of the latest
+    application covering the year and of every filing after it that covers the year (2028-2029: 2024 or 2026; 2030-2031: 2024, 2026 or 2028). None =the table says nothing about the year (before the first filing, after the last, or claims after CLAIMS_LAST_YEAR): not checked."""
+    year = int(year)
+    if purpose == ACC_PURPOSE_CLAIMS:
+        if year > CLAIMS_LAST_YEAR:
+            return None
+        hit = {c.acc for c in claims_acc() if c.first <= year <= c.last}
+        return hit or None
+    if purpose:
+        f = FILINGS.get(purpose)
+        if f is None:
+            raise ValueError(f"unknown filing {purpose!r}; known: {', '.join(FILINGS)}")
+        return {f.acc} if f.first <= year <= f.last else set()
+    covering = [(i, f) for i, f in enumerate(BUDGET_FILING_ACC) if f.first <= year <= f.last]
+    apps = [i for i, f in covering if "application" in f.filing]
+    start = apps[-1] if apps else 0                 # a later application replaces the earlier filings for its years (2028-2035 replaced 2024-2031 for 2028-31)
+    hit = {f.acc for i, f in covering if i >= start}
+    return hit or None
+
+
+def acc_year_of(key) -> int | None:
+    """The ACC year a version key prices on: a built-in's ACC, else the key itself when it is a year (a new version "2028" made from supplied files); None
+    for a label that names no year ("2026-draft")."""
+    k = str(key).strip()
+    if k in BUILTIN:
+        return BUILTIN[k].acc
+    return int(k) if k.isdigit() and len(k) == 4 else None
+
+
 def acc_short(acc) -> str:
     """'2026 ACC': the web pages' name for a version."""
     return f"{acc} ACC" if acc else ""

@@ -60,6 +60,9 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--filing-validation", choices=["claims", "budget_filing"], default=None,
                    help="also apply CEDARS' upload checks for that filing and flag the records it would reject or warn on (they are still priced)")
     g.add_argument("--filing-year", type=int, default=None, help="the filing's year for those checks (default: each record's claim year)")
+    from .versions import FILINGS
+    g.add_argument("--priced-for", dest="acc_purpose", choices=["claims", *FILINGS], default=None,
+                   help="what the run is priced for: flag the records whose ACC does not normally apply to their program year (default: any filing)")
     g.add_argument("--excel-max-rows", type=int, help="with --format xlsx, a job with more measures than this writes every table as --excel-fallback instead (default 50,000)")
     g.add_argument("--excel-fallback", choices=["csv.zip", "csv", "parquet"], help="the format of every table of a job over --excel-max-rows (default csv.zip)")
     g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
