@@ -350,9 +350,9 @@ def fmt_duration(seconds: float) -> str:
 
 
 def acc_name(key) -> str:
-    """An ACC version key as users see it, both names (BR-11.7): "2024 ACC (Avoided Cost Version 2026)"; a key the package does not know, as given."""
-    v = versions.BUILTIN.get(str(key or ""))
-    return v.label if v is not None else (f"{key} ACC" if key else "")
+    """An ACC version as the web pages name it: "2026 ACC" (Jake, 2026-10-26: CET's "Avoided Cost Version" number is being retired, D12; the New run
+    page's table says which ACC applies to which filing instead)."""
+    return versions.acc_short(key)
 
 
 def expires_text(run, retention_days: int, now: float | None = None) -> str:
@@ -691,7 +691,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             job_files = [JOB_FILE_LABELS[f] for f in job]
             source_run = from_run
         kw.setdefault("form", {})
-        return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: v.label for k, v in versions.BUILTIN.items()}, uploads=UPLOADS, templates_=TEMPLATE_FILES,
+        return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
+                          filing_acc=versions.BUDGET_FILING_ACC, claims_acc=versions.claims_acc(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
                           source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
 

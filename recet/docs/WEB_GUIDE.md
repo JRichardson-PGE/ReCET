@@ -20,8 +20,9 @@ Open **New run**.
    its own is not accepted). Each upload has a **template** link beside it. **Optional supplied files** replace the built-in 8,760 electric profiles, gas
    monthly profiles, run parameters, statewide allocation factors or program metadata for this run only; their layouts are in
    [Input formats](INPUT_FORMATS.md). The page states the size limits (150 MB per file, 1,024 MB once unzipped, unless your site set others).
-3. **Pricing.** The **ACC version** shows both names: the year E3 released the calculator and CET's Avoided Cost Version (for example
-   "2024 ACC (Avoided Cost Version 2026)"); the 2021 and 2022 ACCs are TRC only. **Compare with** prices the job on a second ACC as well. **First Year**
+3. **Pricing.** The **ACC version** is named by the year E3 released the calculator ("2026 ACC"); the 2021 and 2022 ACCs are TRC only. **Which ACC
+   applies to my filing?** below it lists each budget filing with the ACC it is priced on, and the ACC for claims of each program year (the ACC of the
+   year's final budget filing). **Compare with** prices the job on a second ACC as well. **First Year**
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
    **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
