@@ -36,11 +36,11 @@ HERE = Path(__file__).resolve().parent
 SESSION_COOKIE = "recet_session"
 LOGIN_CSRF_COOKIE = "recet_login_csrf"
 DOCS_DIR = HERE.parent / "docs"
-DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "USER_GUIDE.md", "README.md"]
+DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "USER_GUIDE.md", "ARCHITECTURE.md", "README.md"]
 # what the Docs pages call each document (the file names are for the repository and the desktop window)
 DOC_TITLES = {"WEB_GUIDE.md": "Getting started on the web", "INPUT_FORMATS.md": "Input formats", "INPUT_FIELDS.md": "Input fields",
               "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "USER_GUIDE.md": "Desktop and command line",
-              "README.md": "About these documents"}
+              "ARCHITECTURE.md": "System architecture", "README.md": "About these documents"}
 DOCS_HOME = "WEB_GUIDE.md"
 
 
@@ -1259,7 +1259,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if p.suffix != ".md" or not p.is_file() or p.parent != DOCS_DIR.resolve():
             raise HTTPException(404)
         html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
-        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=doc_title(name), current=name)
+        # a ```mermaid block becomes <code class="language-mermaid">; the page then loads the vendored Mermaid (static/docs.js draws it), only when needed
+        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=doc_title(name), current=name, mermaid='class="language-mermaid"' in html)
 
     @app.get("/healthz", response_class=PlainTextResponse)
     async def healthz():
