@@ -61,6 +61,9 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
                    help="also apply CEDARS' upload checks for that filing and flag the records it would reject or warn on (they are still priced)")
     g.add_argument("--filing-year", type=int, default=None, help="the filing's year for those checks (default: each record's claim year)")
     from .versions import FILINGS
+    g.add_argument("--output-template", dest="output_template_file", metavar="NAME_OR_FILE",
+                   help="write only these measure-level columns, in this order: a built-in or saved template's name, or a file (one column per line, or JSON "
+                        "{\"name\": ..., \"columns\": [...]}); the field_definitions file defines each one")
     g.add_argument("--priced-for", dest="acc_purpose", choices=["claims", *FILINGS], default=None,
                    help="what the run is priced for: flag the records whose ACC does not normally apply to their program year (default: any filing)")
     g.add_argument("--excel-max-rows", type=int, help="with --format xlsx, a job with more measures than this writes every table as --excel-fallback instead (default 50,000)")
@@ -74,9 +77,18 @@ def _config_from_args(a: argparse.Namespace):
     import json
     base = json.loads(a.config.read_text(encoding="utf-8")) if getattr(a, "config", None) else {}
     for k, v in vars(a).items():
-        if k in {"config", "cmd", "func"} or v is None:
+        if k in {"config", "cmd", "func", "output_template_file"} or v is None:
             continue
         base[k] = v
+    tmpl = getattr(a, "output_template_file", None)
+    if tmpl:
+        from . import output_templates
+        saved = output_templates.load_saved()
+        name, cols = (tmpl, saved[tmpl]) if tmpl in saved else output_templates.read_file(tmpl)
+        cols, bad = output_templates.check(cols)
+        if bad:
+            raise SystemExit(f"output template {name!r} names columns ReCET does not write: {', '.join(bad)}")
+        base["output_template"], base["output_template_name"] = cols, name
     return RunConfig.from_dict(base)
 
 

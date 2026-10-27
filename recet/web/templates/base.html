@@ -18,6 +18,7 @@
     {{ nav_link('/runs/new', 'New run', here.endswith('/runs/new')) }}
     {{ nav_link('/runs', 'Runs', '/runs' in here and not here.endswith('/runs/new')) }}
     {{ nav_link('/edit', 'Edit inputs', '/edit' in here) }}
+    {{ nav_link('/output-templates', 'Templates', '/output-templates' in here) }}
     {{ nav_link('/docs', 'Docs', '/docs' in here) }}
     {% if user.role == 'admin' %}{{ nav_link('/admin/users', 'Users', '/admin/users' in here) }}{{ nav_link('/admin/audit', 'Audit', '/admin/audit' in here) }}{% endif %}
   </nav>
