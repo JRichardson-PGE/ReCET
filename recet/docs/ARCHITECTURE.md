@@ -101,8 +101,8 @@ config:
 flowchart TB
     IF["Interfaces<br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
     JOB["Job layer<br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
-    CORE["Pricing core<br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills, participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
-    DATA["Data access<br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py, paths.py, datapack.py"]
+    CORE["Pricing core<br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills,<br/>participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
+    DATA["Data access<br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py,<br/>paths.py, datapack.py"]
     OUT["Outputs<br/>outputs.py: tables, summary, file formats<br/>results_view.py, key_metrics.py<br/>field_docs.py, output_templates.py"]
     IF -->|"a RunConfig<br/>(window and web: in a child process)"| JOB
     JOB --> CORE
@@ -190,17 +190,17 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
-    cfg(["RunConfig"]) --> prep["prepare<br/>workbook sheets to files; supplied ACC, profile and parameter files checked and loaded;<br/>ACC version resolved (versions.resolve_acc); pipeline pointed at it (runtime.apply)"]
+    cfg(["RunConfig"]) --> prep["prepare<br/>workbook sheets to files<br/>supplied ACC, profile and parameter files<br/>checked and loaded<br/>ACC version resolved (versions.resolve_acc)<br/>pipeline pointed at it (runtime.apply)"]
     prep --> split{"more Measure.csv rows<br/>than chunk_size<br/>(50,000)?"}
     split -->|"yes: split into parts (5.2)"| pre
     split -->|no| pre
-    pre["preflight<br/>format, profile coverage, ACC horizon, PrgID alignment,<br/>ACC-for-program-year check, optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
+    pre["preflight<br/>format, profile coverage, ACC horizon,<br/>PrgID alignment, ACC-for-program-year check,<br/>optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
     pre -->|"an error"| stop(["run stops; warnings never stop it"])
-    pre --> load["load<br/>derived fields (C1); statewide allocation if on (C15); Programs metadata"]
-    load --> price["price each measure<br/>electric (C5.1), gas (C5.4), water energy (C5.5), societal (C5.6),<br/>bill impacts (C9), participant costs (C8), other benefits and costs (C7),<br/>emissions (C14), savings and discounted savings (C19);<br/>ACC components and the portfolio 8,760 if asked"]
-    price --> pc["program costs<br/>ProgramCost.csv lines discounted and shared by each measure's<br/>share of its program's benefits (C11)"]
-    pc --> tests["cost tests<br/>TRC, PAC, RIM, SCT Base / High, PCT, gross and NoAdmin,<br/>ratios, levelized values (C12, C19.6)"]
-    tests --> write["write<br/>measure-level table (all columns kept in _results/), portfolio summary,<br/>key metrics, field definitions, CET comparison if supplied, run_settings.json"]
+    pre --> load["load<br/>derived fields (C1)<br/>statewide allocation if on (C15)<br/>Programs metadata"]
+    load --> price["price each measure<br/>electric (C5.1), gas (C5.4),<br/>water energy (C5.5), societal (C5.6)<br/>bill impacts (C9), participant costs (C8)<br/>other benefits and costs (C7)<br/>emissions (C14)<br/>savings and discounted savings (C19)<br/>ACC components and portfolio 8,760 if asked"]
+    price --> pc["program costs<br/>ProgramCost.csv lines discounted and shared<br/>by each measure's share of its program's<br/>benefits (C11)"]
+    pc --> tests["cost tests<br/>TRC, PAC, RIM, SCT Base / High, PCT<br/>gross and NoAdmin variants<br/>ratios, levelized values (C12, C19.6)"]
+    tests --> write["write<br/>measure-level table (all columns in _results/)<br/>portfolio summary, key metrics,<br/>field definitions, run_settings.json<br/>CET comparison if supplied"]
 ```
 
 A two-version comparison (`run_compare`) runs the job twice, each in its own child process, then compares the two measure-level tables (C16.4).
@@ -259,7 +259,7 @@ flowchart TB
     aligned --> mult["multiply hour by hour:<br/>$ per annual kWh in each hour"]
     mult --> q["sum within each ACC quarter<br/>2,160 / 2,184 / 2,208 / 2,208 hours"]
     q --> d["x baseline phasing, 1st / 2nd baseline (C2.3)<br/>x quarterly discount at the PA's rate (C2.4)"]
-    d --> s["sum over the measure's quarters<br/>claim quarter to claim quarter + EUL, the last one prorated"]
+    d --> s["sum over the measure's quarters<br/>claim quarter to claim quarter + EUL<br/>the last one prorated"]
     s --> v["x annual net kWh = lifetime value"]
 ```
 
