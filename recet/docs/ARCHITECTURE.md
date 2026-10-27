@@ -170,7 +170,7 @@ Every module in the package. Paths are relative to `recet/`.
 ```mermaid
 flowchart TB
     cfg(["RunConfig"]) --> prep["<b>prepare</b><br/>workbook sheets to files; supplied ACC, profile and parameter files checked and loaded;<br/>ACC version resolved (versions.resolve_acc); pipeline pointed at it (runtime.apply)"]
-    prep --> split{"more Measure.csv rows<br/>than chunk_size (20,000)?"}
+    prep --> split{"more Measure.csv rows<br/>than chunk_size?<br/>(50,000 on the web server)"}
     split -->|"yes: split into parts (5.2)"| pre
     split -->|no| pre
     pre["<b>preflight</b><br/>format, profile coverage, ACC horizon, PrgID alignment,<br/>ACC-for-program-year check, optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
@@ -186,12 +186,13 @@ A two-version comparison (`run_compare`) runs the job twice, each in its own chi
 
 ### 5.2 Runs in parts
 
-A job larger than `RunConfig.chunk_size` is never held in memory whole. Program costs are the one step that needs the whole job (a measure's share depends
+A job larger than `RunConfig.chunk_size` is never held in memory whole. The web server runs parts of 50,000 measures (set through
+`RECET_WEB_RUN_DEFAULTS`); the desktop window and the command line default to 20,000, which keeps a laptop run's memory lower. Program costs are the one step that needs the whole job (a measure's share depends
 on every other measure in its program), so the run makes two passes:
 
 ```mermaid
 flowchart TB
-    m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000 ... part_049"]
+    m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000, part_001, ...<br/>(1,000,000 measures: 20 parts on the web server)"]
     parts --> pf["preflight part by part; whole-file checks once"]
     pf --> p1
     subgraph P1["Pass 1, per part"]
@@ -376,7 +377,7 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_MAX_UPLOAD_MB` | 150 | largest upload per file |
 | `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
 | `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
-| `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (e.g. `{"parquet_row_group": 50000}` on the small server) |
+| `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"chunk_size": 50000, "parquet_row_group": 50000}`, parts and parquet row groups of 50,000) |
 | `RECET_MEM_LIMIT` | `1400m` | the container's memory limit (docker-compose) |
 | `RECET_DATA` | `/data` in the image | the reference data folder |
 | `RECET_HOME` | `~/.recet` | the config folder (and the web state's parent) |
@@ -389,7 +390,7 @@ The target is 1,000,000 records on 8,760 profiles in 15 minutes inside the serve
 
 | Technique | Where | Effect |
 |---|---|---|
-| Runs in parts of 20,000 measures, two passes | `chunked.py` | memory follows the part size, not the job size (1M: 17.8 GB committed as one piece, under 1 GB in parts) |
+| Runs in parts, two passes: 50,000 measures a part on the web server (20,000 by default elsewhere) | `chunked.py` | memory follows the part size, not the job size (1M: 17.8 GB committed as one piece, under 1 GB in parts) |
 | Price each route once | `engine.py` (C5.1) | pricing follows distinct routes, not measures or measure-quarters |
 | Column-wise computations | `engine.py`, `emissions.py` | bill impact, participant cost and emissions no longer loop over rows |
 | Memory-mapped ACC | `acc_store.py` | the ACC is read once into `(blocks, 8760)` arrays on disk; a run touches only the pages it needs, and series are read-only views, not copies |
