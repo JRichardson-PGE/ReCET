@@ -22,7 +22,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 
-from . import __version__, gui_editor, gui_results, paths, templates, versions
+from . import __version__, gui_editor, gui_results, output_templates, paths, templates, versions
 from .jobs import RunConfig
 
 STATE_KEY = "gui"
@@ -371,6 +371,12 @@ class App:
         ttk.Combobox(row, textvariable=self._var("output_format", tk.StringVar, "csv"), values=["csv", "csv.zip", "xlsx", "parquet"], width=8, state="readonly").pack(side="left", padx=6)
         from .jobs import RunConfig
         ttk.Label(row, text=f"xlsx: up to {RunConfig.excel_max_rows:,} measures; a larger job writes every file as csv.zip", style="Hint.TLabel").pack(side="left", padx=6)
+        row = sub(right, "right")
+        ttk.Label(row, text="Output template:").pack(side="left")
+        self.template_box = ttk.Combobox(row, textvariable=self._var("output_template", tk.StringVar, output_templates.ALL), width=24, state="readonly",
+                                         values=[output_templates.ALL, *output_templates.load_saved()])
+        self.template_box.pack(side="left", padx=6)
+        ttk.Button(row, text="Edit templates…", command=self._edit_templates).pack(side="left")
 
         # --- Reference data tab
         f = self._section(tabs["data"], "Reference data folder (the large ACC and profile files)")
@@ -414,7 +420,9 @@ class App:
             cet_outputs=blank(g("cet_outputs")) if g("compare_cet") else None,
             compare_with=(blank(g("compare_with")) if g("compare") else None), output_format=str(g("output_format")) or "csv", preflight_only=bool(g("preflight_only")),
             filing_validation=FILING_CHOICES.get(str(g("filing_validation")), ""), filing_year=int_or_none(g("filing_year")),
-            acc_purpose={t: k for k, t in PURPOSE_CHOICES}.get(str(g("acc_purpose")), ""))
+            acc_purpose={t: k for k, t in PURPOSE_CHOICES}.get(str(g("acc_purpose")), ""),
+            output_template=output_templates.load_saved().get(str(g("output_template")), []),
+            output_template_name="" if str(g("output_template")) == output_templates.ALL else str(g("output_template")))
 
     def apply_config(self, c: RunConfig) -> None:
         """Fill the window from a RunConfig. The input type follows what the config names (a workbook only -> Excel, a Measure.csv -> CET files); the boxes of
@@ -440,8 +448,68 @@ class App:
         s("compare_cet", bool(c.cet_outputs)), s("cet_outputs", c.cet_outputs), s("output_format", c.output_format), s("preflight_only", c.preflight_only)
         s("filing_validation", {v: k for k, v in FILING_CHOICES.items()}.get(c.filing_validation or "", "none")), s("filing_year", c.filing_year)
         s("acc_purpose", dict(PURPOSE_CHOICES).get(c.acc_purpose or "", PURPOSE_CHOICES[0][1]))
+        s("output_template", c.output_template_name if c.output_template and c.output_template_name in output_templates.load_saved() else output_templates.ALL)
 
     # ------------------------------------------------------------------------------------------------------------------ input type
+    def _edit_templates(self) -> None:
+        """A small editor for the saved output templates (output_templates.py): pick one, edit its columns (one per line, in order), check, save or delete."""
+        top = tk.Toplevel(self.root)
+        top.title("Output templates")
+        saved = output_templates.load_saved()
+        name = tk.StringVar(value=self.v["output_template"].get() if self.v["output_template"].get() in saved else "")
+        row = ttk.Frame(top)
+        row.pack(fill="x", padx=12, pady=(12, 4))
+        ttk.Label(row, text="Template name:").pack(side="left")
+        box = ttk.Combobox(row, textvariable=name, values=list(saved), width=30)
+        box.pack(side="left", padx=6)
+        hint = ("Columns, one per line, in the order the file should have them. Their definitions are in OUTPUT_FIELDS.md (section 1) and INPUT_FIELDS.md; "
+                "each run also writes a field_definitions file.")
+        ttk.Label(top, text=hint, style="Hint.TLabel", wraplength=520, justify="left").pack(fill="x", padx=12)
+        text = scrolledtext.ScrolledText(top, width=60, height=22)
+        text.pack(fill="both", expand=True, padx=12, pady=6)
+
+        def show(*_):
+            text.delete("1.0", "end")
+            text.insert("1.0", "\n".join(output_templates.load_saved().get(name.get(), [])))
+        box.bind("<<ComboboxSelected>>", show)
+        show()
+
+        def refresh(keep: str) -> None:
+            names = list(output_templates.load_saved())
+            box.configure(values=names)
+            self.template_box.configure(values=[output_templates.ALL, *names])
+            self.v["output_template"].set(keep if keep in names else output_templates.ALL)
+
+        def save() -> None:
+            cols, bad = output_templates.check(output_templates.parse(text.get("1.0", "end")))
+            n = name.get().strip()
+            if bad:
+                messagebox.showerror("Output templates", f"Not columns ReCET writes: {', '.join(bad)}", parent=top)
+            elif not n or not cols:
+                messagebox.showerror("Output templates", "Give the template a name and at least one column.", parent=top)
+            else:
+                try:
+                    output_templates.save(n, cols)
+                except ValueError as exc:
+                    messagebox.showerror("Output templates", f"{exc}: save it under another name.", parent=top)
+                    return
+                refresh(n)
+
+        def delete() -> None:
+            try:
+                output_templates.save(name.get().strip(), None)
+            except ValueError as exc:
+                messagebox.showerror("Output templates", str(exc), parent=top)
+                return
+            refresh(output_templates.ALL)
+            name.set("")
+            show()
+        row = ttk.Frame(top)
+        row.pack(fill="x", padx=12, pady=(0, 12))
+        ttk.Button(row, text="Save template", command=save).pack(side="left")
+        ttk.Button(row, text="Delete template", command=delete).pack(side="left", padx=6)
+        ttk.Button(row, text="Close", command=top.destroy).pack(side="right")
+
     def _set_input_mode(self, mode: str) -> None:
         self.input_mode.set(mode)
         self._show_input_mode()

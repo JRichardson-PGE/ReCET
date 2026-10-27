@@ -505,23 +505,43 @@ def write_csv(batches, path: Path, zipped: bool) -> Path:
     return path
 
 
-def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool, on_progress=None) -> Path:
+def write_csv_from_parquet(parquet: Path, path: Path, zipped: bool, on_progress=None, columns: list[str] | None = None) -> Path:
     """The parquet table at `parquet` as CSV (write_csv), read CSV_BATCH_ROWS rows at a time. Kept small on purpose, measured on the 1,000,000-row
     measure-level table: read single-threaded through a 1 MB buffer with no read-ahead (pyarrow otherwise pre-reads whole row groups), and with pyarrow's
     system allocator for the duration (its default, mimalloc, keeps freed memory), the conversion holds about 0.4 GB, against 2.3 GB with the defaults and
-    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop). `on_progress(share)` is called after each batch is read (share 0-1)."""
+    50,000-row batches, in the same time (about 18 s with ISA-L on the laptop). `on_progress(share)` is called after each batch is read (share 0-1).
+    `columns` writes only those columns, in that order (an output template)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
     previous = pa.default_memory_pool()
     pa.set_memory_pool(pa.system_memory_pool())
     try:
         pf = pq.ParquetFile(parquet, pre_buffer=False, buffer_size=1 << 20)
-        batches = pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False)
+        batches = pf.iter_batches(batch_size=CSV_BATCH_ROWS, use_threads=False, columns=columns)
+        if columns is not None:
+            batches = (_select(b, columns) for b in batches)
         if on_progress is not None:
             batches = _counted(batches, max(1, -(-pf.metadata.num_rows // CSV_BATCH_ROWS)), on_progress)
         return write_csv(batches, path, zipped)
     finally:
         pa.set_memory_pool(previous)
+
+
+def _select(batch, columns: list[str]):
+    """The batch's `columns`, in that order (iter_batches gives them in the file's order)."""
+    import pyarrow as pa
+    return pa.RecordBatch.from_arrays([batch.column(c) for c in columns], names=list(columns))
+
+
+def _parquet_select(src: Path, dst: Path, columns: list[str], row_group_rows: int) -> None:
+    """A parquet file holding only `columns` of `src`, in that order, one row group at a time."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    pf = pq.ParquetFile(src)
+    schema = pa.schema([pf.schema_arrow.field(c) for c in columns])
+    with pq.ParquetWriter(dst, schema) as w:
+        for b in pf.iter_batches(batch_size=row_group_rows, columns=columns, use_threads=False):
+            w.write_table(pa.Table.from_batches([_select(b, columns)], schema=schema), row_group_size=row_group_rows)
 
 
 def _counted(items, total: int, on_progress):
@@ -683,10 +703,14 @@ class TableWriter:
 
     csv and csv.zip are written PARQUET FIRST: the parts are joined into a parquet file as above and that file is then written out as CSV by pyarrow (write_csv;
     a 1,000,000-row table in about 30 s, against about 260 s for pandas). `keep_parquet` keeps that parquet in the run's RESULTS_DIR (the Results tables read
-    it: results_source); otherwise it is deleted."""
+    it: results_source); otherwise it is deleted.
+
+    `select` (an output template, BRD BR-06.10) writes only those columns, in that order, to the file; a column the table does not have is left out
+    (`left_out`). The table then always goes through parquet, kept in full when `keep_parquet` (so the Results tables still have every column), and the file is
+    written from it."""
 
     def __init__(self, path: Path, fmt: str, total_rows: int, row_group_rows: int = PARQUET_ROW_GROUP, keep_parquet: bool = False,
-                 excel: ExcelLimit | None = None):
+                 excel: ExcelLimit | None = None, select: list[str] | None = None):
         if fmt not in FORMATS:
             raise ValueError(f"unknown output format {fmt!r}; choose from {FORMATS}")
         self.excel = excel
@@ -695,8 +719,10 @@ class TableWriter:
         self.row_group_rows = max(int(row_group_rows or PARQUET_ROW_GROUP), 1)
         self.path = table_path(path, fmt)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.via_parquet = fmt in ("csv", "csv.zip")
+        self.select = [str(c) for c in select] if select else None
+        self.via_parquet = fmt in ("csv", "csv.zip") or self.select is not None
         self.keep_parquet = keep_parquet
+        self.left_out: list[str] = []
         self.parquet = (path.parent / RESULTS_DIR / f"{path.name}.parquet") if self.via_parquet else self.path
         self.cols: list[str] | None = None
         self.parts: list[Path] = []
@@ -711,7 +737,7 @@ class TableWriter:
                 raise ValueError(f"{self.path.name}: a part has different columns: extra {sorted(set(df.columns) - set(self.cols))}, "
                                  f"missing {sorted(set(self.cols) - set(df.columns))}")
             df = df[self.cols]
-        if self.fmt == "xlsx":
+        if self.fmt == "xlsx" and self.select is None:
             if self.xlsx is None:
                 self.xlsx = _XlsxStream(self.path, df, self.total)
             self.xlsx.append(df)
@@ -753,7 +779,7 @@ class TableWriter:
 
     def close(self, on_progress=None) -> Path:
         """Finish the file. `on_progress(joined, converted)` (each a share 0-1) is called as the parquet parts are joined and the CSV is written."""
-        if self.fmt == "xlsx":
+        if self.fmt == "xlsx" and self.select is None:
             if self.xlsx is not None:
                 self.xlsx.close()
             else:
@@ -763,8 +789,26 @@ class TableWriter:
         if on_progress is not None:
             on_progress(1.0, 0.0)
         if self.via_parquet:
-            write_csv_from_parquet(self.parquet, self.path, zipped=self.fmt == "csv.zip",
-                                   on_progress=None if on_progress is None else lambda c: on_progress(1.0, c))
+            cols = self.output_columns
+            if self.select is not None:
+                self.left_out = [c for c in self.select if c not in (self.cols or [])]
+            if self.fmt in ("csv", "csv.zip"):
+                write_csv_from_parquet(self.parquet, self.path, zipped=self.fmt == "csv.zip",
+                                       on_progress=None if on_progress is None else lambda c: on_progress(1.0, c),
+                                       columns=cols if self.select is not None else None)
+            elif self.fmt == "parquet":
+                _parquet_select(self.parquet, self.path, cols, self.row_group_rows)
+            else:                                                     # xlsx from the parquet, a row group at a time
+                import pyarrow.parquet as pq
+                x = None
+                for b in pq.ParquetFile(self.parquet).iter_batches(batch_size=CSV_BATCH_ROWS, columns=cols, use_threads=False):
+                    df = _select(b, cols).to_pandas()
+                    x = x or _XlsxStream(self.path, df, self.rows)
+                    x.append(df)
+                if x is None:
+                    write_table(pd.DataFrame(columns=cols), self.base, self.fmt, self.excel)
+                else:
+                    x.close()
             if not self.keep_parquet:
                 self.parquet.unlink(missing_ok=True)
                 try:
@@ -772,6 +816,13 @@ class TableWriter:
                 except OSError:
                     pass
         return self.path
+
+    @property
+    def output_columns(self) -> list[str]:
+        """The columns the file holds, in order: the template's that the table has, or every column."""
+        if self.select is None:
+            return list(self.cols or [])
+        return [c for c in self.select if c in (self.cols or [])]
 
 
 def read_table(path: Path) -> pd.DataFrame:

@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS views (
     keys TEXT NOT NULL,                           -- JSON list of column keys
     PRIMARY KEY (user_id, name)
 );
+CREATE TABLE IF NOT EXISTS output_templates (       -- each user's saved output templates (recet/output_templates.py)
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    columns TEXT NOT NULL,                        -- JSON list of measure-level column names, in order
+    PRIMARY KEY (user_id, name)
+);
 CREATE TABLE IF NOT EXISTS value_list_changes (     -- admin changes over the shipped CET value lists (recet/web/value_lists.py)
     list TEXT NOT NULL,
     code TEXT NOT NULL,

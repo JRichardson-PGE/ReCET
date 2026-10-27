@@ -822,3 +822,24 @@ def test_the_web_pages_show_a_running_runs_bar(web, tmp_path):
     assert ctx.runner.work_once()                                                          # a real run writes the file through the runner
     assert progress.read(ctx.runner.folder(run_id) / progress.FILE_NAME)["stage"] == "done"
     assert "<progress" not in c.get(f"{P}/runs").text                                     # finished: no bar
+
+
+def test_output_templates_are_saved_per_user_and_shape_a_run(web, tmp_path):
+    """BR-06.10: a user saves an output template (only known columns, in order) and picks it on New run; the run's config carries the columns."""
+    app, ctx = web
+    _user(ctx, "ot@example.com")
+    c = _login(app, "ot@example.com")
+    page = c.get(f"{P}/output-templates").text
+    assert "Key results" in page and 'data-add-column="ElecBen"' in page and "OUTPUT_FIELDS.md#elecben" in page
+    bad = c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "columns": "CEInputID\nNoSuchColumn"})
+    assert bad.status_code == 400 and "NoSuchColumn" in bad.text
+    assert c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Key results", "columns": "CEInputID"}).status_code == 400
+    ok = c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "columns": "TRCRatio\nCEInputID, ElecBen"})
+    assert ok.status_code in (200, 303)
+    assert 'value="Mine"' in c.get(f"{P}/runs/new").text
+    cfg = json.loads((ctx.runner.folder(_start_run(c, tmp_path, output_template="Mine")) / "config.json").read_text())
+    assert cfg["output_template"] == ["TRCRatio", "CEInputID", "ElecBen"] and cfg["output_template_name"] == "Mine"
+    files = {"job_zip": _job(make_measure_csv(tmp_path / "Measure.csv").read_bytes())}
+    assert c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "output_template": "Theirs"}, files=files).status_code == 400
+    c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "delete": "1"})
+    assert "Mine" not in c.get(f"{P}/output-templates").text
