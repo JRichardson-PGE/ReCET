@@ -90,6 +90,13 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.49 (2026-10-27, Jake; TIER2_PLAN step 4, BR-06.15): the minimal input set. `templates.DESCRIPTIVE_MEASURE_COLUMNS` (MeasDescription, Sector: the
+  preflight's required columns that editor.EFFECTS gives no effect, CEInputID aside; a test keeps them in step) may be left out: `templates.with_defaults`
+  adds them blank in the loader, `outputs.read_raw` and preflight, which warns `missing_descriptive_column`; a missing calculation column
+  (`preflight.CALCULATION_MEASURE_COLUMNS`) is still the `missing_columns` error, now saying it changes the results. `outputs.restated_differs` no longer
+  needs the optional columns a derived field restates (a file without CombustionType crashed there before). ReCET does NOT take lifecycle savings (Jake,
+  2026-10-27): inputs stay CET's per-unit annual gross values with NTG given separately. A file with only the calculation columns gives the same results
+  as the full file (test).
 - 0.1.48 (2026-10-27, Jake; TIER2_PLAN step 3, BR-06.10): output templates and the key-metrics summary. `RunConfig.output_template` (column list, in
   order) + `output_template_name`: `outputs.TableWriter(select=)` writes only those columns to the measure-level file; with a template the table always goes
   through parquet and the FULL table is kept in `_results/` (every format), so the Results tables, summary and key metrics see every column; a column the
