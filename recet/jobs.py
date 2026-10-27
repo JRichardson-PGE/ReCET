@@ -83,7 +83,7 @@ class RunConfig:
     acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
                                              # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
-    chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
+    chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
     subset_step: int = 1
 

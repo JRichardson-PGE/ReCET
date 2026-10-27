@@ -65,6 +65,13 @@ CEDARS.
 ## 2. System context
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart LR
     analysts["Analysts<br/>desktop window, command line"] --> recet
     users["Invited users<br/>browser"] --> recet
@@ -84,12 +91,19 @@ Every outside source enters as a file, read at run time. Nothing is fetched from
 ## 3. Layers
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart TB
-    IF["<b>Interfaces</b><br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
-    JOB["<b>Job layer</b><br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
-    CORE["<b>Pricing core</b><br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills, participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
-    DATA["<b>Data access</b><br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py, paths.py, datapack.py"]
-    OUT["<b>Outputs</b><br/>outputs.py: tables, summary, file formats<br/>results_view.py, key_metrics.py<br/>field_docs.py, output_templates.py"]
+    IF["Interfaces<br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
+    JOB["Job layer<br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
+    CORE["Pricing core<br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills, participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
+    DATA["Data access<br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py, paths.py, datapack.py"]
+    OUT["Outputs<br/>outputs.py: tables, summary, file formats<br/>results_view.py, key_metrics.py<br/>field_docs.py, output_templates.py"]
     IF -->|"a RunConfig<br/>(window and web: in a child process)"| JOB
     JOB --> CORE
     CORE --> DATA
@@ -168,31 +182,44 @@ Every module in the package. Paths are relative to `recet/`.
 ### 5.1 Stages
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart TB
-    cfg(["RunConfig"]) --> prep["<b>prepare</b><br/>workbook sheets to files; supplied ACC, profile and parameter files checked and loaded;<br/>ACC version resolved (versions.resolve_acc); pipeline pointed at it (runtime.apply)"]
-    prep --> split{"more Measure.csv rows<br/>than chunk_size?<br/>(50,000 on the web server)"}
+    cfg(["RunConfig"]) --> prep["prepare<br/>workbook sheets to files; supplied ACC, profile and parameter files checked and loaded;<br/>ACC version resolved (versions.resolve_acc); pipeline pointed at it (runtime.apply)"]
+    prep --> split{"more Measure.csv rows<br/>than chunk_size<br/>(50,000)?"}
     split -->|"yes: split into parts (5.2)"| pre
     split -->|no| pre
-    pre["<b>preflight</b><br/>format, profile coverage, ACC horizon, PrgID alignment,<br/>ACC-for-program-year check, optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
+    pre["preflight<br/>format, profile coverage, ACC horizon, PrgID alignment,<br/>ACC-for-program-year check, optional CEDARS filing rules<br/>preflight.txt / .json / _findings.xlsx"]
     pre -->|"an error"| stop(["run stops; warnings never stop it"])
-    pre --> load["<b>load</b><br/>derived fields (C1); statewide allocation if on (C15); Programs metadata"]
-    load --> price["<b>price</b> each measure<br/>electric (C5.1), gas (C5.4), water energy (C5.5), societal (C5.6),<br/>bill impacts (C9), participant costs (C8), other benefits and costs (C7),<br/>emissions (C14), savings and discounted savings (C19);<br/>ACC components and the portfolio 8,760 if asked"]
-    price --> pc["<b>program costs</b><br/>ProgramCost.csv lines discounted and shared by each measure's<br/>share of its program's benefits (C11)"]
-    pc --> tests["<b>cost tests</b><br/>TRC, PAC, RIM, SCT Base / High, PCT, gross and NoAdmin,<br/>ratios, levelized values (C12, C19.6)"]
-    tests --> write["<b>write</b><br/>measure-level table (all columns kept in _results/), portfolio summary,<br/>key metrics, field definitions, CET comparison if supplied, run_settings.json"]
+    pre --> load["load<br/>derived fields (C1); statewide allocation if on (C15); Programs metadata"]
+    load --> price["price each measure<br/>electric (C5.1), gas (C5.4), water energy (C5.5), societal (C5.6),<br/>bill impacts (C9), participant costs (C8), other benefits and costs (C7),<br/>emissions (C14), savings and discounted savings (C19);<br/>ACC components and the portfolio 8,760 if asked"]
+    price --> pc["program costs<br/>ProgramCost.csv lines discounted and shared by each measure's<br/>share of its program's benefits (C11)"]
+    pc --> tests["cost tests<br/>TRC, PAC, RIM, SCT Base / High, PCT, gross and NoAdmin,<br/>ratios, levelized values (C12, C19.6)"]
+    tests --> write["write<br/>measure-level table (all columns kept in _results/), portfolio summary,<br/>key metrics, field definitions, CET comparison if supplied, run_settings.json"]
 ```
 
 A two-version comparison (`run_compare`) runs the job twice, each in its own child process, then compares the two measure-level tables (C16.4).
 
 ### 5.2 Runs in parts
 
-A job larger than `RunConfig.chunk_size` is never held in memory whole. The web server runs parts of 50,000 measures (set through
-`RECET_WEB_RUN_DEFAULTS`); the desktop window and the command line default to 20,000, which keeps a laptop run's memory lower. Program costs are the one step that needs the whole job (a measure's share depends
+A job larger than `RunConfig.chunk_size` (50,000 measures) is never held in memory whole. Program costs are the one step that needs the whole job (a measure's share depends
 on every other measure in its program), so the run makes two passes:
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart TB
-    m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000, part_001, ...<br/>(1,000,000 measures: 20 parts on the web server)"]
+    m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000, part_001, ...<br/>(1,000,000 measures: 20 parts)"]
     parts --> pf["preflight part by part; whole-file checks once"]
     pf --> p1
     subgraph P1["Pass 1, per part"]
@@ -218,6 +245,13 @@ every output file of a run in parts equals the one-piece run's.
 The general electric route (C5.1), which every electric measure takes:
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart TB
     m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape, sums to 1"]
     shape -->|"rotate once onto the ACC's weekdays (C4.2)"| aligned["aligned shape"]
@@ -289,19 +323,26 @@ every file.
 ### 8.1 Deployment
 
 ```mermaid
+---
+config:
+  htmlLabels: false
+  flowchart:
+    htmlLabels: false
+    wrappingWidth: 400
+---
 flowchart TB
-    b["Browser"] -->|HTTPS| nginx["<b>Edge nginx</b> (jakemoto-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
+    b["Browser"] -->|HTTPS| nginx["Edge nginx (jakemoto-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
     subgraph HOST["AWS EC2 t4g.small: 2 ARM vCPUs, 2 GiB"]
         nginx -->|"docker network web"| srv
         subgraph C["Container recet (1400m memory limit)"]
-            srv["<b>recet-web serve</b><br/>uvicorn + FastAPI<br/>pages, uploads, downloads"]
-            wk["<b>worker thread</b><br/>claims queued runs"]
-            jan["<b>janitor thread</b><br/>hourly clean-up"]
-            child["<b>run process</b><br/>python -m recet run<br/>--config config.json"]
+            srv["recet-web serve<br/>uvicorn + FastAPI<br/>pages, uploads, downloads"]
+            wk["worker thread<br/>claims queued runs"]
+            jan["janitor thread<br/>hourly clean-up"]
+            child["run process<br/>python -m recet run<br/>--config config.json"]
             wk --> child
         end
-        state[("<b>recet_state</b> volume<br/>SQLite, runs, drafts,<br/>ACC cache")]
-        ref[("<b>/data</b> read-only<br/>reference data")]
+        state[("recet_state volume<br/>SQLite, runs, drafts,<br/>ACC cache")]
+        ref[("/data read-only<br/>reference data")]
     end
     srv --- state
     jan --- state
@@ -377,7 +418,7 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_MAX_UPLOAD_MB` | 150 | largest upload per file |
 | `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
 | `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
-| `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"chunk_size": 50000, "parquet_row_group": 50000}`, parts and parquet row groups of 50,000) |
+| `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"parquet_row_group": 50000}`, parquet row groups of 50,000) |
 | `RECET_MEM_LIMIT` | `1400m` | the container's memory limit (docker-compose) |
 | `RECET_DATA` | `/data` in the image | the reference data folder |
 | `RECET_HOME` | `~/.recet` | the config folder (and the web state's parent) |
@@ -390,7 +431,7 @@ The target is 1,000,000 records on 8,760 profiles in 15 minutes inside the serve
 
 | Technique | Where | Effect |
 |---|---|---|
-| Runs in parts, two passes: 50,000 measures a part on the web server (20,000 by default elsewhere) | `chunked.py` | memory follows the part size, not the job size (1M: 17.8 GB committed as one piece, under 1 GB in parts) |
+| Runs in parts of 50,000 measures, two passes | `chunked.py` | memory follows the part size, not the job size (1M: 17.8 GB committed as one piece, under 1 GB in parts) |
 | Price each route once | `engine.py` (C5.1) | pricing follows distinct routes, not measures or measure-quarters |
 | Column-wise computations | `engine.py`, `emissions.py` | bill impact, participant cost and emissions no longer loop over rows |
 | Memory-mapped ACC | `acc_store.py` | the ACC is read once into `(blocks, 8760)` arrays on disk; a run touches only the pages it needs, and series are read-only views, not copies |
