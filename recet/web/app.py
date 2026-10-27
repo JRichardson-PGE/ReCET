@@ -296,6 +296,8 @@ def check_summary(report: dict | None) -> dict | None:
     if not report:
         return None
     issues = sorted(report.get("issues") or [], key=lambda i: SEVERITY_ORDER.get(i.get("severity"), 3))
+    for i in issues:                                  # the energy the finding's records carry: "12,346 first-year net kWh"
+        i["impact_text"] = "; ".join(f"{v:,.0f} {k}" for k, v in (i.get("impact") or {}).items())
     n = {k: sum(1 for i in issues if i.get("severity") == k) for k in SEVERITY_ORDER}
     unpriced = [i for i in issues if i.get("code") in UNPRICED_CODES and i.get("count")]
     return {"n": n, "issues": issues, "unpriced": unpriced, "stats": report.get("stats") or {}}

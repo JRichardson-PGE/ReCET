@@ -628,7 +628,8 @@
       rep.issues.slice().sort(function (a, b) { return rank[a.severity] - rank[b.severity]; }).forEach(function (i) {
         var li = el("li", i.severity);
         li.appendChild(el("span", "sev", i.severity === "error" ? "stops run" : i.severity));
-        li.appendChild(document.createTextNode(i.message + (i.count ? " (" + i.count.toLocaleString() + ")" : "") + " "));
+        var impact = Object.keys(i.impact || {}).map(function (q) { return Math.round(i.impact[q]).toLocaleString() + " " + q; }).join("; ");
+        li.appendChild(document.createTextNode(i.message + (i.count ? " (" + i.count.toLocaleString() + (impact ? "; " + impact : "") + ")" : "") + " "));
         li.appendChild(el("span", "code", i.code));
         if (i._at.length) {                                              // steps through the cells it marked
           var k = 0, show = el("button", "link check-show", "Show in table" + (i._at.length > 1 ? " (" + i._at.length + " cells)" : ""));

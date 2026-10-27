@@ -250,7 +250,7 @@ def test_a_measure_that_cannot_be_priced_is_shown_on_the_run_page(web, tmp_path)
                     files={"job_zip": _job(("\n".join([lines[0], "|".join(row)]) + "\n").encode())}).headers["location"].rsplit("/", 1)[-1]
     assert ctx.runner.work_once()
     page = c.get(f"{P}/runs/{run_id}").text
-    assert "Not priced:" in page and "1 measures: electric measures with no 8,760 profile are NOT priced" in page
+    assert "Not priced:" in page and "1 measures (1,000 first-year net kWh): electric measures with no 8,760 profile are NOT priced" in page
 
 
 def test_rerun_with_different_settings_reuses_the_runs_files(web, tmp_path):

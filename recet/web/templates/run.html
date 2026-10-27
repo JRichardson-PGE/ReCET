@@ -56,7 +56,7 @@
   {% if check.unpriced %}
   <div class="unpriced">
     <p><strong>Not priced:</strong></p>
-    <ul>{% for i in check.unpriced %}<li>{{ '{:,}'.format(i['count']) }} measures: {{ i.message }}</li>{% endfor %}</ul>
+    <ul>{% for i in check.unpriced %}<li>{{ '{:,}'.format(i['count']) }} measures{% if i.impact_text %} ({{ i.impact_text }}){% endif %}: {{ i.message }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
   {% if check.stats %}<p class="check-stats">{% for k, v in check.stats.items() %}{{ k.strip() }}: {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
@@ -64,7 +64,7 @@
   <ul class="check-issues">
     {% for i in check.issues %}
     <li class="{{ i.severity }}"><span class="sev">{{ 'stops run' if i.severity == 'error' else i.severity }}</span>
-      {{ i.message }}{% if i['count'] %} ({{ '{:,}'.format(i['count']) }}){% endif %} <span class="code">{{ i.code }}</span>
+      {{ i.message }}{% if i['count'] %} ({{ '{:,}'.format(i['count']) }}{% if i.impact_text %}; {{ i.impact_text }}{% endif %}){% endif %} <span class="code">{{ i.code }}</span>
       {% if i.examples %}<span class="eg"> e.g. {{ i.examples|join(', ') }}</span>{% endif %}</li>
     {% endfor %}
   </ul>
