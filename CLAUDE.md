@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.52 (2026-10-27, Jake): `docs/ARCHITECTURE.md` (requirements, layers, every module, run flow, data, web deployment and security, performance
+  design; its module map and web settings table are checked by tests). The web Docs pages draw ```mermaid blocks: Mermaid 11.4.1 is vendored in
+  `web/static/vendor/mermaid/` (npm tarball, integrity checked; the CSP allows only same-origin scripts, so never load it from a CDN) and `static/docs.js`
+  turns `code.language-mermaid` into diagrams; app.doc loads them only on a page that has one. The desktop window shows the Mermaid source as text.
 - 0.1.51 (2026-10-27): `key_metrics.sums` grouped on the key columns first and builds the "PrgID - name" label only for the groups; it built it row by row
   (`apply(axis=1)`), 0.9 s of every 50,000-row part (0.047 s now, same table). The 0.1.50 server run's pass 2 took 109 s against 0.1.43's 57 s because of it.
 - 0.1.50 (2026-10-27, Jake's field dictionary, CEDARS-Research `deliverables/recet_field_dictionary/ReCET_Field_Dictionary.xlsx`): output columns renamed and

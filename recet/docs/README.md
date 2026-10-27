@@ -8,10 +8,11 @@
 | [Input fields](INPUT_FIELDS.md) | **every input field**: `Measure.csv`, `ProgramCost.csv`, the run settings, supplied files, reference and built-in tables, with unit and use |
 | [Output fields](OUTPUT_FIELDS.md) | **every output field, each with its complete formula in terms of the input fields**: the shared building blocks (quarters, discounting, baseline phasing, prices), then one entry per column with its unit, what each symbol is, the inputs it depends on and a worked number; the other files; two worked examples |
 | [Calculations](CALCULATIONS.md) | **the method behind the formulas**: which avoided-cost rows and load shape are used and why, the validation against CET, the deliberate differences and limitations, and a worked example |
+| [System architecture](ARCHITECTURE.md) | **how the tool is built**: its requirements and how each is met, the layers and every module, a run end to end, the pricing core, where the data lives, the web app's deployment, queue and security, the performance design, and what is not built |
 
 Start with the web guide (or, on your own computer, the desktop guide). To trace a number: find its column in Output fields; the entry gives the complete
 formula, defines every symbol in it and lists the input fields it uses (described in Input fields), and a worked number you can reproduce. Calculations
-explains why the method is what it is.
+explains why the method is what it is, and System architecture how the tool itself is built.
 
 ## How these documents are kept true
 

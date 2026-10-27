@@ -54,7 +54,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 ## Documentation
 
 In the package (`recet/docs`, and **Help > Documentation** in the window): `USER_GUIDE.md` (every control, the command line, common jobs), `INPUT_FORMATS.md`, `INPUT_FIELDS.md` (every input field),
-`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number) and `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example). Start with `docs/README.md`.
+`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number) and `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
 
 ## Web app (jakemoto.com/ReCET)
 
