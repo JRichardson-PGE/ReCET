@@ -28,7 +28,11 @@ Open **New run**.
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
    **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
-4. **Outputs.** CSV (each file zipped), Excel (for jobs of up to 50,000 measures; a larger job writes zipped CSV), or Parquet. Emissions, leaving
+4. **Outputs.** CSV (each file zipped), Excel (for jobs of up to 50,000 measures; a larger job writes zipped CSV), or Parquet. **Output template**
+   picks the measure-level file's columns and their order: all columns, a built-in template, or one you saved on the **Templates** page (name it, list
+   the columns one per line or press **Add** beside a column in the list, each linked to its definition). The Results tables, the summary and the key
+   metrics still use every column; each run also writes `field_definitions` (each column of the file, defined and linked) and `key_metrics` (the
+   headline results and their main drivers by program, sector and end use). Emissions, leaving
    `Exclude_From_CE` programs out of the portfolio summary, and a combined 8,760 electric load profile are options.
 5. **CEDARS filing checks.** Quarterly Claims or Budget filing applies CEDARS' own upload checks and flags the records CEDARS would reject or warn on
    (columns `FilingValidation` and `FilingRules`, and a `filing_validation` table). Nothing is blocked: the records are still priced.

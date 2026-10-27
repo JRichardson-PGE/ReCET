@@ -133,8 +133,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     log("\n== writing results ==")
     progress.report("writing", 0, len(parts))                       # the parts; then the "file" stage finishes the measure-level file
     tw = time.time()
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel,
+                                 select=cfg.output_template or None)
     summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
+    from . import key_metrics
+    km_parts = []                                                   # the key-metrics sums, a few rows a part (key_metrics.py)
     result_sums, result_columns = [], None
     cet = outputs.read_cet_outputs(cfg.cet_outputs) if cfg.cet_outputs else None
     cet_writer = outputs.TableWriter(run_dir / f"cet_comparison_measures_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, excel=excel) if cet is not None else None
@@ -160,6 +163,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             frame = outputs.attach_filing(frame, filing)
         writer.write(frame)
         summary_parts.add(frame)
+        km_parts.append(key_metrics.sums(frame))
         result_sums.append(results_view.group_sums(frame))           # the Results page's sums, a few hundred rows a part (results_view)
         result_columns = result_columns or list(frame.columns)
         if cet is not None:
@@ -177,6 +181,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     result.files["measure_level"] = writer.close(lambda j, c: progress.report("file", progress.file_share(j, c, writer.fmt), 1))
     ts = time.time()
     log(f"  measure-level table finished ({cfg.output_format}) in {ts - tc:.0f}s")
+    jobs.write_template_files(cfg, writer, key_metrics.combine(km_parts), run_dir, tag, excel, result, log)
     summary = summary_parts.result()
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     log(f"  portfolio summary in {time.time() - ts:.0f}s")
