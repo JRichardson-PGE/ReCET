@@ -46,10 +46,16 @@ def sums(frame: pd.DataFrame) -> pd.DataFrame:
         present = [k for k in keys if k in frame.columns]
         if not present:
             continue
-        key = frame[present].fillna("").astype(str).apply(lambda r: " - ".join(v for v in r if v.strip()) or "(blank)", axis=1) if len(present) > 1 \
-            else frame[present[0]].fillna("").astype(str).str.strip().replace("", "(blank)")
-        g = num.groupby(key.to_numpy()).sum()
-        g["measures"] = key.groupby(key.to_numpy()).size()
+        if len(present) > 1:
+            # group on the key columns first and build the "PrgID - name" text only for the groups (a few hundred), not row by row: building it per
+            # row took 0.9 s of a 50,000-row part. Groups whose texts come out the same are then added together.
+            text = frame[present].fillna("").astype(str)
+            g = num.assign(measures=1).groupby([text[c].to_numpy() for c in present]).sum()
+            label = [" - ".join(v for v in vals if v.strip()) or "(blank)" for vals in g.index]
+            g = g.groupby(label).sum()
+        else:
+            key = frame[present[0]].fillna("").astype(str).str.strip().replace("", "(blank)")
+            g = num.assign(measures=1).groupby(key.to_numpy()).sum()
         out.append(g.rename_axis("key").reset_index().assign(dimension=dim))
     df = pd.concat(out, ignore_index=True)
     return df[["dimension", "key", "measures", *cols]]
