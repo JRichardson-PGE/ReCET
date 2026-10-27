@@ -323,8 +323,11 @@ def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_pat
     assert "Which ACC applies to my filing?" in page
     # one compact row per ACC: its budget filings and the claim years it prices
     assert re.search(r'<td class="nowrap">2024</td><td>2026-27 mid-cycle; 2028-35 application</td><td class="nowrap">2026-2027</td>', page)
-    assert re.search(r'<td class="nowrap">2026</td><td>Sep 2027 true-up \(2028-31\)\*</td><td class="nowrap">2028-2029\*</td>', page)
-    assert [r["acc"] for r in versions.acc_summary()] == [2021, 2022, 2024, 2026, 2028]
+    assert re.search(r'<td class="nowrap">2026</td><td>Sep 2027 true-up \(2028-31\)</td><td class="nowrap">2028-2029</td>', page)
+    assert "*" not in page.split('id="acc-help"')[1].split("</details>")[0]
+    # dimmed = not shipped with ReCET (the 2028 ACC), whatever this server offers (the test server offers only 2024 and 2026)
+    assert [(r["acc"], r["builtin"]) for r in versions.acc_summary()] == [(2021, True), (2022, True), (2024, True), (2026, True), (2028, False)]
+    assert page.count('<tr class="dim">') == 1
     run_id = _start_run(c, tmp_path)
     assert re.search(r'<p class="muted">2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)
     # claims: the ACC of each program year's final budget filing

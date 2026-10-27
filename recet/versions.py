@@ -93,14 +93,13 @@ CLAIMS_LAST_YEAR = 2035          # later years will get filings not in the table
 
 
 def acc_summary(first_acc: int = 2021, last_acc: int = 2028) -> list[dict]:
-    """One row per ACC for the New run page: {"acc", "filings" (short names), "claims" (program years, "" if none)}, a filing still to come (and the
-    claims that rest on it) marked "*". Kept to the ACCs a user is likely to pick (from `first_acc`) and the next one (`last_acc`); the full lists are
-    BUDGET_FILING_ACC and claims_acc()."""
+    """One row per ACC for the New run page: {"acc", "filings" (short names), "claims" (program years, "" if none), "builtin" (ReCET ships it)}. Kept to
+    the ACCs a user is likely to pick (from `first_acc`) and the next one (`last_acc`); the full lists are BUDGET_FILING_ACC and claims_acc()."""
     claims: dict[int, list[str]] = {}
     for c in claims_acc():
-        claims.setdefault(c.acc, []).append(c.years + ("*" if c.expected else ""))
-    return [{"acc": acc, "filings": [(f.short or f.filing) + ("*" if f.expected else "") for f in BUDGET_FILING_ACC if f.acc == acc],
-             "claims": ", ".join(claims.get(acc, []))}
+        claims.setdefault(c.acc, []).append(c.years)
+    return [{"acc": acc, "filings": [f.short or f.filing for f in BUDGET_FILING_ACC if f.acc == acc], "claims": ", ".join(claims.get(acc, [])),
+             "builtin": str(acc) in BUILTIN}
             for acc in sorted({f.acc for f in BUDGET_FILING_ACC if first_acc <= f.acc <= last_acc})]
 
 
