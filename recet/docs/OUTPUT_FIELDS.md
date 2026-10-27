@@ -1902,7 +1902,8 @@ run writes it at the end (a run in parts adds it up part by part as it writes th
 ### 2.8 `preflight.txt`
 
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
-source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count and examples. Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
+source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count, the first-year net kWh or therms its records carry (`no_electric_profile`, `loose_profile_match`,
+`no_gas_profile`) and examples (for `loose_profile_match`: end use | IOU | the AC_Elec_Target_Sector given). Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`,
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
 `no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, `program_costs_unreadable` (a job checked in parts could not read `ProgramCost.csv`), and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
@@ -1919,7 +1920,7 @@ The same input check as a workbook to review and filter, written by every run (a
 | Sheet | Columns |
 |---|---|
 | `Summary` | `Item`, `Value`: the result (whether the run can price), the number of errors, warnings and information findings, then the statistics of `preflight.txt`. |
-| `Findings` | `Severity` (`ERROR` stops the run, `WARNING`, `INFO`), `Code` (the codes of 2.8), `Records` (how many records it concerns), `Message`, `Examples`; errors first. |
+| `Findings` | `Severity` (`ERROR` stops the run, `WARNING`, `INFO`), `Code` (the codes of 2.8), `Records` (how many records it concerns), `Message`, `First-year net kWh` and `First-year net therms` (the energy those records carry, for `no_electric_profile` and `loose_profile_match` (kWh: NumUnits x UnitkWh1stBaseline x NTGRkWh x installation and realization rates) and `no_gas_profile` (therms, the same with the therm fields); blank for the other codes), `Examples`; errors first. |
 | `Cells` | One row per flagged cell: `Severity`, `Code`, `File` (`Measure.csv` or `ProgramCost.csv`), `Line` (the line of the file; line 1 is the header), `Record` (its `CEInputID`, or `PrgID` and `PrgYear`) and `Column`. Up to 5,000 cells per finding. |
 
 `preflight.json` holds the same report for the web app (its Validate inputs panel reads it). The web app's downloads leave `preflight.txt` and `preflight.json` out: the
