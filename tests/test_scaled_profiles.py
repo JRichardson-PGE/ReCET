@@ -2,6 +2,8 @@
 is priced in one record."""
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -41,6 +43,8 @@ def test_load_shifting_only_measure_is_priced_in_one_record(tmp_path):
     r = _run(tmp_path, {"NumUnits": "10", "UnitkWh1stBaseline": "0"}, _profile(tmp_path / "p.csv", values), "shift", _peaky_acc(tmp_path / "acc.parquet"))
     f = r.frame.iloc[0]
     assert "kwh_per_unit_profile" in (r.run_dir / "preflight.txt").read_text(encoding="utf-8")
+    found = {i["code"]: i for i in json.loads((r.run_dir / "preflight.json").read_text(encoding="utf-8"))["issues"]}
+    assert found["kwh_per_unit_profile"]["cells"] == [["Measure", 0, "AC_Elec_Impact_Profile"]]          # it names its records, like every record finding
     assert f["ProfileSource"] == "user profile (kWh per unit)" and f["ElecPricingStatus"] == "priced: hourly profile"
     assert f["ElecBen"] == pytest.approx(10 * (0.300 - 0.050), rel=1e-12)    # hour 1 and hour 3 are both in Q1 of the claim year (no discounting)
     assert f["FirstYearNetKWh"] == 0 and f["BillReducElec"] == 0               # no net annual kWh: no first-year kWh, no bill change on annual rates

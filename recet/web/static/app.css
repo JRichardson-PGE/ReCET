@@ -217,6 +217,14 @@ div.tabulator-popup-container { background: var(--card); color: var(--fg); borde
 .check-log { font-size: .75rem; max-height: 14rem; overflow: auto; white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line);
              border-radius: 6px; padding: .5rem; margin: .4rem 0 0; }
 
+/* New run: which ACC applies to which filing */
+.info-box { margin: .8rem 0 .2rem; }
+.info-box summary { font-weight: 400; color: var(--accent); }
+.info-tables { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-start; }
+.info-tables table { width: auto; max-width: 100%; }
+table.compact th, table.compact td { padding: .25rem .5rem; font-size: .85rem; }
+table.compact caption { text-align: left; font-weight: 600; padding: .3rem 0; }
+
 /* New run */
 .name-field input { max-width: 36rem; }
 .grid2 .wide { grid-column: span 2; }

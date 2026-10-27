@@ -63,6 +63,14 @@ class Issue:
     count: int = 0
     examples: list = field(default_factory=list)
     cells: list = field(default_factory=list)     # (table, row, column): where it is, row = 0-based data row of Measure.csv / ProgramCost.csv
+    impact: dict = field(default_factory=dict)    # {quantity: total} of the records it names, e.g. {"first-year net kWh": 12345.6}; parts add up
+
+    def impact_text(self) -> str:
+        """'12,346 first-year net kWh; 2,100 first-year net therms' (blank when there is no impact)."""
+        return "; ".join(f"{v:,.0f} {k}" for k, v in self.impact.items())
+
+
+IMPACT_KWH, IMPACT_THERMS = "first-year net kWh", "first-year net therms"
 
 
 @dataclass
@@ -73,8 +81,9 @@ class PreflightReport:
     filing: pd.DataFrame | None = None               # with filing_rules: one row per failing record (table, id, FilingValidation, FilingRules)
     filing_rules: dict | None = None                 # with filing_rules: the rule set used (filing_rules.RuleSet.describe)
 
-    def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None) -> None:
-        self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS]))
+    def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None, impact=None) -> None:
+        self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS],
+                                 {k: float(v) for k, v in (impact or {}).items()}))
 
     @property
     def errors(self) -> list[Issue]:
@@ -90,7 +99,8 @@ class PreflightReport:
             for i in (x for x in self.issues if x.severity == sev):
                 n = f" [{i.count:,}]" if i.count else ""
                 ex = f"  e.g. {i.examples}" if i.examples else ""
-                lines.append(f"{sev.upper():8s}{i.code}{n}: {i.message}{ex}")
+                imp = f"  ({i.impact_text()})" if i.impact else ""
+                lines.append(f"{sev.upper():8s}{i.code}{n}: {i.message}{imp}{ex}")
         head = ["PREFLIGHT: " + ("no blocking problems" if self.ok else f"{len(self.errors)} blocking problem(s)")]
         head += [f"  {k}: {v}" for k, v in self.stats.items()]
         return "\n".join(head + [""] + (lines or ["(nothing to report)"]))
@@ -99,7 +109,7 @@ class PreflightReport:
         """The report as plain JSON values (the web app's Validate inputs panel reads it from preflight.json)."""
         return {"ok": self.ok, "errors": len(self.errors), "stats": {str(k): str(v) for k, v in self.stats.items()}, "filing_rules": self.filing_rules,
                 "issues": [{"severity": i.severity, "code": i.code, "message": i.message, "count": int(i.count or 0), "examples": [str(e) for e in i.examples],
-                            "cells": [[str(tb), int(r), str(c)] for tb, r, c in i.cells]}
+                            "cells": [[str(tb), int(r), str(c)] for tb, r, c in i.cells], "impact": dict(i.impact)}
                            for i in self.issues]}
 
     def write_xlsx(self, path: Path, measure_ids=None, program_ids=None) -> Path:
@@ -124,12 +134,14 @@ class PreflightReport:
                    ("Errors (stop the run)", counts["error"]), ("Warnings (the run goes on; some records are priced on a fallback or not at all)", counts["warning"]),
                    ("Information", counts["info"]), *((str(k).strip(), str(v)) for k, v in self.stats.items()),
                    ("Cells sheet", f"the flagged cells, up to {MAX_CELLS:,} per finding; Line is the line of the file (line 1 is the header)")]
-        findings = [(i.severity.upper(), i.code, i.count or None, i.message, "; ".join(map(str, i.examples))) for i in issues]
+        findings = [(i.severity.upper(), i.code, i.count or None, i.message, i.impact.get(IMPACT_KWH), i.impact.get(IMPACT_THERMS),
+                     "; ".join(map(str, i.examples))) for i in issues]
         cells = [(i.severity.upper(), i.code, files.get(t, t), int(r) + 2, rid(t, int(r)), c) for i in issues for t, r, c in i.cells]
         wb = Workbook()
         head_font, head_fill = Font(name="Arial", bold=True, color="FFFFFF", size=10), PatternFill("solid", fgColor="1F3864")
         sheets = (("Summary", ("Item", "Value"), summary, (60, 90)),
-                  ("Findings", ("Severity", "Code", "Records", "Message", "Examples"), findings, (10, 28, 10, 100, 60)),
+                  ("Findings", ("Severity", "Code", "Records", "Message", "First-year net kWh", "First-year net therms", "Examples"), findings,
+                   (10, 28, 10, 100, 16, 16, 60)),
                   ("Cells", ("Severity", "Code", "File", "Line", "Record", "Column"), cells, (10, 28, 16, 9, 40, 28)))
         for k, (name, header, rows, widths) in enumerate(sheets):
             ws = wb.active if k == 0 else wb.create_sheet()
@@ -344,12 +356,14 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
         for i in r.issues:
             k = (i.severity, i.code, i.message)
             if k not in merged:
-                merged[k] = Issue(i.severity, i.code, i.message, i.count, list(i.examples), list(i.cells))
+                merged[k] = Issue(i.severity, i.code, i.message, i.count, list(i.examples), list(i.cells), dict(i.impact))
             else:
                 m = merged[k]
                 m.count += i.count
                 m.examples = list(dict.fromkeys([*m.examples, *i.examples]))[:5]
                 m.cells = (m.cells + i.cells)[:MAX_CELLS]
+                for q, v in i.impact.items():
+                    m.impact[q] = m.impact.get(q, 0.0) + v
     rep.issues += list(merged.values())
     rep.stats.update(_merge_stats(reports, base_year))
     if filing is not None:
@@ -571,6 +585,8 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     counts = {"user profile": 0, "library": 0, "library (sector-loose match)": 0, "NO PROFILE": 0}
     missing_examples: list = []
     missing_keys: list = []
+    loose_examples: list = []
+    loose_keys: list = []
     zone_gaps = 0
     for r in keys.itertuples():
         n = int(r.n)
@@ -580,6 +596,9 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         pid, exact = real_impact_profiles.match_profile_id(r.shape_key, r.PA, r.target_sector) if cat is not None else (None, False)
         if pid is not None:
             counts["library" if exact else "library (sector-loose match)"] += n
+            if not exact:
+                loose_examples.append(f"{r.shape_key} | {r.PA} | {r.target_sector}")
+                loose_keys.append((r.shape_key, r.PA, r.target_sector))
             continue
         counts["NO PROFILE"] += n
         missing_examples.append(f"{r.shape_key} | {r.PA} | {r.target_sector}")
@@ -588,12 +607,20 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     for k, v in counts.items():
         if v:
             rep.stats[f"  electric shape: {k}"] = f"{v:,}"
+    def with_keys(keys_: list) -> pd.DataFrame:
+        return elec[pd.MultiIndex.from_frame(elec[["shape_key", "PA", "target_sector"]]).isin(keys_)] if keys_ else elec.iloc[:0]
+
     if counts["NO PROFILE"]:
+        hit = with_keys(missing_keys)
         rep.add("warning", "no_electric_profile", "electric measures with no 8,760 profile are NOT priced (ElecPricingStatus = UNPRICED); "
                 "supply a profile for them or check the AC_Elec_Impact_Profile spelling", counts["NO PROFILE"], missing_examples,
-                _cells("Measure", mrows(elec[pd.MultiIndex.from_frame(elec[["shape_key", "PA", "target_sector"]]).isin(missing_keys)]), "AC_Elec_Impact_Profile"))
+                _cells("Measure", mrows(hit), "AC_Elec_Impact_Profile"), {IMPACT_KWH: float(hit["shape_scale"].sum())})
     if counts["library (sector-loose match)"]:
-        rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because AC_Elec_Target_Sector has no exact match", counts["library (sector-loose match)"])
+        # which records, and how much energy rides on a profile matched without its sector (examples: end use | IOU | AC_Elec_Target_Sector given)
+        hit = with_keys(loose_keys)
+        rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because AC_Elec_Target_Sector has no exact match",
+                counts["library (sector-loose match)"], loose_examples, _cells("Measure", mrows(hit), "AC_Elec_Target_Sector"),
+                {IMPACT_KWH: float(hit["shape_scale"].sum())})
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
 
@@ -605,7 +632,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         if scaled.any():
             rep.add("info", "kwh_per_unit_profile", "priced on a kWh-per-unit 8,760 profile: the measure's annual kWh is the profile's (its UnitkWh1stBaseline is "
                     "not used; a 2nd baseline keeps the file's UnitkWh2ndBaseline / UnitkWh1stBaseline ratio)", int(scaled.sum()),
-                    measures.loc[scaled, "measure_id"].head(5).tolist())
+                    measures.loc[scaled, "measure_id"].head(5).tolist(), _cells("Measure", mrows(scaled), "AC_Elec_Impact_Profile"))
             zero_net = measures[scaled & (measures["unit_kwh_1st"] == 0) & ((measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0))]
             if len(zero_net):
                 rep.add("warning", "zero_net_profile_water", "water energy on a load-shifting (zero-net) kWh-per-unit profile is priced on that profile, which nets to "
@@ -654,7 +681,8 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     no_gas = gas[gas["gas_profile_key"].isna() | ~gas["gas_profile_key"].map(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(str(k)) is not None)]
     if len(no_gas):
         rep.add("warning", "no_gas_profile", "gas measures whose AC_Gas_Impact_Profile is not a known monthly profile are NOT priced (GasPricingStatus = UNPRICED); "
-                "supply the profile or fix the name", len(no_gas), no_gas["gas_profile_key"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "AC_Gas_Impact_Profile"))
+                "supply the profile or fix the name", len(no_gas), no_gas["gas_profile_key"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "AC_Gas_Impact_Profile"),
+                {IMPACT_THERMS: float(no_gas["annual_net_therms_1st"].sum())})
     bad_gs = gas[~gas["gas_sector"].astype(str).str.upper().isin(VALID_GAS_SECTORS)]
     if len(bad_gs):
         rep.add("error", "bad_gas_sector", f"AC_Gas_Target_Sector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["gas_sector"].unique(),
