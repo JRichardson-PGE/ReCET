@@ -41,6 +41,10 @@ OPTIONAL_MEASURE_COLUMNS = {
     "UnitkWhIOUWater1stBaseline": "water energy benefits/costs are 0 without it and UnitkWhIOUWater2ndBaseline",
     "UnitkWhIOUWater2ndBaseline": "water energy benefits/costs are 0 without it and UnitkWhIOUWater1stBaseline",
 }
+KEY_COLUMNS = ("CEInputID",)
+# the minimal input set (BRD BR-06.15): the required columns that change a result; the others (templates.DESCRIPTIVE_MEASURE_COLUMNS) may be left out
+from .templates import DESCRIPTIVE_MEASURE_COLUMNS  # noqa: E402
+CALCULATION_MEASURE_COLUMNS = [c for c in REQUIRED_MEASURE_COLUMNS if c not in DESCRIPTIVE_MEASURE_COLUMNS]
 NUMERIC_COLUMNS = [c for c in REQUIRED_MEASURE_COLUMNS if c.startswith(("Unit", "NTGR", "RealizationRate", "InstallationRate"))
                    or c in ("EUL_Yrs", "RUL_Yrs", "NumUnits", "MeasInflation")]
 VALID_PA = {"PGE", "SCE", "SDGE", "SCG"}
@@ -514,10 +518,15 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     df = raw.mask(raw == "")                                                            # blank -> NA (what na_values=[""] gave)
     del raw
     rep.stats["measures"] = f"{len(df):,}"
-    missing = [c for c in REQUIRED_MEASURE_COLUMNS if c not in df.columns]
+    missing = [c for c in CALCULATION_MEASURE_COLUMNS if c not in df.columns]
     if missing:
-        rep.add("error", "missing_columns", f"Measure.csv lacks required column(s): {missing}")
+        rep.add("error", "missing_columns", f"Measure.csv lacks required column(s) that change the results: {missing}")
         return rep
+    no_desc = [c for c in DESCRIPTIVE_MEASURE_COLUMNS if c not in df.columns]
+    if no_desc:
+        rep.add("warning", "missing_descriptive_column", f"no {', '.join(no_desc)} column: read as blank (it changes no result; CET's own upload needs it)")
+    from .templates import with_defaults
+    df = with_defaults(df)
     for col, why in OPTIONAL_MEASURE_COLUMNS.items():
         if col not in df.columns:
             rep.add("warning", "missing_optional_column", f"no {col} column: {why}")

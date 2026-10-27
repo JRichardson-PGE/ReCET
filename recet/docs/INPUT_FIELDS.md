@@ -12,6 +12,11 @@ Every input `recet` reads, field by field: what it means, its unit, whether the 
 * [6. Built-in tables](#6-built-in-tables-shipped-inside-the-package) - small tables shipped inside the package
 * [7. CET outputs file](#7-cet-outputs-file-for-comparison) - the optional file to compare against
 
+**The minimal input set (BRD BR-06.15).** For an exploratory run only the columns that change a result are needed: the *required* columns below except
+`MeasDescription` and `Sector`, which may be left out (they are then read as blank, with a `missing_descriptive_column` warning; CET's own upload still needs
+them). *Carried* and *optional* columns may always be left out. Values are annual, per unit and gross, with the net-to-gross ratios given separately, as CET
+takes them: ReCET does not take lifecycle savings to derive annual values from.
+
 **Reading the tables.** *Required* = the column must exist in the file (a missing one stops the run and the preflight names it; a *blank cell* in a numeric column is read as the default stated in "Blank means").
 *Carried* = read if present and copied to the output unchanged, never used in a calculation. Numeric columns must hold numbers or be blank; text in them is a blocking preflight error.
 Four values cannot be blank because the arithmetic has no default for them - `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBaseline` (plus `UnitkWh2ndBaseline` when `RUL_Yrs > 0`); a blank is a blocking preflight error.
@@ -47,7 +52,7 @@ so they can be uploaded to the CET as they are.
 | `CEInputID` | text, unique | required | The measure's unique, persistent ID. The key of every output row and the join key to a CET outputs file. Blank or duplicate values stop the run. |
 | `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on: `2021`, `2022`, `2024` or `2026` (`2024 ACC` is also accepted). Blank, or a file without the column, means the run's "ACC version" setting. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates (CALCULATIONS C3.5). A supplied ACC file replaces only the run's own version. Reported per measure in `POC_ACC` and `poc_acc_version`. |
 | `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share (C11) and, through the program's `PA` in `ProgramCost.csv`, gives `CreditedIOU`. |
-| `MeasDescription` | text | required | A description of the measure. Carried to the output; used only as a label. |
+| `MeasDescription` | text | required (may be left out: read as blank) | A description of the measure. Carried to the output; used only as a label. |
 | `MeasureID` | text | carried | The measure's unique ID in the source workpaper. |
 | `MeasCode` | text | carried | The program administrator's own measure code. |
 | `ClaimYearQuarter` | `YYYYQn`, e.g. `2028Q3` | required | The quarter of the claim. Its year and quarter set when savings start and how they are discounted (C2). Must match the pattern or the run stops. |
@@ -56,7 +61,7 @@ so they can be uploaded to the CET as they are.
 
 | Field | Type | Column | Description |
 |---|---|---|---|
-| `Sector` | text | required | Standard ex-ante sector (e.g. `Ind`). Only used to form the label `poc_subset_key`. |
+| `Sector` | text | required (may be left out: read as blank) | Standard ex-ante sector (e.g. `Ind`). Only used to form the label `poc_subset_key`. |
 | `DeliveryType` | text | carried | The method used to deliver the measure to the customer. |
 | `BldgType` | text | carried | Standard ex-ante building type (sub-sector). |
 | `MeasAppType` | text | carried | Measure application type (e.g. `ROB`). |
