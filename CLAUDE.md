@@ -21,11 +21,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
-- ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. Users see both names (BRD BR-11.7,
-  Jake 2026-10-22): the ACC version (the year E3 released the calculator) and CET's Avoided Cost Version (the first year it was in effect for claims or
-  forecasts), e.g. "2024 ACC (Avoided Cost Version 2026)"; the 2026 ACC is Avoided Cost Version 2028 although CET's draft tables number it 2027
-  (`versions.acc_label` / `AVOIDED_COST_VERSION`; tables are still read through `versions.CET_VERSION_TO_ACC`). Inside the packaged CET exports CET's
-  numbers are mapped on read.
+- ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. The web pages name a version by
+  its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
+  has a "Which ACC applies to my filing?" table instead: `versions.BUDGET_FILING_ACC` (filing, program years, ACC, basis; CET's resolution table through
+  2027, then Jake's 2026-10-26 schedule, the last two rows inferred) and `versions.claims_acc()` (claims = the ACC of the year's final budget filing, one per
+  program year, through CLAIMS_LAST_YEAR 2035). That table is also the source for TIER2_PLAN step 2's BR-06.5 flag. The desktop window and the outputs'
+  POC_ACC label still show both names (`versions.acc_label`, "2024 ACC (Avoided Cost Version 2026)", BR-11.7 as of 2026-10-22); the 2026 ACC is Avoided
+  Cost Version 2028 although CET's draft tables number it 2027 (`AVOIDED_COST_VERSION`; tables are still read through `versions.CET_VERSION_TO_ACC`).
+  Inside the packaged CET exports CET's numbers are mapped on read.
 - Each ACC's hourly data follow one calendar's weekdays: 2018 for 2024/2026, 2020 for 2021/2022 (read from the file's hour stamps,
   `real_impact_profiles.acc_calendar_year`). An ACC year always has 8,760 hours (the last day of a leap year is dropped); never add leap-day handling.
 - The 2021 and 2022 ACCs are TRC only: SCT columns are left blank. ReCET keeps its own behind-the-meter methane rule (Residential fuel-substitution
@@ -99,7 +102,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   upload with a percentage. Results: tiles, TSB-by-sector bars, Portfolio level first, sortable / filterable tables (app.js, numbers sort by data-v),
   column picker at the top in `results_view.GROUP_ORDER` groups with `display_label` names (display only: CSV downloads keep Column.label). The kept results
   parquet's folder (outputs.RESULTS_DIR) is no longer offered as a comparison sub-run (it showed a "_results" tab on CSV runs). Docs home = `docs/WEB_GUIDE.md`,
-  documents named by title (`app.DOC_TITLES`). `[hidden]` is display:none !important (a styled button ignored the attribute).
+  documents named by title (`app.DOC_TITLES`). `[hidden]` is display:none !important (a styled button ignored the attribute). Same PR: the web pages name
+  ACCs "2026 ACC" and New run's "Which ACC applies to my filing?" box shows `versions.BUDGET_FILING_ACC` and `claims_acc()` (see the ACC rule above).
+  Also (Jake): preflight `Issue.impact` totals the first-year net kWh / therms of a finding's records (`no_electric_profile`, `loose_profile_match`: shape_scale;
+  `no_gas_profile`: annual_net_therms_1st), added up across parts, shown in preflight.txt, preflight.json, the Findings sheet (two columns) and the web pages.
+  `loose_profile_match` now names its records (cells on AC_Elec_Target_Sector, examples "end use | IOU | sector") and so does `kwh_per_unit_profile`: every
+  finding about records names its cells; the ones without cells are about the whole file or set-up (missing file / columns, delimiter, unreadable ACC or
+  ProgramCost, no profile library, unknown run parameters, rules not checked). On the 2028 job: 4 loose matches (102,136 kWh); 36 measures with no gas profile
+  carry -26,024 therms (gas increases, so their gas supply cost is left out).
 - 0.1.45 (2026-10-26, Jake; 0.1.44 is the queue-estimate PR): CEDARS filing checks in pass 2. The first server runs with them (0.1.43, 1M, csv.zip)
   took 468 s (claims) and 483 s (budget filing) against 425 s without: preflight +7-8 s as expected, but assembly 57 -> 91 / 108 s, because
   `attach_filing` rebuilt dicts from all 139,612 flagged records and copied the 344-column part, in every part (~1 s a part on the laptop). Now

@@ -14,7 +14,8 @@ of the built-in one). A label the package does not have ("2028", "2026-draft" ..
 supplied falls back to the newest built-in version's file, with a note.
 
 Two labels name every version (BRD BR-11.7): the ACC version, the year E3's calculator was released (2024 ACC), and CET's Avoided Cost Version, the first year
-that ACC was in effect for claims or forecasts (Avoided Cost Version 2026). Labels read "2024 ACC (Avoided Cost Version 2026)".
+that ACC was in effect for claims or forecasts (Avoided Cost Version 2026). Labels read "2024 ACC (Avoided Cost Version 2026)" in the desktop window and the
+outputs; the web pages show "2024 ACC" only (acc_short) with BUDGET_FILING_ACC / claims_acc() saying which ACC applies to which filing.
 
 Run parameters and E3 tables are picked by ACC version too. CET numbers its avoided-cost versions differently (its "Version 2026" holds the 2024 ACC),
 so the packaged tables, which are CET exports, are mapped onto ACC versions when they are read (CET_VERSION_TO_ACC, from each version's release date in
@@ -51,6 +52,59 @@ def acc_label(acc: int) -> str:
     """'2024 ACC (Avoided Cost Version 2026)': both names of a version."""
     cv = avoided_cost_version(acc)
     return f"{acc} ACC" + (f" (Avoided Cost Version {cv})" if cv else "")
+
+
+@dataclass(frozen=True)
+class FilingAcc:
+    """One filing and the ACC its program years are priced on."""
+    filing: str
+    first: int                  # program years covered, first to last
+    last: int
+    acc: int
+    basis: str                  # the resolution, or why the row is expected
+    expected: bool = False      # a filing still to come
+    inferred: bool = False      # not stated: follows the two-year cadence
+
+    @property
+    def years(self) -> str:
+        return str(self.first) if self.first == self.last else f"{self.first}-{self.last}"
+
+
+# Which ACC prices which budget filing, oldest first (TIER2_PLAN step 2, BR-06.5). Through 2027 these are CET's "Program year assignment to CET avoided
+# cost version" table (the resolution that adopted each ACC); the rest is the schedule Jake gave on 2026-10-26, the last two rows inferred from its two-year
+# cadence. The web page shows ACC years only (Jake, 2026-10-26: the "Avoided Cost Version" label is being retired, D12).
+BUDGET_FILING_ACC = [
+    FilingAcc("2020 filings", 2020, 2020, 2019, "Res. E-5014"),
+    FilingAcc("2021-2023 filings", 2021, 2023, 2020, "Res. E-5077"),
+    FilingAcc("2024-2031 application", 2024, 2031, 2021, "Res. E-5150"),
+    FilingAcc("2024-2027 true-up", 2024, 2025, 2022, "Res. E-5228"),
+    FilingAcc("2026-2027 mid-cycle", 2026, 2027, 2024, "Res. E-5328"),
+    FilingAcc("2028-2035 application", 2028, 2035, 2024, "Res. E-5328 (filed before the 2026 ACC was released)"),
+    FilingAcc("True-up advice letter, September 2027", 2028, 2031, 2026, "expected", expected=True),
+    FilingAcc("Mid-cycle advice letter, September 2029", 2030, 2031, 2028, "expected", expected=True),
+    FilingAcc("2032-2039 application", 2032, 2039, 2028, "expected", expected=True),
+    FilingAcc("True-up advice letter, September 2031", 2032, 2035, 2030, "expected; follows the two-year cadence", expected=True, inferred=True),
+    FilingAcc("Mid-cycle advice letter, September 2033", 2034, 2035, 2032, "expected; follows the two-year cadence", expected=True, inferred=True),
+]
+CLAIMS_LAST_YEAR = 2035          # later years will get filings not in the table yet
+
+
+def claims_acc() -> list[FilingAcc]:
+    """Claims use the ACC of the program year's final budget filing (Jake, 2026-10-26), so each program year has one: the last filing in BUDGET_FILING_ACC
+    that covers it. Consecutive years with the same ACC are one row."""
+    rows: list[FilingAcc] = []
+    for year in range(min(f.first for f in BUDGET_FILING_ACC), CLAIMS_LAST_YEAR + 1):
+        last = [f for f in BUDGET_FILING_ACC if f.first <= year <= f.last][-1]
+        if rows and rows[-1].acc == last.acc and rows[-1].last == year - 1 and rows[-1].basis == f"final filing: {last.filing}":
+            rows[-1] = FilingAcc(rows[-1].filing, rows[-1].first, year, last.acc, rows[-1].basis, last.expected, last.inferred)
+        else:
+            rows.append(FilingAcc("Claims", year, year, last.acc, f"final filing: {last.filing}", last.expected, last.inferred))
+    return rows
+
+
+def acc_short(acc) -> str:
+    """'2026 ACC': the web pages' name for a version."""
+    return f"{acc} ACC" if acc else ""
 
 
 def acc_of_cet_version(cet_version) -> int | None:

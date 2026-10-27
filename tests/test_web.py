@@ -250,7 +250,7 @@ def test_a_measure_that_cannot_be_priced_is_shown_on_the_run_page(web, tmp_path)
                     files={"job_zip": _job(("\n".join([lines[0], "|".join(row)]) + "\n").encode())}).headers["location"].rsplit("/", 1)[-1]
     assert ctx.runner.work_once()
     page = c.get(f"{P}/runs/{run_id}").text
-    assert "Not priced:" in page and "1 measures: electric measures with no 8,760 profile are NOT priced" in page
+    assert "Not priced:" in page and "1 measures (1,000 first-year net kWh): electric measures with no 8,760 profile are NOT priced" in page
 
 
 def test_rerun_with_different_settings_reuses_the_runs_files(web, tmp_path):
@@ -311,6 +311,23 @@ def test_the_results_page_tiles_chart_sorting_and_column_groups(web, tmp_path):
     assert '<legend>Ratios</legend>' in page and "Columns…" in page and 'data-filter="results-table"' in page
     levels = re.findall(r'href="\?level=(\w+)', page)
     assert levels[0] == "portfolio" and levels[-1] == "measure"                                                   # summary first
+
+
+def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_path):
+    from recet import versions
+    app, ctx = web
+    _user(ctx, "acc@example.com")
+    c = _login(app, "acc@example.com")
+    page = c.get(f"{P}/runs/new").text
+    assert '<option value="2026" selected>2026 ACC</option>' in page and "Avoided Cost Version 2028)" not in page
+    assert "Which ACC applies to my filing?" in page and "<caption>Budget filings</caption>" in page and "<caption>Claims</caption>" in page
+    assert re.search(r"<td>2028-2035 application</td><td[^>]*>2028-2035</td>\s*<td[^>]*>2024 ACC</td>", page)
+    run_id = _start_run(c, tmp_path)
+    assert re.search(r'<p class="muted">2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)
+    # claims: the ACC of each program year's final budget filing
+    assert [(r.years, r.acc) for r in versions.claims_acc()] == [("2020", 2019), ("2021-2023", 2020), ("2024-2025", 2022), ("2026-2027", 2024),
+                                                                  ("2028-2029", 2026), ("2030-2031", 2028), ("2032-2033", 2030), ("2034-2035", 2032)]
+    assert [r.inferred for r in versions.claims_acc()][-2:] == [True, True]
 
 
 def test_display_labels_name_output_columns_in_words():
