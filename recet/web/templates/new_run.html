@@ -78,10 +78,10 @@
     <summary>Which ACC applies to my filing?</summary>
     <table class="list compact acc-map">
       <thead><tr><th>ACC</th><th>Budget filings</th><th>Claims (program years)</th></tr></thead>
-      <tbody>{% for r in acc_map %}<tr class="{% if r.acc|string not in accs %}dim{% endif %}">
+      <tbody>{% for r in acc_map %}<tr class="{% if not r.builtin %}dim{% endif %}">
         <td class="nowrap">{{ r.acc }}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
     </table>
-    <p class="small muted">Claims use the ACC of the year's final budget filing. * still to come. Dimmed: not in ReCET.</p>
+    <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed: not in ReCET yet.</p>
   </details>
   <div class="checks">
     <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about two thirds of the run time)</label>
