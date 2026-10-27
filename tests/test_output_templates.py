@@ -71,9 +71,9 @@ def test_a_template_works_the_same_in_parts(tmp_path):
 
 
 def test_a_column_the_run_did_not_produce_is_left_out_with_a_note(tmp_path):
-    r = _run(tmp_path, "csv", output_template=["CEInputID", "NetElecCO2", "TotalSystemBenefit"])          # emissions are off
+    r = _run(tmp_path, "csv", output_template=["CEInputID", "FirstYearNetElecCO2", "TotalSystemBenefit"])          # emissions are off
     assert list(outputs.read_table(r.files["measure_level"]).columns) == ["CEInputID", "TotalSystemBenefit"]
-    assert any("NetElecCO2" in n for n in r.notes)
+    assert any("FirstYearNetElecCO2" in n for n in r.notes)
 
 
 def test_without_a_template_every_column_is_written_and_defined(tmp_path):

@@ -232,11 +232,11 @@ def _check_programs(rep: PreflightReport, measures: pd.DataFrame, programcost_cs
             rep.add("info", "program_excluded_from_ce", f"the program metadata flags the program Exclude_From_CE: its measures are priced and {what}",
                     int(flag.sum()), sorted(set(pid[flag])), _cells("Measure", mrows(flag), "PrgID"))
     if programcost_csv:
-        credited = outputs.credited_iou(measures, programcost_csv, allocate_statewide).to_numpy()
+        credited = outputs.credited_pa(measures, programcost_csv, allocate_statewide).to_numpy()
         listed = meta["Prg_PA"].to_numpy()
         differ = (credited != "") & ~missing & (credited != listed)
         if differ.any():
-            rep.add("info", "program_pa_differs", "the program's PA in ProgramCost.csv (CreditedIOU) differs from its PA in the program metadata", int(differ.sum()),
+            rep.add("info", "program_pa_differs", "the program's PA in ProgramCost.csv (CreditedPA) differs from its PA in the program metadata", int(differ.sum()),
                     sorted({f"{p}: {c} vs {l}" for p, c, l in zip(pid[differ], credited[differ], listed[differ])}), _cells("Measure", mrows(differ), "PrgID"))
 
 

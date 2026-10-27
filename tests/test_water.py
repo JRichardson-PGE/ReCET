@@ -118,7 +118,7 @@ def test_program_cost_weights_count_water_benefit():
         d["WaterEnergyBen" + s] = d["WaterEnergyBen"]
         d["WaterEnergyCost" + s] = 0.0
     for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "RebatesandIncentsPV_sct",
-              "NetParticipantCostPV_sct", "NetParticipantCostAdjustedPV_sct", "GrossParticipantCostPV_sct", "BillReducElec", "BillReducGas", "BillIncrElec", "BillIncrGas"):
+              "NetParticipantCostPV_sct", "NetParticipantCostAdjustedPV_sct", "GrossParticipantCostPV_sct", "LifecycleBillReducElec", "LifecycleBillReducGas", "LifecycleBillIncrElec", "LifecycleBillIncrGas"):
         d[c] = 0.0
     prog = pd.DataFrame({"PrgID": ["P"], "SumCosts": [1000.0], "SumCostsNPV": [1000.0], "SumCostsNPV_SCT": [1000.0]})
     out = cost_tests.compute_cost_tests(d, prog).set_index("measure_id")
@@ -130,7 +130,7 @@ def test_program_cost_weights_count_water_benefit():
 def test_summary_and_columns_carry_water(tmp_path):
     r = run_job(_cfg(tmp_path, measure={"UnitkWhIOUWater1stBaseline": 500}, run_name="cols"), log=lambda s: None)
     assert {"WaterEnergyBen", "WaterEnergyCost", "WaterEnergyBen_SB", "WaterEnergyCost_SH", "WaterEnergyBenGross", "WaterPricingStatus",
-            "poc_kwh_water_1st", "poc_water_scale_1st"} <= set(r.frame.columns)
+            "AC_kWh_Water_1st_Baseline"} <= set(r.frame.columns)
     summ = pd.read_csv(r.files["portfolio_summary"])
     assert summ.loc[0, "WaterEnergyBen"] == pytest.approx(r.frame.iloc[0]["WaterEnergyBen"])
     assert "no_water_profile" not in (r.run_dir / "preflight.txt").read_text()

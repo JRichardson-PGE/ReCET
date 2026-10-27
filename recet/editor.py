@@ -55,7 +55,7 @@ NEW_MEASURE_DEFAULTS = {
 
 # Display order in the editor (the files keep CET's order). Pinned on the left, then the columns that change a result (grouped as in INPUT_FIELDS.md 1.3-1.8), then
 # the ones that change nothing (carried to the output only). "Changes a result" = read by the calculation or into a derived output column; the kW fields only feed
-# poc_annual_net_kw*, so they come last in that group. Sector only labels poc_subset_key; RateScheduleElec/Gas are not used (the schedule follows IOU and sector).
+# the kW savings columns, so they come last in that group. Sector changes nothing; RateScheduleElec/Gas are not used (the schedule follows IOU and sector).
 MEASURE_FROZEN = ["CEInputID", "MeasCode", "MeasDescription"]
 MEASURE_CALC = [
     "PrgID", "ClaimYearQuarter", "ACCVersion", "IOU_AC_Territory", "AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline",
@@ -126,7 +126,7 @@ _ELEC = "electric benefits and supply costs (TRC, SCT Base, SCT High)"
 _GAS = "gas benefits and supply costs (TRC, SCT Base, SCT High)"
 _REST = "total system benefit, and every cost-test cost and ratio"
 _INCENT = "rebates and incentives (in the PAC, TRC, RIM and SCT costs and ratios)"
-_KW = "only the reported kW columns (poc_annual_net_kw*)"
+_KW = "only the reported kW savings columns (FirstYearNetKW ...)"
 _KW_HOW = "Not priced: the 8,760 load shape carries the demand (T&D) value."
 _PROGRAM = "program costs: WeightedProgramCost and the program-cost part of the TRC, PAC, RIM and SCT costs and ratios (not TSB, not the NoAdmin tests)"
 _FUELSUB = ("whether negative fuel values count as supply costs or negative benefits, so the cost-test costs and ratios, and the bill-impact split "
@@ -134,7 +134,7 @@ _FUELSUB = ("whether negative fuel values count as supply costs or negative bene
 EFFECTS = {
     "Measure": {
         "PrgID": ("the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings "
-                  "(credited IOU, program segment); statewide allocation when it is on",
+                  "(credited PA, program segment); statewide allocation when it is on",
                   "Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own "
                   "benefits."),
         "ClaimYearQuarter": ("everything valued over time: all benefits and supply costs, participant cost, bill impacts, emissions, " + _REST,
@@ -197,7 +197,7 @@ EFFECTS = {
         "RealizationRatekW": (_KW, _KW_HOW), "InstallationRatekW": (_KW, _KW_HOW),
         # no effect, with a reason worth giving
         "CEInputID": (None, "The measure's key: it labels every output row and joins to a CET outputs file. Must be unique."),
-        "Sector": (None, "Only forms the label poc_subset_key."),
+        "Sector": (None, "Carried to the output only."),
         "RateScheduleElec": (None, "Not read: the electric rate schedule follows IOU_AC_Territory and AC_Elec_Target_Sector."),
         "RateScheduleGas": (None, "Not read: the gas rate schedule follows IOU_AC_Territory and AC_Gas_Target_Sector."),
         "NTG_ID": (None, "A reference ID; the NTGR* values are what is used."),
@@ -208,13 +208,13 @@ EFFECTS = {
     "ProgramCost": {
         "PrgID": ("which measures share this row's costs", "Must match the measures' PrgID (else the run stops)."),
         "ClaimYearQuarter": ("the discounting of this row's costs: " + _PROGRAM, "Its year is when the cost is incurred and discounted from."),
-        "PA": ("the discount rate of this row's costs (" + _PROGRAM + "); the credited IOU in the summary",
+        "PA": ("the discount rate of this row's costs (" + _PROGRAM + "); the credited PA in the summary",
                "SW is treated as SCE unless statewide allocation is on."),
         **{c: (_PROGRAM, "Summed per program and shared among its measures in proportion to their positive benefits.")
            for c in ("AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation", "DIHardwareAndMaterials",
                      "DIRebateAndInspection", "EMV", "UserInputIncentive")},
         "CostsRecoveredFromOtherSources": (_PROGRAM, "Summed with the other costs: enter it as a negative to reduce the total, as CET does."),
-        "PrgYear": (None, "No priced value: the run uses ClaimYearQuarter's year. Used only to pick the credited IOU's row."),
+        "PrgYear": (None, "No priced value: the run uses ClaimYearQuarter's year. Used only to pick the credited PA's row."),
         "OnBillFinancing": (None, "Not part of CET's program-cost sum."),
     },
 }

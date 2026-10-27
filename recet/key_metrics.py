@@ -20,10 +20,10 @@ import pandas as pd
 TOP_N = 10
 DIMENSIONS = {"Top programs": ("PrgID", "Prg_ProgramName"), "Top program sectors": ("Prg_PrimarySector",), "Top end uses": ("UseCategory",)}
 # the columns summed: what TSB, the TRC / PAC ratios (outputs.group_ratios) and the headline metrics need
-SUM_COLUMNS = ["TotalSystemBenefit", "TotalExpenditures", "ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TaxCredits", "BillIncrElec", "BillIncrGas",
+SUM_COLUMNS = ["TotalSystemBenefit", "TotalExpenditures", "ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas",
                "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
                "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin", "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin",
-               "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "NetElecCO2Lifecycle", "NetGasCO2Lifecycle"]
+               "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "LifecycleNetElecCO2", "LifecycleNetGasCO2"]
 # the Portfolio rows: (label, column or ratio, documented column the definition comes from)
 HEADLINES = [("Total system benefit ($)", "TotalSystemBenefit", "TotalSystemBenefit"), ("Budget / expenditures ($)", "TotalExpenditures", "TotalExpenditures"),
              ("TRC ratio", "TRC", "TRCRatio"), ("PAC ratio", "PAC", "PACRatio"), ("RIM ratio", "RIM", "RIMRatio"),
@@ -31,7 +31,7 @@ HEADLINES = [("Total system benefit ($)", "TotalSystemBenefit", "TotalSystemBene
              ("TRC cost ($)", "TRCCost", "TRCCost"), ("PAC cost ($)", "PACCost", "PACCost"),
              ("First-year net kWh", "FirstYearNetKWh", "FirstYearNetKWh"), ("First-year net kW", "FirstYearNetKW", "FirstYearNetKW"),
              ("First-year net therms", "FirstYearNetThm", "FirstYearNetThm"),
-             ("CO2 avoided, lifecycle (metric tons)", "CO2", "NetElecCO2Lifecycle")]
+             ("CO2 avoided, lifecycle (metric tons)", "CO2", "LifecycleNetElecCO2")]
 COLUMNS = ["section", "item", "measures", "value", "TotalSystemBenefit", "share_of_TSB", "TRCCost", "share_of_TRC_cost", "TRC_ratio", "PAC_ratio",
            "definition", "documentation"]
 
@@ -75,7 +75,7 @@ def build(totals: pd.DataFrame, base_url: str = "") -> pd.DataFrame:
         if key in pratios:
             value = pratios[key]
         elif key == "CO2":
-            parts = [port.get(c) for c in ("NetElecCO2Lifecycle", "NetGasCO2Lifecycle") if c in port.index]
+            parts = [port.get(c) for c in ("LifecycleNetElecCO2", "LifecycleNetGasCO2") if c in port.index]
             value = float(sum(parts)) if parts else None
         else:
             value = float(port[key]) if key in port.index else None

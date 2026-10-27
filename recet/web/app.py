@@ -535,7 +535,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         out = dict(ot.BUILTIN)
         for r in ctx.db.all("SELECT name, columns FROM output_templates WHERE user_id = ? ORDER BY name", (uid,)):
             try:
-                out[r["name"]] = [str(c) for c in json.loads(r["columns"])]
+                out[r["name"]] = ot.current(json.loads(r["columns"]))            # names renamed in 0.1.50 read as the new ones
             except ValueError:
                 pass
         return out
@@ -1093,7 +1093,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         views = {rv.DEFAULT_VIEW_NAME: list(rv.DEFAULT_VIEW)}
         for r in ctx.db.all("SELECT name, keys FROM views WHERE user_id = ? ORDER BY name", (uid,)):
             try:
-                views[r["name"]] = [str(k) for k in json.loads(r["keys"])]
+                views[r["name"]] = rv.current_keys(json.loads(r["keys"]))      # names renamed in 0.1.50 read as the new ones
             except ValueError:
                 pass
         return views

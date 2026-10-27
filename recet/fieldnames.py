@@ -46,3 +46,76 @@ def to_recet(df: pd.DataFrame) -> pd.DataFrame:
 def to_cet(df: pd.DataFrame) -> pd.DataFrame:
     """The frame with CET's names for the CET fields (for a file to upload to the CET)."""
     return df.rename(columns={c: RECET_TO_CET[c] for c in df.columns if c in RECET_TO_CET})
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------- output columns
+# Measure-level output columns renamed in 0.1.50 (from the field dictionary): the name used before -> the name ReCET writes now. Old names are still
+# accepted wherever a user names output columns (output templates, saved Results views), and a CET outputs file's own names are read through this map.
+OUTPUT_RENAMES = {
+    "POC_ACC": "Used_ACCVersion",
+    "poc_claim_year": "Used_Year",
+    "poc_claim_quarter": "Used_Quarter",
+    "poc_shape_scale": "AC_kWh_1st_Baseline",
+    "poc_shape_scale_2nd": "AC_kWh_2nd_Baseline",
+    "poc_annual_net_therms_1st": "AC_Therms_1st_Baseline",
+    "poc_annual_net_therms_2nd": "AC_Therms_2nd_Baseline",
+    "poc_water_scale_1st": "AC_kWh_Water_1st_Baseline",
+    "poc_water_scale_2nd": "AC_kWh_Water_2nd_Baseline",
+    "poc_is_fuel_sub": "Fuel_Sub_Flag",
+    "BillReducElec": "LifecycleBillReducElec",
+    "BillIncrElec": "LifecycleBillIncrElec",
+    "BillReducGas": "LifecycleBillReducGas",
+    "BillIncrGas": "LifecycleBillIncrGas",
+    "BillReducElecGross": "LifecycleBillReducElecGross",
+    "BillIncrElecGross": "LifecycleBillIncrElecGross",
+    "BillReducGasGross": "LifecycleBillReducGasGross",
+    "BillIncrGasGross": "LifecycleBillIncrGasGross",
+    "NetElecCO2": "FirstYearNetElecCO2",
+    "GrossElecCO2": "FirstYearGrossElecCO2",
+    "NetElecCO2Lifecycle": "LifecycleNetElecCO2",
+    "GrossElecCO2Lifecycle": "LifecycleGrossElecCO2",
+    "NetElecNOx": "FirstYearNetElecNOx",
+    "GrossElecNOx": "FirstYearGrossElecNOx",
+    "NetElecNOxLifecycle": "LifecycleNetElecNOx",
+    "GrossElecNOxLifecycle": "LifecycleGrossElecNOx",
+    "NetPM10": "FirstYearNetElecPM10",
+    "GrossPM10": "FirstYearGrossElecPM10",
+    "NetPM10Lifecycle": "LifecycleNetElecPM10",
+    "GrossPM10Lifecycle": "LifecycleGrossElecPM10",
+    "NetGasCO2": "FirstYearNetGasCO2",
+    "GrossGasCO2": "FirstYearGrossGasCO2",
+    "NetGasCO2Lifecycle": "LifecycleNetGasCO2",
+    "GrossGasCO2Lifecycle": "LifecycleGrossGasCO2",
+    "NetGasNOx": "FirstYearNetGasNOx",
+    "GrossGasNOx": "FirstYearGrossGasNOx",
+    "NetGasNOxLifecycle": "LifecycleNetGasNOx",
+    "GrossGasNOxLifecycle": "LifecycleGrossGasNOx",
+    "CreditedIOU": "CreditedPA",
+}
+# Measure-level columns no longer written (0.1.50): restatements of an input or of another output, and the per-record checks, which are in the
+# preflight findings and filing_validation files instead. A user's template or view naming one simply drops it.
+OUTPUT_REMOVED = frozenset({
+    "poc_PA", "poc_climate_zone", "poc_target_sector", "poc_shape_key", "poc_shape_key_2nd", "poc_shape_key_water", "poc_gas_profile_key", "poc_gas_sector",
+    "poc_subset_key", "poc_eul_years_exact", "poc_eul_years", "poc_rul_years_exact", "poc_NTGRkWh", "poc_ntgr_kwh", "poc_ntgr_kw", "poc_ntgr_therm",
+    "poc_ntgr_cost", "poc_ir_kwh", "poc_rr_kwh", "poc_ir_kw", "poc_rr_kw", "poc_ir_therm", "poc_rr_therm", "poc_annual_net_kwh_1st", "poc_annual_net_kwh_2nd",
+    "poc_annual_net_kwh", "poc_annual_net_kw_1st", "poc_annual_net_kw_2nd", "poc_annual_net_kw", "poc_annual_net_therms", "poc_kwh_water_1st",
+    "poc_kwh_water_2nd", "poc_water_net_kwh_1st", "poc_water_net_kwh_2nd", "poc_fuel_type", "poc_acc_version",
+    "ProgramCosts", "WeightedSavings", "FilingValidation", "FilingRules", "ACCCheck",
+})
+# ReCET's name -> CET's name, for the renamed columns CET's outputs file also has (the bill impacts without Gross, and the emissions)
+OUTPUT_TO_CET = {OUTPUT_RENAMES[old]: old for old in OUTPUT_RENAMES if old in ("BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas")
+                 or old.startswith(("Net", "Gross"))}
+
+
+def output_name(column: str) -> str:
+    """The current name of a measure-level output column given by an old name (its own name otherwise); "" for a column ReCET no longer writes."""
+    c = str(column).strip()
+    if c in OUTPUT_REMOVED:
+        return ""
+    return OUTPUT_RENAMES.get(c, c)
+
+
+def cet_outputs_to_recet(df: pd.DataFrame) -> pd.DataFrame:
+    """A CET outputs table with ReCET's names for the columns ReCET renamed (CET keeps BillReducElec, NetElecCO2 ...)."""
+    back = {cet: recet for recet, cet in OUTPUT_TO_CET.items()}
+    return df.rename(columns={c: back[c] for c in df.columns if c in back})

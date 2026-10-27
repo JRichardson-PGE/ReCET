@@ -1,5 +1,5 @@
 """The ACC-for-program-year check (BRD BR-06.5, TIER2_PLAN step 2): records priced on an ACC that does not normally apply to their program year are
-flagged -- in preflight, the ACCCheck column and run_settings.json -- and still priced."""
+flagged -- in preflight and run_settings.json -- and still priced."""
 from __future__ import annotations
 
 import json
@@ -64,7 +64,7 @@ def _run(tmp_path, purpose, **kw):
 def test_claims_flag_the_measure_on_an_acc_that_does_not_apply_and_still_price_it(tmp_path):
     r = _run(tmp_path, "claims")
     f = r.frame.set_index("CEInputID")
-    assert f.loc["ON_RUN", "ACCCheck"] == "ok" and f.loc["ON_2024", "ACCCheck"] == "not for this program year"
+    assert "ACCCheck" not in f.columns                                       # the check is in preflight and run_settings, not the measure table
     assert f.loc["ON_2024", "ElecBen"] > 0                                   # flagged, not stopped
     assert r.acc_check["flagged"] == 1 and r.acc_check["measures"] == 2 and r.acc_check["label"] == "Quarterly Claims"
     rows = {(x["acc"], x["program_year"]): x for x in r.acc_check["by_acc_and_year"]}
@@ -77,7 +77,7 @@ def test_claims_flag_the_measure_on_an_acc_that_does_not_apply_and_still_price_i
 
 def test_any_filing_accepts_both_accs_of_2028(tmp_path):
     r = _run(tmp_path, "")
-    assert set(r.frame["ACCCheck"]) == {"ok"} and r.acc_check["flagged"] == 0
+    assert r.acc_check["flagged"] == 0
 
 
 def test_a_named_filing_flags_the_other_acc_and_points_at_the_cells(tmp_path):

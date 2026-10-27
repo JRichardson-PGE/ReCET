@@ -40,8 +40,8 @@ CLAUDE.md finding 11):
 
 LEVELIZED AND OTHER CalcCost COLUMNS (CET_v25.1_documentation_extracted.txt
 16434-17484): the program-cost components each measure carries (Wtd<field> =
-the program's nominal total of the field x WeightedBenefits; ProgramCosts =
-their sum, = WeightedProgramCost), the lifecycle net benefits (TRC / PAC:
+the program's nominal total of the field x WeightedBenefits; CET's ProgramCosts,
+their sum, equals WeightedProgramCost and is not written), the lifecycle net benefits (TRC / PAC:
 ElecBen + GasBen - cost) and the levelized columns, which divide a benefit or
 an electric (gas) share of a cost by the discounted net kWh (therms):
     LevBenElec        = ElecBen / DSkWh           LevBenGas = GasBen / DSThm
@@ -194,7 +194,7 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd
     their Gross forms, and the (primary and _sct) participant PV columns
     RebatesandIncentsPV, NetParticipantCostPV, NetParticipantCostAdjustedPV (the one the TRC / SCT costs use: it includes the market-effects term),
     GrossParticipantCostPV (+ *_sct),
-    BillReducElec/Gas, BillIncrElec/Gas. `prog` is program_cost_sums(...).
+    LifecycleBillReducElec/Gas, LifecycleBillIncrElec/Gas. `prog` is program_cost_sums(...).
     WaterEnergyBen / WaterEnergyCost (+ _SB/_SH) enter TSB, the program-cost weighting and every cost and ratio the way CalcCE has them (Calculations CTE 15148-15723);
     a frame without those columns is treated as having none.
     `totals` (share_totals over the whole job) gives the programs' benefit totals when `d` holds only part of the job (a chunked run, see recet/chunked.py);
@@ -223,7 +223,6 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd
     d["WeightedProgramCost"] = sh_trc * d["_SumCosts"]
     for f in _COST_FIELDS:                                           # CalcCost's program-cost components, each the program's nominal total x WeightedBenefits
         d[f"Wtd{f}"] = sh_trc * d[f"_Sum{f}"]
-    d["ProgramCosts"] = d["WeightedProgramCost"]                     # CalcCost's own name for the same figure
     pos_e = _pos(d.ElecBen)
     pos_all = pos_e + _pos(d.GasBen) + _pos(d.WaterEnergyBen) + _pos(d.OtherBen)
     d["WeightedElecAlloc"] = (pos_e / pos_all.replace(0, np.nan)).fillna(0.0)
@@ -240,8 +239,8 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd
     d["TRCCostNoAdmin"] = inc + d.NetParticipantCostAdjustedPV + sup
     d["TRCCost"] = sh_trc * d["_SumCostsNPV"] + d["TRCCostNoAdmin"]
     d["TRCCostGross"] = sh_trc_g * d["_SumCostsNPV"] + inc + d.GrossParticipantCostPV + sup_g
-    d["RIMCostNoAdmin"] = d.BillReducElec + d.BillReducGas + d["PACCostNoAdmin"]
-    d["RIMCost"] = d.BillReducElec + d.BillReducGas + d["PACCost"]
+    d["RIMCostNoAdmin"] = d.LifecycleBillReducElec + d.LifecycleBillReducGas + d["PACCostNoAdmin"]
+    d["RIMCost"] = d.LifecycleBillReducElec + d.LifecycleBillReducGas + d["PACCost"]
 
     for sfx, sh, sh_g in (("SB", sh_sb, sh_sb_g), ("SH", sh_sh, sh_sh_g)):
         s = f"_{sfx}"
@@ -260,7 +259,7 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd
     d["TRCRatioNoAdmin"] = ratio(b + d.TaxCredits, d.TRCCostNoAdmin)
     d["PACRatio"] = ratio(b, d.PACCost)
     d["PACRatioNoAdmin"] = ratio(b, d.PACCostNoAdmin)
-    rim_b = b + d.BillIncrElec + d.BillIncrGas
+    rim_b = b + d.LifecycleBillIncrElec + d.LifecycleBillIncrGas
     d["RIMRatio"] = ratio(rim_b, d.RIMCost)
     d["RIMRatioNoAdmin"] = ratio(rim_b, d.RIMCostNoAdmin)
     b_sb = d.ElecBen_SB + d.GasBen_SB + d.WaterEnergyBen_SB + d.OtherBen

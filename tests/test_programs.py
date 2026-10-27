@@ -66,7 +66,7 @@ def test_bad_tables_are_refused(tmp_path):
 
 
 def test_summary_segment_rows_and_exclude_from_ce():
-    frame = pd.DataFrame({"poc_PA": ["PGE", "PGE", "SCE"], "CreditedIOU": ["PGE", "PGE", "SCE"], "Prg_ProgramSegment": ["equity", "", "equity"],
+    frame = pd.DataFrame({"IOU_AC_Territory": ["PGE", "PGE", "SCE"], "CreditedPA": ["PGE", "PGE", "SCE"], "Prg_ProgramSegment": ["equity", "", "equity"],
                           "Prg_Exclude_From_CE": ["False", "TRUE", "false"], "ElecBen": [1.0, 10.0, 100.0], "TRCCost": [1.0, 1.0, 1.0]})
     s = outputs.summarize(frame)
     seg = s[s["group"] == "program segment"].set_index("value")["ElecBen"]
@@ -94,7 +94,7 @@ def test_run_attaches_metadata_and_preflight_reports_programs(tmp_path):
     res = run_job(cfg, log=lambda s: None)
     row = res.frame.iloc[0]
     assert row["Prg_MatchedOn"] == prg and row["Prg_ProgramSegment"] == "equity" and row["Prg_PA"] == "SCE"
-    assert list(res.frame.columns).index("Prg_MatchedOn") == list(res.frame.columns).index("CreditedIOU") + 1
+    assert list(res.frame.columns).index("Prg_MatchedOn") == list(res.frame.columns).index("CreditedPA") + 1
     text = res.files["preflight"].read_text(encoding="utf-8")
     for code in ("claim_outside_program_years", "program_closed", "program_excluded_from_ce", "program_pa_differs"):
         assert code in text, code

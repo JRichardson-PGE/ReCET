@@ -244,12 +244,13 @@ def test_a_run_flags_its_measures(tmp_path, chunk):
     m, pc = _job(tmp_path)
     res = run_job(_cfg(tmp_path, m, pc, run_name=f"f{chunk}", chunk_size=chunk, output_format="parquet", filing_validation="claims"), log=lambda s: None)
     out = pd.read_parquet(res.files["measure_level"])
-    assert set(out["FilingValidation"]) == {"reject"} and out["FilingRules"].str.len().gt(0).all()
     table = pd.read_parquet(res.files["filing_validation"])
     assert {"rule_set", "table", "record", "FilingValidation", "FilingRules", "rules_failed"} <= set(table.columns)
+    flagged = table[table["table"] == "Measure"]
+    assert set(flagged["FilingValidation"]) == {"reject"} and set(flagged["record"]) == set(out["CEInputID"]) and flagged["FilingRules"].str.len().gt(0).all()
     settings = json.loads(res.files["run_settings"].read_text())
     assert settings["filing_validation"]["rule_set"] == "claims" and settings["config"]["filing_validation"] == "claims"
     plain = run_job(_cfg(tmp_path, m, pc, run_name=f"p{chunk}", chunk_size=chunk, output_format="parquet"), log=lambda s: None)
     cols = list(pd.read_parquet(plain.files["measure_level"]).columns)
-    assert "FilingValidation" not in cols and list(out.columns) == cols + ["FilingValidation", "FilingRules"]
+    assert "FilingValidation" not in cols and list(out.columns) == cols         # the flags are in filing_validation, not the measure table
     assert np.allclose(out["TotalSystemBenefit"], pd.read_parquet(plain.files["measure_level"])["TotalSystemBenefit"])   # priced the same

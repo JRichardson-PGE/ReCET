@@ -287,8 +287,8 @@ def bill_pv(d, s1, s2, rates, rate_annual, base_year):
 def participant_test(d, part, tax_credits_gross, bills_gross, rate_qtr, first_year):
     """C12: the Participant Cost Test on gross bill impacts (`bills_gross`: the four ...Gross bill columns)."""
     pvf = (1.0 + rate_qtr) ** ((d["claim_year"] - first_year) * 4 + (d["claim_quarter"] - 1))
-    ben = bills_gross["BillReducElecGross"] + bills_gross["BillReducGasGross"] + part["RebatesandIncentsPV"] + tax_credits_gross / pvf
-    cost = part["GrossParticipantCostPV"] + part["RebatesandIncentsPV"] + bills_gross["BillIncrElecGross"] + bills_gross["BillIncrGasGross"]
+    ben = bills_gross["LifecycleBillReducElecGross"] + bills_gross["LifecycleBillReducGasGross"] + part["RebatesandIncentsPV"] + tax_credits_gross / pvf
+    cost = part["GrossParticipantCostPV"] + part["RebatesandIncentsPV"] + bills_gross["LifecycleBillIncrElecGross"] + bills_gross["LifecycleBillIncrGasGross"]
     return {**bills_gross, "PCTBen": ben, "PCTCost": cost, "PCTRatio": ben / cost if cost else 0.0}
 
 
@@ -355,12 +355,12 @@ def emissions(d, quarters, nox, pm10, co2_gas, nox_gas, meb):
         return rul * t1 + (eul - rul) * t2 if rul > 0 else (eul * t1 if eul > 0 else 0.0)
 
     out = {}
-    for scope, e, g in (("", fy, gas_first(d["th1"], d["th2"])), ("Lifecycle", lc, gas_life(d["th1"], d["th2"]))):
+    for scope, e, g in (("FirstYear", fy, gas_first(d["th1"], d["th2"])), ("Lifecycle", lc, gas_life(d["th1"], d["th2"]))):
         for net, tag in ((True, "Net"), (False, "Gross")):
             fe = d["qty"] * ((d["ntg_kwh"] + meb) if net else 1.0) * d["irr_kwh"]
             fg = d["qty"] * ((d["ntg_therm"] + meb) if net else 1.0) * d["irr_therm"]
-            out[f"{tag}ElecCO2{scope}"], out[f"{tag}ElecNOx{scope}"], out[f"{tag}PM10{scope}"] = fe * e["co2"], fe * e["nox"], fe * e["pm"]
-            out[f"{tag}GasCO2{scope}"], out[f"{tag}GasNOx{scope}"] = fg * co2_gas * g, fg * nox_gas * g
+            out[f"{scope}{tag}ElecCO2"], out[f"{scope}{tag}ElecNOx"], out[f"{scope}{tag}ElecPM10"] = fe * e["co2"], fe * e["nox"], fe * e["pm"]
+            out[f"{scope}{tag}GasCO2"], out[f"{scope}{tag}GasNOx"] = fg * co2_gas * g, fg * nox_gas * g
     return out
 
 
@@ -409,10 +409,6 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
     sh_trc, sh_trc_g = share(out, trc_cols), share(out, trc_cols, True)
     sh_sb, sh_sb_g = share(out, sb_cols), share(out, sb_cols, True)
     sh_sh, sh_sh_g = share(out, sh_cols), share(out, sh_cols, True)
-    therm_kwh = 29.307111111                                                         # C19.4: kWh per therm
-    for r in out:
-        r["_FYkWh"], r["_FYThmkWh"] = r["FirstYearGrossKWh"], therm_kwh * r["FirstYearGrossThm"]
-    sh_sav = share(out, lambda r, g: ["_FYkWh", "_FYThmkWh"])
     for i, r in enumerate(out):
         ps = sums.get(r["prg"], zero)
         r["TotalSystemBenefit"] = (r["ElecBen"] + r["GasBen"] + r["WaterEnergyBen"] + r["OtherBen"]) - (r["ElecSupplyCost"] + r["GasSupplyCost"] + r["WaterEnergyCost"] + r["OtherCost"])
@@ -429,8 +425,8 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
         r["TRCCostNoAdmin"] = inc + r["NetParticipantCostAdjustedPV"] + sup
         r["TRCCost"] = sh_trc[i] * ps["npv"] + r["TRCCostNoAdmin"]
         r["TRCCostGross"] = sh_trc_g[i] * ps["npv"] + inc + r["GrossParticipantCostPV"] + sup_g
-        r["RIMCostNoAdmin"] = r["BillReducElec"] + r["BillReducGas"] + r["PACCostNoAdmin"]
-        r["RIMCost"] = r["BillReducElec"] + r["BillReducGas"] + r["PACCost"]
+        r["RIMCostNoAdmin"] = r["LifecycleBillReducElec"] + r["LifecycleBillReducGas"] + r["PACCostNoAdmin"]
+        r["RIMCost"] = r["LifecycleBillReducElec"] + r["LifecycleBillReducGas"] + r["PACCost"]
         for name, s, sh, sh_g in (("SCB", "_SB", sh_sb, sh_sb_g), ("SCH", "_SH", sh_sh, sh_sh_g)):
             sup_s = r[f"ElecSupplyCost{s}"] + r[f"GasSupplyCost{s}"] + r[f"WaterEnergyCost{s}"] + r["OtherCost"]
             sup_sg = r[f"ElecSupplyCostGross{s}"] + r[f"GasSupplyCostGross{s}"] + r[f"WaterEnergyCostGross{s}"] + r["OtherCostGross"]
@@ -440,21 +436,18 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
         b = r["ElecBen"] + r["GasBen"] + r["WaterEnergyBen"] + r["OtherBen"]
         r["TRCRatio"], r["TRCRatioNoAdmin"] = ratio(b + r["TaxCredits"], r["TRCCost"]), ratio(b + r["TaxCredits"], r["TRCCostNoAdmin"])
         r["PACRatio"], r["PACRatioNoAdmin"] = ratio(b, r["PACCost"]), ratio(b, r["PACCostNoAdmin"])
-        rim_b = b + r["BillIncrElec"] + r["BillIncrGas"]
+        rim_b = b + r["LifecycleBillIncrElec"] + r["LifecycleBillIncrGas"]
         r["RIMRatio"], r["RIMRatioNoAdmin"] = ratio(rim_b, r["RIMCost"]), ratio(rim_b, r["RIMCostNoAdmin"])
         b_sb = r["ElecBen_SB"] + r["GasBen_SB"] + r["WaterEnergyBen_SB"] + r["OtherBen"]
         b_sh = r["ElecBen_SH"] + r["GasBen_SH"] + r["WaterEnergyBen_SH"] + r["OtherBen"]
         r["SCBRatio"], r["SCHRatio"] = ratio(b_sb, r["SCBCost"]), ratio(b_sh, r["SCHCost"])
         r["SCBRatioNoAdmin"], r["SCHRatioNoAdmin"] = ratio(b_sb, r["SCBCostNoAdmin"]), ratio(b_sh, r["SCHCostNoAdmin"])
-        # C11.4: program-cost components and the electric share of the benefits; C19.4: the savings share; C19.6: lifecycle net benefits and levelized values
+        # C11.4: program-cost components and the electric share of the benefits; C19.6: lifecycle net benefits and levelized values
         for c in COST_FIELDS:
             r[f"Wtd{c}"] = sh_trc[i] * ps[c]
-        r["ProgramCosts"] = r["WeightedProgramCost"]
         all_pos = pos(r["ElecBen"]) + pos(r["GasBen"]) + pos(r["WaterEnergyBen"]) + pos(r["OtherBen"])
         wea = ratio(pos(r["ElecBen"]), all_pos)
         r["WeightedElecAlloc"] = wea
-        r["WeightedSavings"] = sh_sav[i]
-        del r["_FYkWh"], r["_FYThmkWh"]
         r["TRCLifecycleNetBen"] = r["ElecBen"] + r["GasBen"] - r["TRCCost"]
         r["PACLifecycleNetBen"] = r["ElecBen"] + r["GasBen"] - r["PACCost"]
         dse, dsg = r["DiscountedSavingsNetkWh"], r["DiscountedSavingsNetThm"]
