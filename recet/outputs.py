@@ -48,11 +48,12 @@ SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupply
 
 def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.DataFrame:
     """The Measure.csv columns as text (blank stays blank); with statewide allocation, the allocated rows (numbers are then written as computed)."""
+    from .templates import with_defaults
     p = Path(measure_csv)
     if not allocate_statewide:
-        return read_cet_csv(p, dtype=str, keep_default_na=False, low_memory=False)
+        return with_defaults(read_cet_csv(p, dtype=str, keep_default_na=False, low_memory=False))
     from .pipeline.statewide_allocation import allocate_measure_inputs
-    df, _report = allocate_measure_inputs(read_cet_csv(p, low_memory=False))
+    df, _report = allocate_measure_inputs(with_defaults(read_cet_csv(p, low_memory=False)))
     return df.astype(object).where(df.notna(), "").astype(str)
 
 
@@ -109,6 +110,9 @@ def restated_differs(raw: pd.DataFrame, measures: pd.DataFrame) -> set[str]:
     for c in derived.columns:
         if c in RESTATES:
             col = RESTATES[c]
+            if col not in raw.columns:              # an optional column the file left out (the minimal input set): the derived field restates nothing
+                out.add(c)
+                continue
             if c == "combustion_type":
                 same = (raw[col].replace("", np.nan).fillna("").to_numpy() == derived[c].fillna("").astype(str).to_numpy()).all()
             else:

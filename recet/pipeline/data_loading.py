@@ -25,6 +25,8 @@ def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = Fa
     dtypes: column types to read with instead of inferring them from the file (delimited.part_dtypes): a part of a larger file is read with the types the
     whole file would get, so it loads exactly as those rows do in the whole file."""
     df = read_cet_csv(measure_csv_path, low_memory=False, **({"dtype": dtypes} if dtypes else {}))
+    from ..templates import with_defaults
+    df = with_defaults(df)                          # the minimal input set: a missing descriptive column is read as blank (BR-06.15)
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
         df, report = allocate_measure_inputs(df)
