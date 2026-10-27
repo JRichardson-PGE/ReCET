@@ -6,6 +6,7 @@ measure-level file (RunConfig.output_template); the Results tables still read ev
     check(columns)               (known, unknown) names
     read_file(path)              a template saved as a file: JSON {"name": ..., "columns": [...]}, or text with one column per line
     load_saved() / save(...)     the window's saved templates (the tool's config file); the web app keeps each user's in its database
+    current(columns)             a template's columns under the names a run writes now (columns renamed in 0.1.50 accepted by their old names)
 
 A column the run did not produce (an SCT column with the Societal Cost Tests off, a component column without components mode) is left out of the file, and
 the run says so.
@@ -22,9 +23,9 @@ from . import field_docs, paths, templates
 CONFIG_KEY = "output_templates"
 ALL = "All columns"
 BUILTIN: dict[str, list[str]] = {
-    "Key results": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "IOU_AC_Territory", "POC_ACC", "ElecPricingStatus", "GasPricingStatus",
+    "Key results": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "IOU_AC_Territory", "Used_ACCVersion", "ElecPricingStatus", "GasPricingStatus",
                     "TotalSystemBenefit", "ElecBen", "GasBen", "OtherBen", "TRCCost", "PACCost", "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio",
-                    "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "NetElecCO2Lifecycle", "NetGasCO2Lifecycle", "CreditedIOU", "ACCCheck"],
+                    "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "LifecycleNetElecCO2", "LifecycleNetGasCO2", "CreditedPA"],
     "Participant costs": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "GrossMeasureCost", "GrossMeasCostPV", "ExcessIncentives",
                           "ExcessIncentivesPV", "GrossParticipantCost", "GrossParticipantCostAdjustedPV", "NetParticipantCost", "NetParticipantCostAdjusted",
                           "NetParticipantCostPV", "RebatesandIncents", "RebatesandIncentsPV", "TRCCost", "TRCRatio"],
@@ -35,7 +36,7 @@ BUILTIN: dict[str, list[str]] = {
 def catalog() -> list[tuple[str, str, str, str]]:
     """(group, column, definition, documentation link) for every measure-level column, in the order a run writes them: the input columns, then each
     OUTPUT_FIELDS.md section 1 group. Per-component columns (ElecValue_<component>) are not listed: they depend on the ACC."""
-    out = [("Input columns", c, *_def(c)) for c in ["POC_ACC", *templates.MEASURE_COLUMNS]]
+    out = [("Input columns", c, *_def(c)) for c in ["Used_ACCVersion", *templates.MEASURE_COLUMNS]]
     text = (field_docs.DOCS / "OUTPUT_FIELDS.md").read_text(encoding="utf-8")
     text = text[text.index("## 1. "):text.index("## 2. ")]
     group, seen = "", {c for _g, c, _d, _l in out}
@@ -49,7 +50,7 @@ def catalog() -> list[tuple[str, str, str, str]]:
         for n in names:
             if n in seen or "<" in n or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", n) or n.startswith(("ElecValue_", "GasValue_")):
                 continue
-            if group.startswith("POC_ACC") or n in templates.MEASURE_COLUMNS:
+            if group.startswith("Used_ACCVersion") or n in templates.MEASURE_COLUMNS:
                 continue
             seen.add(n)
             out.append((group, n, *_def(n)))
@@ -65,11 +66,26 @@ def names() -> set[str]:
     return {c for _g, c, _d, _l in catalog()}
 
 
+def current(columns) -> list[str]:
+    """The columns under the names a run writes now, in order and without repeats: an old name (NetElecCO2, CreditedIOU ...) becomes the new one and a column
+    ReCET no longer writes (poc_PA, ACCCheck ...) is dropped (fieldnames.output_name)."""
+    from .fieldnames import output_name
+    out = []
+    for c in columns:
+        n = output_name(c)
+        if n and n not in out:
+            out.append(n)
+    return out
+
+
 def check(columns) -> tuple[list[str], list[str]]:
-    """(the names a template may use, in order and without repeats; the ones it may not). ElecValue_ / GasValue_ component columns are allowed."""
+    """(the names a template may use, in order and without repeats; the ones it may not). ElecValue_ / GasValue_ component columns are allowed, and an old
+    name of a renamed column is taken as its new name; a column no longer written is not allowed."""
+    from .fieldnames import OUTPUT_RENAMES
     ok, bad, known = [], [], names()
     for c in columns:
         c = str(c).strip()
+        c = OUTPUT_RENAMES.get(c, c)
         if not c or c in ok:
             continue
         (ok if c in known or c.startswith(("ElecValue_", "GasValue_")) else bad).append(c)
@@ -101,7 +117,7 @@ def load_saved() -> dict[str, list[str]]:
     out = dict(BUILTIN)
     for name, cols in saved.items():
         if name not in BUILTIN and isinstance(cols, list):
-            out[str(name)] = [str(c) for c in cols]
+            out[str(name)] = current(cols)
     return out
 
 

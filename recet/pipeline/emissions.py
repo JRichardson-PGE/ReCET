@@ -200,14 +200,14 @@ def price_emissions_per_measure(measures: pd.DataFrame, acc_version: int = 2024,
             return qty * (ntg_thm if net else 1.0) * irr_thm * factor * g
 
         r = {"measure_id": m.measure_id}
-        for scope, d, g in (("", fy, gfy), ("Lifecycle", lc, glc)):
+        for scope, d, g in (("FirstYear", fy, gfy), ("Lifecycle", lc, glc)):
             for net, tag in ((True, "Net"), (False, "Gross")):
                 c, n, p = elec(d, net)
-                r[f"{tag}ElecCO2{scope}"] = c
-                r[f"{tag}ElecNOx{scope}"] = n
-                r[f"{tag}PM10{scope}"] = p
-                r[f"{tag}GasCO2{scope}"] = gas(g, co2_gas, net)
-                r[f"{tag}GasNOx{scope}"] = gas(g, nox_gas, net)
+                r[f"{scope}{tag}ElecCO2"] = c
+                r[f"{scope}{tag}ElecNOx"] = n
+                r[f"{scope}{tag}ElecPM10"] = p
+                r[f"{scope}{tag}GasCO2"] = gas(g, co2_gas, net)
+                r[f"{scope}{tag}GasNOx"] = gas(g, nox_gas, net)
         rows.append(r)
     out = pd.DataFrame(rows)
     return out.groupby("measure_id", sort=False).sum().reset_index() if len(out) and out["measure_id"].duplicated().any() else out
@@ -299,14 +299,14 @@ def price_emissions(measures: pd.DataFrame, acc_version: int = 2024, market_effe
     g_life = np.select([rul > 0, eul > 0], [rul * thm1 + (eul - rul) * thm2, eul * thm1], default=0.0)
 
     out = {"measure_id": m["measure_id"].to_numpy()}
-    for scope, co2_s, ak_s, g in (("", sums["fy_co2"], sums["fy_ak"], g_first), ("Lifecycle", sums["lc_co2"], sums["lc_ak"], g_life)):
+    for scope, co2_s, ak_s, g in (("FirstYear", sums["fy_co2"], sums["fy_ak"], g_first), ("Lifecycle", sums["lc_co2"], sums["lc_ak"], g_life)):
         for net, tag in ((True, "Net"), (False, "Gross")):
             fe = qty * ((ntg_kwh + market_effects_bens) if net else 1.0) * irr_kwh
             fg = qty * ((ntg_thm + market_effects_bens) if net else 1.0) * irr_thm
-            out[f"{tag}ElecCO2{scope}"] = fe * co2_s
-            out[f"{tag}ElecNOx{scope}"] = fe * nox_rate * ak_s / 4.0
-            out[f"{tag}PM10{scope}"] = fe * pm_rate * ak_s / 4.0
-            out[f"{tag}GasCO2{scope}"] = fg * co2_gas * g
-            out[f"{tag}GasNOx{scope}"] = fg * nox_gas * g
+            out[f"{scope}{tag}ElecCO2"] = fe * co2_s
+            out[f"{scope}{tag}ElecNOx"] = fe * nox_rate * ak_s / 4.0
+            out[f"{scope}{tag}ElecPM10"] = fe * pm_rate * ak_s / 4.0
+            out[f"{scope}{tag}GasCO2"] = fg * co2_gas * g
+            out[f"{scope}{tag}GasNOx"] = fg * nox_gas * g
     res = pd.DataFrame(out)
     return res.groupby("measure_id", sort=False).sum().reset_index() if res["measure_id"].duplicated().any() else res

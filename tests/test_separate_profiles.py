@@ -50,7 +50,7 @@ def test_second_baseline_years_are_priced_on_their_own_shape(tmp_path):
     first = sum(1000 * 0.100 * QUARTER_HOURS[q] / 8760 / r ** q for q in (0, 1))         # flat shape at $100/MWh
     second = 400 * 0.300 / r ** 2                                                          # all 2nd-baseline kWh in the $300 hour of Q3
     assert f["ElecBen"] == pytest.approx(first + second, rel=1e-12)
-    assert f["ElecPricingStatus"] == "priced: hourly profile" and f["poc_shape_key_2nd"] == "PEAK"
+    assert f["ElecPricingStatus"] == "priced: hourly profile"
     same = _run(tmp_path, "one_shape", **early)
     q3 = 400 * ((QUARTER_HOURS[2] - 1) * 0.100 + 0.300) / 8760 / r ** 2                   # the flat shape also sees the $300 hour
     assert same["ElecBen"] == pytest.approx(first + q3 + 400 * 0.100 * QUARTER_HOURS[3] / 8760 / r ** 3, rel=1e-12)
@@ -58,7 +58,7 @@ def test_second_baseline_years_are_priced_on_their_own_shape(tmp_path):
 
 def test_water_energy_is_priced_on_its_own_shape(tmp_path):
     f = _run(tmp_path, "water", UnitkWh1stBaseline="0", UnitkWhIOUWater1stBaseline="50", AC_Elec_Impact_Profile_Water="PEAK")
-    assert f["WaterEnergyBen"] == pytest.approx(50 * 0.300 / (1 + _rate()) ** 2, rel=1e-12) and f["poc_shape_key_water"] == "PEAK"
+    assert f["WaterEnergyBen"] == pytest.approx(50 * 0.300 / (1 + _rate()) ** 2, rel=1e-12)
 
 
 def test_a_missing_second_baseline_shape_leaves_the_measure_partly_priced(tmp_path, monkeypatch):

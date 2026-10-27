@@ -95,9 +95,9 @@ def test_worked_example_quarter_table_follows_the_formulas(tmp_path):
         assert (year, q, hours) == (2028 + (2 + k) // 4, (2 + k) % 4, [2160, 2184, 2208, 2208][q])
         df = 1 / rqf ** ((year - 2028) * 4 + q)
         assert float(df_) == pytest.approx(df, abs=5e-7)
-        e = f["poc_shape_scale"] * 0.080 * hours / 8760 * weight * df
-        g = f["poc_annual_net_therms_1st"] * 1.0 * 3 / 12 * weight * df
-        w = f["poc_water_scale_1st"] * 0.070 * hours / 8760 * weight * df
+        e = f["AC_kWh_1st_Baseline"] * 0.080 * hours / 8760 * weight * df
+        g = f["AC_Therms_1st_Baseline"] * 1.0 * 3 / 12 * weight * df
+        w = f["AC_kWh_Water_1st_Baseline"] * 0.070 * hours / 8760 * weight * df
         for cell, want in ((v_e, e), (v_g, g), (v_w, w)):
             value, tol = _number(cell)
             assert want == pytest.approx(value, abs=tol)
@@ -107,7 +107,7 @@ def test_worked_example_quarter_table_follows_the_formulas(tmp_path):
 
 # ------------------------------------------------------------------------------------------------------------------------------------ every column is documented
 def _full_frame(tmp_path):
-    """A run with every optional group switched on, on a measure with a blank NTGRCost (so `poc_ntgr_cost` appears)."""
+    """A run with every optional group switched on, on a measure with a blank NTGRCost."""
     tc.write_measures(tmp_path / "Measure.csv", {"EX1": tc.MEASURES["EX1"], "EX3": dict(tc.MEASURES["EX3"], NTGRCost="")})
     tc.write_program(tmp_path / "ProgramCost.csv")
     tc.make_acc(tmp_path / "acc.parquet")
@@ -139,7 +139,8 @@ def test_every_measure_level_column_is_documented_and_every_documented_column_ex
     stale = sorted(n for n in out_names if n not in frame.columns and n not in patterns and n != "the 74 `Measure.csv` columns (`CEInputID` ... `Comments`)"
                    and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", n))
     assert not stale, f"OUTPUT_FIELDS.md describes columns the tool did not write: {stale}"
-    assert {"ElecValue_energy", "GasValue_market", "poc_ntgr_cost"} <= set(frame.columns)      # the optional groups were really exercised
+    assert {"ElecValue_energy", "GasValue_market"} <= set(frame.columns)      # the optional groups were really exercised
+    assert not [c for c in frame.columns if c.startswith("poc_")]            # the restated inputs are not written (0.1.50)
 
 
 def test_secondary_output_files_are_documented(tmp_path):

@@ -563,9 +563,9 @@ def price_bill_impact_per_measure(
     settings_base_year: int = 2024,
 ) -> pd.DataFrame:
     """
-    Real ratepayer bill impact (`BillReducElec`/`BillIncrElec`/
-    `BillReducGas`/`BillIncrGas` -- the RIM test's other half, alongside
-    system avoided cost: `RIMCost = BillReducElec + BillReducGas +
+    Real ratepayer bill impact (`LifecycleBillReducElec`/`LifecycleBillIncrElec`/
+    `LifecycleBillReducGas`/`LifecycleBillIncrGas` -- the RIM test's other half, alongside
+    system avoided cost: `RIMCost = LifecycleBillReducElec + LifecycleBillReducGas +
     PACCost`), traced directly from `CalcCE`'s real SQL
     (CET_v25.1_documentation_extracted.txt:15859-16106).
 
@@ -582,7 +582,7 @@ def price_bill_impact_per_measure(
     A REAL, CONFIRMED ASYMMETRY in CalcCE's own SQL (found 2026-09-17,
     chasing a RUL-cohort-specific ~7-9% overshoot that only appeared for
     measures with RUL_Yrs > 0 -- RUL=0 measures matched CET's real
-    BillIncrElec/BillReducGas EXACTLY on the first attempt): the "pure 1st
+    LifecycleBillIncrElec/LifecycleBillReducGas EXACTLY on the first attempt): the "pure 1st
     baseline" years (`RE1`, `Qy Between Yr1 and Yr1+floor(RUL)-1`) discount
     by `Raf ^ (Qy - Yr1)` -- i.e. plain years-elapsed-since-claim-year, "k"
     in this function's loop -- but the boundary year AND every "2nd
@@ -594,7 +594,7 @@ def price_bill_impact_per_measure(
     what the 1st-baseline years get -- a real quirk (bug or not, this is
     what CalcCE's real SQL does) this function must reproduce, not
     "correct". Verified exactly (ratio 0.99999995) against one real
-    SCE/RUL=8.33 SWWH025 measure's actual `BillIncrElec` before trusting
+    SCE/RUL=8.33 SWWH025 measure's actual `LifecycleBillIncrElec` before trusting
     it at scale. `_phased_scale()` isn't used here for this reason -- its
     single-exponent design can't express two different discount bases for
     the same boundary year, so the split is done directly.
@@ -615,8 +615,8 @@ def price_bill_impact_per_measure(
     A measure with no rate-schedule coverage (get_*_rate_years returns
     None, or a target year falls outside the table's real span) is
     skipped for that fuel only -- e.g. a fuel-sub-to-elec measure with no
-    matching gas schedule still gets a real BillIncrElec, just no
-    BillReducGas row.
+    matching gas schedule still gets a real LifecycleBillIncrElec, just no
+    LifecycleBillReducGas row.
     """
     rows: list[dict] = []
 
@@ -677,10 +677,10 @@ def price_bill_impact_per_measure(
         reduc_g, incr_g = split(gas_pv)
         rows.append({
             "measure_id": m["measure_id"],
-            "BillReducElec": reduc_e,
-            "BillIncrElec": incr_e,
-            "BillReducGas": reduc_g,
-            "BillIncrGas": incr_g,
+            "LifecycleBillReducElec": reduc_e,
+            "LifecycleBillIncrElec": incr_e,
+            "LifecycleBillReducGas": reduc_g,
+            "LifecycleBillIncrGas": incr_g,
         })
 
     return pd.DataFrame(rows)
@@ -911,7 +911,7 @@ def price_bill_impact(
     m = measures
     n_rows = len(m)
     if n_rows == 0:
-        return pd.DataFrame(columns=["measure_id", "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas"])
+        return pd.DataFrame(columns=["measure_id", "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas"])
     claim_year = m["claim_year"].astype(int).to_numpy()
     yr1 = claim_year - settings_base_year
     raf = 1.0 + np.asarray(_by_key(m, ["PA"], get_discount_rate_annual), dtype=float)
@@ -958,10 +958,10 @@ def price_bill_impact(
     fs = m["is_fuel_sub"].fillna(True).astype(bool).to_numpy() if "is_fuel_sub" in m.columns else np.ones(n_rows, dtype=bool)
     return pd.DataFrame({
         "measure_id": m["measure_id"].to_numpy(),
-        "BillReducElec": np.where(fs, np.maximum(pv_e, 0.0), pv_e),
-        "BillIncrElec": np.where(fs, np.maximum(-pv_e, 0.0), 0.0),
-        "BillReducGas": np.where(fs, np.maximum(pv_g, 0.0), pv_g),
-        "BillIncrGas": np.where(fs, np.maximum(-pv_g, 0.0), 0.0),
+        "LifecycleBillReducElec": np.where(fs, np.maximum(pv_e, 0.0), pv_e),
+        "LifecycleBillIncrElec": np.where(fs, np.maximum(-pv_e, 0.0), 0.0),
+        "LifecycleBillReducGas": np.where(fs, np.maximum(pv_g, 0.0), pv_g),
+        "LifecycleBillIncrGas": np.where(fs, np.maximum(-pv_g, 0.0), 0.0),
     })
 
 

@@ -1,18 +1,20 @@
 """Building and writing a run's result files.
 
 measure-level table -- one row per measure, column groups left to right:
-  POC_ACC                          which ACC version the run priced against
+  Used_ACCVersion                  which ACC version the run priced against
   <raw Measure.csv columns>        exactly as in the input file (text preserved)
-  poc_*                            the fields the POC derives from them and prices with (net kWh/kW/therms, EUL/RUL, NTG and realization x installation rates,
-                                   profile keys, fuel-substitution flag ...); straight copies of a raw column are left out
+  Used_Year ... Fuel_Sub_Flag      the few derived values a reader cannot see in the inputs (DERIVED_OUTPUTS): the claim year and quarter used, the annual
+                                   kWh / therms each baseline is priced on (net, with installation and realization rates), the fuel-substitution flag
   ElecPricingStatus, ProfileSource, GasPricingStatus, GasProfileSource, WaterPricingStatus
                                    how each fuel was priced, from which profile, or that it was UNPRICED (a 0 benefit alone cannot tell "no savings" from "could not price")
   <outputs>                        benefits (electric, gas, water energy, other), supply costs, participant / bill-impact PVs, Gross and NoAdmin variants, TRC/PAC/RIM/SCB/SCH costs and ratios,
                                    societal (_SB/_SH) parts, program-cost weighting, CO2/NOx/PM10 (net/gross, first-year and lifecycle)
   ElecValue_* / GasValue_*         (components mode) each ACC component's discounted lifetime value; they sum to ElecBen - ElecSupplyCost / GasBen - GasSupplyCost
-  CreditedIOU                      the IOU the measure is credited to: the `PA` of its program in the ProgramCost input (`SW` for an unallocated statewide program;
+  CreditedPA                       the PA the measure is credited to: the `PA` of its program in the ProgramCost input (`SW` for an unallocated statewide program;
                                    with statewide allocation, the IOU each allocated share went to); blank without a ProgramCost input
   Prg_MatchedOn, Prg_<column>      the program's metadata from the CEDARS Programs list (programs.py), matched on the measure's PrgID as priced
+
+The per-record checks (CEDARS filing checks, the ACC check) are not columns of this table: they are in the preflight findings and filing_validation files.
 """
 from __future__ import annotations
 
@@ -27,23 +29,23 @@ import pandas as pd
 
 from .pipeline.delimited import read_cet_csv
 
-# derived field -> the raw Measure.csv column it merely restates (dropped from the poc_ block when the values are identical)
-RESTATES = {
-    "num_units": "NumUnits", "unit_meas_cost_1st": "UnitMeaCost1stBaseline", "unit_meas_cost_2nd": "UnitMeaCost2ndBaseline",
-    "unit_incentive_to_others": "UnitIncentiveToOthers", "unit_end_user_rebate": "UnitEndUserRebate", "unit_di_labor": "UnitDirectInstallLab",
-    "unit_di_material": "UnitDirectInstallMat", "ntgr_cost": "NTGRCost", "meas_inflation": "MeasInflation", "unit_gas_infra_bens": "UnitGasInfraBens",
-    "unit_refrig_costs": "UnitRefrigCosts", "unit_refrig_bens": "UnitRefrigBens", "unit_misc_costs": "UnitMiscCosts", "unit_misc_bens": "UnitMiscBens",
-    "unit_tax_credits": "UnitTaxCredits", "unit_kwh_1st": "UnitkWh1stBaseline", "unit_kwh_2nd": "UnitkWh2ndBaseline",
-    "unit_therm_1st": "UnitTherm1stBaseline", "unit_therm_2nd": "UnitTherm2ndBaseline", "unit_kw_1st": "UnitkW1stBaseline", "unit_kw_2nd": "UnitkW2ndBaseline",
-    "combustion_type": "CombustionType",
+# the loader's derived fields that are written, under their measure-level names; the others restate an input column (or another output) and are not written.
+# The two kWh columns are the annual net kWh x installation and realization rates (the loader's shape_scale, except on an already-scaled kWh-per-unit profile,
+# where shape_scale is a multiplier of the profile and the annual kWh is the profile's own).
+DERIVED_OUTPUTS = {
+    "claim_year": "Used_Year", "claim_quarter": "Used_Quarter",
+    "annual_net_kwh_1st": "AC_kWh_1st_Baseline", "annual_net_kwh_2nd": "AC_kWh_2nd_Baseline",
+    "annual_net_therms_1st": "AC_Therms_1st_Baseline", "annual_net_therms_2nd": "AC_Therms_2nd_Baseline",
+    "water_scale_1st": "AC_kWh_Water_1st_Baseline", "water_scale_2nd": "AC_kWh_Water_2nd_Baseline",
+    "is_fuel_sub": "Fuel_Sub_Flag",
 }
 DROP_FROM_RESULT = {"measure_id", "prg_id", "NTGRkWh", "ntgr_therm"}   # restate CEInputID / PrgID / derived NTG columns already present
 
 # the columns compared between two runs / against CET, and the totals in the summary
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas"]
+               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "FirstYearNetElecCO2", "FirstYearNetGasCO2", "LifecycleBillReducElec", "LifecycleBillReducGas"]
 SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TotalSystemBenefit", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "BillReducElec", "BillReducGas", "PCTBen", "PCTCost", "NetElecCO2", "NetGasCO2"]
+                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "LifecycleBillReducElec", "LifecycleBillReducGas", "PCTBen", "PCTCost", "FirstYearNetElecCO2", "FirstYearNetGasCO2"]
 
 
 def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.DataFrame:
@@ -57,7 +59,7 @@ def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.Da
     return df.astype(object).where(df.notna(), "").astype(str)
 
 
-def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bool = False) -> pd.Series:
+def credited_pa(measures: pd.DataFrame, programcost_csv, allocate_statewide: bool = False) -> pd.Series:
     """Per measure (aligned with `measures`), the `PA` of its program in the ProgramCost input, exactly as filed -- so an unallocated statewide program shows `SW`.
     With statewide allocation the ProgramCost rows are allocated the same way the measures are, so a statewide program's share shows the IOU it was allocated to
     (its program row's PA is that IOU) and every other program shows its filed PA. Matched on (PrgID, claim year = PrgYear), else on PrgID alone; blank when there
@@ -76,7 +78,7 @@ def credited_iou(measures: pd.DataFrame, programcost_csv, allocate_statewide: bo
 
 @lru_cache(maxsize=4)
 def _credited_maps(path: str, allocate_statewide: bool, size: int, mtime_ns: int) -> tuple[dict, dict]:
-    """credited_iou's (PrgID, PrgYear) -> PA and PrgID -> PA maps of one ProgramCost file, read once per file and version of it (a run asks once per part).
+    """credited_pa's (PrgID, PrgYear) -> PA and PrgID -> PA maps of one ProgramCost file, read once per file and version of it (a run asks once per part).
     The maps are shared: do not change them."""
     pc = read_cet_csv(path, dtype=str, keep_default_na=False)
     if allocate_statewide:
@@ -98,46 +100,19 @@ def _aligned_raw(raw: pd.DataFrame, measures: pd.DataFrame) -> pd.DataFrame:
     return raw
 
 
-def _derived(measures: pd.DataFrame) -> pd.DataFrame:
-    return measures.drop(columns=["measure_id", "prg_id", "MeasDescription", "eul_years_raw"])        # eul_years_raw = EUL_Yrs as filed (already echoed)
-
-
-def restated_differs(raw: pd.DataFrame, measures: pd.DataFrame) -> set[str]:
-    """The derived fields in RESTATES whose values are NOT straight copies of their raw column for these measures: they get a poc_ column. A chunked run takes
-    the union over its parts, which is the set the whole job gives."""
-    raw, derived = _aligned_raw(raw, measures), _derived(measures)
-    out = set()
-    for c in derived.columns:
-        if c in RESTATES:
-            col = RESTATES[c]
-            if col not in raw.columns:              # an optional column the file left out (the minimal input set): the derived field restates nothing
-                out.add(c)
-                continue
-            if c == "combustion_type":
-                same = (raw[col].replace("", np.nan).fillna("").to_numpy() == derived[c].fillna("").astype(str).to_numpy()).all()
-            else:
-                same = np.allclose(pd.to_numeric(raw[col], errors="coerce").fillna(0.0).to_numpy(),
-                                   pd.to_numeric(derived[c], errors="coerce").fillna(0.0).to_numpy(), rtol=0, atol=1e-12)
-            if not same:
-                out.add(c)
-    return out
-
-
-def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series, credited: pd.Series | None = None,
-                           restated: set[str] | None = None) -> pd.DataFrame:
-    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID. `restated`
-    (restated_differs over the whole job) decides which RESTATES fields get a poc_ column when `measures` is only part of the job; None = decide on these rows."""
+def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series,
+                           credited: pd.Series | None = None) -> pd.DataFrame:
+    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
     raw = _aligned_raw(raw, measures)
     result = result.set_index("measure_id").reindex(measures["measure_id"]).reset_index()
-    derived = _derived(measures)
-    if restated is None:
-        restated = restated_differs(raw, measures)
-    keep = [c for c in derived.columns if c not in RESTATES or c in restated]
-    poc = derived[keep].add_prefix("poc_").reset_index(drop=True)
+    derived = measures[list(DERIVED_OUTPUTS)].rename(columns=DERIVED_OUTPUTS).reset_index(drop=True)
+    rates = (measures["ir_kwh"].astype(float) * measures["rr_kwh"].astype(float)).to_numpy()
+    for c in ("AC_kWh_1st_Baseline", "AC_kWh_2nd_Baseline"):
+        derived[c] = derived[c].astype(float) * rates
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
-    frame = pd.concat([raw.reset_index(drop=True), poc, out], axis=1).copy()       # copy: one block, so the two columns added below do not warn
-    frame.insert(0, "POC_ACC", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())     # one label, or one per measure (mixed ACC versions)
-    frame["CreditedIOU"] = credited.to_numpy() if credited is not None else ""
+    frame = pd.concat([raw.reset_index(drop=True), derived, out], axis=1).copy()   # copy: one block, so the two columns added below do not warn
+    frame.insert(0, "Used_ACCVersion", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())   # one label, or one per measure (mixed ACC versions)
+    frame["CreditedPA"] = credited.to_numpy() if credited is not None else ""
     return frame
 
 
@@ -147,44 +122,6 @@ def attach_programs(frame: pd.DataFrame, prg_ids) -> pd.DataFrame:
     meta = programs.lookup(prg_ids)
     meta.index = frame.index
     return pd.concat([frame, meta], axis=1)
-
-
-ACC_CHECK = "ACCCheck"
-
-
-def attach_acc_check(frame: pd.DataFrame, measures: pd.DataFrame, purpose: str = "") -> pd.DataFrame:
-    """ACCCheck appended to the measure-level table (BR-06.5): "ok" when the ACC the measure was priced on (its acc_version, already filled with the run's)
-    normally applies to its program year for `purpose` (versions.expected_accs), "not for this program year" when not, "not checked" when the table says
-    nothing about the year or the version names no ACC year. `measures` is aligned with `frame`."""
-    from . import versions
-    keys, years = measures["acc_version"].astype(str).to_numpy(), measures["claim_year"].astype(int).to_numpy()
-    status = {}
-    for k, y in set(zip(keys, years)):
-        a, exp = versions.acc_year_of(k), versions.expected_accs(int(y), purpose)
-        status[(k, y)] = "not checked" if a is None or exp is None else ("ok" if a in exp else "not for this program year")
-    frame[ACC_CHECK] = [status[(k, y)] for k, y in zip(keys, years)]
-    return frame
-
-
-def filing_lookup(filing: pd.DataFrame) -> pd.DataFrame:
-    """The preflight's failing Measure records (preflight.PreflightReport.filing) indexed by CEInputID, for attach_filing. Built once per run: a run in parts
-    attaches it to every part, and rebuilding it each time cost about 2 s a part on the server at 140,000 flagged records."""
-    m = filing[filing["table"] == "Measure"]
-    return m.drop_duplicates("id").set_index("id")[["FilingValidation", "FilingRules"]]
-
-
-def attach_filing(frame: pd.DataFrame, lookup: pd.DataFrame) -> pd.DataFrame:
-    """FilingValidation (pass / warning / reject) and FilingRules (the failing rule IDs) appended to the measure-level table, from `lookup` (filing_lookup).
-    A measure priced as "<IOU>_<CEInputID>" (statewide allocation) takes its file record's flags."""
-    ids = frame["CEInputID"].astype(str).to_numpy()
-    hit = lookup.reindex(ids)
-    missing = hit["FilingValidation"].isna().to_numpy()
-    if missing.any() and lookup.index.size:                    # "<IOU>_<CEInputID>": try the file's own ID
-        bare = pd.Series(ids[missing]).str.partition("_")[2].to_numpy()
-        hit.iloc[np.flatnonzero(missing)] = lookup.reindex(bare).to_numpy()
-    frame["FilingValidation"] = hit["FilingValidation"].fillna("pass").to_numpy()
-    frame["FilingRules"] = hit["FilingRules"].fillna("").to_numpy()
-    return frame
 
 
 def filing_table(filing: pd.DataFrame, rule_set: str) -> pd.DataFrame:
@@ -213,7 +150,7 @@ def _ratio_parts(get) -> list[tuple[str, object, object]]:
         return None if any(p is None for p in parts) else sum(parts)
 
     b, b_sb, b_sh = benefits(), benefits("_SB"), benefits("_SH")
-    tax, incr = z(get("TaxCredits")), z(get("BillIncrElec")) + z(get("BillIncrGas"))
+    tax, incr = z(get("TaxCredits")), z(get("LifecycleBillIncrElec")) + z(get("LifecycleBillIncrGas"))
     plus = lambda x, y: None if x is None else x + y
     return [("TRC", plus(b, tax), get("TRCCost")), ("PAC", b, get("PACCost")), ("RIM", plus(b, incr), get("RIMCost")),
             ("SCB", b_sb, get("SCBCost")), ("SCH", b_sh, get("SCHCost")),
@@ -242,7 +179,7 @@ def row_ratios(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.DataFrame:
-    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited IOU and by program segment. With `apply_exclude_from_ce`, measures of programs
+    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA and by program segment. With `apply_exclude_from_ce`, measures of programs
     whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`)."""
     def block(g: pd.DataFrame, label: str, group: str) -> dict:
         return _summary_row(g, label, group, len(g))
@@ -252,8 +189,8 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
         flag = programs.is_true(frame[EXCLUDE_FLAG]).to_numpy()
         excluded, frame = frame[flag], frame[~flag]
     rows = [block(frame, "all measures", "portfolio")]
-    for col, group in (("poc_PA", "IOU territory (PA)"), ("CreditedIOU", "credited IOU"), ("Prg_ProgramSegment", "program segment")):
-        if col in frame and not (col != "poc_PA" and (frame[col].astype(str) == "").all()):
+    for col, group in (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment")):
+        if col in frame and not (col != "IOU_AC_Territory" and (frame[col].astype(str) == "").all()):
             for key, g in frame.groupby(frame[col].astype(str).replace("", "(blank)"), sort=True):
                 rows.append(block(g, str(key), group))
     if excluded is not None:
@@ -264,7 +201,7 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
 class SummaryParts:
     """summarize() over a table that arrives in parts (a chunked run): each part is reduced to per-group sums as it comes, so the whole table is never held.
     `result()` gives the rows summarize(whole table) gives, to rounding (the sums are taken in a different order)."""
-    GROUPS = (("poc_PA", "IOU territory (PA)"), ("CreditedIOU", "credited IOU"), ("Prg_ProgramSegment", "program segment"))
+    GROUPS = (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment"))
     EXCLUDED = ("excluded", "Exclude_From_CE programs (left out of the rows above)")
 
     def __init__(self, apply_exclude_from_ce: bool = False):
@@ -312,7 +249,7 @@ class SummaryParts:
             return _summary_row(g, key[1], key[0], self.counts[key])
         rows = [block(("portfolio", "all measures"))]
         for col, group in self.GROUPS:
-            if self.present.get(col) and (col == "poc_PA" or self.nonblank.get(col)):
+            if self.present.get(col) and (col == "IOU_AC_Territory" or self.nonblank.get(col)):
                 rows += [block(k) for k in sorted(k for k in self.sums if k[0] == group)]
         if self.EXCLUDED in self.counts:
             rows.append(block(self.EXCLUDED))
@@ -365,13 +302,16 @@ def compare_frames(a: pd.DataFrame, b: pd.DataFrame, label_a: str, label_b: str,
 
 CET_COMPARED = ("TotalSystemBenefit", "ElecBen", "GasBen", "WaterEnergyBen", "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyBenGross", "OtherBen",
                 "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                "TRCRatio", "PACRatio", "RIMRatio", "NetElecCO2", "NetGasCO2", "BillReducElec", "BillReducGas")
+                "TRCRatio", "PACRatio", "RIMRatio", "FirstYearNetElecCO2", "FirstYearNetGasCO2", "LifecycleBillReducElec", "LifecycleBillReducGas")
 
 
 def read_cet_outputs(cet_outputs: str | Path) -> pd.DataFrame:
-    """The columns of a CET *_outputs.csv that compare_to_cet uses, with CET_ID named CEInputID."""
-    cols = {"CET_ID", "CEInputID", *CET_COMPARED}
-    return read_cet_csv(cet_outputs, low_memory=False, usecols=lambda c: str(c).strip() in cols).rename(columns={"CET_ID": "CEInputID"})
+    """The columns of a CET *_outputs.csv that compare_to_cet uses, under ReCET's names (CET_ID named CEInputID; CET's NetElecCO2, BillReducElec ...
+    named as ReCET writes them, fieldnames.OUTPUT_TO_CET)."""
+    from .fieldnames import OUTPUT_TO_CET, cet_outputs_to_recet
+    cols = {"CET_ID", "CEInputID", *CET_COMPARED, *(OUTPUT_TO_CET.get(c, c) for c in CET_COMPARED)}
+    cet = read_cet_csv(cet_outputs, low_memory=False, usecols=lambda c: str(c).strip() in cols).rename(columns={"CET_ID": "CEInputID"})
+    return cet_outputs_to_recet(cet)
 
 
 def compare_to_cet_part(frame: pd.DataFrame, cet: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, tuple[float, float]], int]:
@@ -723,7 +663,10 @@ class TableWriter:
         self.row_group_rows = max(int(row_group_rows or PARQUET_ROW_GROUP), 1)
         self.path = table_path(path, fmt)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.select = [str(c) for c in select] if select else None
+        if select:
+            from .output_templates import current
+            select = current(select)                 # a template saved before 0.1.50 names some columns by their old names
+        self.select = select or None
         self.via_parquet = fmt in ("csv", "csv.zip") or self.select is not None
         self.keep_parquet = keep_parquet
         self.left_out: list[str] = []

@@ -50,78 +50,94 @@ so they can be uploaded to the CET as they are.
 | Field | Type / unit | Column | Description and use |
 |---|---|---|---|
 | `CEInputID` | text, unique | required | The measure's unique, persistent ID. The key of every output row and the join key to a CET outputs file. Blank or duplicate values stop the run. |
-| `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on: `2021`, `2022`, `2024` or `2026` (`2024 ACC` is also accepted). Blank, or a file without the column, means the run's "ACC version" setting. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates (CALCULATIONS C3.5). A supplied ACC file replaces only the run's own version. Reported per measure in `POC_ACC` and `poc_acc_version`. |
-| `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share (C11) and, through the program's `PA` in `ProgramCost.csv`, gives `CreditedIOU`. |
-| `MeasDescription` | text | required (may be left out: read as blank) | A description of the measure. Carried to the output; used only as a label. |
+| `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on. Accepts values such as 2024, 2026, as well as values like "2022 ACC", "2024 ACC". Blank, or a file without the column, means the run's "ACC version" setting is used. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates. A supplied ACC file replaces only the run's own version and is not saved for future use. |
+| `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share and, through the program's PA in `ProgramCost.csv`, gives `CreditedPA`. |
+| `MeasDescription` | text | required (may be left out: read as blank) | Description of measure; should include enough information to allow understanding of what EE measure(s) are being installed. |
 | `MeasureID` | text | carried | The measure's unique ID in the source workpaper. |
-| `MeasCode` | text | carried | The program administrator's own measure code. |
-| `ClaimYearQuarter` | `YYYYQn`, e.g. `2028Q3` | required | The quarter of the claim. Its year and quarter set when savings start and how they are discounted (C2). Must match the pattern or the run stops. |
+| `MeasCode` | text | carried | PA-specific measure code. |
+| `ClaimYearQuarter` | `YYYYQn`, e.g. `2028Q3` | required | The year and quarter when the measure(s) were both installed and paid in e.g. '2023Q1'. Its year and quarter set when savings start and how they are discounted. Must match the pattern or the run stops. |
 
 ### 1.2 Classification (carried, no effect on any result)
 
 | Field | Type | Column | Description |
 |---|---|---|---|
-| `Sector` | text | required (may be left out: read as blank) | Standard ex-ante sector (e.g. `Ind`). Only used to form the label `poc_subset_key`. |
-| `DeliveryType` | text | carried | The method used to deliver the measure to the customer. |
-| `BldgType` | text | carried | Standard ex-ante building type (sub-sector). |
-| `MeasAppType` | text | carried | Measure application type (e.g. `ROB`). |
-| `TechGroup`, `TechType` | text | carried | Standard technology group and type (e.g. `CoolRoof`). |
-| `UseCategory`, `UseSubCategory` | text | carried | Standard end-use category and sub-category. |
-| `WaterUse` | text | carried | Whether the water savings are indoor or outdoor. |
-| `PreDesc`, `StdDesc` | text | carried | Descriptions of the pre-existing and standard (baseline) technologies. |
-| `SourceDesc` | text | carried | The workpaper or DEER ID, with revision. |
-| `Version` | text | carried | The workpaper / DEER version (e.g. `2013 Ex-Ante`). |
-| `NormUnit` | text | carried | The normalizing unit that `NumUnits` counts (e.g. `Lamp`). |
-| `NTG_ID`, `EUL_ID`, `RUL_ID`, `GSIA_ID` | text | carried | References to the ex-ante NTG, EUL, RUL and gross-savings/installation-adjustment tables. The *values* (`NTGR*`, `EUL_Yrs`, ...) are what the tool uses. |
-| `Residential_Flag`, `Upstream_Flag` | 0/1 | carried | Flags for residential sites and upstream claims. |
-| `MiscCostsDesc`, `MiscBensDesc` | text | carried | Descriptions of the miscellaneous costs and benefits. |
-| `Comments` | text | carried | Free-text comments. |
+| `Sector` | text | required (may be left out: read as blank) | Measure-level sector aligned to the program business plan sectors. |
+| `DeliveryType` | text | carried | From DEER. Identifies program implementation strategy/method of delivering a measure to a customer (e.g. direct install). |
+| `BldgType` | text | carried | From DEER. Text codes that identify the building type/use and other parameters specific to that building use. For example, 'Com' = Commercial buildings. |
+| `MeasAppType` | text | carried | From DEER. The measure application identifies the context for the measure's installation. (e.g. accelerated replacement, new construction or behavioral). |
+| `TechGroup` | text | carried | From DEER. All Technology Types in an end use are associated with a high-level Technology Group. For example, in the 'lighting' end use all screw-in lighting technologies, including compact fluorescent lamps (CFLs), light-emitting diodes (LEDs), and incandescent lamps are part of a Technology Group. All hard-wired lighting fixtures are part of a different Technology Group. |
+| `TechType` | text | carried | From DEER. Technology Type is more specific than Technology Group. For example, a Technology Group can be further classified into individual parts. For example, all screw-in lighting technologies, including compact fluorescent lamps (CFLs), light-emitting diodes (LEDs), and incandescent lamps are included in the same Technology Group. |
+| `UseCategory` | text | carried | From DEER. Describes the end use of the measure in broad terms (e.g. HVAC, lighting, motors, refrigeration, process). |
+| `UseSubCategory` | text | carried | From DEER. This is a more specific end use subcategory (e.g. the Lighting `UseCategory` contains Indoor General, Exit Signs, etc.). |
+| `WaterUse` | text | carried | Water Energy Calculator water used to calculate water energy savings. |
+| `PreDesc` | text | carried | Pre-existing measure description. Should include enough information to allow understanding of what the pre-existing measure(s) were. |
+| `StdDesc` | text | carried | Standard practice or code measure description. Should include enough information to allow understanding of what the standard measure(s) are. |
+| `SourceDesc` | text | carried | The measure package ID for deemed measures. |
+| `Version` | text | carried | The version of the work paper or DEER (e.g. 2013 Ex-Ante). |
+| `NormUnit` | text | carried | Type of normalizing units, or basis of `NumUnits` or quantity used by the cost effectiveness calculation (e.g. 'Lamp', 'hp', 'tons', 'facility', etc.). |
+| `NTG_ID` | text | carried | From DEER. The Ex Ante `NTG_ID` associated with the NTG values being claimed. |
+| `EUL_ID` | text | carried | From DEER. Identifier from the EUL table which specifies the estimated useful life of the measure technology. |
+| `RUL_ID` | text | carried | From DEER. For dual baseline measures, specifies a row in the EUL table that identifies the remaining useful life of the existing technology. |
+| `GSIA_ID` | text | carried | Reference to the Ex Ante Gross Savings and Installation Adjustment table. |
+| `Residential_Flag` | 0/1 | carried | The measure was installed in a residential setting. |
+| `Upstream_Flag` | 0/1 | carried | The measure was delivered via an upstream delivery type, i.e. targeted the beginning of the supply chain (e.g. the manufacturer). |
+| `MiscCostsDesc` | text | carried | A description of the miscellaneous costs reported in the `UnitMiscCosts` field. |
+| `MiscBensDesc` | text | carried | A description of the miscellaneous benefits reported in the `UnitMiscBens` field. |
+| `Comments` | text | carried | Text field for clarifying comments. |
 
 ### 1.3 Keys that select prices, profiles and rates
 
 | Field | Type | Column | Description and use |
 |---|---|---|---|
-| `IOU_AC_Territory` | `PGE` `SCE` `SDGE` `SCG` | required | The utility whose avoided costs apply (the avoided-cost territory; formerly `PA`). Selects the ACC utility (C3.1, C3.2), the discount rate (C2.4), the retail rates (C9) and the profile match. Any other value is a blocking error. |
-| `AC_Climate_Zone` | text, e.g. `13`, `3A` | required | The California climate zone. Selects the ACC zone (C3.1) and the profile's zone (C4.1). |
-| `AC_Elec_Impact_Profile` | text | required | The name of the electric end-use load shape. Must equal a supplied or library profile's `end_use_name` (the library includes the TOU end uses as 8,760s) or the measure's electricity is **not priced** (C4.1). |
-| `AC_Elec_Impact_Profile_2nd_Baseline` | text | optional, **not a CET column** | The electric end-use shape of the 2nd-baseline years of an early replacement (`0 < RUL_Yrs < EUL_Yrs`). Blank, or a file without the column, means `AC_Elec_Impact_Profile`. The 1st-baseline years are priced on `AC_Elec_Impact_Profile` and the 2nd-baseline years on this shape (CALCULATIONS C4.6). |
-| `AC_Elec_Impact_Profile_Water` | text | optional, **not a CET column** | The electric end-use shape the measure's water energy (`UnitkWhIOUWater*`) is spread over, for both baselines. Blank, or a file without the column, means `AC_Elec_Impact_Profile`. Matched like `AC_Elec_Impact_Profile` (supplied or library profile, IOU, target sector, climate zone). See CALCULATIONS C4.6. |
-| `AC_Elec_Target_Sector` | text | required | The target sector (e.g. `Residential`, `Non_Res`). Part of the profile match, and selects the retail rate schedule (C9) and the NOx/PM10 factors (C14). |
-| `AC_Gas_Impact_Profile` | text | required | The name of the gas monthly savings profile (e.g. `Annual`, `Winter Only`). A name that matches nothing leaves gas savings **unpriced** (C4.3). A `...FuelSub...` name on a residential measure adds behind-the-meter methane (C3.2). |
-| `AC_Gas_Target_Sector` | `Residential` `Commercial` `Core` | required | The gas customer class. Selects the gas ACC class (C3.2) and the gas rate schedule (C9). Must be one of the three for any measure with gas savings. |
-| `FuelID` | text | optional | A DEER value list that identifies fuel substitution. `AllElec-New`, `FuelSub-ToElec` and `FuelSub-ToGas` mark the measure as fuel substitution (C1.5). |
-| `MeasImpactType` | text | optional | The impact type. A value containing `FuelSub` also marks fuel substitution. |
-| `CombustionType` | text | optional | The gas combustion type (a `LookupCode` of the combustion table, e.g. `Residential Furnaces (<0.3):Uncontrolled`). Gives the gas NOx rate (C14.3); blank or unknown means gas NOx = 0. |
-| `RateScheduleElec`, `RateScheduleGas` | text | carried | CET fields that override a measure's retail rate schedule. **Not used**: the tool always maps the schedule from `IOU_AC_Territory` and the target / gas sector (C9). |
+| `IOU_AC_Territory` | `PGE` `SCE` `SDGE` `SCG` | required | The utility avoided costs being used (PGE, SCE, SCG, SDGE). This field was previously called PA. **In ReCET:** Selects the ACC utility (C3.1, C3.2), the discount rate (C2.4), the retail rates (C9) and the profile match; any other value stops the run. |
+| `AC_Climate_Zone` | text, e.g. `13`, `3A` | required | The geographic area where the installation is completed. The CEC designates micro-climate and ranges from 1 - 16. Use 'System' if a program or measure installation is not specific to an area or city. Required for cost effectiveness calc; Must be compatible with defined values (e.g. '3A'). Previously called E3ClimateZone. |
+| `AC_Elec_Impact_Profile` | text | required | Identifies the measure electric impact profile shape. Required for cost effectiveness calculation for measures with electric savings. Previously called E3MeaElecEndUseShape. **In ReCET:** Must equal a supplied or library profile's `end_use_name` (the library includes the TOU end uses as 8,760s), or the measure's electricity is **not priced** (C4.1). |
+| `AC_Elec_Impact_Profile_2nd_Baseline` | text | optional, **not a CET column** | Identifies the measure electric impact profile shape for the 2nd baseline. Optionally used for cost effectiveness calculation for measures with electric savings. If left blank, `AC_Elec_Impact_Profile` will be used. **In ReCET:** Not a CET column. The 2nd-baseline years of an early replacement (`0 < RUL_Yrs < EUL_Yrs`) are priced on this shape (C4.6). |
+| `AC_Elec_Impact_Profile_Water` | text | optional, **not a CET column** | Identifies the measure electric impact profile shape for the water energy savings. Optionally used for cost effectiveness calculation for measures with electric savings. If left blank, `AC_Elec_Impact_Profile` will be used. **In ReCET:** Not a CET column. The water energy (`UnitkWhIOUWater*`) is spread over this shape for both baselines, matched like `AC_Elec_Impact_Profile` (C4.6). |
+| `AC_Elec_Target_Sector` | text | required | Identifies the electric sector being targeted by the measure intervention. Required for cost effectiveness calculation for measures with electric savings. Previously called E3TargetSector. **In ReCET:** Part of the profile match; selects the retail rate schedule (C9) and the NOx/PM10 factors (C14). |
+| `AC_Gas_Impact_Profile` | text | required | Used to profile typical period of use for gas appliances/measures. Required for cost effectiveness calculation for measures with gas savings (e.g. 'Summer Only', 'Winter Only', 'Annual'). Previously called E3GasSavProfile. **In ReCET:** A name that matches nothing leaves gas savings **unpriced** (C4.3); a `...FuelSub...` name on a residential measure adds behind-the-meter methane (C3.2). |
+| `AC_Gas_Target_Sector` | `Residential` `Commercial` `Core` | required | Used to determine how gas is purchased by the customer (e.g. 'Residential', 'Commercial', 'Core'). Required for cost effectiveness calculation for measures with gas savings. Previously called E3GasSector. **In ReCET:** Selects the gas ACC class (C3.2) and the gas rate schedule (C9); must be one of the three for any measure with gas savings. |
+| `FuelID` | text | optional | This field references a CEDARS value list used to identify fuel substitution for Deemed measures. FuelID distinguishes exempt and non-exempt Deemed measure packages under the Viable Electric Alternative (VEA) framework established in D.23-04-035. **In ReCET:** `AllElec-New`, `FuelSub-ToElec` and `FuelSub-ToGas` mark the measure as fuel substitution (`Fuel_Sub_Flag`, C1.5). |
+| `MeasImpactType` | text | optional | From DEER. Describes how the savings impact was determined (e.g. Deemed-DEER, Deemed-Workpaper, Site-specific calculation, etc.). **In ReCET:** A value containing `FuelSub` also marks fuel substitution (C1.5). |
+| `CombustionType` | text | optional | Field that determines the rate of emission savings per MMBTU of reduced natural gas usage from gas conservation. Res Furnace is used as a default if there is no user selection. If not applicable or unknown, then leave the field blank. **In ReCET:** A `LookupCode` of the combustion table (e.g. `Residential Furnaces (<0.3):Uncontrolled`) gives the gas NOx rate (C14.3). There is no default: blank or unknown means gas NOx = 0. |
+| `RateScheduleElec` | text | carried | Field to specify measure-level electric rate schedule, overrides default. Used to differentiate between customer types and system average rates. **In ReCET:** **Not used**: the schedule follows `IOU_AC_Territory` and `AC_Elec_Target_Sector` (C9). |
+| `RateScheduleGas` | text | carried | Field to specify measure-level gas rate schedule, overrides default. Used to differentiate between customer types and system average rates. **In ReCET:** **Not used**: the schedule follows `IOU_AC_Territory` and `AC_Gas_Target_Sector` (C9). |
 
 ### 1.4 Quantities
 
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
-| `NumUnits` | number, units of `NormUnit` | required | error | The number of units claimed. Multiplies every per-unit quantity and cost (`Q`). |
-| `UnitkWh1stBaseline` | kWh per unit per year | required | error (enter 0 for none) | Electric energy savings per unit against the 1st baseline; negative = added load. Priced in C5.1 (`kWh1`). |
-| `UnitkWh2ndBaseline` | kWh per unit per year | required | 0 (error when `RUL_Yrs > 0`) | The same against the 2nd baseline; used only after the RUL of an early-replacement measure (`kWh2`). |
-| `UnitkW1stBaseline`, `UnitkW2ndBaseline` | kW per unit | required | 0 | Demand savings. Reported in `poc_annual_net_kw*` only: pricing is on kWh through the 8,760 shape, which carries the T&D value. |
-| `UnitTherm1stBaseline`, `UnitTherm2ndBaseline` | therms per unit per year | required | 0 | Gas savings against the 1st / 2nd baseline; negative = added gas use (`Th1`, `Th2`; C5.4). |
-| `UnitkWhIOUWater1stBaseline`, `UnitkWhIOUWater2ndBaseline` | kWh per unit per year | optional | 0 | The IOU-supplied energy embedded in the water a measure saves (positive) or uses (negative) (`Wt1`, `Wt2`; C5.5). If both columns are missing, water energy is 0. |
+| `NumUnits` | Decimal number (units of `NormUnit`) | required | error | Number of units or quantity. `NumUnits` must work in conjunction with the `NormUnit` value for the claim. Cross reference `NormUnit` and `NumUnits` before interpreting quantities of measures installed. |
+| `UnitkWh1stBaseline` | kWh (per unit per year) | required | error (enter 0 for none) | The first baseline kWh Impact per Unit. |
+| `UnitkWh2ndBaseline` | kWh (per unit per year) | required | 0 (error when `RUL_Yrs > 0`) | The second baseline kWh Impact per Unit. Only used for accelerated replacement situations. |
+| `UnitkW1stBaseline` | kW (per unit) | required | 0 | The first baseline kW Impact per Unit. **In ReCET:** Reported in the kW savings columns (`FirstYearNetKW` ...) only: pricing is on kWh through the 8,760 shape, which carries the T&D value. |
+| `UnitkW2ndBaseline` | kW (per unit) | required | 0 | The second baseline kW Impact per Unit. Only used for accelerated replacement situations. **In ReCET:** Reported in the kW savings columns only, as `UnitkW1stBaseline`. |
+| `UnitTherm1stBaseline` | Therms (per unit per year) | required | 0 | The first baseline therm Impact per Unit. |
+| `UnitTherm2ndBaseline` | Therms (per unit per year) | required | 0 | The second baseline therm Impact per Unit. Only used for accelerated replacement situations. |
+| `UnitkWhIOUWater1stBaseline` | kWh (per unit per year) | optional | 0 | The first baseline kWh impact per unit due to water savings. |
+| `UnitkWhIOUWater2ndBaseline` | kWh (per unit per year) | optional | 0 | The second baseline kWh impact per unit due to water savings. Only used for accelerated replacement situations. |
 
 ### 1.5 Useful life
 
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
-| `EUL_Yrs` | years (fractional allowed) | required | error | The effective useful life. Savings run from the claim quarter for `EUL` years, in whole quarters with the last one prorated (C2.1). A value below 0.25 is treated as 0.25. |
-| `RUL_Yrs` | years | required | 0 | The remaining useful life of the pre-existing equipment. 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
+| `EUL_Yrs` | Years (fractional allowed) | required | error | Effective useful life of measure in years. **In ReCET:** Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); a value below 0.25 is treated as 0.25. |
+| `RUL_Yrs` | Years | required | 0 | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
 
 ### 1.6 Net-to-gross, realization and installation rates
 
 | Field | Type | Column | Blank means | Description and use |
 |---|---|---|---|---|
-| `NTGRkWh` | fraction | required | error | The kWh net-to-gross ratio. Scales electric, water and other benefits and the electric emissions (C1.2, C7). |
-| `NTGRkW` | fraction | required | `NTGRkWh` | The kW net-to-gross ratio; reported in `poc_annual_net_kw*` only. |
-| `NTGRTherm` | fraction | required | `NTGRkWh`, then 1 | The therm net-to-gross ratio (C1.3). |
-| `NTGRCost` | fraction | required | `NTGRkWh`, then 1 | The cost net-to-gross ratio; scales the participant cost (C8). |
-| `RealizationRatekWh`, `RealizationRatekW`, `RealizationRateTherm` | fraction | required | 1 | The weighted realization rate for the claim. Multiplies the savings of that fuel (C1.2, C1.3). |
-| `InstallationRatekWh`, `InstallationRatekW`, `InstallationRateTherm` | fraction | required | 1 | The weighted installation rate for the claim. Multiplies the savings of that fuel. |
+| `NTGRkWh` | Decimal number | required | error | kWh-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
+| `NTGRkW` | Decimal number | required | `NTGRkWh` | kW-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. **In ReCET:** Used only in the kW savings columns. |
+| `NTGRTherm` | Decimal number | required | `NTGRkWh`, then 1 | Therm-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
+| `NTGRCost` | Decimal number | required | `NTGRkWh`, then 1 | Cost-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
+| `RealizationRatekWh` | Decimal number | required | 1 | Ex ante adjustment factor: kWh weighted Realization rate for all measures included in this claim record. |
+| `RealizationRatekW` | Decimal number | required | 1 | Ex ante adjustment factor: kW weighted Realization rate for all measures included in this claim record. |
+| `RealizationRateTherm` | Decimal number | required | 1 | Ex ante adjustment factor: Therm weighted Realization rate for all measures included in this claim record. |
+| `InstallationRatekWh` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kWh weighted installation rate for all measures included in the associated claim. |
+| `InstallationRatekW` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kW weighted installation rate for all measures included in the associated claim. |
+| `InstallationRateTherm` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. Therm weighted installation rate for all measures included in the associated claim. |
 
 ### 1.7 Costs, incentives and inflation
 
@@ -129,13 +145,13 @@ All are dollars **per unit** (multiplied by `NumUnits`), blank = 0.
 
 | Field | Unit | Column | Description and use |
 |---|---|---|---|
-| `UnitMeaCost1stBaseline` | $ per unit | required | The incremental measure cost over code / standard practice for a single-baseline measure (the desktop CET's "Gross Measure Cost"). Also used for the excess-incentive test (C8). |
-| `UnitMeaCost2ndBaseline` | $ per unit | required | For an early-replacement measure (`RUL > 0`) the measure cost that counts in the cost tests (the desktop CET's "Gross Measure Cost_ER"); ignored when `RUL = 0` (C8). |
-| `UnitDirectInstallLab` | $ per unit | required | Direct-install labor paid by the program. Counted as an incentive (C8). |
-| `UnitDirectInstallMat` | $ per unit | required | Direct-install materials paid by the program. Counted as an incentive. |
-| `UnitIncentiveToOthers` | $ per unit | required | Incentives paid to parties other than the end user. Counted as an incentive. |
-| `UnitEndUserRebate` | $ per unit | required | Rebates paid to the end user. Counted in `RebatesandIncentsPV` and `GrossParticipantCostPV`, but not in the excess-incentive test. |
-| `MeasInflation` | fraction per year, e.g. 0.02 | required | A measure-level inflation rate for the measure cost. Used only for early-replacement measures (`RUL > 0`), in `GrossMeasCostPV` (C8). |
+| `UnitMeaCost1stBaseline` | Dollars (per unit) | required | This field is the installed measure cost. Incremental Measure Cost or Full Measure Cost for the first baseline period, as appropriate for the `MeasAppType` and `DeliveryType`. Incremental measure cost over Code/Std for single baseline measures. Full measure cost for accelerated replacement situations. **In ReCET:** Also used for the excess-incentive test (C8). |
+| `UnitMeaCost2ndBaseline` | Dollars (per unit) | required | This field is the incremental measure cost over Code/Std for accelerated replacement situations, and is zero in other situations. **In ReCET:** The measure cost the cost tests count for an early replacement (`RUL_Yrs > 0`); ignored when `RUL_Yrs = 0` (C8). |
+| `UnitDirectInstallLab` | Dollars (per unit) | required | This field is the actual cost in dollars of installation labor. Enter the unit incentive for labor. Cost effectiveness calculator uses this field; and overrides ExAnte values for deemed claims, and is one of two incentive fields for Direct Install. Only use if a direct install. |
+| `UnitDirectInstallMat` | Dollars (per unit) | required | This field is the actual cost in dollars of installation materials. Enter the unit incentive for materials. Cost effectiveness calculator uses this field; and overrides ExAnte values for deemed claims, and is one of two incentive fields for Direct Install. Only use if direct install. |
+| `UnitIncentiveToOthers` | Dollars (per unit) | required | This field is the actual cost in dollars of incentives to others besides the end user. Enter the incentive for others for each unit of measure. Cost effectiveness calculator uses this field; and overrides ExAnte values for deemed claims. Only use if midstream or upstream delivery type. Input should always be '0' for custom measures. |
+| `UnitEndUserRebate` | Dollars (per unit) | required | This field is the actual cost of rebates to the end user in dollars. Enter rebate to the customer for each unit of the measure. Cost effectiveness calculator uses this field, and overrides ExAnte values for deemed claims. Only use if downstream delivery type. |
+| `MeasInflation` | Decimal number (per year, e.g. 0.02) | required | CET field to specify measure-level inflation rate, overrides CET default. **In ReCET:** Used only for early-replacement measures (`RUL_Yrs > 0`), in `GrossMeasCostPV` (C8); blank = 0. |
 
 ### 1.8 Other benefits, other costs, tax credits
 
@@ -143,12 +159,12 @@ Dollars per unit, undiscounted, blank = 0 (C7).
 
 | Field | Unit | Column | Description and use |
 |---|---|---|---|
-| `UnitGasInfraBens` | $ per unit | required | Benefits from offsetting gas infrastructure costs. In `OtherBen`. |
-| `UnitRefrigBens` | $ per unit | required | Benefits of decreased refrigerant use or a lower-GWP refrigerant. In `OtherBen`. |
-| `UnitMiscBens` | $ per unit | required | Other benefits. In `OtherBen`. |
-| `UnitRefrigCosts` | $ per unit | required | Costs of increased refrigerant use or a higher-GWP refrigerant. In `OtherCost`. |
-| `UnitMiscCosts` | $ per unit | required | Other costs. In `OtherCost`. |
-| `UnitTaxCredits` | $ per unit | required | Federal (IRA) tax incentives. Summed into the TRC ratio's numerator with the other benefits (`TaxCredits`); not part of any cost or of `TotalSystemBenefit`. |
+| `UnitGasInfraBens` | Dollars (per unit) | required | The unit benefits due to gas infrastructure savings. |
+| `UnitRefrigBens` | Dollars (per unit) | required | The unit benefits due to refrigeration savings. |
+| `UnitMiscBens` | Dollars (per unit) | required | The unit benefits not captured in other benefit fields. |
+| `UnitRefrigCosts` | Dollars (per unit) | required | The unit cost in dollars for refrigeration. |
+| `UnitMiscCosts` | Dollars (per unit) | required | The unit cost in dollars that is not captured in other cost fields. |
+| `UnitTaxCredits` | Dollars (per unit) | required | Inflation Reduction Act tax incentives for energy, per unit. The CET sums `UnitTaxCredits` with other benefits in the TRC calculation where IRA-eligible measures apply. **In ReCET:** Summed into the TRC ratio's numerator (`TaxCredits`); not part of any cost or of `TotalSystemBenefit`. |
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -159,21 +175,21 @@ blank = 0.
 
 | Field | Type / unit | Description and use |
 |---|---|---|
-| `PrgID` | text | Program identifier; links to the measures. |
-| `PA` | `PGE` `SCE` `SDGE` `SCG` (or `SW`) | The program administrator; selects the discount rate for this row's costs. A `SW` (statewide) row is treated as `SCE` unless statewide allocation is on (which sets it to each IOU). |
-| `PrgYear` | year | The year of `ClaimYearQuarter`. Carried. |
-| `ClaimYearQuarter` | `YYYYQn` | Its year is the year the cost is incurred and discounted from (C11.1). |
-| `AdminCostsOverheadAndGA` | $ | Administration, overhead and general administration. |
-| `AdminCostsOther` | $ | Other administration costs. |
-| `MarketingOutreach` | $ | Marketing and outreach. |
-| `DIActivity` | $ | Direct-implementation activity costs. |
-| `DIInstallation` | $ | Direct-implementation installation costs. |
-| `DIHardwareAndMaterials` | $ | Direct-implementation hardware and materials. |
-| `DIRebateAndInspection` | $ | Direct-implementation rebate and inspection costs. |
-| `EMV` | $ | Evaluation, measurement and verification. |
-| `UserInputIncentive` | $ | Program-level incentive rebates. |
-| `CostsRecoveredFromOtherSources` | $ | Costs recovered from other sources (enter as a negative to reduce the total, as CET does). |
-| `OnBillFinancing` | $ | On-bill financing. **Not** included in the cost sum (CET's `SumCosts` omits it). |
+| `PrgID` | text | The unique and persistent program identifier. The ProgramCost primary key is `PrgID` and `PrgYear` in combination. |
+| `PA` | `PGE` `SCE` `SDGE` `SCG` (or `SW`) | The program administrator; A SW (statewide) row is treated as SCE unless statewide allocation is on (which sets it to each IOU). **In ReCET:** Selects the discount rate for this row's costs. |
+| `PrgYear` | year | The claim year. The ProgramCost primary key is `PrgID` and `PrgYear` in combination, must match the year in `ClaimYearQuarter`. |
+| `ClaimYearQuarter` | `YYYYQn` | The year and claim quarter, e.g. '2023Q1'. **In ReCET:** Its year is the year the cost is incurred and discounted from (C11.1). |
+| `AdminCostsOverheadAndGA` | Dollars | Program-level general administration costs and overhead. |
+| `AdminCostsOther` | Dollars | Program-level other administration costs (not general administration or overhead). |
+| `MarketingOutreach` | Dollars | Program-level marketing outreach costs. |
+| `DIActivity` | Dollars | Direct-implementation activity costs. |
+| `DIInstallation` | Dollars | Direct-implementation installation costs. |
+| `DIHardwareAndMaterials` | Dollars | Direct implementation hardware and materials costs. |
+| `DIRebateAndInspection` | Dollars | Direct-implementation rebate and inspection costs. |
+| `EMV` | Dollars | Program-level evaluation, measurement, and verification costs. |
+| `UserInputIncentive` | Dollars | Program-level incentives and rebates. |
+| `CostsRecoveredFromOtherSources` | Dollars | This field captures program-level energy efficiency (EE) activity costs that are recovered from ratepayers outside of the EE Public Purpose Program (PPP) budget, such as those covered by the General Rate Case (GRC). These costs are included to ensure accurate cost-effectiveness calculations but should not be confused with Integrated Demand-Side Management (IDSM) fields. **In ReCET:** Enter it as a negative to reduce the total, as CET does. |
+| `OnBillFinancing` | Dollars | Program-level on-bill financing. **In ReCET:** **Not** included in the cost sum (CET's `SumCosts` omits it). |
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -209,14 +225,14 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `base_year` | First Year | `--base-year` | earliest claim year | CET's First Year: the reference point of all discounting (C2.5). |
 | `output_template` | Output template | `--output-template` | every column | The measure-level file's columns, in order (BRD BR-06.10): a built-in template (*Key results*, *Participant costs*), one you saved, or a file (one column per line, or JSON `{"name": ..., "columns": [...]}`). Only the measure-level file is shaped: the Results tables, the summary and the key metrics still use every column. A column the run does not produce (an SCT column with the societal tests off) is left out, with a note. Names are those of OUTPUT_FIELDS.md section 1 and the input columns. |
 | `output_template_name` | (the template's name) | (from `--output-template`) | blank | The template's name, for the record in `run_settings.json`. |
-| `acc_purpose` | Priced for | `--priced-for` | any filing | What the run is priced for, for the ACC check (BRD BR-06.5; OUTPUT_FIELDS 1.18): blank = any filing (a record is flagged when no filing covering its program year uses its ACC), `claims` (the ACC of the program year's final budget filing), or one budget filing by key, e.g. `2028-2035-application`, `true-up-advice-letter-september-2027` (`recet run --help` lists them). Flagged records are still priced. |
+| `acc_purpose` | Priced for | `--priced-for` | any filing | What the run is priced for, for the ACC check (BRD BR-06.5; OUTPUT_FIELDS 2.9b): blank = any filing (a record is flagged when no filing covering its program year uses its ACC), `claims` (the ACC of the program year's final budget filing), or one budget filing by key, e.g. `2028-2035-application`, `true-up-advice-letter-september-2027` (`recet run --help` lists them). Flagged records are still priced. |
 | `cet_outputs` | Compare with a CET outputs file | `--cet-outputs` | none | Path to a CET `*_outputs.csv` to compare against (section 7). |
 | `compare_with` | Also run another ACC version | `--compare-with` | none | A second built-in ACC version to run and compare measure by measure. |
 | `output_format` | Output format | `--format` | `csv` | `csv`, `csv.zip`, `xlsx` or `parquet` for every table written. `csv.zip` writes each CSV inside its own zip (`<table>.csv.zip` holding `<table>.csv`), about a fifth of the size: a 1,000,000-measure measure-level table is 3.5 GB as CSV and 0.74 GB zipped; the web app always uses it when CSV is chosen. CSV is formatted by pyarrow (about 8x faster than pandas) and, for the measure-level table, written from a parquet copy kept in the run's `_results` folder for the Results tables. Values are the same as pandas would write; the text can differ (`0` for `0.0`, `0.0000704` for `7.04e-05`, text values quoted). Zips are compressed with ISA-L when the optional `isal` package is installed (`pip install ".[fast]"`; part of the web app's install), else zlib. `xlsx` writes one formatted Excel file per table, for a job of up to `excel_max_rows` measures; a larger job writes every table as `excel_fallback` (zipped CSV) instead, so its files are all one format, and the run log says so. |
 | `excel_max_rows` | (none) | `--excel-max-rows` | 50,000 | The most measures (after statewide allocation) a job may have for Excel output (Excel itself holds 1,048,575 rows). Writing runs at about 400 rows a second for the 344-column measure-level table, so 50,000 rows take about 2 minutes and make about a 100 MB workbook; a million would take 40 minutes. A larger Excel job writes every table as `excel_fallback`. |
 | `excel_fallback` | (none) | `--excel-fallback` | `csv.zip` | The format of every table of an Excel job over `excel_max_rows`: `csv.zip`, `csv` or `parquet`. |
 | `preflight_only` | Preflight check only | `--preflight-only` / `preflight` | false | Check the inputs and stop before pricing. |
-| `filing_validation` | CEDARS filing checks | `--filing-validation` | none | `claims` or `budget_filing`: also apply CEDARS' upload checks for that filing and flag the records it would reject or warn on (OUTPUT_FIELDS 1.17, 2.10). They are still priced. |
+| `filing_validation` | CEDARS filing checks | `--filing-validation` | none | `claims` or `budget_filing`: also apply CEDARS' upload checks for that filing and flag the records it would reject or warn on (OUTPUT_FIELDS 2.10). They are still priced. |
 | `filing_year` | Filing year | `--filing-year` | each record's claim year | The filing's year, for the rules that name it (budget filing: `CEInputID` starts with `<PA>-<year>`; `PrgYear` equals it). Blank: each record's claim year, and for `ProgramCost` the job's earliest claim year. |
 | `parquet_row_group` | (none) | `--parquet-row-group` | 200,000 | Rows per row group when a job run in parts writes parquet. Bigger groups compress much better (a 1,000,000-measure measure-level table is 666 MB in 20,000-row groups, 302 MB in 100,000 and 253 MB in 200,000) but each is held in memory while it is written: about 0.4 GB per 100,000 rows, so 200,000 adds about 0.7 GB to the run's peak. Use 50,000-100,000 on a 2 GB server. |
 | `chunk_size` | (none) | `--chunk-size` | 20,000 | A job whose `Measure.csv` has more rows than this is run in parts of this many rows, so the run holds about one part at a time (0.96 GB peak at 1,000,000 records, against 17.8 GB as one piece; larger parts are a little faster and use more memory: 2.3 GB at 50,000; README Performance, USER_GUIDE "What a run does"). The files written are the same as a whole-job run's, values equal to rounding. 0 = always run the whole job at once. |
@@ -383,5 +399,5 @@ ReCET's names drop the `E3` prefix of the CET tables they copy; the CET name is 
 ## 7. CET outputs file (for comparison)
 
 Optional. A CET run's `*_outputs.csv` (pipe or comma delimited) with a `CET_ID` column; measures are matched to the POC's `CEInputID`. Columns compared when present: `TotalSystemBenefit`, `ElecBen`, `GasBen`, `WaterEnergyBen` (+ `_SB`, `_SH`,
-`Gross`), `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCRatio`, `PACRatio`, `RIMRatio`, `NetElecCO2`, `NetGasCO2`, `BillReducElec`, `BillReducGas`. The comparison is only
+`Gross`), `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCRatio`, `PACRatio`, `RIMRatio`, and CET's `NetElecCO2`, `NetGasCO2`, `BillReducElec`, `BillReducGas` (compared with ReCET's `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, `LifecycleBillReducElec`, `LifecycleBillReducGas`). The comparison is only
 meaningful when the job is run the way the CET run was (same First Year, ACC version, and statewide allocation).
