@@ -7,6 +7,8 @@ Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, wi
   H-factor profile exists, for every measure with gas savings whether its monthly profile exists,
 * the ACC horizon: claim years before the first ACC year or measure lives that run past the last one,
 * PrgID alignment between Measure.csv and ProgramCost.csv, and statewide-program rows,
+* the ACC each record is priced on against the ACCs that normally apply to its program year (BR-06.5; `acc_purpose`: any filing, claims, or one budget
+  filing; versions.expected_accs): a record outside them is a warning, never a stop,
 * optionally (`filing_rules`), CEDARS' own upload checks for a claims or a budget filing (filing_rules.py): the records CEDARS would reject or warn on, each
   listed under the rule's ID, and kept on the report (`PreflightReport.filing`) for the run to flag in the measure-level table. They never stop the run.
 
@@ -80,6 +82,7 @@ class PreflightReport:
     agg: dict = field(default_factory=dict)          # raw values behind some stats, for combining the reports of a file checked in parts (not reported)
     filing: pd.DataFrame | None = None               # with filing_rules: one row per failing record (table, id, FilingValidation, FilingRules)
     filing_rules: dict | None = None                 # with filing_rules: the rule set used (filing_rules.RuleSet.describe)
+    acc_check: dict | None = None                    # the ACC-for-program-year check (BR-06.5): purpose, counts, and one row per (ACC, program year)
 
     def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None, impact=None) -> None:
         self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS],
@@ -108,6 +111,7 @@ class PreflightReport:
     def to_dict(self) -> dict:
         """The report as plain JSON values (the web app's Validate inputs panel reads it from preflight.json)."""
         return {"ok": self.ok, "errors": len(self.errors), "stats": {str(k): str(v) for k, v in self.stats.items()}, "filing_rules": self.filing_rules,
+                "acc_check": self.acc_check,
                 "issues": [{"severity": i.severity, "code": i.code, "message": i.message, "count": int(i.count or 0), "examples": [str(e) for e in i.examples],
                             "cells": [[str(tb), int(r), str(c)] for tb, r, c in i.cells], "impact": dict(i.impact)}
                            for i in self.issues]}
@@ -251,7 +255,7 @@ class _Filing:
 def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = None, *, acc=None, allocate_statewide: bool = False,
                  base_year: int | None = None, apply_exclude_from_ce: bool = False, chunk_size: int | None = None,
                  parts: list | None = None, dtypes: dict | None = None, filing_rules: str | None = None,
-                 filing_year: int | None = None) -> PreflightReport:
+                 filing_year: int | None = None, acc_purpose: str = "") -> PreflightReport:
     """`acc` is a versions.ResolvedAcc (for the horizon and E3-version checks); the runtime must already be configured for it (runtime.apply) so that profile
     and TOU coverage reflect this run's user-supplied profiles.
 
@@ -261,7 +265,9 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     report is the one the whole file gives, except that a part's checks still run when another part has a blocking problem.
 
     `filing_rules` ("claims" or "budget_filing") also applies CEDARS' upload checks for that kind of filing (filing_rules.py); `filing_year` is the filing's
-    year for the rules that name it (default: each record's claim year, and the job's earliest claim year for ProgramCost)."""
+    year for the rules that name it (default: each record's claim year, and the job's earliest claim year for ProgramCost).
+
+    `acc_purpose` says what the run is priced for, for the ACC-for-program-year check (BR-06.5): "" any filing, "claims", or a versions.FILINGS key."""
     from . import filing_rules as fr
     filing = _Filing(fr.rule_set(filing_rules), filing_year) if filing_rules else None
     p = Path(measure_csv)
@@ -270,15 +276,71 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         with tempfile.TemporaryDirectory(prefix="recet_preflight_") as tmp:
             parts = delimited.split_file(p, chunk_size, tmp)
             dtypes = delimited.part_dtypes(parts)[0]
-            rep = _check_parts(p, parts, dtypes, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing)
+            rep = _check_parts(p, parts, dtypes, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing, acc_purpose)
     elif parts is not None and len(parts) > 1:
-        rep = _check_parts(p, parts, dtypes or {}, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing)
+        rep = _check_parts(p, parts, dtypes or {}, programcost_csv, acc, allocate_statewide, base_year, apply_exclude_from_ce, filing, acc_purpose)
     else:
         rep = _check(p, programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
-                     filing=filing)
+                     filing=filing, acc_purpose=acc_purpose)
     if filing is not None:
         _finish_filing(rep, filing)
+    _finish_acc_check(rep, acc_purpose)
     return rep
+
+
+def _expected_text(exp: set[int], year: int, purpose: str) -> str:
+    from . import versions
+    if not exp:
+        f = versions.FILINGS.get(purpose)
+        return f"the {f.filing} covers program years {f.years} only" if f else "no ACC applies"
+    accs = " or ".join(f"the {a} ACC" for a in sorted(exp))
+    return f"program year {year} uses {accs}" if len(exp) == 1 else f"program year {year} can use {accs}"
+
+
+def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpose: str, mrows) -> None:
+    """BR-06.5: each record's ACC (its ACCVersion, else the run's) against the ACCs that normally apply to its program year (its claim year) for
+    `purpose` (versions.expected_accs). A warning per (ACC, program year) that does not apply, naming the records; the counts by (ACC version, program year)
+    go to rep.agg["acc_check"] for _finish_acc_check (a file checked in parts adds its parts' up)."""
+    from . import versions
+    run_key = acc.key if acc is not None else ""
+    named = (measures["acc_version"].astype(str) != "").to_numpy()
+    keys = np.where(named, measures["acc_version"].astype(str).to_numpy(), run_key)
+    years = measures["claim_year"].astype(int).to_numpy()
+    label = versions.acc_purpose_label(purpose)
+    counts = rep.agg.setdefault("acc_check", {})
+    for (key, year), idx in pd.Series(np.arange(len(measures))).groupby([keys, years]).groups.items():
+        idx = np.asarray(idx)
+        acc_year = versions.acc_year_of(key) if key else None
+        exp = versions.expected_accs(int(year), purpose)
+        status = "not checked" if acc_year is None or exp is None else ("ok" if acc_year in exp else "flagged")
+        c = counts.setdefault((str(key), acc_year, int(year)), {"measures": 0, "status": status, "expected": sorted(exp) if exp is not None else None})
+        c["measures"] += len(idx)
+        if status != "flagged":
+            continue
+        own, other = np.zeros(len(measures), dtype=bool), np.zeros(len(measures), dtype=bool)
+        own[idx[named[idx]]] = True                 # the record names its ACC: point at ACCVersion; else at its program year
+        other[idx[~named[idx]]] = True
+        rep.add("warning", "acc_not_for_program_year",
+                f"priced on the {acc_year} ACC, which does not normally apply to program year {year} for {label}: {_expected_text(set(exp), int(year), purpose)}",
+                len(idx), measures["measure_id"].iloc[idx[:5]].tolist(),
+                _cells("Measure", mrows(own), "ACCVersion") + _cells("Measure", mrows(other), "ClaimYearQuarter"))
+
+
+def _finish_acc_check(rep: PreflightReport, purpose: str) -> None:
+    """rep.acc_check and the 'ACC check' statistic, from the counts _check_acc_applies kept."""
+    from . import versions
+    counts = rep.agg.pop("acc_check", None)
+    if counts is None:
+        return
+    rows = [{"acc_version": k, "acc": a, "program_year": y, "measures": c["measures"], "status": c["status"], "expected_accs": c["expected"]}
+            for (k, a, y), c in sorted(counts.items(), key=lambda kv: (kv[0][2], kv[0][0]))]
+    n = sum(r["measures"] for r in rows)
+    flagged = sum(r["measures"] for r in rows if r["status"] == "flagged")
+    unchecked = sum(r["measures"] for r in rows if r["status"] == "not checked")
+    label = versions.acc_purpose_label(purpose)
+    rep.acc_check = {"purpose": purpose, "label": label, "measures": n, "flagged": flagged, "not_checked": unchecked, "by_acc_and_year": rows}
+    rep.stats["ACC check"] = (f"{label}: {flagged:,} of {n:,} measures priced on an ACC that does not normally apply to their program year"
+                              + (f" ({unchecked:,} not checked: the ACC or the program year is not in the table)" if unchecked else ""))
 
 
 def _filing_check(rep: PreflightReport, table: str, df: pd.DataFrame, ids: pd.Series, filing: _Filing, year: int | None) -> None:
@@ -320,7 +382,7 @@ def _finish_filing(rep: PreflightReport, filing: _Filing) -> None:
 
 
 def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, allocate_statewide: bool, base_year: int | None,
-                 apply_exclude_from_ce: bool, filing: _Filing | None = None) -> PreflightReport:
+                 apply_exclude_from_ce: bool, filing: _Filing | None = None, acc_purpose: str = "") -> PreflightReport:
     """check_inputs for a file split into `parts` ((file, first row, rows) each): each part is checked on its own, its Measure row numbers shifted to the whole
     file's, and the reports combined; duplicate CEInputIDs and the ProgramCost alignment are checked on the whole file."""
     from .pipeline import cost_tests
@@ -346,7 +408,7 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
     for k, (f, start, _n) in enumerate(parts):
         progress.report("preflight", k, len(parts))
         r = _check(Path(f), programcost_csv, acc=acc, allocate_statewide=allocate_statewide, base_year=base_year, apply_exclude_from_ce=apply_exclude_from_ce,
-                   part=_Part(dtypes, None if program is None else set(program["PrgID"])), filing=filing)
+                   part=_Part(dtypes, None if program is None else set(program["PrgID"])), filing=filing, acc_purpose=acc_purpose)
         for i in r.issues:
             i.cells = [(t, row + start if t == "Measure" else row, c) for t, row, c in i.cells]
         r.agg["no_cost_cells"] = [(t, row + start, c) for t, row, c in r.agg.get("no_cost_cells", [])]
@@ -366,6 +428,10 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
                     m.impact[q] = m.impact.get(q, 0.0) + v
     rep.issues += list(merged.values())
     rep.stats.update(_merge_stats(reports, base_year))
+    for r in reports:                               # the ACC check's counts, added up over the parts (_finish_acc_check)
+        for k, c in r.agg.get("acc_check", {}).items():
+            m = rep.agg.setdefault("acc_check", {}).setdefault(k, {**c, "measures": 0})
+            m["measures"] += c["measures"]
     if filing is not None:
         rep.agg["filing"] = [f for r in reports for f in r.agg.get("filing", [])]
         years = [int(str(r.stats["claim years"]).split("-")[0]) for r in reports if "claim years" in r.stats]
@@ -431,7 +497,7 @@ def _merge_stats(reports: list[PreflightReport], base_year: int | None) -> dict:
 
 
 def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = False, base_year: int | None = None, apply_exclude_from_ce: bool = False,
-           part: _Part | None = None, filing: _Filing | None = None) -> PreflightReport:
+           part: _Part | None = None, filing: _Filing | None = None, acc_purpose: str = "") -> PreflightReport:
     """The check of one file. `part` = it is one part of a larger file (see _Part): the checks across the whole file are left to _check_parts."""
     rep = PreflightReport()
     p = Path(p)
@@ -550,6 +616,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
                 rep.add("error", "acc_version_file_missing", f"the {versions.BUILTIN[k].label} electric file is not in the reference data folder, so the measures "
                         f"that name it cannot be priced", len(rows), [k], _cells("Measure", rows, "ACCVersion"))
     rep.stats["First Year (base year) that will be used"] = base_year or int(measures["claim_year"].min())
+    _check_acc_applies(rep, measures, acc, acc_purpose, mrows)
     if part is not None:
         prg = measures["prg_id"].astype(str).str.strip()
         rep.agg["measure_prg_ids"] = set(prg)

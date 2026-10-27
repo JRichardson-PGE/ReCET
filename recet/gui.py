@@ -90,6 +90,8 @@ def _check_file(name: str, path: str) -> tuple[bool, str]:
 
 # the CEDARS filing checks choice (filing_rules.py): window label -> RunConfig.filing_validation
 FILING_CHOICES = {"none": "", "Quarterly Claims": "claims", "Budget filing": "budget_filing"}
+# what the run is priced for (BR-06.5, versions.acc_purposes): (RunConfig.acc_purpose, window label)
+PURPOSE_CHOICES = versions.acc_purposes()
 
 
 class App:
@@ -288,6 +290,9 @@ class App:
         ttk.Label(f, text="(or type a new label and supply its files below)", style="Hint.TLabel").grid(row=0, column=2, sticky="w", padx=8)
         ttk.Label(f, text="First Year (blank = earliest claim year)").grid(row=1, column=0, sticky="w", padx=(12, 8), pady=4)
         ttk.Entry(f, textvariable=self._var("base_year"), width=8).grid(row=1, column=1, sticky="w", pady=4)
+        ttk.Label(f, text="Priced for").grid(row=2, column=0, sticky="w", padx=(12, 8), pady=4)
+        ttk.Combobox(f, textvariable=self._var("acc_purpose", tk.StringVar, PURPOSE_CHOICES[0][1]), values=[t for _k, t in PURPOSE_CHOICES], width=60,
+                     state="readonly").grid(row=2, column=1, columnspan=2, sticky="w", pady=4)
 
         # --- Edit inputs tab
         self.editor = gui_editor.EditorTab(self, tabs["edit"])
@@ -408,7 +413,8 @@ class App:
             apply_exclude_from_ce=bool(g("apply_exclude_from_ce")), base_year=int_or_none(g("base_year")),
             cet_outputs=blank(g("cet_outputs")) if g("compare_cet") else None,
             compare_with=(blank(g("compare_with")) if g("compare") else None), output_format=str(g("output_format")) or "csv", preflight_only=bool(g("preflight_only")),
-            filing_validation=FILING_CHOICES.get(str(g("filing_validation")), ""), filing_year=int_or_none(g("filing_year")))
+            filing_validation=FILING_CHOICES.get(str(g("filing_validation")), ""), filing_year=int_or_none(g("filing_year")),
+            acc_purpose={t: k for k, t in PURPOSE_CHOICES}.get(str(g("acc_purpose")), ""))
 
     def apply_config(self, c: RunConfig) -> None:
         """Fill the window from a RunConfig. The input type follows what the config names (a workbook only -> Excel, a Measure.csv -> CET files); the boxes of
@@ -433,6 +439,7 @@ class App:
         s("compare", bool(c.compare_with)), s("compare_with", c.compare_with or ("2026" if c.acc_version == "2024" else "2024"))
         s("compare_cet", bool(c.cet_outputs)), s("cet_outputs", c.cet_outputs), s("output_format", c.output_format), s("preflight_only", c.preflight_only)
         s("filing_validation", {v: k for k, v in FILING_CHOICES.items()}.get(c.filing_validation or "", "none")), s("filing_year", c.filing_year)
+        s("acc_purpose", dict(PURPOSE_CHOICES).get(c.acc_purpose or "", PURPOSE_CHOICES[0][1]))
 
     # ------------------------------------------------------------------------------------------------------------------ input type
     def _set_input_mode(self, mode: str) -> None:

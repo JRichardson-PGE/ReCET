@@ -71,6 +71,8 @@
     <label>Compare with
       <select name="compare_with" id="compare-with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
+    <label>Priced for
+      <select name="acc_purpose" title="Records priced on an ACC that does not normally apply to their program year are flagged, not stopped">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
   </div>
