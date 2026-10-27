@@ -694,7 +694,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             source_run = from_run
         kw.setdefault("form", {})
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
-                          filing_acc=versions.BUDGET_FILING_ACC, claims_acc=versions.claims_acc(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
+                          acc_map=versions.acc_summary(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
                           source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
 

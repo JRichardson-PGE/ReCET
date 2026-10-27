@@ -25,7 +25,8 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
   has a "Which ACC applies to my filing?" table instead: `versions.BUDGET_FILING_ACC` (filing, program years, ACC, basis; CET's resolution table through
   2027, then Jake's 2026-10-26 schedule, the last two rows inferred) and `versions.claims_acc()` (claims = the ACC of the year's final budget filing, one per
-  program year, through CLAIMS_LAST_YEAR 2035). That table is also the source for TIER2_PLAN step 2's BR-06.5 flag. The desktop window and the outputs'
+  program year, through CLAIMS_LAST_YEAR 2035). The page shows it compactly (Jake: the two full tables were too big): `versions.acc_summary()`, one row per
+  ACC 2021-2028 with its filings' short names and its claim years, "*" = still to come. That table is also the source for TIER2_PLAN step 2's BR-06.5 flag. The desktop window and the outputs'
   POC_ACC label still show both names (`versions.acc_label`, "2024 ACC (Avoided Cost Version 2026)", BR-11.7 as of 2026-10-22); the 2026 ACC is Avoided
   Cost Version 2028 although CET's draft tables number it 2027 (`AVOIDED_COST_VERSION`; tables are still read through `versions.CET_VERSION_TO_ACC`).
   Inside the packaged CET exports CET's numbers are mapped on read.
