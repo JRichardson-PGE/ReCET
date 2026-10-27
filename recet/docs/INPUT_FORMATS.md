@@ -209,9 +209,9 @@ give the same results. A file chosen separately (for example a run-parameters CS
 
 One folder `<out>/<run name>_acc<version>/`:
 
-* `measure_level_acc<version>.csv` - one row per measure: the input columns, the derived `poc_*` fields, `ElecPricingStatus` / `ProfileSource` / `GasPricingStatus` /
+* `measure_level_acc<version>.csv` - one row per measure: the input columns, the derived pricing inputs (`Used_Year`, `AC_kWh_1st_Baseline` ...), `ElecPricingStatus` / `ProfileSource` / `GasPricingStatus` /
   `GasProfileSource`, then every output (benefits, supply costs, participant and bill-impact PVs, Gross / NoAdmin variants, TRC / PAC / RIM / SCB / SCH costs and ratios,
-  program-cost weighting, CO2 / NOx / PM10), `ElecValue_*` / `GasValue_*` in components mode, `CreditedIOU` (the `PA` of the measure's program in `ProgramCost.csv`; with statewide
+  program-cost weighting, CO2 / NOx / PM10), `ElecValue_*` / `GasValue_*` in components mode, `CreditedPA` (the `PA` of the measure's program in `ProgramCost.csv`; with statewide
   allocation, the IOU each statewide share went to), and the program metadata (`Prg_MatchedOn`, `Prg_<column>`).
 * `portfolio_summary_*.csv`, `preflight.txt`, `run_settings.json` (everything needed to reproduce the run).
 * Optional: `components_summary_*.csv`, `portfolio_8760_*.csv` (+ `_unshaped`), `cet_comparison_*.csv`, and for a two-version run `comparison_acc<A>_vs_acc<B>.csv`.

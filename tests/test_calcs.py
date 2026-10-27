@@ -194,20 +194,20 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         ft = (d["ntg_therm"] + meb) / d["ntg_therm"] if (meb and d["ntg_therm"] > 0) else 1.0
         pv_e = ref.bill_pv(d, fe * d["shape_scale_1st"], fe * d["shape_scale_2nd"], rates_e, st["annual"], st["base_year"])
         pv_g = ref.bill_pv(d, ft * d["therms_1st"], ft * d["therms_2nd"], rates_g, st["annual"], st["base_year"])
-        e["BillReducElec"], e["BillIncrElec"] = ref.split_ben_supply(pv_e, d["is_fuel_sub"])
-        e["BillReducGas"], e["BillIncrGas"] = ref.split_ben_supply(pv_g, d["is_fuel_sub"])
+        e["LifecycleBillReducElec"], e["LifecycleBillIncrElec"] = ref.split_ben_supply(pv_e, d["is_fuel_sub"])
+        e["LifecycleBillReducGas"], e["LifecycleBillIncrGas"] = ref.split_ben_supply(pv_g, d["is_fuel_sub"])
         gross_e = ref.bill_pv(d, d["qty"] * d["kwh1"] * d["irr_kwh"], d["qty"] * d["kwh2"] * d["irr_kwh"], rates_e, st["annual"], st["base_year"])
         gross_g = ref.bill_pv(d, d["qty"] * d["th1"] * d["irr_therm"], d["qty"] * d["th2"] * d["irr_therm"], rates_g, st["annual"], st["base_year"])
         bg = {}
-        bg["BillReducElecGross"], bg["BillIncrElecGross"] = ref.split_ben_supply(gross_e, d["is_fuel_sub"])
-        bg["BillReducGasGross"], bg["BillIncrGasGross"] = ref.split_ben_supply(gross_g, d["is_fuel_sub"])
+        bg["LifecycleBillReducElecGross"], bg["LifecycleBillIncrElecGross"] = ref.split_ben_supply(gross_e, d["is_fuel_sub"])
+        bg["LifecycleBillReducGasGross"], bg["LifecycleBillIncrGasGross"] = ref.split_ben_supply(gross_g, d["is_fuel_sub"])
         e.update(ref.participant_test(d, p1, e["TaxCreditsGross"], bg, st["qtr"], first_year))
         e["prg"], e["ntg_kwh"], e["ntg_therm"] = raw["PrgID"], d["ntg_kwh"], d["ntg_therm"]
         nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["AC_Elec_Target_Sector"], raw["AC_Elec_Impact_Profile"], raw["AC_Climate_Zone"])
         nox_gas = 0.0092 if raw.get("CombustionType") else 0.0
         e.update(ref.emissions(d, ref.hourly_co2_quarters(shape, REPRESENTS, {y: _emission_rate(y) for y in YEARS}), nox, pm10, st["co2_gas"], nox_gas, meb))
-        e["poc_shape_scale"], e["poc_shape_scale_2nd"] = d["shape_scale_1st"], d["shape_scale_2nd"]
-        e["poc_annual_net_therms_1st"], e["poc_water_scale_1st"] = d["therms_1st"], d["water_scale_1st"]
+        e["AC_kWh_1st_Baseline"], e["AC_kWh_2nd_Baseline"] = d["shape_scale_1st"], d["shape_scale_2nd"]
+        e["AC_Therms_1st_Baseline"], e["AC_kWh_Water_1st_Baseline"] = d["therms_1st"], d["water_scale_1st"]
         rows.append(e)
         per[cid] = e
     for cid, out in zip(MEASURES, ref.cost_tests(rows, program, first_year, st, meb)):
@@ -248,7 +248,7 @@ def test_every_documented_output_matches_the_reference_formulas(tmp_path, meb, m
     assert expected["EX2"]["ElecSupplyCost"] > 0 and expected["EX2"]["ElecBen"] == 0                  # fuel substitution: added load is a supply cost
     assert expected["EX2"]["WaterEnergyCost"] > 0 and expected["EX1"]["WaterEnergyBen"] > 0
     assert expected["EX3"]["GrossParticipantCostPV"] < 0 < expected["EX3"]["NetParticipantCostPV"] - expected["EX3"]["GrossParticipantCostPV"]   # excess incentives
-    assert expected["EX1"]["NetElecNOx"] > 0 and expected["EX1"]["NetGasNOx"] > 0
+    assert expected["EX1"]["FirstYearNetElecNOx"] > 0 and expected["EX1"]["FirstYearNetGasNOx"] > 0
 
     # portfolio summary (C16.3): CET's portfolio ratios are summed benefits (+ tax credits / bill increases) over the summed cost
     summ = pd.read_csv(result.files["portfolio_summary"]).iloc[0]
@@ -256,7 +256,7 @@ def test_every_documented_output_matches_the_reference_formulas(tmp_path, meb, m
     ben = tot("ElecBen") + tot("GasBen") + tot("WaterEnergyBen") + tot("OtherBen")
     assert summ["TRC_ratio"] == pytest.approx((ben + tot("TaxCredits")) / tot("TRCCost"), rel=1e-9)
     assert summ["PAC_ratio"] == pytest.approx(ben / tot("PACCost"), rel=1e-9)
-    assert summ["RIM_ratio"] == pytest.approx((ben + tot("BillIncrElec") + tot("BillIncrGas")) / tot("RIMCost"), rel=1e-9)
+    assert summ["RIM_ratio"] == pytest.approx((ben + tot("LifecycleBillIncrElec") + tot("LifecycleBillIncrGas")) / tot("RIMCost"), rel=1e-9)
     assert summ["SCB_ratio"] == pytest.approx((tot("ElecBen_SB") + tot("GasBen_SB") + tot("WaterEnergyBen_SB") + tot("OtherBen")) / tot("SCBCost"), rel=1e-9)
     assert summ["TotalSystemBenefit"] == pytest.approx(tot("TotalSystemBenefit"), rel=1e-9)
     assert summ["PCT_ratio"] == pytest.approx(tot("PCTBen") / tot("PCTCost"), rel=1e-9)
@@ -272,7 +272,7 @@ def test_bill_impact_of_a_single_baseline_measure_with_a_fractional_life():
     """A single-baseline measure's fractional last year is 1st baseline: a 3.5-year life must be worth more than a 3-year one (it was priced at ~0.7x CET)."""
     rates = {y: 0.20 for y in range(2024, 2060)}
     raf = 1.07
-    run = lambda eul: price_bill_impact(_bill_measure(eul, 0.0), lambda m: rates, lambda m: None, lambda m: 0.07, 2024).iloc[0]["BillReducElec"]
+    run = lambda eul: price_bill_impact(_bill_measure(eul, 0.0), lambda m: rates, lambda m: None, lambda m: 0.07, 2024).iloc[0]["LifecycleBillReducElec"]
     assert run(3.0) == pytest.approx(sum(1000 * 0.2 / raf ** k for k in range(3)))
     assert run(3.5) == pytest.approx(sum(1000 * 0.2 / raf ** k for k in range(3)) + 0.5 * 1000 * 0.2 / raf ** (3 + 4))     # the last year keeps CalcCE's Raf^Qy exponent
     assert run(3.5) > run(3.0)

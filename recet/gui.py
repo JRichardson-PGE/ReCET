@@ -363,7 +363,7 @@ class App:
         ttk.Label(row, text="Filing year:").pack(side="left")
         ttk.Entry(row, textvariable=self._var("filing_year"), width=6).pack(side="left", padx=6)
         row = sub(right, "right")
-        hint = ("Flags the records CEDARS' upload would reject or warn on (FilingValidation, FilingRules); they are still priced. "
+        hint = ("Flags the records CEDARS' upload would reject or warn on (the filing_validation table); they are still priced. "
                 "Filing year blank: each record's claim year.")
         ttk.Label(row, text=hint, style="Hint.TLabel", wraplength=420, justify="left").pack(side="left")
         row = sub(right, "right")

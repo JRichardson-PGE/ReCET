@@ -240,10 +240,16 @@ def test_every_input_field_named_in_the_document_exists():
     assert not bad, f"names that look like Measure.csv fields but are not: {bad}"
 
 
-def test_every_poc_field_named_in_the_document_exists(runs):
+def test_old_column_names_appear_only_in_the_rename_note(runs):
+    """Columns renamed or dropped in 0.1.50 are named only in 2.1's note of the old names (fieldnames.OUTPUT_RENAMES / OUTPUT_REMOVED), and a run writes none."""
     cols = set(runs["A"]["frame"].index) | set(runs["B"]["frame"].index)
-    bad = sorted({t for t in re.findall(r"`(poc_[A-Za-z0-9_]+)`", TEXT[DOC]) if t not in cols and t not in ("poc_ntgr_cost", "poc_num_units")})     # named as fields that appear only when they differ from the input column
-    assert not bad, f"poc_ fields named in OUTPUT_FIELDS.md that a run does not write: {bad}"
+    old = set(fieldnames.OUTPUT_RENAMES) | set(fieldnames.OUTPUT_REMOVED)
+    assert not (old & cols)
+    text = TEXT[DOC]
+    note = text[text.index("**Column names (0.1.50).**"):text.index("### 2.2 ")]
+    rest = text.replace(note, "")
+    bad = sorted({t for t in re.findall(r"`([A-Za-z][A-Za-z0-9_]*)`", rest) if t in old and t not in ("FilingValidation", "FilingRules", "ACCCheck")})   # filing_validation columns; 2.9b names the old ACCCheck
+    assert not bad, f"old column names used outside the rename note: {bad}"
 
 
 def test_the_output_reference_is_plain_ascii():

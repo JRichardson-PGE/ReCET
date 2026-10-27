@@ -62,7 +62,7 @@
   {% if check.acc and check.acc.flagged %}
   <p class="warn"><strong>ACC check ({{ check.acc.label }}):</strong> {{ '{:,}'.format(check.acc.flagged) }} of {{ '{:,}'.format(check.acc.measures) }} measures are priced
     on an ACC that does not normally apply to their program year ({% for r in check.acc.by_acc_and_year if r.status == 'flagged' %}{{ r.acc }} ACC for {{ r.program_year }}: {{ '{:,}'.format(r.measures) }}{% if not loop.last %}; {% endif %}{% endfor %}).
-    They are still priced; the ACCCheck column marks them.</p>
+    They are still priced; the input check lists them.</p>
   {% endif %}
   {% if check.stats %}<p class="check-stats">{% for k, v in check.stats.items() %}{{ k.strip() }}: {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
   {% if check.issues %}

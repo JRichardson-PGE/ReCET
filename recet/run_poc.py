@@ -286,8 +286,8 @@ def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2024):
     docstring for the full mechanics (annual, not quarterly; sign-based
     Reduc/Incr classification).
 
-    Returns a DataFrame with one row per measure: measure_id, BillReducElec,
-    BillIncrElec, BillReducGas, BillIncrGas -- NOT a measure_year-per-quarter
+    Returns a DataFrame with one row per measure: measure_id, LifecycleBillReducElec,
+    LifecycleBillIncrElec, LifecycleBillReducGas, LifecycleBillIncrGas -- NOT a measure_year-per-quarter
     series like this POC's other run_* functions, since the real quantity
     itself is a single lifetime PV number per measure (see price_bill_impact).
     """
@@ -425,12 +425,12 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     priced (2026-09-20; `run_water_energy`) and enter TSB, the PAC/TRC/RIM costs and
     every ratio.
 
-    RIMCost/RIMRatio (2026-09-17): `RIMCost = BillReducElec + BillReducGas
+    RIMCost/RIMRatio (2026-09-17): `RIMCost = LifecycleBillReducElec + LifecycleBillReducGas
     + PACCost`, `RIMRatio = (ElecBen+GasBen+WaterEnergyBen+OtherBen+
-    BillIncrElec+BillIncrGas) / RIMCost` (CET_v25.1_documentation_extracted
+    LifecycleBillIncrElec+LifecycleBillIncrGas) / RIMCost` (CET_v25.1_documentation_extracted
     .txt:16115-16168) -- built directly on run_bill_impact's already
-    floating-point-exact BillReducElec/BillIncrElec/BillReducGas/
-    BillIncrGas, so RIMCost/RIMRatio's own accuracy is bounded only by
+    floating-point-exact LifecycleBillReducElec/LifecycleBillIncrElec/LifecycleBillReducGas/
+    LifecycleBillIncrGas, so RIMCost/RIMRatio's own accuracy is bounded only by
     PACCost's (already-validated) residual.
 
     SCBCost/SCHCost/SCBRatio/SCHRatio (societal cost tests) are built by
@@ -507,12 +507,12 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     supply_and_other_cost = df["ElecSupplyCost"] + df["GasSupplyCost"] + df["WaterEnergyCost"] + df["OtherCost"]
     df["PACCost"] = df["RebatesandIncentsPV"] + supply_and_other_cost
     df["TRCCost"] = df["RebatesandIncentsPV"] + df["NetParticipantCostAdjustedPV"] + supply_and_other_cost
-    df["RIMCost"] = df["BillReducElec"] + df["BillReducGas"] + df["PACCost"]
+    df["RIMCost"] = df["LifecycleBillReducElec"] + df["LifecycleBillReducGas"] + df["PACCost"]
 
     total_ben = df["ElecBen"] + df["GasBen"] + df["WaterEnergyBen"] + df["OtherBen"]
     df["TRCRatio"] = (total_ben + df["TaxCredits"]) / df["TRCCost"]
     df["PACRatio"] = total_ben / df["PACCost"]
-    df["RIMRatio"] = (total_ben + df["BillIncrElec"] + df["BillIncrGas"]) / df["RIMCost"]
+    df["RIMRatio"] = (total_ben + df["LifecycleBillIncrElec"] + df["LifecycleBillIncrGas"]) / df["RIMCost"]
     df = df.merge(participant_cost_test(measures, df, acc_version, base_year), on="measure_id", how="left")
 
     return df[["measure_id", "ElecPricingStatus", "ProfileSource", "SystemClimateZone", "SystemZoneSource", "GasPricingStatus", "GasProfileSource", "WaterPricingStatus",
@@ -520,8 +520,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
                "OtherBen", "OtherCost", "TaxCredits", "OtherBenGross", "OtherCostGross", "TaxCreditsGross",
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
                "GrossParticipantCostPV",
-               *PARTICIPANT_EXTRA, "BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas",
-               "BillReducElecGross", "BillIncrElecGross", "BillReducGasGross", "BillIncrGasGross", "PCTBen", "PCTCost", "PCTRatio",
+               *PARTICIPANT_EXTRA, "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas",
+               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "PCTBen", "PCTCost", "PCTRatio",
                "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
 
 
@@ -529,8 +529,8 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
     """The Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (BRD BR-06.8; on CPUC's CET roadmap). From the
     participant's side, on GROSS savings (free riders are participants too) and without market effects:
 
-        PCTBen   = BillReducElecGross + BillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF       (bill reductions, incentives, tax credits)
-        PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + BillIncrElecGross + BillIncrGasGross       (the full measure cost, bill increases)
+        PCTBen   = LifecycleBillReducElecGross + LifecycleBillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF       (bill reductions, incentives, tax credits)
+        PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + LifecycleBillIncrElecGross + LifecycleBillIncrGasGross       (the full measure cost, bill increases)
         PCTRatio = PCTBen / PCTCost
 
     The gross bill impacts are C9's bill impacts with NTG = 1 (same rates, discounting and fuel-substitution split). PVF is the participant-cost discount factor
@@ -540,16 +540,16 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
     gross["annual_net_kwh_2nd"] = gross["num_units"] * gross["unit_kwh_2nd"]
     gross["annual_net_therms_1st"] = gross["num_units"] * gross["unit_therm_1st"] * gross["ir_therm"] * gross["rr_therm"]
     gross["annual_net_therms_2nd"] = gross["num_units"] * gross["unit_therm_2nd"] * gross["ir_therm"] * gross["rr_therm"]
-    bills = run_bill_impact(gross, acc_version=acc_version).rename(columns={c: f"{c}Gross" for c in ("BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas")})
+    bills = run_bill_impact(gross, acc_version=acc_version).rename(columns={c: f"{c}Gross" for c in ("LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas")})
     rates = {pa: discount_settings.get_discount_rate_qtr(pa, acc_version) for pa in measures["PA"].unique()}
     qm = (measures["claim_year"] - base_year) * 4 + (measures["claim_quarter"] - 1)
     pvf = (1.0 + measures["PA"].map(rates)) ** qm
     out = measures[["measure_id"]].assign(_pvf=pvf.to_numpy()).merge(bills, on="measure_id", how="left")
     out = out.merge(priced[["measure_id", "RebatesandIncentsPV", "GrossParticipantCostPV", "TaxCreditsGross"]], on="measure_id", how="left")
-    gross_cols = ["BillReducElecGross", "BillIncrElecGross", "BillReducGasGross", "BillIncrGasGross"]
+    gross_cols = ["LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross"]
     out[gross_cols] = out[gross_cols].fillna(0.0)
-    out["PCTBen"] = out["BillReducElecGross"] + out["BillReducGasGross"] + out["RebatesandIncentsPV"] + out["TaxCreditsGross"] / out["_pvf"]
-    out["PCTCost"] = out["GrossParticipantCostPV"] + out["RebatesandIncentsPV"] + out["BillIncrElecGross"] + out["BillIncrGasGross"]
+    out["PCTBen"] = out["LifecycleBillReducElecGross"] + out["LifecycleBillReducGasGross"] + out["RebatesandIncentsPV"] + out["TaxCreditsGross"] / out["_pvf"]
+    out["PCTCost"] = out["GrossParticipantCostPV"] + out["RebatesandIncentsPV"] + out["LifecycleBillIncrElecGross"] + out["LifecycleBillIncrGasGross"]
     out["PCTRatio"] = (out["PCTBen"] / out["PCTCost"].where(out["PCTCost"] != 0)).fillna(0.0)
     return out[["measure_id"] + gross_cols + ["PCTBen", "PCTCost", "PCTRatio"]]
 
@@ -686,9 +686,6 @@ def _first_year_weights(rul: pd.Series, eul: pd.Series) -> tuple[pd.Series, pd.S
     return pd.Series(w1, index=rul.index), pd.Series(w2, index=rul.index)
 
 
-THERM_TO_KWH = 29.307111111          # CalcSavings' @ThermConv: kWh per therm, for WeightedSavings
-
-
 def _savings_quantities(m: pd.DataFrame) -> dict[str, pd.Series]:
     """Per fuel: (units x installation x realization, 1st-baseline amount, 2nd-baseline amount, NTG) -- the pieces every CalcSavings column is built from."""
     q = m["num_units"].astype(float)
@@ -729,19 +726,6 @@ def savings_outputs(measures: pd.DataFrame, market_effects_bens: float = 0.0) ->
     order = [f"{p}{gn}{f}" for p in ("FirstYear", "Lifecycle", "Annual") for gn in ("Gross", "Net") for f in ("KWh", "KWhSite", "KWhWater", "KW", "Thm")
              if not (p == "Lifecycle" and f == "KW")]
     return pd.DataFrame(out)[["measure_id"] + order]
-
-
-def weighted_savings_pos(sav: pd.DataFrame) -> pd.Series:
-    """The amount WeightedSavings divides up: the measure's positive first-year gross kWh plus its positive first-year gross therms in kWh."""
-    return sav["FirstYearGrossKWh"].clip(lower=0.0) + (THERM_TO_KWH * sav["FirstYearGrossThm"]).clip(lower=0.0)
-
-
-def weighted_savings(sav: pd.DataFrame, prg: pd.Series, totals: pd.DataFrame | None = None) -> pd.Series:
-    """CalcSavings' WeightedSavings: a measure's share of its program's positive first-year gross savings, therms converted at THERM_TO_KWH kWh per therm;
-    1 / (measures in the program) when the program has none. Not used by any cost test (CET shares program costs by benefits, WeightedBenefits).
-    `totals`: the programs' totals over the whole job when `sav` is only part of it (cost_tests.share_totals)."""
-    from .pipeline.cost_tests import _share
-    return _share(weighted_savings_pos(sav), prg, totals)
 
 
 def discounted_savings(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0) -> pd.DataFrame:
@@ -838,14 +822,11 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     return d.merge(trc, on="measure_id").merge(sct, on="measure_id").merge(ds, on="measure_id", how="left")
 
 
-def program_share_totals(d: pd.DataFrame, measures: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Each program's totals of the amounts its program-level shares divide up (the benefits behind WeightedBenefits and the cost tests' program-cost shares,
-    and the savings behind WeightedSavings), over `d` (price_measure_values) and its `measures`. A chunked run adds these up over its chunks
+def program_share_totals(d: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Each program's totals of the amounts its program-level shares divide up (the benefits behind WeightedBenefits and the cost tests' program-cost shares),
+    over `d` (price_measure_values). A chunked run adds these up over its chunks
     (cost_tests.combine_share_totals) and passes the sum to apply_program_costs, so every measure gets the share it has in the whole job."""
-    totals = cost_tests.share_totals(cost_tests.share_inputs(d), d["prg_id"])
-    sav = savings_outputs(measures)
-    totals.update(cost_tests.share_totals(pd.DataFrame({"savings": weighted_savings_pos(sav).to_numpy()}), measures["prg_id"].reset_index(drop=True)))
-    return totals
+    return cost_tests.share_totals(cost_tests.share_inputs(d), d["prg_id"])
 
 
 def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
@@ -855,10 +836,7 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
     passes the job in parts; None = `d` is the whole job."""
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
     out = cost_tests.compute_cost_tests(d, prog, totals)
-    sav = savings_outputs(measures, market_effects_bens)
-    sav["WeightedSavings"] = weighted_savings(sav, measures["prg_id"].reset_index(drop=True),                       # savings_outputs keeps the measures' order
-                                              None if totals is None else totals["savings"]).to_numpy()
-    out = out.merge(sav, on="measure_id", how="left")
+    out = out.merge(savings_outputs(measures, market_effects_bens), on="measure_id", how="left")
     if not include_societal:
         out[[c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]] = float("nan")
     return out

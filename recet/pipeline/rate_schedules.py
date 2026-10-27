@@ -1,7 +1,7 @@
 """
 Real CET retail rate schedules, for the RIM (Ratepayer Impact Measure) test's
-bill-impact columns (`BillReducElec`, `BillIncrElec`, `BillReducGas`,
-`BillIncrGas`) -- pulled directly from `dbo.E3RateScheduleElec`,
+bill-impact columns (`LifecycleBillReducElec`, `LifecycleBillIncrElec`, `LifecycleBillReducGas`,
+`LifecycleBillIncrGas`) -- pulled directly from `dbo.E3RateScheduleElec`,
 `dbo.E3RateScheduleElecMapping`, `dbo.E3RateScheduleGas`, and
 `dbo.E3RateScheduleGasMapping` (Jake exported all four as CSVs, 2026-09-17,
 after this project confirmed via `CET_v25.1_documentation_extracted.txt`

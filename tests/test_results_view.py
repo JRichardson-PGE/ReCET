@@ -13,25 +13,25 @@ from conftest import make_electric_acc, make_flat_profile_csv, make_measure_csv
 def _frame() -> pd.DataFrame:
     """Four measures, two programs, two PAs. Program P1 holds one cheap and one expensive measure so an averaged ratio would differ from the recomputed one."""
     rows = [
-        dict(CEInputID="M1", MeasDescription="a", PrgID="P1", CreditedIOU="PGE", Prg_PA="PGE", IOU_AC_Territory="PGE", Prg_PrimarySector="Residential",
+        dict(CEInputID="M1", MeasDescription="a", PrgID="P1", CreditedPA="PGE", Prg_PA="PGE", IOU_AC_Territory="PGE", Prg_PrimarySector="Residential",
              Prg_ProgramSegment="resource_acquisition", Prg_ProgramName="One", ElecBen=100.0, GasBen=0.0, TRCCost=50.0),
-        dict(CEInputID="M2", MeasDescription="b", PrgID="P1", CreditedIOU="PGE", Prg_PA="PGE", IOU_AC_Territory="PGE", Prg_PrimarySector="Residential",
+        dict(CEInputID="M2", MeasDescription="b", PrgID="P1", CreditedPA="PGE", Prg_PA="PGE", IOU_AC_Territory="PGE", Prg_PrimarySector="Residential",
              Prg_ProgramSegment="resource_acquisition", Prg_ProgramName="One", ElecBen=10.0, GasBen=0.0, TRCCost=100.0),
-        dict(CEInputID="M3", MeasDescription="c", PrgID="P2", CreditedIOU="", Prg_PA="BAY", IOU_AC_Territory="PGE", Prg_PrimarySector="Commercial",
+        dict(CEInputID="M3", MeasDescription="c", PrgID="P2", CreditedPA="", Prg_PA="BAY", IOU_AC_Territory="PGE", Prg_PrimarySector="Commercial",
              Prg_ProgramSegment="", Prg_ProgramName="Two", ElecBen=30.0, GasBen=10.0, TRCCost=20.0),
-        dict(CEInputID="M4", MeasDescription="d", PrgID="P3", CreditedIOU="", Prg_PA="", IOU_AC_Territory="SCE", Prg_PrimarySector="Commercial",
+        dict(CEInputID="M4", MeasDescription="d", PrgID="P3", CreditedPA="", Prg_PA="", IOU_AC_Territory="SCE", Prg_PrimarySector="Commercial",
              Prg_ProgramSegment="market_support", Prg_ProgramName="Three", ElecBen=5.0, GasBen=5.0, TRCCost=10.0),
     ]
     f = pd.DataFrame(rows)
-    for c in ("WaterEnergyBen", "OtherBen", "TaxCredits", "BillIncrElec", "BillIncrGas"):
+    for c in ("WaterEnergyBen", "OtherBen", "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas"):
         f[c] = 0.0
     f["PACCost"] = f["TRCCost"] / 2
     f["RIMCost"] = f["TRCCost"] * 3
     f["TotalExpenditures"] = [40.0, 60.0, 15.0, 5.0]
     f["TotalSystemBenefit"] = f["ElecBen"] + f["GasBen"]
     f["FirstYearNetKWh"] = [1000.0, 2000.0, 500.0, 100.0]
-    f["NetElecCO2Lifecycle"] = [1.0, 2.0, 3.0, 4.0]
-    f["NetGasCO2Lifecycle"] = [0.5, 0.0, 0.5, 0.0]
+    f["LifecycleNetElecCO2"] = [1.0, 2.0, 3.0, 4.0]
+    f["LifecycleNetGasCO2"] = [0.5, 0.0, 0.5, 0.0]
     f["TRCRatio"] = (f["ElecBen"] + f["GasBen"]) / f["TRCCost"]   # a measure-level ratio column: never summed
     f["NumUnits"] = 7.0                                    # an input: never offered
     return f
