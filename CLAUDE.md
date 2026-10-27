@@ -90,6 +90,16 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.47 (2026-10-27, Jake; TIER2_PLAN step 2, BR-06.5): the ACC check. Run option `acc_purpose` ("Priced for": "" any filing, "claims", or a
+  `versions.FILINGS` key, the filing name slugged, e.g. "2028-2035-application"; CLI `--priced-for`, window and New run). `versions.expected_accs(year,
+  purpose)`: claims = the ACC of the year's final budget filing (claims_acc); a filing = its ACC within its years, none outside; any = the latest
+  application covering the year and every filing after it (so 2028-2029: 2024/2026, 2030-2031: 2024/2026/2028; the 2024-2031 application's 2021 ACC no
+  longer counts once the 2028-2035 application covers the year); None = not in the table (not checked). Each record's ACC = its ACCVersion, else the run's
+  (`acc_year_of`: a built-in's ACC, or a four-digit new label). Preflight warns `acc_not_for_program_year` per (ACC, program year), cells on ACCVersion when the
+  record names it, else ClaimYearQuarter; `PreflightReport.acc_check` (counts by ACC version and program year, added up over parts) goes to preflight.json, the
+  "ACC check" stat, `run_settings.json` `acc_check`, and a line on the web run page's input check. Measure-level column `ACCCheck` (ok / not for this program
+  year / not checked) after the Prg_ columns (OUTPUT_FIELDS 1.18). Never stops a run. Real 2030 PG&E job on the 2024 ACC: claims 5,100 of 5,100 flagged,
+  2028-2035 application 0, any filing 0.
 - 0.1.46 (2026-10-26, Jake): web usability pass (the plan is CEDARS-Research `UI_UPDATE_PLAN.md`). Edit inputs: one verdict line at the top of the check
   panel combines the cell checks (every save) with the latest Validate inputs result, which never says "the run can start" once the tables changed; the cell
   list is in the panel (was below the grid); Run these inputs shows the first blocking cell. Run page: Input check card from preflight.json
