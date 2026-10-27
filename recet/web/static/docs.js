@@ -11,6 +11,7 @@
     code.parentNode.replaceWith(div);
   });
   var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  mermaid.initialize({startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default"});
+  // SVG text labels (not HTML in a foreignObject, which clips any text wider than Mermaid measured, e.g. when a font loads late)
+  mermaid.initialize({startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default", htmlLabels: false, flowchart: {htmlLabels: false}});
   mermaid.run({querySelector: "article.doc .mermaid"});
 })();

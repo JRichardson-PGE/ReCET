@@ -118,6 +118,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   design; its module map and web settings table are checked by tests). The web Docs pages draw ```mermaid blocks: Mermaid 11.4.1 is vendored in
   `web/static/vendor/mermaid/` (npm tarball, integrity checked; the CSP allows only same-origin scripts, so never load it from a CDN) and `static/docs.js`
   turns `code.language-mermaid` into diagrams; app.doc loads them only on a page that has one. The desktop window shows the Mermaid source as text.
+  Diagrams use SVG text labels (`htmlLabels: false` in each diagram's front matter, for GitHub, and in docs.js): HTML labels sit in a foreignObject
+  that clips any text wider than Mermaid measured (e.g. a font that loads after measuring). No `<b>` in labels (it prints literally as SVG text).
+  Same version (Jake): default `chunk_size` 50,000 (was 20,000), as the web server already ran; about 1 GiB peak at 1M on the server.
 - 0.1.51 (2026-10-27): `key_metrics.sums` grouped on the key columns first and builds the "PrgID - name" label only for the groups; it built it row by row
   (`apply(axis=1)`), 0.9 s of every 50,000-row part (0.047 s now, same table). The 0.1.50 server run's pass 2 took 109 s against 0.1.43's 57 s because of it.
 - 0.1.50 (2026-10-27, Jake's field dictionary, CEDARS-Research `deliverables/recet_field_dictionary/ReCET_Field_Dictionary.xlsx`): output columns renamed and
