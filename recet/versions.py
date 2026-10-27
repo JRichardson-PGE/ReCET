@@ -64,6 +64,7 @@ class FilingAcc:
     basis: str                  # the resolution, or why the row is expected
     expected: bool = False      # a filing still to come
     inferred: bool = False      # not stated: follows the two-year cadence
+    short: str = ""             # the compact name for the New run page ("Sep 2027 true-up (2028-31)")
 
     @property
     def years(self) -> str:
@@ -74,19 +75,32 @@ class FilingAcc:
 # cost version" table (the resolution that adopted each ACC); the rest is the schedule Jake gave on 2026-10-26, the last two rows inferred from its two-year
 # cadence. The web page shows ACC years only (Jake, 2026-10-26: the "Avoided Cost Version" label is being retired, D12).
 BUDGET_FILING_ACC = [
-    FilingAcc("2020 filings", 2020, 2020, 2019, "Res. E-5014"),
-    FilingAcc("2021-2023 filings", 2021, 2023, 2020, "Res. E-5077"),
-    FilingAcc("2024-2031 application", 2024, 2031, 2021, "Res. E-5150"),
-    FilingAcc("2024-2027 true-up", 2024, 2025, 2022, "Res. E-5228"),
-    FilingAcc("2026-2027 mid-cycle", 2026, 2027, 2024, "Res. E-5328"),
-    FilingAcc("2028-2035 application", 2028, 2035, 2024, "Res. E-5328 (filed before the 2026 ACC was released)"),
-    FilingAcc("True-up advice letter, September 2027", 2028, 2031, 2026, "expected", expected=True),
-    FilingAcc("Mid-cycle advice letter, September 2029", 2030, 2031, 2028, "expected", expected=True),
-    FilingAcc("2032-2039 application", 2032, 2039, 2028, "expected", expected=True),
-    FilingAcc("True-up advice letter, September 2031", 2032, 2035, 2030, "expected; follows the two-year cadence", expected=True, inferred=True),
-    FilingAcc("Mid-cycle advice letter, September 2033", 2034, 2035, 2032, "expected; follows the two-year cadence", expected=True, inferred=True),
+    FilingAcc("2020 filings", 2020, 2020, 2019, "Res. E-5014", short="2020 filings"),
+    FilingAcc("2021-2023 filings", 2021, 2023, 2020, "Res. E-5077", short="2021-23 filings"),
+    FilingAcc("2024-2031 application", 2024, 2031, 2021, "Res. E-5150", short="2024-31 application"),
+    FilingAcc("2024-2027 true-up", 2024, 2025, 2022, "Res. E-5228", short="2024-27 true-up (2024-25)"),
+    FilingAcc("2026-2027 mid-cycle", 2026, 2027, 2024, "Res. E-5328", short="2026-27 mid-cycle"),
+    FilingAcc("2028-2035 application", 2028, 2035, 2024, "Res. E-5328 (filed before the 2026 ACC was released)", short="2028-35 application"),
+    FilingAcc("True-up advice letter, September 2027", 2028, 2031, 2026, "expected", expected=True, short="Sep 2027 true-up (2028-31)"),
+    FilingAcc("Mid-cycle advice letter, September 2029", 2030, 2031, 2028, "expected", expected=True, short="Sep 2029 mid-cycle (2030-31)"),
+    FilingAcc("2032-2039 application", 2032, 2039, 2028, "expected", expected=True, short="2032-39 application"),
+    FilingAcc("True-up advice letter, September 2031", 2032, 2035, 2030, "expected; follows the two-year cadence", expected=True, inferred=True,
+              short="Sep 2031 true-up (2032-35)"),
+    FilingAcc("Mid-cycle advice letter, September 2033", 2034, 2035, 2032, "expected; follows the two-year cadence", expected=True, inferred=True,
+              short="Sep 2033 mid-cycle (2034-35)"),
 ]
 CLAIMS_LAST_YEAR = 2035          # later years will get filings not in the table yet
+
+
+def acc_summary(first_acc: int = 2021, last_acc: int = 2028) -> list[dict]:
+    """One row per ACC for the New run page: {"acc", "filings" (short names), "claims" (program years, "" if none), "builtin" (ReCET ships it)}. Kept to
+    the ACCs a user is likely to pick (from `first_acc`) and the next one (`last_acc`); the full lists are BUDGET_FILING_ACC and claims_acc()."""
+    claims: dict[int, list[str]] = {}
+    for c in claims_acc():
+        claims.setdefault(c.acc, []).append(c.years)
+    return [{"acc": acc, "filings": [f.short or f.filing for f in BUDGET_FILING_ACC if f.acc == acc], "claims": ", ".join(claims.get(acc, [])),
+             "builtin": str(acc) in BUILTIN}
+            for acc in sorted({f.acc for f in BUDGET_FILING_ACC if first_acc <= f.acc <= last_acc})]
 
 
 def claims_acc() -> list[FilingAcc]:
