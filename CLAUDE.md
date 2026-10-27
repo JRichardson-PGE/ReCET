@@ -90,6 +90,18 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.48 (2026-10-27, Jake; TIER2_PLAN step 3, BR-06.10): output templates and the key-metrics summary. `RunConfig.output_template` (column list, in
+  order) + `output_template_name`: `outputs.TableWriter(select=)` writes only those columns to the measure-level file; with a template the table always goes
+  through parquet and the FULL table is kept in `_results/` (every format), so the Results tables, summary and key metrics see every column; a column the
+  run did not produce is left out with a note (`writer.left_out`). `recet/output_templates.py`: `catalog()` (input columns, then OUTPUT_FIELDS section 1
+  groups, with definitions), `BUILTIN` (Key results, Participant costs), `check`/`parse`/`read_file`, window templates in the config file
+  (`output_templates` key); web: per-user table `output_templates`, page `/output-templates` (nav "Templates"; Add buttons in app.js), New run picker; CLI
+  `--output-template NAME_OR_FILE`. `recet/field_docs.py` reads each column's definition from OUTPUT_FIELDS.md (#### entries' first paragraph, or a table
+  row's second cell) or INPUT_FIELDS.md (echoed input columns), with the web Docs anchor (Python-Markdown toc slug). Every run writes
+  `field_definitions_<tag>` (each column of the file: definition, documentation link) and `key_metrics_<tag>` (`recet/key_metrics.py`: Portfolio headline
+  rows with definitions; top 10 programs, program sectors (Prg_PrimarySector) and end uses (UseCategory) by |share of TSB|, with TRC cost share and TRC/PAC
+  ratios; a run in parts adds `key_metrics.sums` per part). A ratio whose cost is 0 is blank, as in the summary. The five ratio entries in OUTPUT_FIELDS
+  got a definition sentence. Real 2028 job (5,518 measures, parts): key metrics equal the portfolio summary; the SW codes-and-standards programs carry 93% of TSB.
 - 0.1.47 (2026-10-27, Jake; TIER2_PLAN step 2, BR-06.5): the ACC check. Run option `acc_purpose` ("Priced for": "" any filing, "claims", or a
   `versions.FILINGS` key, the filing name slugged, e.g. "2028-2035-application"; CLI `--priced-for`, window and New run). `versions.expected_accs(year,
   purpose)`: claims = the ACC of the year's final budget filing (claims_acc); a filing = its ACC within its years, none outside; any = the latest

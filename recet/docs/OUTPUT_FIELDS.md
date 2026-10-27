@@ -1159,6 +1159,8 @@ from the numerator.
 
 #### `TRCRatio`, `TRCRatioNoAdmin`
 
+The Total Resource Cost test's benefit-cost ratio: benefits plus tax credits over the TRC cost (`TRCRatioNoAdmin`: without program-level costs). Ratio.
+
 **Formula**
 
 ```text
@@ -1174,6 +1176,8 @@ TRCRatioNoAdmin = ( B + TaxCredits ) / TRCCostNoAdmin
 - Example B, `TRCRatioNoAdmin`: (7310.5647 + 800.00) / 58514.4821 = **0.1386**
 
 #### `PACRatio`, `PACRatioNoAdmin`
+
+The Program Administrator Cost test's benefit-cost ratio: benefits over the PAC cost (`PACRatioNoAdmin`: without program-level costs). Ratio.
 
 **Formula**
 
@@ -1191,6 +1195,8 @@ PACRatioNoAdmin = B / PACCostNoAdmin
 
 #### `RIMRatio`, `RIMRatioNoAdmin`
 
+The Ratepayer Impact Measure test's benefit-cost ratio: benefits plus bill increases over the RIM cost (`RIMRatioNoAdmin`: without program-level costs). Ratio.
+
 **Formula**
 
 ```text
@@ -1206,6 +1212,8 @@ RIMRatioNoAdmin = ( B + BillIncrElec + BillIncrGas ) / RIMCostNoAdmin
 - Example B, `RIMRatioNoAdmin`: (7310.5647 + 20764.8592 + 0.00) / 30742.3231 = **0.9132**
 
 #### `SCBRatio`, `SCBRatioNoAdmin`, `SCHRatio`, `SCHRatioNoAdmin`
+
+The Societal Cost Test's benefit-cost ratios, Base (`SCB`) and High (`SCH`) social cost of carbon: the societal benefits over the societal cost (`...NoAdmin`: without program-level costs). Ratio.
 
 **Formula**
 
@@ -1904,7 +1912,7 @@ The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (
 
 ### 2.7b `_results/measure_level_acc<version>.parquet`
 
-When the output format is `csv` or `csv.zip`, the measure-level table is written as parquet first and the CSV is made from it; the parquet is kept in the run
+When the output format is `csv` or `csv.zip`, or the run has an output template (then in every format, with every column), the measure-level table is written as parquet first and the CSV is made from it; the parquet is kept in the run
 folder's `_results` folder, and the Results tables (window and web app) read it rather than the CSV. Same columns and values as the measure-level file. The web
 app does not list it for download.
 
@@ -1967,6 +1975,33 @@ One row per record that fails at least one CEDARS upload check (1.17), written b
 | `FilingValidation` | `reject` or `warning`, as in 1.17. |
 | `FilingRules` | The failing rule IDs. |
 | `rules_failed` | Each failing rule's ID and text, separated by ` \| `. |
+
+### 2.11 `field_definitions_acc<version>`
+
+One row per column of the measure-level file, in the file's order (BRD BR-06.10): what each column is, from this document (section 1) or, for an echoed
+input column, from INPUT_FIELDS.md. With an output template it lists exactly the template's columns.
+
+| Column | Meaning |
+|---|---|
+| `position` | The column's place in the measure-level file, from 1. |
+| `column` | The column's name. |
+| `definition` | The first paragraph of its entry (or its table row), as plain text. |
+| `documentation` | The entry: the document and the heading id, e.g. `OUTPUT_FIELDS.md#elecben` (on the web app, `/docs/OUTPUT_FIELDS.md#elecben`). |
+
+### 2.12 `key_metrics_acc<version>`
+
+The key-metrics summary (BRD BR-06.10): the headline results and the main drivers of them. Built from every measure, whatever the output template.
+
+| Column | Meaning |
+|---|---|
+| `section` | `Portfolio` (the headline metrics), `Top programs`, `Top program sectors` (the program's `PrimarySector`, 1.14) or `Top end uses` (the measure's `UseCategory`). |
+| `item` | The metric's name, or the program (`PrgID` - program name), sector or end use. Up to 10 per driver section, largest share of total system benefit first (by size: a negative share counts too). |
+| `measures` | The number of measures it covers. |
+| `value` | Portfolio rows: the metric (total system benefit, budget, TRC / PAC / RIM / SCT Base / SCT High ratios recomputed from the portfolio sums, TRC and PAC cost, first-year net kWh / kW / therms, lifecycle CO2). A ratio whose cost is 0 is blank, as in the portfolio summary. |
+| `TotalSystemBenefit`, `share_of_TSB` | Driver rows: the item's total system benefit and its share of the portfolio's. |
+| `TRCCost`, `share_of_TRC_cost` | Driver rows: the item's TRC cost and its share of the portfolio's. |
+| `TRC_ratio`, `PAC_ratio` | Driver rows: the item's ratios, recomputed from its sums. |
+| `definition`, `documentation` | Portfolio rows: the metric's definition and its entry in this document, as in 2.11. |
 
 Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of any supplied ACC that was not already Parquet) and, from the GUI, `_gui_job.json` in the output folder (the settings the GUI launched the run with).
 

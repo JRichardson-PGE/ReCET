@@ -10,6 +10,8 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   preflight.txt                  the input check that ran first
   preflight.json                 the same check as JSON (ok, stats, issues), read by the web app's Validate inputs panel
   run_settings.json              everything needed to reproduce the run (options, resolved ACC files, supplied files with sizes, package version, timings)
+  field_definitions_<acc>        one row per column of the measure-level file, in order: its definition and documentation link (field_docs.py)
+  key_metrics_<acc>              the headline results with their definitions, and the main drivers by program, sector and end use (key_metrics.py)
   components_summary_<acc>.csv   (components mode) portfolio value of each ACC component, with the sum-check against the totals
   portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh; portfolio_8760_unshaped_<acc>.csv lists measures left out
   cet_comparison_*.csv           (when a CET outputs file is given) POC vs CET, per measure and in total
@@ -76,6 +78,8 @@ class RunConfig:
     preflight_only: bool = False
     filing_validation: str = ""              # "" | "claims" | "budget_filing": also apply CEDARS' upload checks for that filing (filing_rules.py); flags, never stops
     filing_year: int | None = None           # the filing's year for the rules that name it (default: each record's claim year; ProgramCost: the earliest)
+    output_template: list[str] = field(default_factory=list)   # the measure-level file's columns, in order (BR-06.10; output_templates.py); empty = every column
+    output_template_name: str = ""           # the template's name, for the record
     acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
                                              # not normally apply to their program year are flagged (preflight, ACCCheck column, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
@@ -269,6 +273,19 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     result.files["run_settings"] = run_dir / "run_settings.json"
 
 
+def write_template_files(cfg: RunConfig, writer, km_totals, run_dir: Path, tag: str, excel, result: RunResult, log: Log) -> None:
+    """After the measure-level file: a note for any template column the run did not produce, the field_definitions table (one row per column of the file,
+    its definition and documentation link) and the key_metrics table (BR-06.10)."""
+    from . import field_docs, key_metrics, outputs
+    if writer.left_out:
+        note = (f"output template{' ' + repr(cfg.output_template_name) if cfg.output_template_name else ''}: this run did not produce "
+                f"{', '.join(writer.left_out)}, so the measure-level file leaves them out")
+        result.notes.append(note)
+        log(f"note: {note}")
+    result.files["field_definitions"] = outputs.write_table(field_docs.table(writer.output_columns), run_dir / f"field_definitions_{tag}", cfg.output_format, excel)
+    result.files["key_metrics"] = outputs.write_table(key_metrics.build(km_totals), run_dir / f"key_metrics_{tag}", cfg.output_format, excel)
+
+
 def write_findings(rep, cfg: RunConfig, run_dir: Path) -> Path | None:
     """preflight_findings.xlsx: the input check as a workbook to review (preflight.PreflightReport.write_xlsx), with each flagged cell's record ID. The IDs
     are read (one column of the file) only when some finding points at that file. A workbook that cannot be written is left out; the run goes on."""
@@ -447,9 +464,12 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         frame = outputs.attach_filing(frame, outputs.filing_lookup(result.filing))
     result.frame = frame
     progress.report("writing")
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel)
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel,
+                                 select=cfg.output_template or None)
     writer.write(frame)
     result.files["measure_level"] = writer.close()                   # csv / csv.zip: parquet first (kept for the Results tables), then CSV
+    from . import key_metrics
+    write_template_files(cfg, writer, key_metrics.sums(frame), run_dir, tag, excel, result, log)
     summary = outputs.summarize(frame, cfg.apply_exclude_from_ce)
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}

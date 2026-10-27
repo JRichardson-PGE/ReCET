@@ -331,6 +331,8 @@ def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
         parts.append("ACC components priced separately")
     if cfg.get("portfolio_8760"):
         parts.append("combined 8,760 profile")
+    if cfg.get("output_template") and not cfg.get("preflight_only"):
+        parts.append(f"output template {cfg.get('output_template_name') or ''} ({len(cfg['output_template'])} columns)".replace("  ", " "))
     if not cfg.get("preflight_only"):
         parts.append(FORMAT_NAMES.get(str(cfg.get("output_format") or ""), str(cfg.get("output_format") or "")) + " output")
     return " · ".join(p for p in parts if p)
@@ -526,6 +528,55 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx.set_cookie(resp, SESSION_COOKIE, auth.new_session(ctx.db, u["id"], s.session_days), s.session_days * 86400)
         return resp
 
+    # ----------------------------------------------------------------------------------------------------------------- output templates (BR-06.10)
+    def user_templates(uid: int) -> dict[str, list[str]]:
+        """The built-in output templates, then the user's saved ones."""
+        from .. import output_templates as ot
+        out = dict(ot.BUILTIN)
+        for r in ctx.db.all("SELECT name, columns FROM output_templates WHERE user_id = ? ORDER BY name", (uid,)):
+            try:
+                out[r["name"]] = [str(c) for c in json.loads(r["columns"])]
+            except ValueError:
+                pass
+        return out
+    ctx.user_templates = user_templates
+
+    def templates_page(request: Request, status_code: int = 200, **kw):
+        from .. import output_templates as ot
+        u = ctx.need_user(request)
+        groups: dict[str, list] = {}
+        for g, col, text, link in ot.catalog():
+            groups.setdefault(g, []).append((col, text, link))
+        mine = user_templates(u["id"])
+        editing = kw.pop("editing", "")
+        kw.setdefault("columns", mine.get(editing, []))
+        return ctx.render(request, "output_templates.html", status_code=status_code, all_templates=mine, builtin=set(ot.BUILTIN),
+                          catalog=list(groups.items()), editing=editing, **{"error": "", "saved_ok": "", **kw})
+
+    @app.get("/output-templates", response_class=HTMLResponse)
+    async def output_templates_page(request: Request, edit: str = "", saved: str = ""):
+        return templates_page(request, editing=edit, saved_ok=saved)
+
+    @app.post("/output-templates")
+    async def output_templates_save(request: Request):
+        from .. import output_templates as ot
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        name = str(form.get("name", "")).strip()[:60]
+        if form.get("delete"):
+            ctx.db.run("DELETE FROM output_templates WHERE user_id = ? AND name = ?", (u["id"], name))
+            return ctx.redirect("/output-templates")
+        cols, bad = ot.check(ot.parse(str(form.get("columns", ""))))
+        error = ("Give the template a name." if not name else f'"{name}" is a built-in template: save your copy under another name.'
+                 if name in ot.BUILTIN or name == ot.ALL else f"Not columns ReCET writes: {', '.join(bad)}." if bad
+                 else "Pick at least one column." if not cols else "")
+        if error:
+            return templates_page(request, 400, editing=name, columns=ot.parse(str(form.get("columns", ""))), error=error)
+        ctx.db.run("INSERT OR REPLACE INTO output_templates (user_id, name, columns) VALUES (?,?,?)", (u["id"], name, json.dumps(cols)))
+        from urllib.parse import quote
+        return ctx.redirect(f"/output-templates?edit={quote(name)}&saved={quote(name)}")
+
     @app.get("/account", response_class=HTMLResponse)
     async def account_page(request: Request, done: str = ""):
         ctx.need_user(request)
@@ -696,7 +747,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             source_run = from_run
         kw.setdefault("form", {})
         return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
-                          acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), uploads=UPLOADS, templates_=TEMPLATE_FILES,
+                          acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), output_templates=list(ctx.user_templates(request.state.user["id"])),
+                          uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
                           source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
 
@@ -782,6 +834,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return fail("Unknown output format.")
         cfg["output_format"] = "csv.zip" if fmt_ == "csv" else fmt_     # the web app always zips its CSVs: a fifth of the size to store and to download
         cfg["excel_fallback"] = "csv.zip"                               # an Excel table over the row limit is written as zipped CSV (outputs.ExcelLimit)
+        tname = str(form.get("output_template", "")).strip()
+        if tname:
+            tmpl = ctx.user_templates(u["id"]).get(tname)
+            if tmpl is None:
+                return fail("Unknown output template.")
+            cfg["output_template"], cfg["output_template_name"] = tmpl, tname
         label = str(form.get("label", "")).strip()[:120]
 
         # --- inputs

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Output templates{% endblock %}
+{% block content %}
+<h1>Output templates</h1>
+<p>An output template is a list of measure-level columns, in order. A run given one (New run, Outputs) writes only those columns, in that order, to its
+  measure-level file; the Results tables, the portfolio summary and the key metrics still use every column. Every run also writes
+  <code>field_definitions</code>, the definition and documentation link of each column in its file.</p>
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if saved_ok %}<p class="ok">Saved "{{ saved_ok }}".</p>{% endif %}
+<section class="card">
+  <h2>Templates</h2>
+  <table class="list compact">
+    <thead><tr><th>Name</th><th>Columns</th><th></th></tr></thead>
+    <tbody>
+    {% for name, cols in all_templates.items() %}
+      <tr><td>{{ name }}{% if name in builtin %} <span class="muted">(built-in)</span>{% endif %}</td><td>{{ cols|length }}: {{ cols[:6]|join(', ') }}{% if cols|length > 6 %} ...{% endif %}</td>
+        <td><a href="{{ u('/output-templates') }}?edit={{ name|urlencode }}">{% if name in builtin %}Copy{% else %}Edit{% endif %}</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>{% if editing and editing not in builtin %}Edit "{{ editing }}"{% else %}New template{% endif %}</h2>
+  <form method="post" action="{{ u('/output-templates') }}" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Name <input type="text" name="name" maxlength="60" required value="{{ editing if editing and editing not in builtin else '' }}"></label>
+    <label>Columns, one per line, in the order the file should have them
+      <textarea name="columns" id="template-columns" rows="16" required>{{ columns|join('\n') }}</textarea></label>
+    <div class="actions"><button class="primary">Save template</button>
+      {% if editing and editing not in builtin %}<button name="delete" value="1" class="danger">Delete template</button>{% endif %}</div>
+  </form>
+</section>
+<section class="card">
+  <h2>Columns you can use</h2>
+  <p class="muted">Add puts a column at the end of the list above. Each name links to its definition.</p>
+  {% for group, items in catalog %}
+  <details class="info-box"><summary>{{ group }} ({{ items|length }})</summary>
+    <table class="list compact">
+      <tbody>{% for col, text, link in items %}
+        <tr><td><button type="button" class="small" data-add-column="{{ col }}">Add</button></td><td><a href="{{ u('/docs/' ~ link) }}"><code>{{ col }}</code></a></td><td>{{ text }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </details>
+  {% endfor %}
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

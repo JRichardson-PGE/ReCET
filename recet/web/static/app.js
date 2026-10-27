@@ -292,4 +292,16 @@
     next.addEventListener("click", function () { pageNo += 1; apply(); vlTable.scrollIntoView({ block: "start" }); });
     apply();
   }
+
+  // Output templates page: "Add" puts a column at the end of the template's list
+  var tmplCols = document.getElementById("template-columns");
+  if (tmplCols) {
+    document.querySelectorAll("[data-add-column]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = tmplCols.value.replace(/\s+$/, "");
+        tmplCols.value = (v ? v + "\n" : "") + b.getAttribute("data-add-column") + "\n";
+        tmplCols.focus();
+      });
+    });
+  }
 })();
