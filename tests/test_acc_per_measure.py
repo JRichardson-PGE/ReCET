@@ -37,8 +37,7 @@ def test_each_measure_is_priced_on_its_own_acc_version(tmp_path):
     f = r.frame.set_index("CEInputID")
     assert f.loc["ON_RUN", "ElecBen"] == pytest.approx(expected_flat_value(1000, 0.100, _rate(2026)), rel=1e-12)
     assert f.loc["ON_OTHER", "ElecBen"] == pytest.approx(expected_flat_value(1000, 0.050, _rate(2024)), rel=1e-12)
-    assert f.loc["ON_RUN", "POC_ACC"] == versions.acc_label(2026) and f.loc["ON_OTHER", "POC_ACC"] == versions.acc_label(2024)
-    assert list(f["poc_acc_version"]) == ["2026", "2024"]
+    assert f.loc["ON_RUN", "Used_ACCVersion"] == versions.acc_label(2026) and f.loc["ON_OTHER", "Used_ACCVersion"] == versions.acc_label(2024)
 
 
 def test_unknown_acc_version_is_a_preflight_error(tmp_path):

@@ -4,11 +4,11 @@ Levels (`LEVELS`): measure, program (PrgID), program sector (the program's Prima
 portfolio. Every level above the measure is a sum over its measures; ratio columns are recomputed from the summed benefits and costs (`outputs.group_ratios`,
 the same definition the portfolio summary and CET's run receipt use), never averaged.
 
-The PA of a measure (`pa_of`) is its program's administrator: the `PA` of its ProgramCost row (`CreditedIOU`), else the program's PA in the Programs list
+The PA of a measure (`pa_of`) is its program's administrator: the `PA` of its ProgramCost row (`CreditedPA`), else the program's PA in the Programs list
 (`Prg_PA`), else the IOU territory the measure is priced in. So a REN or CCA program filters under the REN or CCA, and an unallocated statewide program under SW.
 
 Columns: `catalog(frame)` lists what a view can show - the run's additive output columns (benefits, costs, savings, emissions, bill impacts, components ...),
-the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, `poc_` fields, measure-level ratios, shares and statuses are not offered: they do not
+the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, derived pricing inputs (`Used_Year`, `AC_kWh_1st_Baseline` ...), measure-level ratios, shares and statuses are not offered: they do not
 add up across measures. `DEFAULT_VIEW` is the built-in view; users save their own (`load_views` / `save_views`, kept in the tool's config file).
 
 Memory (`RunResults`): every level above the measure is built from the run's GROUP SUMS -- one row per (PA, PrgID, program name, sector, segment) with each
@@ -66,9 +66,9 @@ RATIOS = [
     Column("SCH_NoAdmin_ratio", "SCT High (no admin)", "ratio", "ratio", help="SCT High ratio without program-level costs"),
 ]
 DERIVED = [
-    Column("TotalCO2Lifecycle", "CO2 avoided, lifecycle (t)", "derived", "tonnes", ("NetElecCO2Lifecycle", "NetGasCO2Lifecycle"),
+    Column("TotalCO2Lifecycle", "CO2 avoided, lifecycle (t)", "derived", "tonnes", ("LifecycleNetElecCO2", "LifecycleNetGasCO2"),
            "Net electric + net gas CO2 avoided over the measures' lives, metric tons"),
-    Column("TotalCO2FirstYear", "CO2 avoided, first year (t)", "derived", "tonnes", ("NetElecCO2", "NetGasCO2"),
+    Column("TotalCO2FirstYear", "CO2 avoided, first year (t)", "derived", "tonnes", ("FirstYearNetElecCO2", "FirstYearNetGasCO2"),
            "Net electric + net gas CO2 avoided in the measures' first year, metric tons"),
 ]
 # Friendlier labels (and formats) for the sum columns most views use; any other additive output column is offered under its own name.
@@ -80,14 +80,15 @@ LABELS = {
     "RIMCost": ("RIM cost ($)", "usd"), "SCBCost": ("SCT Base cost ($)", "usd"), "SCHCost": ("SCT High cost ($)", "usd"),
     "PCTBen": ("PCT benefits ($)", "usd"), "PCTCost": ("PCT cost ($)", "usd"),
 }
-NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}
+NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}     # WeightedSavings: a run written before 0.1.50
 _INPUTS = set(templates.MEASURE_COLUMNS)
+_DERIVED = {"Used_ACCVersion", *outputs.DERIVED_OUTPUTS.values()}
 
 
 def pa_of(frame: pd.DataFrame) -> pd.Series:
-    """Each measure's PA: CreditedIOU, else Prg_PA, else the IOU territory (see the module docstring)."""
+    """Each measure's PA: CreditedPA, else Prg_PA, else the IOU territory (see the module docstring)."""
     out = pd.Series("", index=frame.index, dtype=object)
-    for col in ("CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"):
+    for col in ("CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"):      # CreditedIOU / poc_PA: a run written before 0.1.50
         if col in frame:
             v = frame[col].fillna("").astype(str).str.strip()
             out = out.where(out != "", v)
@@ -100,8 +101,9 @@ def _is_ratio_column(c: str) -> bool:
 
 
 def _summable(c: str) -> bool:
-    """A column a group total may add up (when it is numeric): not an input, a poc_/Prg_ field, a share, a per-measure ratio or a group-sum key."""
-    return not (c in _INPUTS or c.startswith(("poc_", "Prg_", "_")) or c in NOT_ADDITIVE or _is_ratio_column(c))
+    """A column a group total may add up (when it is numeric): not an input, a derived pricing input (Used_Year, AC_kWh_1st_Baseline ...; poc_ before
+    0.1.50), a Prg_ field, a share, a per-measure ratio or a group-sum key."""
+    return not (c in _INPUTS or c in _DERIVED or c.startswith(("poc_", "Prg_", "_")) or c in NOT_ADDITIVE or _is_ratio_column(c))
 
 
 def catalog(frame: pd.DataFrame) -> dict[str, Column]:
@@ -270,7 +272,7 @@ def _combine(parts: list[pd.DataFrame]) -> pd.DataFrame:
     return allp.groupby(keys, sort=False, dropna=False)[cols].sum(min_count=1).reset_index()
 
 
-KEY_SOURCES = {"CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", "PrgID", "Prg_ProgramName", "Prg_PrimarySector", "Prg_ProgramSegment"}
+KEY_SOURCES = {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", "PrgID", "Prg_ProgramName", "Prg_PrimarySector", "Prg_ProgramSegment"}
 
 
 def _needed_for_sums(schema) -> list[str]:
@@ -341,7 +343,7 @@ def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None, sums: pd.D
 
 
 RATIO_INPUTS = {"ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
-                "TaxCredits", "BillIncrElec", "BillIncrGas", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin",
+                "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin",
                 "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin", "PCTBen", "PCTCost"}     # every column outputs._ratio_parts reads
 
 
@@ -417,7 +419,7 @@ class RunResults:
             return filter_pa(outputs.read_table(self.path), pa)
         import pyarrow.parquet as pq
         pf = pq.ParquetFile(self.path)
-        want = {"CEInputID", "MeasDescription", "PrgID", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"}
+        want = {"CEInputID", "MeasDescription", "PrgID", *(KEY_SOURCES & {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"})}
         for c in cols:
             want |= set(c.parts) if c.kind == "derived" else (RATIO_INPUTS if c.kind == "ratio" else {c.key})
         names = [n for n in pf.schema_arrow.names if n in want]
@@ -469,9 +471,21 @@ def load_views() -> tuple[dict[str, list[str]], str]:
     views = {DEFAULT_VIEW_NAME: list(DEFAULT_VIEW)}
     for name, keys in (saved.get("views") or {}).items():
         if name != DEFAULT_VIEW_NAME and isinstance(keys, list):
-            views[name] = [str(k) for k in keys]
+            views[name] = current_keys(keys)
     current = saved.get("current") if saved.get("current") in views else DEFAULT_VIEW_NAME
     return views, current
+
+
+def current_keys(keys) -> list[str]:
+    """A saved view's column keys under the names a run writes now: a column renamed in 0.1.50 (NetElecCO2 -> FirstYearNetElecCO2 ...) gets its new name,
+    one no longer written is dropped (fieldnames.output_name)."""
+    from .fieldnames import output_name
+    out = []
+    for k in keys:
+        n = output_name(str(k))
+        if n and n not in out:
+            out.append(n)
+    return out
 
 
 def save_views(views: dict[str, list[str]], current: str) -> None:

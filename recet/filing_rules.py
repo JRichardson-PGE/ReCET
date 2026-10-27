@@ -10,7 +10,7 @@ per rule set and version, and this module reads them as they are, so updating a 
 
 Each rule has a stable ID built from its content (`V` validation rule, `W` warning rule, `S` spec constraint, then six hex digits), so a rule that is in both
 sets, or in two versions of one set, keeps its ID. `check_frame` applies a set's rules to a table and returns, per rule, the rows that fail it; preflight
-reports them and the run flags the failing measures (FilingValidation, FilingRules). Nothing here stops a run: ReCET prices every record and says which ones
+reports them and the run lists the failing records in its filing_validation table. Nothing here stops a run: ReCET prices every record and says which ones
 CEDARS would reject.
 
 How the rules are read (CEDARS' own code is not published, so these are choices, kept consistent):

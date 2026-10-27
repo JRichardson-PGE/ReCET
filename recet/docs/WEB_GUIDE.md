@@ -23,7 +23,7 @@ Open **New run**.
 3. **Pricing.** The **ACC version** is named by the year E3 released the calculator ("2026 ACC"); the 2021 and 2022 ACCs are TRC only. **Which ACC
    applies to my filing?** below it is a short table, one row per ACC: the budget filings priced on it and the program years whose claims use it (the ACC
    of the year's final budget filing); ACCs not yet in ReCET are dimmed. **Priced for** says what the run is for (any filing, Quarterly Claims, or one
-   budget filing): records priced on an ACC that does not normally apply to their program year are flagged (`ACCCheck` column, the input check, and the run
+   budget filing): records priced on an ACC that does not normally apply to their program year are flagged (in the input check and on the run
    page), never stopped. **Compare with** prices the job on a second ACC as well. **First Year**
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
    **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
@@ -35,7 +35,7 @@ Open **New run**.
    headline results and their main drivers by program, sector and end use). Emissions, leaving
    `Exclude_From_CE` programs out of the portfolio summary, and a combined 8,760 electric load profile are options.
 5. **CEDARS filing checks.** Quarterly Claims or Budget filing applies CEDARS' own upload checks and flags the records CEDARS would reject or warn on
-   (columns `FilingValidation` and `FilingRules`, and a `filing_validation` table). Nothing is blocked: the records are still priced.
+   (the `filing_validation` table and the input check). Nothing is blocked: the records are still priced.
 6. **Start run**, or **Check inputs only** to run just the input check a run makes before pricing (nothing is priced). The upload shows its progress.
 
 Runs wait in a queue and run one at a time (input checks first). A queued run shows its place in the queue and when it should start and finish.
@@ -66,7 +66,7 @@ until you show them. Queued and running runs update in place.
 
 **Results** (on the run page) shows the run's outputs as tables.
 
-- **PA** limits every table to one program administrator. A measure's PA is its credited IOU, else its program's PA, else its IOU territory.
+- **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
 - **Levels:** portfolio, program segment, program sector, program, and measure. Every level above the measure is a sum of its measures; ratios are
   recomputed from the summed benefits and costs. The measure level is shown for runs of up to 50,000 measures, and for up to 5,000 measures of the chosen
   PA; a larger run's measure-level table is in its files.

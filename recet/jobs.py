@@ -5,8 +5,8 @@
 
 Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
 
-  measure_level_<acc>.csv        (or .csv.zip / .xlsx / .parquet, per output_format) one row per measure: the raw input columns, the derived poc_* fields, pricing status, every output (see outputs.py)
-  portfolio_summary_<acc>.csv    totals and ratios overall, by IOU territory, by credited IOU and by program segment
+  measure_level_<acc>.csv        (or .csv.zip / .xlsx / .parquet, per output_format) one row per measure: the raw input columns, the derived pricing inputs, pricing status, every output (see outputs.py)
+  portfolio_summary_<acc>.csv    totals and ratios overall, by IOU territory, by credited PA and by program segment
   preflight.txt                  the input check that ran first
   preflight.json                 the same check as JSON (ok, stats, issues), read by the web app's Validate inputs panel
   run_settings.json              everything needed to reproduce the run (options, resolved ACC files, supplied files with sizes, package version, timings)
@@ -81,7 +81,7 @@ class RunConfig:
     output_template: list[str] = field(default_factory=list)   # the measure-level file's columns, in order (BR-06.10; output_templates.py); empty = every column
     output_template_name: str = ""           # the template's name, for the record
     acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
-                                             # not normally apply to their program year are flagged (preflight, ACCCheck column, run_settings.json), never stopped
+                                             # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 20_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     # --- test hook (not shown in the GUI)
@@ -453,15 +453,12 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     log("\n== writing results ==")
     acc_labels = measures["acc_version"].map({k: g.label for k, g in groups.items()})
     frame = outputs.assemble_measure_level(raw, measures, res, acc_labels if len(groups) > 1 else acc.label,
-                                           credited=outputs.credited_iou(measures, cfg.programcost, cfg.allocate_statewide))
+                                           credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
     if comps is not None:
         frame = frame.merge(comps, left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
-        cols = [c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]
+        cols = [c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]
         frame = frame[cols]
     frame = outputs.attach_programs(frame, measures["prg_id"])
-    frame = outputs.attach_acc_check(frame, measures, cfg.acc_purpose)
-    if result.filing is not None:
-        frame = outputs.attach_filing(frame, outputs.filing_lookup(result.filing))
     result.frame = frame
     progress.report("writing")
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel,

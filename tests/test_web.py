@@ -354,10 +354,10 @@ def test_display_labels_name_output_columns_in_words():
     from recet import results_view as rv
     col = lambda k, fmt="usd": rv.Column(k, k, "sum", fmt)
     assert rv.display_label(col("ElecSupplyCost_SB")) == "Electric supply cost (SCT Base) ($)"
-    assert rv.display_label(col("BillIncrElec")) == "Bill increase electric ($)"
-    assert rv.display_label(col("NetElecCO2Lifecycle", "tonnes")) == "Net electric CO2 lifecycle (t)"
+    assert rv.display_label(col("LifecycleBillIncrElec")) == "Lifecycle bill increase electric ($)"
+    assert rv.display_label(col("LifecycleNetElecCO2", "tonnes")) == "Lifecycle net electric CO2 (t)"
     assert rv.display_label(rv.Column("TRC_ratio", "TRC", "ratio", "ratio")) == "TRC"                          # a column with a label keeps it
-    assert rv.column_group(col("GasBen_SH")) == "Societal Cost Tests (SCT)" and rv.column_group(col("NetElecNOx", "lbs")) == "Emissions"
+    assert rv.column_group(col("GasBen_SH")) == "Societal Cost Tests (SCT)" and rv.column_group(col("FirstYearNetElecNOx", "lbs")) == "Emissions"
 
 
 

@@ -115,8 +115,8 @@
       <select name="filing_validation" id="filing-validation">{% for o, t in (('', 'None'), ('claims', 'Quarterly Claims'), ('budget_filing', 'Budget filing')) %}<option value="{{ o }}" {% if f.get('filing_validation', '') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
     <label class="filing-year">Filing year <input type="text" name="filing_year" inputmode="numeric" placeholder="each record's claim year" value="{{ f.get('filing_year', '') }}"></label>
   </div>
-  <p class="muted small">Applies CEDARS' own upload checks for that filing and flags the records it would reject or warn on (the FilingValidation and FilingRules
-    columns, and a filing_validation table); the records are still priced.</p>
+  <p class="muted small">Applies CEDARS' own upload checks for that filing and flags the records it would reject or warn on (the filing_validation table and
+    the input check); the records are still priced.</p>
 </section>
 
 <div class="submit-row">

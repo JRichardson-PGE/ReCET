@@ -47,7 +47,7 @@ def test_load_shifting_only_measure_is_priced_in_one_record(tmp_path):
     assert found["kwh_per_unit_profile"]["cells"] == [["Measure", 0, "AC_Elec_Impact_Profile"]]          # it names its records, like every record finding
     assert f["ProfileSource"] == "user profile (kWh per unit)" and f["ElecPricingStatus"] == "priced: hourly profile"
     assert f["ElecBen"] == pytest.approx(10 * (0.300 - 0.050), rel=1e-12)    # hour 1 and hour 3 are both in Q1 of the claim year (no discounting)
-    assert f["FirstYearNetKWh"] == 0 and f["BillReducElec"] == 0               # no net annual kWh: no first-year kWh, no bill change on annual rates
+    assert f["FirstYearNetKWh"] == 0 and f["LifecycleBillReducElec"] == 0               # no net annual kWh: no first-year kWh, no bill change on annual rates
 
 
 def test_kwh_per_unit_profile_gives_the_same_value_as_a_share_profile_and_the_kwh_it_implies(tmp_path):
@@ -56,7 +56,7 @@ def test_kwh_per_unit_profile_gives_the_same_value_as_a_share_profile_and_the_kw
     share = _run(tmp_path, {"UnitkWh1stBaseline": "1000"}, _profile(tmp_path / "u.csv", flat / 1000.0, basis="share"), "share").frame.iloc[0]
     assert scaled["ElecBen"] == pytest.approx(share["ElecBen"], rel=1e-12)
     assert scaled["FirstYearNetKWh"] == pytest.approx(share["FirstYearNetKWh"], rel=1e-12) == pytest.approx(1000.0)
-    assert scaled["poc_unit_kwh_1st"] == pytest.approx(1000.0)            # the UnitkWh1stBaseline it was given (0) is replaced by the profile's annual kWh
+    assert scaled["AC_kWh_1st_Baseline"] == pytest.approx(share["AC_kWh_1st_Baseline"], rel=1e-12)    # the profile's own annual kWh, not UnitkWh1stBaseline (0)
 
 
 def test_loader_rejects_an_all_zero_or_mixed_basis_profile(tmp_path):

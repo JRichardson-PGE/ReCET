@@ -169,7 +169,7 @@ def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2024) -> float:
 
 def get_co2_gas(pa: str, acc_version: int = 2024) -> float:
     """RunParameters `CO2Gas` (CET's Settingsvw.CO2Gas): metric tons CO2 per therm of gas
-    saved, used by CalcEmissions for NetGasCO2/GrossGasCO2. 0.00531 for
+    saved, used by CalcEmissions for FirstYearNetGasCO2/FirstYearGrossGasCO2. 0.00531 for
     Version 2026 (older versions differ, e.g. 0.00585 for 2020)."""
     pa_key = PA_ALIASES.get(pa.upper().replace("&", ""), pa.upper())
     return _settings_row(pa_key, int(acc_version))[1]

@@ -90,6 +90,18 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.50 (2026-10-27, Jake's field dictionary, CEDARS-Research `deliverables/recet_field_dictionary/ReCET_Field_Dictionary.xlsx`): output columns renamed and
+  dropped, and the input / output definitions and units replaced by Jake's. `fieldnames.OUTPUT_RENAMES` (39: `POC_ACC` -> `Used_ACCVersion`, the kept `poc_`
+  values -> `Used_Year`, `AC_kWh_1st_Baseline` ..., bills -> `LifecycleBill...`, emissions -> `FirstYear...` / `Lifecycle...` with PM10 -> `...ElecPM10`,
+  `CreditedIOU` -> `CreditedPA`; two of Jake's names were typos, fixed with his OK) and `OUTPUT_REMOVED` (36 `poc_` restatements, `ProgramCosts`,
+  `WeightedSavings`, `FilingValidation` / `FilingRules` / `ACCCheck`, which are now only in filing_validation and preflight). Renamed throughout the code, not
+  just at write time; `outputs.DERIVED_OUTPUTS` lists the nine derived columns written (`AC_kWh_*_Baseline` = annual net kWh x IR x RR, which differs from
+  `shape_scale` on a kWh-per-unit profile). Old names still work in output templates and saved Results views (`output_templates.current`,
+  `results_view.current_keys`), a CET outputs file's own names are read as ReCET's (`fieldnames.cet_outputs_to_recet`), and the Results page still opens a
+  run written before 0.1.50. The summary group "credited IOU" is now "credited PA". OUTPUT_FIELDS: section 1 entries carry Jake's descriptions (per-column
+  "- `Col`: ..." lines where they differ, which `field_docs` reads); 1.17 / 1.18 moved to 2.10 / 2.9b; the rename table is in 2.1. INPUT_FIELDS: Jake's
+  definitions, one row per field, with an "In ReCET:" note where ReCET's use differs (e.g. RateScheduleElec/Gas not used; CombustionType has no Res Furnace
+  default, blank = gas NOx 0). `run_poc.program_share_totals(d)` no longer takes the measures; `outputs.restated_differs` and chunked's per-part raw re-read are gone.
 - 0.1.49 (2026-10-27, Jake; TIER2_PLAN step 4, BR-06.15): the minimal input set. `templates.DESCRIPTIVE_MEASURE_COLUMNS` (MeasDescription, Sector: the
   preflight's required columns that editor.EFFECTS gives no effect, CEInputID aside; a test keeps them in step) may be left out: `templates.with_defaults`
   adds them blank in the loader, `outputs.read_raw` and preflight, which warns `missing_descriptive_column`; a missing calculation column

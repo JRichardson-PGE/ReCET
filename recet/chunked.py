@@ -6,8 +6,7 @@ the parts (preflight.check_inputs). Then two passes over the parts:
 
   pass 1, per part: load its measures; price every measure-level value (run_poc.price_measure_values: benefits, supply costs, participant and bill-impact PVs,
           the societal variants, discounted savings), the emissions and (components mode) the ACC components; write them to `_parts/values`; add the part's
-          program totals (run_poc.program_share_totals) to the job's; note which derived fields restate their raw column (outputs.restated_differs); and in
-          combined-8760 mode take the part's hourly profile.
+          program totals (run_poc.program_share_totals) to the job's; and in combined-8760 mode take the part's hourly profile.
   pass 2, per part: load the measures again and read their values back; finish the cost tests with the WHOLE job's program totals (run_poc.apply_program_costs
           with `totals`), so each measure gets the share of its program's costs it gets in the whole job; assemble the part's measure-level rows and append them
           to the output file (outputs.TableWriter); add them to the portfolio summary (outputs.SummaryParts) and the CET comparison.
@@ -71,7 +70,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     log("\n== pricing (TRC" + (", SCB, SCH" if societal else "") + f", PAC, RIM, bill impacts) in {len(parts)} parts ==")
     t0 = time.time()
     progress.report("pricing", 0, len(parts))
-    totals, restated, n_measures = None, set(), 0
+    totals, n_measures = None, 0
     comp_checks, profiles = [], []
     for i, (f, start, n) in enumerate(parts):
         tp = time.time()
@@ -92,7 +91,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if len(groups) > 1:
             runtime.switch_acc(acc)
         d = pd.concat(vals, ignore_index=True) if len(vals) > 1 else vals[0]
-        totals = cost_tests.combine_share_totals(totals, run_poc.program_share_totals(d, measures))
+        totals = cost_tests.combine_share_totals(totals, run_poc.program_share_totals(d))
         d.to_parquet(spill / f"values_{i:04d}.parquet", index=False)
         if ems:
             pd.concat(ems, ignore_index=True).to_parquet(spill / f"emissions_{i:04d}.parquet", index=False)
@@ -100,7 +99,6 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             c = pd.concat(comps, ignore_index=True)
             c.to_parquet(spill / f"components_{i:04d}.parquet", index=False)
             comp_checks.append((d[["measure_id", "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost"]], c))
-        restated |= outputs.restated_differs(outputs.read_raw(f, cfg.allocate_statewide), measures)
         if years:
             profiles.append(profile8760.portfolio_profile(measures, years, log=lambda s: None))
         n_measures += len(measures)
@@ -144,7 +142,6 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     cet_sums: dict[str, tuple[float, float]] = {}
     matched = 0
     labels = {k: g.label for k, g in groups.items()}
-    filing = outputs.filing_lookup(result.filing) if result.filing is not None else None     # CEDARS filing checks: built once, attached to every part
     for i, (f, _start, _n) in enumerate(parts):
         measures = load(f)
         res = run_poc.apply_program_costs(pd.read_parquet(spill / f"values_{i:04d}.parquet"), measures, program, acc_version=acc.settings_acc,
@@ -153,14 +150,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             res = res.merge(pd.read_parquet(spill / f"emissions_{i:04d}.parquet"), on="measure_id", how="left")
         frame = outputs.assemble_measure_level(outputs.read_raw(f, cfg.allocate_statewide), measures, res,
                                                measures["acc_version"].map(labels) if len(groups) > 1 else acc.label,
-                                               credited=outputs.credited_iou(measures, cfg.programcost, cfg.allocate_statewide), restated=restated)
+                                               credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
         if cfg.components:
             frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
-            frame = frame[[c for c in frame.columns if c != "CreditedIOU"] + ["CreditedIOU"]]
+            frame = frame[[c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]]
         frame = outputs.attach_programs(frame, measures["prg_id"])
-        frame = outputs.attach_acc_check(frame, measures, cfg.acc_purpose)
-        if filing is not None:
-            frame = outputs.attach_filing(frame, filing)
         writer.write(frame)
         summary_parts.add(frame)
         km_parts.append(key_metrics.sums(frame))

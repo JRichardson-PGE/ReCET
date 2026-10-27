@@ -414,4 +414,4 @@ def test_array_bill_impact_participant_and_other_costs_equal_the_per_measure_ver
                      (engine.price_other_ben_cost(m, 0.05, 0.05), engine.price_other_ben_cost_per_measure(m, 0.05, 0.05))):
         pd.testing.assert_frame_equal(got[ref.columns].reset_index(drop=True), ref.reset_index(drop=True), check_dtype=False, rtol=1e-12, atol=1e-9)
     bills = engine.price_bill_impact(m, elec, gas, rate, 2024)
-    assert (bills.BillIncrElec > 0).any() and (bills.BillReducElec < 0).any() and (bills.BillReducGas != 0).any()      # both sign rules were exercised
+    assert (bills.LifecycleBillIncrElec > 0).any() and (bills.LifecycleBillReducElec < 0).any() and (bills.LifecycleBillReducGas != 0).any()      # both sign rules were exercised

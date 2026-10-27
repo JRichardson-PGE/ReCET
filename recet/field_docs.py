@@ -3,8 +3,8 @@ table can carry a definition and a link for every column (BRD BR-06.10).
 
     definition("ElecBen") -> Definition("ElecBen", "OUTPUT_FIELDS.md", "elecben", "The lifetime value of the measure's net electric savings ...")
 
-An OUTPUT_FIELDS.md entry is a `####` heading naming one or more columns, whose first paragraph is the definition, or a table row whose first cell names the
-columns and whose second cell is the definition (the link is then the section's heading). `anchor` is the heading's id as the web app's Docs pages make it
+An OUTPUT_FIELDS.md entry is a `####` heading naming one or more columns, whose first paragraph is the definition (or, when the columns are defined one by
+one, a list of lines "- `Column`: definition"), or a table row whose first cell names the columns and whose second cell is the definition (the link is then the section's heading). `anchor` is the heading's id as the web app's Docs pages make it
 (Python-Markdown's toc slug), so `/docs/OUTPUT_FIELDS.md#elecben` opens the entry. Columns written per ACC component (`ElecValue_<component>`) share one
 definition. No document is read until a definition is asked for, and each is read once.
 """
@@ -76,8 +76,13 @@ def _output_entries() -> dict[str, Definition]:
                 while j < len(lines) and lines[j].strip() and not lines[j].startswith(("#", "|", "```")):
                     para.append(lines[j])
                     j += 1
+                own = {}                                   # "- `Column`: definition" lines: one definition per column
+                for p in para:
+                    b = re.match(r"^- `([^`]+)`: (.+)$", p)
+                    if b:
+                        own[b.group(1)] = b.group(2)
                 for n in names:
-                    out.setdefault(n, Definition(n, doc, section, _plain(" ".join(para))))
+                    out.setdefault(n, Definition(n, doc, section, _plain(own.get(n) or " ".join(para))))
             i += 1
             continue
         if line.startswith("|") and not re.match(r"^\|\s*-", line):
@@ -99,12 +104,18 @@ def _input_entries() -> dict[str, Definition]:
     text = text[start:text.index("## 2. ", start)]
     out: dict[str, Definition] = {}
     section = slug("1. `Measure.csv`")
+    names_table = False                                  # the table of CET's legacy names: not a definition
     for line in text.splitlines():
         m = re.match(r"^(#{2,4}) (.+)$", line)
         if m:
             section = slug(m.group(2))
             continue
-        if line.startswith("|") and not re.match(r"^\|\s*-", line):
+        if not line.startswith("|"):
+            names_table = False
+            continue
+        if line.startswith("| ReCET name"):
+            names_table = True
+        if not names_table and not re.match(r"^\|\s*-", line):
             cells = _cells(line)
             names = re.findall(r"`([^`]+)`", cells[0]) if cells else []
             if names and len(cells) > 1:
