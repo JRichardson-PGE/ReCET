@@ -183,7 +183,7 @@ Gen(y, i)  = AC(y, i) - TD(y, i)                                                
 
 1. `PA` to an ACC utility: `PGE` = PG&E, `SCE` = SCE, `SDGE` = SDG&E. `SCG` (a gas-only utility) is priced in each zone entirely - generation, T&D and emission
    rate - by **one** utility: SCE where the ACC file has SCE's own rows for that zone, otherwise PG&E where it has PG&E's, otherwise SCE (with the fallbacks below).
-   SCE's CZ5 stand-in (item 2) does not count as SCE data, so SCG CZ5 is PG&E. On both built-in ACCs: SCE in 6, 8, 9, 10, 13, 14, 15, 16; PG&E in 1, 2, 3A, 3B, 4, 5,
+   SCE's CZ5 stand-in (item 2) does not count as SCE data, so SCG CZ5 is PG&E. On the 2024 and 2026 ACCs: SCE in 6, 8, 9, 10, 13, 14, 15, 16; PG&E in 1, 2, 3A, 3B, 4, 5,
    11, 12.
 2. The zone is `"CZ" + AC_Climate_Zone`. Three (utility, zone) pairs that the ACC model does not export are stood in for by a documented neighbour: SCE CZ5 uses SCE CZ9;
    SDG&E CZ6 and CZ8 use SDG&E CZ7.
@@ -487,11 +487,11 @@ All of these match CET's own columns to the cent with 0% and 5% market effects (
 
 ## C9 Bill impacts
 
-The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses the E3 retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to, and `RateG` ($/therm) for
+The ratepayer bill change for RIM. Unlike C5 it is **annual**, not quarterly, and uses CET's retail rate schedules: `RateE` ($/kWh) for the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to, and `RateG` ($/therm) for
 (`PA`, `AC_Gas_Target_Sector`). Like the benefits it uses `NTG + MEB` (CalcCE prices the bill on `Qty x (NTGRkWh + MEBens)` and `(NTGRThm + MEBens)`), and the measure-level
 `RateScheduleElec` / `RateScheduleGas` columns are not read.
 
-With `yr1 = Y0 - BaseYear` (RunParameters `BaseYear`, 2024), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
+With `yr1 = Y0 - BaseYear` (RunParameters `BaseYear` of the ACC version, C3.3: 2021, 2022, or 2024 for the 2024 and 2026 ACCs), `E = EUL`, `R = RUL`, `full = floor(E)`, `rem = E - full`, `n = full + 1 if rem > 1e-9 else full`:
 
 ```text
 floor_rul = floor(R) if R > 0 else full                                     boundary share of the 1st baseline:  b = R - floor(R) if R > 0 else 1
@@ -501,7 +501,7 @@ PV(s1, s2, rates) =   SUM over k = 0 ... min(floor_rul, n) - 1 of        s1 * ra
       where  wt = rem if k = n-1 and rem > 1e-9, else 1          v(k) = b * s1 + (1 - b) * s2  if k = floor_rul,   else s2
 ```
 
-The second sum's exponent `k + yr1` (years since 2024, not since the claim) reproduces what CalcCE's SQL does for the boundary year and every 2nd-baseline year; it was confirmed against real CET output
+The second sum's exponent `k + yr1` (years since `BaseYear`, not since the claim) reproduces what CalcCE's SQL does for the boundary year and every 2nd-baseline year; it was confirmed against real CET output
 to the cent, so it is kept rather than "corrected".
 
 ```text
@@ -646,14 +646,14 @@ off makes both 0.
 
 **Validated** (2026-10-08) on CET jobs 121842 (0%) and 121841 (5%), the same 13-measure PG&E job: every column the setting changes in CET changes the same way here
 (benefits, net emissions, bill impacts, TRC / SCT costs, participant costs; `NetParticipantCostPV`, the Gross columns and the PAC cost do not change in either), and the
-participant-cost columns match CET to the cent. CET's run used its avoided-cost Version 2024, which this tool does not have, so benefit levels were compared as ratios.
+participant-cost columns match CET to the cent. CET's run used its avoided-cost Version 2024 (the 2022 ACC), which this tool did not have yet, so benefit levels were compared as ratios.
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## C14 Emissions
 
 Emission columns are produced when "Include emissions" is on. "First-year" is the measure's **first four quarters** of life (not the calendar year); "Lifecycle" is all of them; "Net" includes NTG (and `MEB`), "Gross" does not.
-Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and RunParameters `CO2Gas` = 0.00531 is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
+Units: **CO2 in metric tons** (confirmed; the ACC's rate is `tonnes/kWh` and RunParameters `CO2Gas` = 0.00531 (0.00585 for the 2021 ACC) is metric tons per therm, so CET's SQL comments that say "lbs" for CO2 are wrong). NOx and PM10 are in **pounds** (confirmed).
 
 **C14.1 Electric CO2 per annual kWh, by quarter** (`co2(qidx)`, `qidx = 4 * year + quarter`, quarter 1-4):
 
@@ -663,11 +663,12 @@ co2(year, q) = SUM over hours i in quarter q of  shape_year(i) * rate(year, i)  
 
 Quarters exist only for years present in the ACC file: life beyond its last year adds **no** emissions (unlike prices, which use the nearest year).
 
-**C14.2 Kilowatt-hours in a quarter.** With `eul = EUL`, `rul = RUL` (0 if `RUL >= EUL`), `rulq = 4 * rul`, `eulq = 4 * eul`, quarter offset `k = qidx - install` where `install = 4 * Y0 + q0`, and per-unit `kWh1, kWh2`:
+**C14.2 Kilowatt-hours in a quarter.** With `eul = EUL`, `rul = RUL` (0 if `RUL >= EUL`), `rulq = 4 * rul`, `eulq = 4 * eul`, quarter offset `k = qidx - install` where `install = 4 * Y0 + q0`, and per-unit `kWh1, kWh2` (`Used_UnitkWh1stBaseline`, `Used_UnitkWh2ndBaseline`; on a kWh-per-unit
+profile, C4.5, the profile's hours carry the kWh):
 
 ```text
 single baseline (rulq = 0):   AnnualkWh(k) = 0 if kWh1 = 0;   kWh1 * (eulq mod 1) if k < eulq < k + 1 (the last part-quarter);   else kWh1
-dual baseline:                kWh1 if rulq > k + 1;      kWh2 if rulq < k and eulq > k + 1;
+dual baseline:                0 if kWh1 = kWh2 = 0;   kWh1 if rulq > k + 1;      kWh2 if rulq < k and eulq > k + 1;
                               kWh1*(rulq mod 1) + kWh2*(eulq - rulq)     if the RUL and the end of life fall in the same quarter;
                               kWh1*(rulq mod 1) + kWh2*(1 - rulq mod 1)  if only the RUL falls in it;      kWh2*(eulq - floor(eulq))  if only the end of life does;   else kWh2
 quarters counted: install <= qidx < install + eulq
@@ -689,7 +690,7 @@ GasCO2    = fg * CO2Gas(PA) * G          GasNOx = fg * NOxfactor * G          NO
 ```
 
 The Emissions table covers only a slice of the (PA, sector, end use, zone) keys, so NOx and PM10 are 0 for most electric measures (this is CET's own behaviour). Output columns: `FirstYearNetElecCO2`, `FirstYearNetElecNOx`, `FirstYearNetElecPM10`, `FirstYearNetGasCO2`, `FirstYearNetGasNOx`,
-the five `Gross...` counterparts, and the ten `...Lifecycle` columns.
+the five `FirstYearGross...` counterparts, and the ten `Lifecycle...` columns (`LifecycleNet...`, `LifecycleGross...`).
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -866,8 +867,8 @@ Program `PRG1`: 2028 costs 1,500 (admin) + 500 (marketing); 2029 costs 1,000 (EM
 Sums: `V_elec` = 5,841.50, `V_gas` = 3,454.03, `V_water` = 30.67. (Row 0: 34,200 x 0.080 x 2208/8760 x 0.962773 = 663.95; gas row 0: 1,620 x 1.00 x 3/12 x 0.962773 = 389.92; water row 0: 205.2 x 0.070 x 2208/8760 x 0.962773 = 3.49.)
 
 **C6 / C7 / C8 / C9.** Not a fuel-substitution measure, so `ElecBen` = `V_elec`, `GasBen` = `V_gas`, all supply costs 0; `Wt1 > 0` so `WaterEnergyBen` = `V_water`. `OtherBen` = 100 x (0.8) x (0 + 0 + 2) = 160; `OtherCost` = 100 x 0.8 x 1 = 80; `TaxCredits` = 100 x 0.8 x 5 = 400.
-Qm = (2028 - 2028) x 4 + 2 = 2, `PVF` = 1.01915^2 = 1.038672. `IncentsDI` = 100 x 40 = 4,000, `Rebates` = 2,000, so `RebatesandIncentsPV` = 6,000 / 1.038672 = 5,776.64. `GrossMeasCostPV` = 100 x 200 / 1.038672 = 19,255.4;
-excess = pos(4,000 / 1.038672 - 19,255.4) = 0; `GrossParticipantCostPV` = 19,255.4 - 5,776.64 = 13,478.82; `NetParticipantCostPV` = 0.9 x 13,478.82 = 12,130.94. Bill impact (C9): yr1 = 4, floor_rul = 2, boundary share 1, three billed years;
+Qm = (2028 - 2028) x 4 + 2 = 2, `PVF` = 1.01915^2 = 1.038667. `IncentsDI` = 100 x 40 = 4,000, `Rebates` = 2,000, so `RebatesandIncentsPV` = 6,000 / 1.038667 = 5,776.64. `GrossMeasCostPV` = 100 x 200 / 1.038667 = 19,255.4;
+excess = pos(4,000 / 1.038667 - 19,255.4) = 0; `GrossParticipantCostPV` = 19,255.4 - 5,776.64 = 13,478.82; `NetParticipantCostPV` = 0.9 x 13,478.82 = 12,130.94. Bill impact (C9): yr1 = 4, floor_rul = 2, boundary share 1, three billed years;
 `RateE` = 0.406249518 / 0.418437003 / 0.430990113 $/kWh for 2028 / 2029 / 2030, so `LifecycleBillReducElec` = 34,200 x 0.406249518 + 34,200 x 0.418437003 / 1.0766 + 0.4 x 34,200 x 0.430990113 / 1.0766^6 = 13,893.73 + 13,292.5 + 3,786.6 = 30,972.49.
 
 **C11 / C12.** One measure, so its share is 1: `WeightedBenefits` = 1, `WeightedProgramCost` = 2,000 + 1,000 = 3,000; `SumCostsNPV` = 2,000 + 1,000 / 1.0766 = 2,928.85.

@@ -253,14 +253,14 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
-    m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape, sums to 1"]
+    m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape: shares summing to 1<br/>(or kWh per unit, C4.5)"]
     shape -->|"rotate once onto the ACC's weekdays (C4.2)"| aligned["aligned shape"]
     acc["ACC hourly avoided cost<br/>for (IOU, zone, cost test, year)"] --> mult
     aligned --> mult["multiply hour by hour:<br/>$ per annual kWh in each hour"]
     mult --> q["sum within each ACC quarter<br/>2,160 / 2,184 / 2,208 / 2,208 hours"]
     q --> d["x baseline phasing, 1st / 2nd baseline (C2.3)<br/>x quarterly discount at the PA's rate (C2.4)"]
     d --> s["sum over the measure's quarters<br/>claim quarter to claim quarter + EUL<br/>the last one prorated"]
-    s --> v["x annual net kWh = lifetime value"]
+    s --> v["x the annual net kWh it is scaled by<br/>(AC_Net_kWh_ScaledProfile_*, C1.2)<br/>= lifetime value"]
 ```
 
 Multiplying each hour before summing is what lets a measure that only shifts load have value; the CET nets annual savings first and prices it at zero.
