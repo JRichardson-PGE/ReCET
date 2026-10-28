@@ -179,7 +179,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
 | `openbca/workbook.py` | job | writes an OpenBCA Program Input workbook in OpenBCA's template layout |
-| `openbca/translate.py` | job | a CET job as an OpenBCA job priced on ReCET's own shapes, avoided costs and discount rates, with every known difference flagged; `compare_job` runs both tools and compares them (C3 / C4) |
+| `openbca/translate.py` | job | a CET job as an OpenBCA job priced on ReCET's own electric and gas shapes, avoided costs and discount rates, with every known difference flagged; `compare_job` runs both tools and compares them (C3 / C4) |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |

@@ -155,12 +155,16 @@ def test_program_input_workbook_has_openbcas_layout(tmp_path):
         workbook.write_program_input(tmp_path / "y.xlsx", m, None, {"Flat": np.zeros(10)})
 
 
-def _job_cfg(tmp_path, **measure):
+def _job_cfg(tmp_path, gas=False, **measure):
     from conftest import make_electric_acc, make_flat_profile_csv, make_measure_csv
     from recet.jobs import RunConfig
+    gas_file = None
+    if gas:
+        from test_calcs import make_gas_acc
+        make_gas_acc(gas_file := tmp_path / "gas.csv")
     return RunConfig(measures=str(make_measure_csv(tmp_path / "Measure.csv", **measure)), out_dir=str(tmp_path / "out"), run_name="t", acc_version="2026",
                      acc_electric_file=str(make_electric_acc(tmp_path / "acc.parquet")), profiles_8760_file=str(make_flat_profile_csv(tmp_path / "p.csv")),
-                     emissions=False, include_societal=False)
+                     acc_gas_file=str(gas_file) if gas else None, emissions=False, include_societal=False)
 
 
 def test_translation_sends_recets_quantity_shape_and_avoided_costs(tmp_path):
@@ -186,7 +190,31 @@ def test_translation_flags_every_known_difference(tmp_path):
     cfg = _job_cfg(tmp_path, ClaimYearQuarter="2028Q3", EUL_Yrs="2.5", NumUnits="1.5", NTGRCost="0.9", UnitDirectInstallMat="50",
                    UnitTherm1stBaseline="3", UnitMiscCosts="1")
     flags = set(translate.translate(cfg, tmp_path / "ob").table["differences"].iloc[0].split(", "))
-    assert flags == {"start_quarter", "fractional_eul", "fractional_units", "ntg_cost", "excess_incentive", "gas", "other"}
+    assert flags == {"start_quarter", "fractional_eul", "fractional_units", "ntg_cost", "excess_incentive", "unpriced", "other"}   # therms, no gas profile
+
+
+def test_translation_sends_recets_gas_shape_and_monthly_avoided_costs(tmp_path):
+    import numpy as np
+    import pandas as pd
+    from openpyxl import load_workbook
+    from recet.openbca import translate
+    from recet.pipeline import gas_avoided_cost, gas_savings_profiles
+    cfg = _job_cfg(tmp_path, gas=True, NumUnits="2", NTGRkWh="0.8", NTGRTherm="0.6", NTGRCost="0.8", EUL_Yrs="3", UnitTherm1stBaseline="50",
+                   AC_Gas_Impact_Profile="Winter Only")
+    t = translate.translate(cfg, tmp_path / "ob", test="TRC")
+    wb = load_workbook(t.program_input, read_only=True)
+    rec = dict(zip(*list(wb["Measure Inputs"].iter_rows(min_row=4, max_row=5, values_only=True))))
+    # one NTG per measure in OpenBCA (the kWh one here): the gas savings carry ReCET's priced therms, 2 x 50 x 0.6 = 60 therms = 6 MMBtu
+    assert rec["Natural Gas Savings Load Shape"] == "G_Winter Only" and rec["Avoided Cost Subset "] == "PGE CZ13 | G1"
+    assert rec["Adj. Gross Annual Natural Gas Savings (MMBTU)"] * 2 * 0.8 == pytest.approx(6.0)
+    shape = [r[1] for r in wb["Natural Gas Load Shapes"].iter_rows(min_row=3, values_only=True)]
+    assert np.allclose(shape, gas_savings_profiles.get_shape("Winter Only"))
+    avoided = pd.read_parquet(t.jurisdiction / "avoided_costs_ts.parquet")
+    gas = avoided[avoided["avoided_cost"] == "CA ACC Gas (G)"]
+    assert set(gas["year"]) >= {2028, 2029, 2030, 2031} and gas["hour_of_year"].isna().all()
+    expected = gas_avoided_cost.get_years_for_measure("PGE", "Residential", "Winter Only", "TRC")
+    assert np.allclose(gas[gas["year"] == 2031].sort_values("month")["avoided_cost_value"], np.asarray(expected[max(expected)]) * 10)   # last year beyond
+    assert t.table["differences"].iloc[0] == ""
 
 
 def test_comparison_allows_for_the_start_quarter(tmp_path):
@@ -197,6 +225,8 @@ def test_comparison_allows_for_the_start_quarter(tmp_path):
     ob = pd.DataFrame({"type": ["Measure"], "id": ["A"], "ELECTRIC Total ($)": [100.0 * 1.02 ** 2], "total_costs": [-50.0 * 1.02 ** 2]})
     c = translate.compare_with_recet(recet, ob, "TRC", table)
     assert c["electric_ratio_after_start_quarter"].iloc[0] == pytest.approx(1.0) and c["cost_ratio_after_start_quarter"].iloc[0] == pytest.approx(1.0)
+    recet["GasBen"], ob["NATURAL GAS Total ($)"] = [20.0], [20.0 * 1.02 ** 2]
+    assert translate.compare_with_recet(recet, ob, "TRC", table)["gas_ratio_after_start_quarter"].iloc[0] == pytest.approx(1.0)
 
 
 @pytest.mark.skipif(not os.environ.get("RECET_OPENBCA_HOME"), reason="needs RECET_OPENBCA_HOME (a synced OpenBCA checkout)")
@@ -207,3 +237,14 @@ def test_c3_openbca_prices_a_matched_measure_as_recet(tmp_path):
     s = translate.compare_job(cfg, tmp_path / "cmp", log=lambda s: None).set_index("test")
     assert (s["max_electric_deviation_after_start_quarter"] < 1e-5).all() and (s["max_cost_deviation_after_start_quarter"] < 1e-6).all()
     assert s.loc["TRC", "openbca_jst_ratio"] == pytest.approx(s.loc["TRC", "recet_ratio_on_openbca_terms"], rel=1e-5)
+
+
+@pytest.mark.skipif(not os.environ.get("RECET_OPENBCA_HOME"), reason="needs RECET_OPENBCA_HOME (a synced OpenBCA checkout)")
+def test_c3_openbca_prices_a_matched_gas_measure_as_recet(tmp_path):
+    """C3 with gas: a measure with kWh and therms (different NTGs) gives the same electric and gas values in both tools."""
+    from recet.openbca import translate
+    cfg = _job_cfg(tmp_path, gas=True, NumUnits="2", NTGRkWh="0.85", NTGRTherm="0.7", NTGRCost="0.85", EUL_Yrs="4", UnitEndUserRebate="30",
+                   UnitMeaCost1stBaseline="120", UnitTherm1stBaseline="40", AC_Gas_Impact_Profile="Winter Only")
+    s = translate.compare_job(cfg, tmp_path / "cmp", log=lambda s: None).set_index("test")
+    assert (s["max_gas_deviation_after_start_quarter"] < 1e-4).all() and (s["max_electric_deviation_after_start_quarter"] < 1e-5).all()
+    assert s.loc["TRC", "openbca_gas"] == pytest.approx(s.loc["TRC", "recet_gas"], rel=1e-4)
