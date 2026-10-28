@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.56 (2026-10-28; made 2026-10-27 for 0.1.52 but pushed after PR #38 merged): default `chunk_size` 50,000 (was 20,000), as the web server
+  already ran; about 1 GiB peak at 1M on the server. Diagrams use SVG text labels (`htmlLabels: false` in each diagram's front matter, for GitHub,
+  and in docs.js): HTML labels sit in a foreignObject that clips any text wider than Mermaid measured (e.g. a font that loads after measuring).
+  No `<b>` in labels (it prints literally as SVG text).
 - 0.1.55 (2026-10-28, Jake; plan and workbook in CEDARS-Review `deliverables/recet_renaming/`): the calculation code uses the input and output field names.
   The loader (`data_loading._derive_fields`) keeps the Measure fields under their own names (no `num_units`, `ntgr_kwh`, `shape_key` ... aliases) and names
   each derived value for the output it is written as (`Used_Year`, `AC_Net_kWh_1st_Baseline`, `Fuel_Sub_Flag`) or `Used_<field>` (`Used_UnitkWh1stBaseline`:

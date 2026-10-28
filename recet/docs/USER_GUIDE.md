@@ -220,7 +220,7 @@ off until you load one version's run folder.
 5. **Components** (if on), then **assemble and write** the measure-level table, the portfolio summary and any optional files; **combined 8760 profile** and **CET comparison** if requested.
 6. **Record.** `run_settings.json` lists the exact settings, files and timings.
 
-**Large jobs run in parts.** A `Measure.csv` with more than 20,000 rows (the `chunk_size` setting, `--chunk-size`) is split into parts of that many rows in the
+**Large jobs run in parts.** A `Measure.csv` with more than 50,000 rows (the `chunk_size` setting, `--chunk-size`) is split into parts of that many rows in the
 run folder's `_parts` folder (deleted at the end), and steps 2-5 work on one part at a time, so the run's memory is about that of one part whatever the job's size.
 The preflight checks each part and checks duplicate CEInputIDs and the ProgramCost alignment over the whole file. Pricing makes two passes: the first prices every
 part and adds up each program's totals (the benefits its costs are shared by); the second shares each program's costs over all its measures with those totals,
