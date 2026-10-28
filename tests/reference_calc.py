@@ -440,6 +440,8 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
         r["RIMRatio"], r["RIMRatioNoAdmin"] = ratio(rim_b, r["RIMCost"]), ratio(rim_b, r["RIMCostNoAdmin"])
         b_sb = r["ElecBen_SB"] + r["GasBen_SB"] + r["WaterEnergyBen_SB"] + r["OtherBen"]
         b_sh = r["ElecBen_SH"] + r["GasBen_SH"] + r["WaterEnergyBen_SH"] + r["OtherBen"]
+        # C12: each ratio's numerator, written as its own column
+        r["TRCBen"], r["PACBen"], r["RIMBen"], r["SCBBen"], r["SCHBen"] = b + r["TaxCredits"], b, rim_b, b_sb, b_sh
         r["SCBRatio"], r["SCHRatio"] = ratio(b_sb, r["SCBCost"]), ratio(b_sh, r["SCHCost"])
         r["SCBRatioNoAdmin"], r["SCHRatioNoAdmin"] = ratio(b_sb, r["SCBCostNoAdmin"]), ratio(b_sh, r["SCHCostNoAdmin"])
         # C11.4: program-cost components and the electric share of the benefits; C19.6: lifecycle net benefits and levelized values
