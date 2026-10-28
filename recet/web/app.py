@@ -142,13 +142,21 @@ class Ctx:
         resp.set_cookie(name, value, max_age=max_age, path=self.s.prefix or "/", secure=self.s.secure_cookies, httponly=True, samesite="lax")
 
     # --- runs
-    def run_for(self, request: Request, run_id: str):
-        """The run if this user may see it (owner or admin), else 404."""
+    def run_for(self, request: Request, run_id: str, owner: bool = False):
+        """The run if this user may see it (its owner, an admin, or a user it is shared with), else 404. `owner`: only its owner or an admin, for what
+        changes the run (Stop, Delete, sharing); a user it is shared with may read everything else and rerun its inputs as a run of their own."""
         u = self.need_user(request)
         row = self.db.one("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id WHERE r.id = ?", (run_id,))
-        if row is None or (row["user_id"] != u["id"] and u["role"] != "admin"):
+        if row is None:
             raise HTTPException(404)
+        if row["user_id"] != u["id"] and u["role"] != "admin":
+            shared = self.db.one("SELECT 1 FROM run_shares WHERE run_id = ? AND user_id = ?", (run_id, u["id"])) is not None
+            if not shared or owner:
+                raise HTTPException(404)
         return row
+
+    def shared_with(self, run_id: str) -> list:
+        return self.db.all("SELECT u.id, u.email FROM run_shares s JOIN users u ON u.id = s.user_id WHERE s.run_id = ? ORDER BY u.email", (run_id,))
 
     def queue_run(self, request: Request, u, run_id: str, cfg: dict, label: str, names: list[str]) -> None:
         """Write a run's config.json and log header (its inputs are already in its folder), add it to the queue and the audit log."""
@@ -599,10 +607,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from urllib.parse import quote
         return ctx.redirect(f"/output-templates?edit={quote(name)}&saved={quote(name)}")
 
+    def account_kw(u) -> dict:
+        from . import notify
+        return dict(email_on=notify.enabled(s), notify_runs=notify.wants(ctx.db, u["id"]))
+
     @app.get("/account", response_class=HTMLResponse)
     async def account_page(request: Request, done: str = ""):
-        ctx.need_user(request)
-        return ctx.render(request, "account.html", error="", done=done)
+        u = ctx.need_user(request)
+        return ctx.render(request, "account.html", error="", done=done, **account_kw(u))
+
+    @app.post("/account/notifications")
+    async def account_notifications(request: Request):
+        """The Account page's "Email me when a run finishes or fails" (notify.py)."""
+        from . import notify
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        on = bool(form.get("notify_runs"))
+        notify.set_wants(ctx.db, u["id"], on)
+        ctx.db.audit("run emails " + ("on" if on else "off"), u, ip=ctx.ip(request))
+        return ctx.redirect("/account?done=email")
 
     @app.post("/account")
     async def account(request: Request):
@@ -610,11 +634,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         if auth.check_login(ctx.db, u["email"], str(form.get("current", "")), ctx.ip(request)) is None:
-            return ctx.render(request, "account.html", status_code=400, error="Your current password is not right.", done="")
+            return ctx.render(request, "account.html", status_code=400, error="Your current password is not right.", done="", **account_kw(u))
         pw, again = str(form.get("password", "")), str(form.get("password2", ""))
         problem = auth.password_problem(pw, again)
         if problem:
-            return ctx.render(request, "account.html", status_code=400, error=problem, done="")
+            return ctx.render(request, "account.html", status_code=400, error=problem, done="", **account_kw(u))
         auth.set_password(ctx.db, u["id"], pw)          # ends every session, this one too: sign in again with a fresh one
         ctx.db.audit("password changed", u, ip=ctx.ip(request))
         resp = ctx.redirect("/account?done=1")
@@ -723,7 +747,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                               "expires": expires_text(r, s.retention_days) if r["status"] not in ("queued", "running") else "",
                               "settings": settings_summary(ctx.run_config(r)) if r["status"] != "expired" else ""}
         live_ids = [r["id"] for r in rows if r["status"] in ("queued", "running")]
-        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
+        shared = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id JOIN run_shares s ON s.run_id = r.id "
+                            "WHERE s.user_id = ? AND r.status != 'expired' ORDER BY r.created_at DESC LIMIT 200", (u["id"],))
+        return ctx.render(request, "runs.html", shared=shared, runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
                           n_expired=n_expired, show_expired=bool(expired), live_ids=live_ids)
 
     @app.get("/runs/live")
@@ -961,7 +987,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         editable = n is None or n <= editor.MAX_EDIT_ROWS
         check = check_summary(ctx.preflight_report(run)) if run["status"] not in ("queued", "expired") else None
         headline = ctx.headline(run) if run["status"] == "finished" and run["result_dir"] else []
-        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
+        u = request.state.user
+        owner = run["user_id"] == u["id"] or u["role"] == "admin"
+        sharing = dict(owner=owner, shared_with=ctx.shared_with(run["id"]) if owner else [],
+                       candidates=compare_candidates(u, run["id"]) if run["status"] == "finished" and run["result_dir"] and not run["preflight_only"] else [])
+        return ctx.render(request, "run.html", **sharing, status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
                           retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run),
                           settings=settings_summary(ctx.run_config(run), size) if has_inputs else "", editable=editable, n_measures=n,
                           max_edit_rows=editor.MAX_EDIT_ROWS, check=check, headline=headline, expires=expires_text(run, s.retention_days))
@@ -1058,7 +1088,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/runs/{run_id}/cancel")
     async def run_cancel(request: Request, run_id: str):
-        run = ctx.run_for(request, run_id)
+        run = ctx.run_for(request, run_id, owner=True)
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         ctx.runner.cancel(run["id"])
@@ -1067,7 +1097,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/runs/{run_id}/delete")
     async def run_delete(request: Request, run_id: str):
-        run = ctx.run_for(request, run_id)
+        run = ctx.run_for(request, run_id, owner=True)
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         if run["status"] in ("queued", "running"):
@@ -1121,7 +1151,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return views
 
     @app.get("/runs/{run_id}/results", response_class=HTMLResponse)
-    async def run_results(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = ""):
+    async def run_results(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                          years: list[str] = Query(default=[])):
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         u = request.state.user
@@ -1148,6 +1179,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         res = ctx.results(source)
         pas = res.pas()
         pa = pa if pa in pas else rv.ALL_PAS
+        all_years = res.years()
+        years = [y for y in rv.parse_years(years) if y in all_years]            # program years to total (BR-04.1); none = every year
+        if set(years) == set(all_years):
+            years = []
         views = user_views(u["id"])
         cat = res.catalog()
         if columns:                                          # an unsaved choice from the column picker
@@ -1164,34 +1199,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if level == "measure" and not measure_ok:
             note = (f"This run has {res.n:,} measures: the measure level is shown only for runs of up to {rv.MAX_RUN_MEASURE_ROWS:,}. "
                     "Its measure-level table is in the downloads on the run page.")
-        elif level == "measure" and not res.measure_level_allowed(pa):
-            note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA."
+        elif level == "measure" and not res.measure_level_allowed(pa, years):
+            note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA or fewer years."
         else:
-            table = res.table(level, pa, keys)
+            table = res.table(level, pa, keys, years)
         shown = [cat[k] for k in keys if k in cat]
         kw.update(level=level, pa=pa, pas=pas, views=views, view=view, keys=keys, catalog=cat, shown=shown, file_name=measure_files[0].name,
-                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS,
-                  tiles=results_tiles(res, cat, pa), chart=sector_chart(res, cat, pa), groups=picker_groups(cat), labels={k: rv.display_label(c) for k, c in cat.items()})
+                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS, all_years=all_years, years=years,
+                  years_param=",".join(years),
+                  tiles=results_tiles(res, cat, pa, years), chart=sector_chart(res, cat, pa, years=years), groups=picker_groups(cat),
+                  labels={k: rv.display_label(c) for k, c in cat.items()})
         return ctx.render(request, "results.html", **kw, note=note, table=table, rv=rv)
 
-    def results_tiles(res, cat, pa) -> list[dict]:
-        """The Results page's headline numbers for the chosen PA: measures, then Ctx.HEADLINE's columns that this run has."""
+    def results_tiles(res, cat, pa, years=None) -> list[dict]:
+        """The Results page's headline numbers for the chosen PA and program years: measures, then Ctx.HEADLINE's columns that this run has."""
         from .. import results_view as rv
         keys = [k for k, _ in Ctx.HEADLINE if k in cat]
-        t = res.table("portfolio", pa, keys)
+        t = res.table("portfolio", pa, keys, years)
         if not len(t):
             return []
         row, labels = t.iloc[0], dict(Ctx.HEADLINE)
         return ([{"label": "Measures", "value": f"{int(row['Measures']):,}", "help": "measures in the table below"}]
                 + [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys])
 
-    def sector_chart(res, cat, pa, limit: int = 12) -> dict | None:
+    def sector_chart(res, cat, pa, limit: int = 12, years=None) -> dict | None:
         """Total system benefit by program sector, as bars for the Results page (widths in percent of the largest value; negative bars marked)."""
         from .. import results_view as rv
         key = "TotalSystemBenefit"
         if key not in cat:
             return None
-        t = res.table("sector", pa, [key])
+        t = res.table("sector", pa, [key], years)
         if len(t) < 2 or key not in t:
             return None
         t = t.sort_values(key, ascending=False).head(limit)
@@ -1209,7 +1246,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [(g, items) for g, items in out.items() if items]
 
     @app.get("/runs/{run_id}/results.csv")
-    async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = ""):
+    async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                              years: list[str] = Query(default=[])):
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         base = ctx.result_path(run, sub) if sub else ctx.result_path(run)
@@ -1221,12 +1259,97 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         views = user_views(request.state.user["id"])
         keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
         pa = pa if pa in res.pas() else rv.ALL_PAS
+        years = [y for y in rv.parse_years(years) if y in res.years()]
         level = level if level in {k for k, _ in rv.LEVELS} else "portfolio"
-        if level == "measure" and not res.measure_level_allowed(pa):
+        if level == "measure" and not res.measure_level_allowed(pa, years):
             raise HTTPException(400, "The measure level is too large to show: download the measure-level file instead.")
-        t = res.table(level, pa, keys).rename(columns={k: c.label for k, c in cat.items()})
+        t = res.table(level, pa, keys, years).rename(columns={k: c.label for k, c in cat.items()})
         name = f"recet_{run_id}_{level}.csv"
         return Response(t.to_csv(index=False), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    # ----------------------------------------------------------------------------------------------------------------- sharing and comparing runs
+    def compare_candidates(u, run_id: str) -> list:
+        """Finished runs with results this user may compare a run with: their own and the ones shared with them, newest first."""
+        return ctx.db.all("SELECT r.id, r.label, r.acc_version, r.created_at, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
+                          "WHERE r.status = 'finished' AND r.result_dir IS NOT NULL AND r.preflight_only = 0 AND r.id != ? "
+                          "AND (r.user_id = ? OR r.id IN (SELECT run_id FROM run_shares WHERE user_id = ?)) ORDER BY r.created_at DESC LIMIT 100",
+                          (run_id, u["id"], u["id"]))
+
+    @app.post("/runs/{run_id}/share")
+    async def run_share(request: Request, run_id: str):
+        """Share a run read-only with another user, by their email (owner or admin only). They see it under Shared with you on the runs list."""
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        email = str(form.get("email", "")).strip()
+        target = ctx.db.one("SELECT id, email FROM users WHERE email = ? AND disabled = 0", (email,)) if email else None
+        if target is None:
+            return run_page_for(request, run, 400, f"No active user has the email {email!r}: an admin adds users on the Users page.")
+        if target["id"] == run["user_id"]:
+            return run_page_for(request, run, 400, "That is the run's owner.")
+        ctx.db.run("INSERT OR IGNORE INTO run_shares (run_id, user_id, shared_by, created_at) VALUES (?,?,?,?)",
+                   (run_id, target["id"], request.state.user["id"], time.time()))
+        ctx.db.audit("run shared", request.state.user, detail=f"{run_id} with {target['email']}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    @app.post("/runs/{run_id}/unshare")
+    async def run_unshare(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        uid = int(str(form.get("user_id", "0")) or 0)
+        ctx.db.run("DELETE FROM run_shares WHERE run_id = ? AND user_id = ?", (run["id"], uid))
+        ctx.db.audit("run unshared", request.state.user, detail=f"{run_id} user {uid}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    def compare_tables(request: Request, run_id: str, other: str, level: str, view: str, columns: str, years):
+        """(run a, run b, its results a and b, keys, level, years, the compare frame) for the compare page and its CSV."""
+        from .. import results_view as rv
+        a, b = ctx.run_for(request, run_id), ctx.run_for(request, other)
+        def source(r):
+            base = ctx.result_path(r)
+            return outputs.results_source(base) if base else None
+        sa, sb = source(a), source(b)
+        if sa is None or sb is None:
+            raise HTTPException(404, "Both runs need results to compare them.")
+        ra, rb = ctx.results(sa), ctx.results(sb)
+        cat = {**rb.catalog(), **ra.catalog()}
+        views = user_views(request.state.user["id"])
+        keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
+        level = level if level in {k for k, _ in rv.COMPARE_LEVELS} else "portfolio"
+        known = sorted(set(ra.years()) | set(rb.years()))
+        years = [y for y in rv.parse_years(years) if y in known]
+        if set(years) == set(known):
+            years = []
+        return a, b, cat, keys, level, known, years, rv.compare(ra, rb, level, keys, years=years)
+
+    @app.get("/runs/{run_id}/compare", response_class=HTMLResponse)
+    async def run_compare(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                          columns: str = "", years: list[str] = Query(default=[])):
+        """Any two runs the user may see, side by side at one level (BRD BR-06.11): each run's value, the difference (b - a) and the % change."""
+        from .. import results_view as rv
+        u = ctx.need_user(request)
+        if not other:
+            return ctx.redirect(f"/runs/{run_id}")
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        views = user_views(u["id"])
+        return ctx.render(request, "compare.html", a=a, b=b, table=table, ids=[c for c in table.columns if "__" not in c], keys=["Measures"] + [k for k in keys if k in cat], catalog=cat, level=level,
+                          levels=rv.COMPARE_LEVELS, view=view if view in views else ("" if columns else rv.DEFAULT_VIEW_NAME), views=views,
+                          columns=columns, all_years=known, years=years, years_param=",".join(years),
+                          labels={k: rv.display_label(c) for k, c in cat.items()}, rv=rv, candidates=compare_candidates(u, run_id))
+
+    @app.get("/runs/{run_id}/compare.csv")
+    async def run_compare_csv(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                              columns: str = "", years: list[str] = Query(default=[])):
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        side = {"a": f"run {a['id']}", "b": f"run {b['id']}", "diff": "difference", "pct": "% change"}
+
+        def name(c: str) -> str:
+            k, _, part = c.rpartition("__")
+            return f"{cat[k].label if k in cat else k} ({side[part]})" if k and part in side else c
+        name_csv = f"recet_compare_{a['id']}_{b['id']}_{level}.csv"
+        return Response(table.rename(columns=name).to_csv(index=False), media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{name_csv}"'})
 
     @app.post("/views")
     async def save_view(request: Request):

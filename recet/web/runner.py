@@ -11,6 +11,9 @@
 own process group, so a run's memory and caches are its own and a Stop kills it and anything it started (a comparison runs two child processes). Raising the
 worker count is the only change needed to run jobs side by side; the claim is a single SQL transaction, so two workers never take the same run.
 
+When a run ends, its owner is emailed (notify.py) if the server has an SMTP server set and the owner has not turned it off; the email is sent on its own
+thread, so a slow mail server never holds the worker.
+
 A cleanup thread deletes runs older than `retention_days` (files gone, the row kept as 'expired' for the audit trail) and drafts untouched for `draft_days`.
 """
 from __future__ import annotations
@@ -40,6 +43,7 @@ class Runner:
         self.db = db
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
+        self.mail_threads: list[threading.Thread] = []      # run emails being sent (tests join them)
         self.s.runs_dir.mkdir(parents=True, exist_ok=True)
         self.s.drafts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -187,6 +191,18 @@ class Runner:
     def _finish(self, run_id, status, code, result_dir, message) -> None:
         self.db.run("UPDATE runs SET status = ?, exit_code = ?, result_dir = ?, message = ?, finished_at = ? WHERE id = ?",
                     (status, code, result_dir, message, time.time(), run_id))
+        from . import notify
+        if notify.enabled(self.s):
+            t = threading.Thread(target=self._notify, args=(run_id,), name=f"recet-email-{run_id}", daemon=True)
+            t.start()
+            self.mail_threads.append(t)
+
+    def _notify(self, run_id: str) -> None:
+        from . import notify
+        try:
+            notify.run_ended(self.s, self.db, run_id)
+        except Exception as exc:                             # an email must never break the queue
+            print(f"recet-web email error: {exc}", file=sys.stderr, flush=True)
 
     # ------------------------------------------------------------------------------------------------------------------------- cleanup
     def cleanup(self, now: float | None = None) -> dict:

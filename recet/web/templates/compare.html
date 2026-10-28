@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Compare · {{ a.label or a.id }} and {{ b.label or b.id }}{% endblock %}
+{% block main_class %}page wide{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Compare two runs</h1>
+  <a class="button" href="{{ u('/runs/' + a.id) }}">Back to the run</a>
+</div>
+<p><strong>A:</strong> <a href="{{ u('/runs/' + a.id + '/results') }}">{{ a.label or a.id }}</a> <span class="muted">· {{ acc_label(a.acc_version) }} · {{ fmt_time(a.created_at) }}{% if a.owner_email != user.email %} · {{ a.owner_email }}{% endif %}</span><br>
+<strong>B:</strong> <a href="{{ u('/runs/' + b.id + '/results') }}">{{ b.label or b.id }}</a> <span class="muted">· {{ acc_label(b.acc_version) }} · {{ fmt_time(b.created_at) }}{% if b.owner_email != user.email %} · {{ b.owner_email }}{% endif %}</span></p>
+
+<form method="get" class="filters">
+  <input type="hidden" name="level" value="{{ level }}">
+  <label>B <select name="with" class="autosubmit">
+    <option value="{{ b.id }}" selected>{{ b.label or b.id }}</option>
+    {% for c in candidates if c.id != b.id %}<option value="{{ c.id }}">{{ c.label or c.id }} · {{ acc_label(c.acc_version) }} · {{ fmt_time(c.created_at) }}</option>{% endfor %}
+  </select></label>
+  <label>View <select name="view" class="autosubmit">
+    {% if not view %}<option value="" selected>(unsaved columns)</option>{% endif %}
+    {% for v in views %}<option {% if v == view %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  {% if not view %}<input type="hidden" name="columns" value="{{ columns }}">{% endif %}
+  {% if all_years|length > 1 %}
+  <fieldset class="years" title="Total both runs over these program years; none ticked = every year">
+    <legend>Program years</legend>
+    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" class="autosubmit" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+  </fieldset>
+  {% endif %}
+</form>
+
+<p class="tabs">
+  {% for key, label in levels %}<a class="{% if key == level %}on{% endif %}" href="?{{ {'with': b.id, 'level': key, 'view': view, 'columns': '' if view else columns, 'years': years_param}|urlencode }}">{{ label }}</a>{% endfor %}
+</p>
+<p class="muted small">Each row is a group found in either run, matched on its {{ 'PrgID' if level == 'program' else 'name' }}; Difference = B - A and % = the difference over |A| (blank when A is 0). Ratios are each run's own, from its summed benefits and costs. The columns come from your Results views.</p>
+
+<div class="table-tools">
+  <label class="inline small">Filter rows <input type="search" data-filter="compare-table" data-count="filter-count" placeholder="program, text…" autocomplete="off"></label>
+  <span class="small muted" id="filter-count"></span>
+  <a class="button" href="{{ u('/runs/' + a.id + '/compare.csv') }}?{{ {'with': b.id, 'level': level, 'view': view, 'columns': '' if view else columns, 'years': years_param}|urlencode }}">Download this table (CSV)</a>
+</div>
+<div class="scroll"><table class="data sortable" id="compare-table">
+  <thead>
+    <tr>{% for c in ids %}<th rowspan="2" scope="col">{{ c }}</th>{% endfor %}
+      {% for k in keys %}<th colspan="4" scope="colgroup" title="{{ catalog[k].help if k in catalog else '' }}">{{ labels[k] if k in labels else k }}</th>{% endfor %}</tr>
+    <tr>{% for k in keys %}<th scope="col">A</th><th scope="col">B</th><th scope="col">Difference</th><th scope="col">%</th>{% endfor %}</tr>
+  </thead>
+  <tbody>{% for r in table.to_dict('records') %}<tr>
+    {% for c in ids %}<td>{{ r[c] }}</td>{% endfor %}
+    {% for k in keys %}{% for part in ('a', 'b', 'diff') %}{% set v = r[k + '__' + part] %}
+      <td class="num" {% if v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ ('{:,.0f}'.format(v) if v == v else '') if k == 'Measures' else rv.format_value(catalog.get(k), v) }}</td>{% endfor %}
+      {% set p = r[k + '__pct'] %}<td class="num" {% if p is number and p == p %}data-v="{{ p }}"{% endif %}>{{ '{:+.1%}'.format(p) if p is number and p == p else '' }}</td>
+    {% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% if table|length == 0 %}<p class="muted">Neither run has rows at this level{{ ' for these years' if years }}.</p>{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

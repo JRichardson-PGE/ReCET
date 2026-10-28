@@ -62,18 +62,25 @@ The run page opens as soon as the run is queued.
 - **Rerun with different settings** opens New run with this run's files and settings: change a setting (or a file) and start it. Nothing is uploaded
   again.
 - **Edit inputs and rerun** copies the run's tables into a new Edit inputs draft (jobs of up to 500 measures).
+- **Compare with another run** (a finished run) puts it beside any other finished run of yours, or one shared with you: each level (portfolio, program
+  year, segment, sector, program) with both runs' values, the difference (B - A) and the % change, using your Results views' columns and program-year
+  choice; **Download this table (CSV)** saves it (BRD BR-06.11). A group found in one run only is blank for the other.
+- **Sharing** (your own runs) shares the run read-only with another user by their sign-in email. They find it under **Shared with you** on the runs list
+  and can open its results and files, compare it and rerun its inputs as their own run; they cannot stop, delete or share it. **Stop sharing** takes it back.
 - **Stop** a queued or running run; **Delete** a finished one. A run and its files are deleted automatically 7 days after it starts (the run page and
   the runs list say when).
 
 **Runs** lists your runs, newest first, with their settings, measures, status, how long they took and when they will be deleted. Expired runs are hidden
-until you show them. Queued and running runs update in place.
+until you show them. Queued and running runs update in place. Runs other users shared with you are listed below yours, under **Shared with you**.
 
 ## 4. Results
 
 **Results** (on the run page) shows the run's outputs as tables.
 
 - **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
-- **Levels:** portfolio, program segment, program sector, program, and measure. Every level above the measure is a sum of its measures; ratios are
+- **Program years** (a run with more than one claim year) totals every table, the headline numbers and the chart over the years ticked; none ticked, or
+  **all years**, is every year (BRD BR-04.1).
+- **Levels:** portfolio, program segment, program sector, program year, program, and measure. Every level above the measure is a sum of its measures; ratios are
   recomputed from the summed benefits and costs. The measure level is shown for runs of up to 50,000 measures, and for up to 5,000 measures of the chosen
   PA; a larger run's measure-level table is in its files.
 - The **headline numbers** and a **total system benefit by program sector** chart sit above the table.
@@ -83,6 +90,9 @@ until you show them. Queued and running runs update in place.
 - A run that compared two ACCs has a **Comparison** tab and one tab per ACC.
 
 Every output column, with its formula, is described in [Output fields](OUTPUT_FIELDS.md).
+
+**Email.** When the server has a mail server set up, you get an email when each of your runs finishes or fails, with its headline results and a link
+to its page (not for stopped runs or input checks that pass). Turn it off or on under **Account**.
 
 ## 5. Edit inputs
 

@@ -456,13 +456,33 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
         m_ids = set().union(*(r.agg.get("measure_prg_ids", set()) for r in reports))
         p_ids = set(program["PrgID"])
         gap = {"program_costs_without_measures": sorted(p_ids - m_ids), "measure_programs_without_costs": sorted(m_ids - p_ids)}
-        if gap["measure_programs_without_costs"] or gap["program_costs_without_measures"]:
-            no_meas = set(gap["program_costs_without_measures"]) | {i.partition("_")[2] for i in gap["program_costs_without_measures"] if i.partition("_")[0] in VALID_PA}
-            where = sorted(set(c for r in reports for c in r.agg["no_cost_cells"]))
-            if "PrgID" in pc.columns:
-                where += _cells("ProgramCost", pc["PrgID"].astype(str).str.strip().isin(no_meas), "PrgID")
-            rep.add("error", "program_alignment", f"PrgIDs do not line up: {gap}", cells=where)
+        _program_alignment(rep, gap, program, pc, sorted(set(c for r in reports for c in r.agg["no_cost_cells"])))
     return rep
+
+
+def _program_alignment(rep: PreflightReport, gap: dict, program: pd.DataFrame, pc: pd.DataFrame, measure_cells: list) -> None:
+    """PrgIDs that do not line up between Measure.csv and ProgramCost.csv (BRD BR-06.16): warnings, and the run goes on. A measure whose program has no
+    ProgramCost row is priced with no program costs; a ProgramCost row whose program has no measures is charged to none, so its costs are in no cost test.
+    (CET stops the job on either; ReCET did too before 0.1.59.) `program` is the loaded (possibly allocated) table, `pc` the file as filed, `measure_cells`
+    the Measure cells of the measures with no cost row."""
+    from .pipeline.cost_tests import _COST_FIELDS
+
+    def bare(ids):                                           # with or without the "<IOU>_" that statewide allocation adds
+        return set(ids) | {i.partition("_")[2] for i in ids if i.partition("_")[0] in VALID_PA}
+    no_cost = gap["measure_programs_without_costs"]
+    if no_cost:
+        n = len(measure_cells)
+        rep.add("warning", "measures_without_program_costs",
+                f"{n:,} measure(s) in {len(no_cost):,} program(s) have no ProgramCost row: they are priced with no program costs "
+                "(WeightedProgramCost 0, so their NoAdmin and regular cost tests are equal)", len(no_cost), no_cost, measure_cells)
+    no_meas = gap["program_costs_without_measures"]
+    if no_meas:
+        rows = program[program["PrgID"].isin(no_meas)]
+        dollars = float(rows[[c for c in _COST_FIELDS if c in rows.columns]].fillna(0.0).to_numpy(dtype=float).sum())
+        where = _cells("ProgramCost", pc["PrgID"].astype(str).str.strip().isin(bare(no_meas)), "PrgID") if "PrgID" in pc.columns else []
+        rep.add("warning", "program_costs_without_measures",
+                f"{len(rows):,} ProgramCost row(s) of {len(no_meas):,} program(s) have no measures: their ${dollars:,.0f} of program costs (nominal) are charged to "
+                "no measure, so no cost test or portfolio total includes them", len(no_meas), no_meas, where)
 
 
 def _merge_stats(reports: list[PreflightReport], base_year: int | None) -> dict:
@@ -610,15 +630,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         else:
             measures, program = run_poc.load_job(p, programcost_csv, allocate_statewide=allocate_statewide)
     except ValueError as exc:
-        where: list = []
-        try:                                        # point at the PrgIDs that have no partner in the other file
-            pc = delimited.read_cet_csv(programcost_csv, dtype=str, keep_default_na=False) if programcost_csv is not None else None
-            if pc is not None and "PrgID" in pc.columns:
-                mp, cp = df["PrgID"].astype(str).str.strip(), pc["PrgID"].astype(str).str.strip()
-                where = _cells("Measure", ~mp.isin(set(cp)), "PrgID") + _cells("ProgramCost", ~cp.isin(set(mp)), "PrgID")
-        except Exception:
-            pass
-        rep.add("error", "program_alignment", str(exc), cells=where)
+        rep.add("error", "inputs_unreadable", f"the inputs could not be loaded for pricing: {exc}")
         return rep
     rep.stats["claim years"] = f"{measures['Used_Year'].min()}-{measures['Used_Year'].max()}"
     named = measures.loc[measures["ACCVersion"] != "", "ACCVersion"]
@@ -651,15 +663,8 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             rep.add("info", "statewide_program_costs", "ProgramCost rows with PA = SW are given PA = SCE (what CET does with them); tick 'allocate statewide programs' to split them across the IOUs", sw_rows,
                     cells=_cells("ProgramCost", swmask, "PA"))
         gap = cost_tests.check_program_alignment(measures, program)
-        if gap["measure_programs_without_costs"] or gap["program_costs_without_measures"]:
-            def bare(ids):                                       # with or without the "<IOU>_" that statewide allocation adds
-                return set(ids) | {i.partition("_")[2] for i in ids if i.partition("_")[0] in VALID_PA}
-            no_meas = bare(gap["program_costs_without_measures"])
-            no_cost = measures["PrgID"].astype(str).str.strip().isin(gap["measure_programs_without_costs"])
-            where = [("Measure", r, "PrgID") for r in sorted(set(mrows(no_cost)))]
-            if "PrgID" in pc.columns:
-                where += _cells("ProgramCost", pc["PrgID"].astype(str).str.strip().isin(no_meas), "PrgID")
-            rep.add("error", "program_alignment", f"PrgIDs do not line up: {gap}", cells=where)
+        no_cost = measures["PrgID"].astype(str).str.strip().isin(gap["measure_programs_without_costs"])
+        _program_alignment(rep, gap, program, pc, [("Measure", r, "PrgID") for r in sorted(set(mrows(no_cost)))] if no_cost.any() else [])
 
     _check_programs(rep, measures, programcost_csv, allocate_statewide, apply_exclude_from_ce, mrows)
 
