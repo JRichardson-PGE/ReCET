@@ -153,6 +153,11 @@ output,SCBCostGross,Weighted Factor
 output,SCBCostNoAdmin,Weighted Factor
 output,SCHCostGross,Weighted Factor
 output,SCHCostNoAdmin,Weighted Factor
+output,TRCBen,Weighted Factor
+output,PACBen,Weighted Factor
+output,RIMBen,Weighted Factor
+output,SCBBen,Weighted Factor
+output,SCHBen,Weighted Factor
 output,TRCRatio,Pass Through
 output,PACRatio,Pass Through
 output,RIMRatio,Pass Through

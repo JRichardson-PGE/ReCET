@@ -150,7 +150,7 @@ def test_secondary_output_files_are_documented(tmp_path):
                  "cet_comparison_summary_acc", "comparison_acc", "comparison_summary_acc", "preflight.txt", "preflight_findings.xlsx", "run_settings.json", "filing_validation_acc",
                  "field_definitions_acc", "key_metrics_acc"):
         assert name in text, name
-    summary_cols = ["group", "value", "measures", *outputs.SUMMARY_TOTALS, "TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio"]
+    summary_cols = ["group", "value", "measures", *outputs.SUMMARY_TOTALS, *(f"{t}Ben" for t in outputs.RATIO_TESTS), "TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio"]
     documented = first_cell_names("OUTPUT_FIELDS.md", "### 2.2 `portfolio_summary_acc<version>`", "### 2.3")
     assert not [c for c in summary_cols if c not in documented], [c for c in summary_cols if c not in documented]
     for code in re.findall(r'rep\.add\("(?:error|warning|info)", "(\w+)"', Path(preflight.__file__).read_text(encoding="utf-8")):

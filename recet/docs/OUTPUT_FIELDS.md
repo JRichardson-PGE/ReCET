@@ -1157,82 +1157,107 @@ share_SB_gross_m = the same share computed on the gross versions of those benefi
 ### 1.10 Benefit-cost ratios
 
 `B = ElecBen + GasBen + WaterEnergyBen + OtherBen`. A ratio is 0 when its cost is 0, and blank for the societal ratios when SCB/SCH are off. Unit: ratio (no unit). Supply costs are inside the *costs*, not netted
-from the numerator.
+from the numerator. Each test's numerator is written as its own column just before its ratios (`TRCBen`, `PACBen`, `RIMBen`, `SCBBen`, `SCHBen`; the Participant Cost Test's is
+`PCTBen`), so every ratio is two columns of the same file: `<test>Ratio = <test>Ben / <test>Cost` and `<test>RatioNoAdmin = <test>Ben / <test>CostNoAdmin` (0 when the cost is 0).
 
-#### `TRCRatio`, `TRCRatioNoAdmin`
+#### `TRCBen`, `TRCRatio`, `TRCRatioNoAdmin`
 
+- `TRCBen`: Total Resource Cost test benefits: the numerator of `TRCRatio` and `TRCRatioNoAdmin`. Unit: Dollars (PV).
 - `TRCRatio`: Total Resource Cost Test Ratio. Unit: Decimal Number.
 - `TRCRatioNoAdmin`: Total Resource Cost Test Ratio, without program costs. Unit: Decimal Number.
 
 **Formula**
 
 ```text
-TRCRatio        = ( B + TaxCredits ) / TRCCost
-TRCRatioNoAdmin = ( B + TaxCredits ) / TRCCostNoAdmin
+TRCBen          = B + TaxCredits
+TRCRatio        = TRCBen / TRCCost
+TRCRatioNoAdmin = TRCBen / TRCCostNoAdmin
 ```
 
 **Inputs:** the four benefit columns of `B`, `TaxCredits`, `TRCCost` and `TRCCostNoAdmin`.
+
+- Example A, `TRCBen`: 9486.1908 + 400.00 = **9,886.19**
+- Example B, `TRCBen`: 7310.5647 + 800.00 = **8,110.56**
 
 - Example A, `TRCRatio`: (9486.1908 + 400.00) / 20916.4229 = **0.4727**
 - Example A, `TRCRatioNoAdmin`: (9486.1908 + 400.00) / 17987.5728 = **0.5496**
 - Example B, `TRCRatio`: (7310.5647 + 800.00) / 60271.7921 = **0.1346**
 - Example B, `TRCRatioNoAdmin`: (7310.5647 + 800.00) / 58514.4821 = **0.1386**
 
-#### `PACRatio`, `PACRatioNoAdmin`
+#### `PACBen`, `PACRatio`, `PACRatioNoAdmin`
 
+- `PACBen`: Program Administrator Cost test benefits: the numerator of `PACRatio` and `PACRatioNoAdmin`. Unit: Dollars (PV).
 - `PACRatio`: Program Administrator Cost test ratio. Unit: Decimal Number.
 - `PACRatioNoAdmin`: Program Administrator Cost test ratio, without program costs. Unit: Decimal Number.
 
 **Formula**
 
 ```text
-PACRatio        = B / PACCost
-PACRatioNoAdmin = B / PACCostNoAdmin
+PACBen          = B = ElecBen + GasBen + WaterEnergyBen + OtherBen
+PACRatio        = PACBen / PACCost
+PACRatioNoAdmin = PACBen / PACCostNoAdmin
 ```
 
 **Inputs:** the four benefit columns of `B`, `PACCost` and `PACCostNoAdmin`.
+
+- Example A, `PACBen`: 5841.4973 + 3454.0256 + 30.6679 + 160.00 = **9,486.19**
+- Example B, `PACBen`: 0.0000 + 6990.5647 + 0.0000 + 320.00 = **7,310.56**
 
 - Example A, `PACRatio`: 9486.1908 / 8785.4865 = **1.0798**
 - Example A, `PACRatioNoAdmin`: 9486.1908 / 5856.6364 = **1.6197**
 - Example B, `PACRatio`: 7310.5647 / 19301.4366 = **0.3788**
 - Example B, `PACRatioNoAdmin`: 7310.5647 / 17544.1265 = **0.4167**
 
-#### `RIMRatio`, `RIMRatioNoAdmin`
+#### `RIMBen`, `RIMRatio`, `RIMRatioNoAdmin`
 
+- `RIMBen`: Ratepayer Impact Measure test benefits: the numerator of `RIMRatio` and `RIMRatioNoAdmin`. Unit: Dollars (PV).
 - `RIMRatio`: Ratepayer Impact Measure test ratio. Unit: Decimal Number.
 - `RIMRatioNoAdmin`: Ratepayer Impact Measure test ratio, without program costs. Unit: Decimal Number.
 
 **Formula**
 
 ```text
-RIMRatio        = ( B + LifecycleBillIncrElec + LifecycleBillIncrGas ) / RIMCost
-RIMRatioNoAdmin = ( B + LifecycleBillIncrElec + LifecycleBillIncrGas ) / RIMCostNoAdmin
+RIMBen          = B + LifecycleBillIncrElec + LifecycleBillIncrGas
+RIMRatio        = RIMBen / RIMCost
+RIMRatioNoAdmin = RIMBen / RIMCostNoAdmin
 ```
 
 **Inputs:** the four benefit columns of `B`, `LifecycleBillIncrElec`, `LifecycleBillIncrGas`, `RIMCost` and `RIMCostNoAdmin`.
+
+- Example A, `RIMBen`: 9486.1908 + 0.00 + 0.00 = **9,486.19**
+- Example B, `RIMBen`: 7310.5647 + 20764.8592 + 0.00 = **28,075.42**
 
 - Example A, `RIMRatio`: (9486.1908 + 0.00 + 0.00) / 49925.6844 = **0.1900**
 - Example A, `RIMRatioNoAdmin`: (9486.1908 + 0.00 + 0.00) / 46996.8343 = **0.2018**
 - Example B, `RIMRatio`: (7310.5647 + 20764.8592 + 0.00) / 32499.6332 = **0.8639**
 - Example B, `RIMRatioNoAdmin`: (7310.5647 + 20764.8592 + 0.00) / 30742.3231 = **0.9132**
 
-#### `SCBRatio`, `SCBRatioNoAdmin`, `SCHRatio`, `SCHRatioNoAdmin`
+#### `SCBBen`, `SCBRatio`, `SCBRatioNoAdmin`, `SCHBen`, `SCHRatio`, `SCHRatioNoAdmin`
 
+- `SCBBen`: Societal Cost Test Base benefits: the numerator of `SCBRatio` and `SCBRatioNoAdmin`. Unit: Dollars (PV at the societal rate).
 - `SCBRatio`: Societal Cost Test Base Ratio. Unit: Decimal Number.
 - `SCBRatioNoAdmin`: Societal Cost Test Base Ratio, without program costs. Unit: Decimal Number.
+- `SCHBen`: Societal Cost Test High benefits: the numerator of `SCHRatio` and `SCHRatioNoAdmin`. Unit: Dollars (PV at the societal rate).
 - `SCHRatio`: Societal Cost Test High Ratio. Unit: Decimal Number.
 - `SCHRatioNoAdmin`: Societal Cost Test High Ratio, without program costs. Unit: Decimal Number.
 
 **Formula**
 
 ```text
-SCBRatio        = ( ElecBen_SB + GasBen_SB + WaterEnergyBen_SB + OtherBen ) / SCBCost
-SCBRatioNoAdmin = the same numerator / SCBCostNoAdmin
-SCHRatio        = ( ElecBen_SH + GasBen_SH + WaterEnergyBen_SH + OtherBen ) / SCHCost
-SCHRatioNoAdmin = the same numerator / SCHCostNoAdmin
+SCBBen          = ElecBen_SB + GasBen_SB + WaterEnergyBen_SB + OtherBen
+SCBRatio        = SCBBen / SCBCost
+SCBRatioNoAdmin = SCBBen / SCBCostNoAdmin
+SCHBen          = ElecBen_SH + GasBen_SH + WaterEnergyBen_SH + OtherBen
+SCHRatio        = SCHBen / SCHCost
+SCHRatioNoAdmin = SCHBen / SCHCostNoAdmin
 ```
 
-**Inputs:** the `_SB` / `_SH` benefit columns, `OtherBen`, and the societal cost columns of 1.9.
+**Inputs:** the `_SB` / `_SH` benefit columns, `OtherBen`, and the societal cost columns of 1.9. `SCBBen` and `SCHBen` are blank when SCB/SCH are off.
+
+- Example A, `SCBBen`: 6688.3412 + 4314.2947 + 35.5698 + 160.00 = **11,198.21**
+- Example A, `SCHBen`: 7296.3723 + 5033.3438 + 39.2180 + 160.00 = **12,528.93**
+- Example B, `SCBBen`: 0.00 + 8827.1057 + 0.00 + 320.00 = **9,147.11**
+- Example B, `SCHBen`: 0.00 + 10432.0340 + 0.00 + 320.00 = **10,752.03**
 
 - Example A, `SCBRatio`: (6688.3412 + 4314.2947 + 35.5698 + 160.00) / 21172.9970 = **0.5289**
 - Example A, `SCBRatioNoAdmin`: 11198.2057 / 18220.8880 = **0.6146**
@@ -1789,6 +1814,7 @@ it they are counted like every other measure.
 | `measures` | Number of measures in the group. Count. | `COUNT of the measure-level rows in the group` |
 | `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
 | `FirstYearNetElecCO2`, `FirstYearNetGasCO2` | The group's First Year Net Electric CO2 emissions avoided and First Year Net Gas CO2 emissions avoided. Metric Tons. | `SUM over the group of FirstYearNetElecCO2` (and of `FirstYearNetGasCO2`) |
+| `TRCBen`, `PACBen`, `RIMBen`, `SCBBen`, `SCHBen` | The numerators of the group's ratios below: the group's total of the measure-level column of the same name (`SCBBen` and `SCHBen` omitted when SCB/SCH are off), so `TRC_ratio = TRCBen / TRCCost`, `TRC_NoAdmin_ratio = TRCBen / TRCCostNoAdmin`, `PAC_ratio = PACBen / PACCost`, and so on. $ (PV). | `SUM over the group of TRCBen` (and of each of the others) |
 | `TRC_ratio` | Portfolio Total Resource Cost ratio, on CET's receipt definition: the summed benefits (supply costs are inside the cost, not netted from the numerator) over the summed cost. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCost)` |
 | `TRC_NoAdmin_ratio` | The same over the cost without program costs. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) + SUM(TaxCredits) ) / SUM(TRCCostNoAdmin)` |
 | `PAC_ratio` | Portfolio Program Administrator Cost ratio. Ratio. | `( SUM(ElecBen) + SUM(GasBen) + SUM(WaterEnergyBen) + SUM(OtherBen) ) / SUM(PACCost)` |
@@ -1803,6 +1829,7 @@ Each `SUM` is over the group's measures. A ratio is omitted when a column it nee
 - Example A (a portfolio of just that measure), `measures`: `COUNT` of one row = **1**
 - Example A, `TRC_ratio`: (5841.4973 + 3454.0256 + 30.6679 + 160.00 + 400.00) / 20916.4229 = **0.4727**
 - Example A, `PAC_ratio`: (5841.4973 + 3454.0256 + 30.6679 + 160.00) / 8785.4865 = **1.0798**
+- Example A, `TRCBen`: `SUM` of one row = **9,886.19**
 - Example B, `RIM_ratio`: (0.0000 + 6990.5647 + 0.0000 + 320.00 + 20764.8592 + 0.00) / 32499.6332 = **0.8639**
 - Example B, `SCB_ratio`: (0.00 + 8827.1057 + 0.00 + 320.00) / 60501.5955 = **0.1512**
 - Example B, `TotalSystemBenefit`: `SUM` of one row = **3,012.77**
@@ -1886,7 +1913,7 @@ The tool's measure-level table against a real CET run's outputs file, matched on
 ### 2.7 `comparison_acc<A>_vs_acc<B>` and `comparison_summary_acc<A>_vs_acc<B>` (two-version run)
 
 The same job priced under two ACC versions `A` and `B`, matched on `CEInputID` (a measure in only one run is kept, with the other side blank). `c` is one of `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`,
-`TotalSystemBenefit`, `ElecSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCRatio`, `PACRatio`, `RIMRatio`, `SCBRatio`, `SCHRatio`, `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, `LifecycleBillReducElec`,
+`TotalSystemBenefit`, `ElecSupplyCost`, `WaterEnergyCost`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCBen`, `PACBen`, `RIMBen`, `SCBBen`, `SCHBen`, `TRCRatio`, `PACRatio`, `RIMRatio`, `SCBRatio`, `SCHRatio`, `PCTBen`, `PCTCost`, `PCTRatio`, `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, `LifecycleBillReducElec`,
 `LifecycleBillReducGas` (those present in both).
 
 | Field | Meaning and unit | Formula |
@@ -2252,15 +2279,20 @@ refer to.
 | `SCHCostNoAdmin` | 18220.9 | 59161.4 |
 | `SCHCost` | 21173 | 60932.6 |
 | `SCHCostGross` | 22558.4 | 68624.9 |
+| `TRCBen` | 9886.19 | 8110.56 |
 | `TRCRatio` | 0.472652 | 0.134567 |
 | `TRCRatioNoAdmin` | 0.549612 | 0.138608 |
+| `PACBen` | 9486.19 | 7310.56 |
 | `PACRatio` | 1.07976 | 0.378758 |
 | `PACRatioNoAdmin` | 1.61973 | 0.416696 |
+| `RIMBen` | 9486.19 | 28075.4 |
 | `RIMRatio` | 0.190006 | 0.863869 |
 | `RIMRatioNoAdmin` | 0.201847 | 0.91325 |
+| `SCBBen` | 11198.2 | 9147.11 |
 | `SCBRatio` | 0.528891 | 0.151188 |
-| `SCHRatio` | 0.591741 | 0.176458 |
 | `SCBRatioNoAdmin` | 0.614581 | 0.155748 |
+| `SCHBen` | 12528.9 | 10752 |
+| `SCHRatio` | 0.591741 | 0.176458 |
 | `SCHRatioNoAdmin` | 0.687614 | 0.181741 |
 | `TRCLifecycleNetBen` | -11620.9 | -53281.2 |
 | `PACLifecycleNetBen` | 510.036 | -12310.9 |
