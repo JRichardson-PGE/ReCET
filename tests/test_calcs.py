@@ -1,9 +1,9 @@
 """The documented formulas (docs/CALCULATIONS.md) against the tool.
 
-`reference_calc.py` re-implements every formula in plain loops; here a synthetic three-measure job is priced by the tool and by that reference, and every documented
+`reference_calc.py` re-implements every formula in plain loops; here a synthetic four-measure job is priced by the tool and by that reference, and every documented
 output has to agree. The job is built to exercise the branches the documentation describes: an hourly profile on a non-default calendar, year-varying and
 cost-test-varying avoided costs, ACC years that run out before the measure life does, a dual-baseline measure with a fractional EUL and a mid-year claim, a fuel-
-substitution measure (supply costs, negative water use), incentives above measure cost (excess incentives), program costs shared across three measures, statewide-free
+substitution measure (supply costs, negative water use), incentives above measure cost (excess incentives), an RUL equal to a fractional EUL (single-baseline, as CalcCE), program costs shared across four measures, statewide-free
 market effects on benefits and costs.
 """
 from __future__ import annotations
@@ -127,6 +127,11 @@ MEASURES = {
                 AC_Elec_Target_Sector="Residential", IOU_AC_Territory="PGE", EUL_Yrs="4.25", RUL_Yrs="0", NumUnits="20", UnitkWh1stBaseline="100", NTGRkWh="1",
                 NTGRkW="1", NTGRCost="1", UnitMeaCost1stBaseline="50", UnitIncentiveToOthers="60", UnitEndUserRebate="30",
                 MeasDescription="incentives above measure cost (excess incentives)"),
+    "EX4": dict(PrgID="PRG1", ClaimYearQuarter="2028Q2", Sector="Com", AC_Climate_Zone="13", AC_Gas_Impact_Profile="Winter Only", AC_Gas_Target_Sector="Commercial",
+                AC_Elec_Impact_Profile=EU_COM, AC_Elec_Target_Sector="Commercial", IOU_AC_Territory="PGE", EUL_Yrs="2.4", RUL_Yrs="2.4", NumUnits="8",
+                UnitkWh1stBaseline="900", UnitkWh2ndBaseline="300", UnitTherm1stBaseline="40", UnitTherm2ndBaseline="10", UnitkWhIOUWater1stBaseline="3",
+                UnitkWhIOUWater2ndBaseline="1", NTGRkWh="0.85", NTGRkW="0.85", NTGRTherm="0.85", NTGRCost="0.85", UnitMeaCost1stBaseline="250",
+                UnitMeaCost2ndBaseline="90", MeasInflation="0.02", MeasDescription="RUL equal to a fractional EUL: single baseline (CalcCE's InputMeasurevw)"),
 }
 PROGRAM_ROWS = [
     dict(PrgID="PRG1", PA="PGE", PrgYear="2028", ClaimYearQuarter="2028Q1", AdminCostsOverheadAndGA="1000", MarketingOutreach="250", EMV="100", UserInputIncentive="50"),
@@ -251,6 +256,7 @@ def test_every_documented_output_matches_the_reference_formulas(tmp_path, meb, m
     assert expected["EX2"]["WaterEnergyCost"] > 0 and expected["EX1"]["WaterEnergyBen"] > 0
     assert expected["EX3"]["GrossParticipantCostPV"] < 0 < expected["EX3"]["NetParticipantCostPV"] - expected["EX3"]["GrossParticipantCostPV"]   # excess incentives
     assert expected["EX1"]["FirstYearNetElecNOx"] > 0 and expected["EX1"]["FirstYearNetGasNOx"] > 0
+    assert ref.derive(MEASURES["EX4"])["rul"] == 0                                                     # RUL = EUL prices as single-baseline
 
     # portfolio summary (C16.3): CET's portfolio ratios are summed benefits (+ tax credits / bill increases) over the summed cost
     summ = pd.read_csv(result.files["portfolio_summary"]).iloc[0]
