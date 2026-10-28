@@ -152,70 +152,73 @@ def price_emissions_per_measure(measures: pd.DataFrame, acc_version: int = 2024,
     quarterly CO2 table.
     NOx/PM10 still come from the Emissions table -- the ACC has no electric NOx/
     PM10 rates, so this remains a CET-table dependency (see module docstring)."""
-    nox_idx, comb = _nox_pm10_index(acc_version), _combustion_nox()
+    nox_pm10_by_key, nox_by_combustion_type = _nox_pm10_index(acc_version), _combustion_nox()
     from .. import run_poc
     rows: list[dict] = []
-    for m in run_poc.split_by_baseline_shape(measures).itertuples(index=False):      # a separate 2nd-baseline shape: two parts, summed below
-        qty = float(m.num_units)
-        ntg_kwh, ntg_thm = float(m.NTGRkWh) + market_effects_bens, float(m.ntgr_therm) + market_effects_bens
-        irr_kwh = float(m.ir_kwh) * float(m.rr_kwh)
-        irr_thm = float(m.ir_therm) * float(m.rr_therm)
-        kwh1, kwh2 = float(m.unit_kwh_1st), float(m.unit_kwh_2nd)
-        if _is_kwh_per_unit(m.PA, m.target_sector, m.shape_key, str(m.climate_zone)):
-            # the profile is already kWh per unit per hour: it is multiplied by what the electric benefit multiplies it by (shape_scale), per unit
-            per_unit = qty * float(m.NTGRkWh) * irr_kwh
-            kwh1, kwh2 = (float(m.shape_scale) / per_unit, float(m.shape_scale_2nd) / per_unit) if per_unit else (1.0, 1.0)
-        thm1, thm2 = float(m.unit_therm_1st), float(m.unit_therm_2nd)
-        eul = float(m.eul_years_exact)
-        rul = float(m.rul_years_exact) if float(m.rul_years_exact) < eul else 0.0
-        rulq, eulq = rul * 4.0, eul * 4.0
-        install_q = int(m.claim_year) * 4 + int(m.claim_quarter)
+    for m in run_poc.split_by_baseline_shape(measures).itertuples(index=False):      # a separate 2nd-baseline profile: two parts, summed below
+        NumUnits = float(m.NumUnits)
+        NTGRkWh_plus_MEBens, NTGRTherm_plus_MEBens = float(m.NTGRkWh) + market_effects_bens, float(m.NTGRTherm) + market_effects_bens
+        ir_x_rr_kwh = float(m.InstallationRatekWh) * float(m.RealizationRatekWh)
+        ir_x_rr_therm = float(m.InstallationRateTherm) * float(m.RealizationRateTherm)
+        profile, iou, sector, zone = m.Used_AC_Elec_Impact_Profile, m.IOU_AC_Territory, m.AC_Elec_Target_Sector, str(m.AC_Climate_Zone)
+        kwh_per_unit_1st, kwh_per_unit_2nd = float(m.Used_UnitkWh1stBaseline), float(m.Used_UnitkWh2ndBaseline)
+        if _is_kwh_per_unit(iou, sector, profile, zone):
+            # the profile is already kWh per unit per hour: it is multiplied by what the electric benefit multiplies it by (AC_Net_kWh_ScaledProfile_*), per unit
+            units_x_ntg_x_ir_x_rr = NumUnits * float(m.NTGRkWh) * ir_x_rr_kwh
+            kwh_per_unit_1st, kwh_per_unit_2nd = ((float(m.AC_Net_kWh_ScaledProfile_1st_Baseline) / units_x_ntg_x_ir_x_rr,
+                                                   float(m.AC_Net_kWh_ScaledProfile_2nd_Baseline) / units_x_ntg_x_ir_x_rr) if units_x_ntg_x_ir_x_rr else (1.0, 1.0))
+        UnitTherm1stBaseline, UnitTherm2ndBaseline = float(m.UnitTherm1stBaseline), float(m.UnitTherm2ndBaseline)
+        EUL_Yrs = float(m.EUL_Yrs)
+        rul_for_emissions = float(m.RUL_Yrs) if float(m.RUL_Yrs) < EUL_Yrs else 0.0           # CalcCE's InputMeasurevw: RUL >= EUL counts as no RUL
+        rul_quarters, eul_quarters = rul_for_emissions * 4.0, EUL_Yrs * 4.0                   # CalcEmissions' RULq / EULq
+        install_quarter_index = int(m.Used_Year) * 4 + int(m.Used_Quarter)                   # the claim quarter's Qidx
 
-        quarters = _hourly_co2_quarters(m.PA, m.target_sector, m.shape_key, str(m.climate_zone))
-        nox_rate, pm10_rate = nox_idx.get((m.PA, str(m.target_sector).upper(), m.shape_key, str(m.climate_zone).upper()), (0.0, 0.0))
-        fy = {"co2": 0.0, "nox": 0.0, "pm": 0.0}
-        lc = {"co2": 0.0, "nox": 0.0, "pm": 0.0}
-        if quarters:
-            seq = 0
-            for qidx, co2 in quarters:
-                if qidx < install_q or not (qidx < install_q + eulq):
+        co2_quarters = _hourly_co2_quarters(iou, sector, profile, zone)
+        nox_per_kwh, pm10_per_kwh = nox_pm10_by_key.get((iou, str(sector).upper(), profile, zone.upper()), (0.0, 0.0))
+        first_year = {"co2": 0.0, "nox": 0.0, "pm10": 0.0}
+        lifecycle = {"co2": 0.0, "nox": 0.0, "pm10": 0.0}
+        if co2_quarters:
+            counted_quarter = 0
+            for quarter_index, co2_tonnes_per_kwh in co2_quarters:
+                if quarter_index < install_quarter_index or not (quarter_index < install_quarter_index + eul_quarters):
                     continue
-                seq += 1
-                ak = _annual_kwh(qidx - install_q, kwh1, kwh2, rulq, eulq)
-                vals = {"co2": co2 * ak, "nox": nox_rate * ak / 4.0, "pm": pm10_rate * ak / 4.0}
-                for k, v in vals.items():
-                    lc[k] += v
-                    if seq <= 4:
-                        fy[k] += v
+                counted_quarter += 1
+                AnnualkWh = _annual_kwh(quarter_index - install_quarter_index, kwh_per_unit_1st, kwh_per_unit_2nd, rul_quarters, eul_quarters)
+                quarter_emissions = {"co2": co2_tonnes_per_kwh * AnnualkWh, "nox": nox_per_kwh * AnnualkWh / 4.0, "pm10": pm10_per_kwh * AnnualkWh / 4.0}
+                for k, v in quarter_emissions.items():
+                    lifecycle[k] += v
+                    if counted_quarter <= 4:
+                        first_year[k] += v
 
-        co2_gas = discount_settings.get_co2_gas(m.PA, acc_version)
-        nox_gas = comb.get(m.combustion_type, 0.0) if isinstance(m.combustion_type, str) else 0.0
-        gfy, glc = _gas_first_year(thm1, thm2, rul, eul), _gas_lifecycle(thm1, thm2, rul, eul)
+        CO2Gas = discount_settings.get_co2_gas(iou, acc_version)
+        combustion_nox_per_therm = nox_by_combustion_type.get(m.CombustionType, 0.0) if isinstance(m.CombustionType, str) else 0.0
+        first_year_therms = _gas_first_year(UnitTherm1stBaseline, UnitTherm2ndBaseline, rul_for_emissions, EUL_Yrs)
+        lifecycle_therms = _gas_lifecycle(UnitTherm1stBaseline, UnitTherm2ndBaseline, rul_for_emissions, EUL_Yrs)
 
-        def elec(d, net):
-            f = qty * (ntg_kwh if net else 1.0) * irr_kwh
-            return f * d["co2"], f * d["nox"], f * d["pm"]
+        def elec(sums, is_net):
+            elec_quantity_factor = NumUnits * (NTGRkWh_plus_MEBens if is_net else 1.0) * ir_x_rr_kwh
+            return elec_quantity_factor * sums["co2"], elec_quantity_factor * sums["nox"], elec_quantity_factor * sums["pm10"]
 
-        def gas(g, factor, net):
-            return qty * (ntg_thm if net else 1.0) * irr_thm * factor * g
+        def gas(therms, per_therm, is_net):
+            return NumUnits * (NTGRTherm_plus_MEBens if is_net else 1.0) * ir_x_rr_therm * per_therm * therms
 
-        r = {"measure_id": m.measure_id}
-        for scope, d, g in (("FirstYear", fy, gfy), ("Lifecycle", lc, glc)):
-            for net, tag in ((True, "Net"), (False, "Gross")):
-                c, n, p = elec(d, net)
-                r[f"{scope}{tag}ElecCO2"] = c
-                r[f"{scope}{tag}ElecNOx"] = n
-                r[f"{scope}{tag}ElecPM10"] = p
-                r[f"{scope}{tag}GasCO2"] = gas(g, co2_gas, net)
-                r[f"{scope}{tag}GasNOx"] = gas(g, nox_gas, net)
-        rows.append(r)
+        row = {"CEInputID": m.CEInputID}
+        for scope, sums, therms in (("FirstYear", first_year, first_year_therms), ("Lifecycle", lifecycle, lifecycle_therms)):
+            for is_net, net_or_gross in ((True, "Net"), (False, "Gross")):
+                co2, nox, pm10 = elec(sums, is_net)
+                row[f"{scope}{net_or_gross}ElecCO2"] = co2
+                row[f"{scope}{net_or_gross}ElecNOx"] = nox
+                row[f"{scope}{net_or_gross}ElecPM10"] = pm10
+                row[f"{scope}{net_or_gross}GasCO2"] = gas(therms, CO2Gas, is_net)
+                row[f"{scope}{net_or_gross}GasNOx"] = gas(therms, combustion_nox_per_therm, is_net)
+        rows.append(row)
     out = pd.DataFrame(rows)
-    return out.groupby("measure_id", sort=False).sum().reset_index() if len(out) and out["measure_id"].duplicated().any() else out
+    return out.groupby("CEInputID", sort=False).sum().reset_index() if len(out) and out["CEInputID"].duplicated().any() else out
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------
 # The array version of price_emissions_per_measure (the reference: read it for the CalcEmissions mechanics; tests/test_performance.py requires the two to agree).
-# Per route (PA, target sector, shape, zone) the quarterly CO2 series is built once; each measure's sum over the quarters of its life is then a matrix
+# Per route (IOU_AC_Territory, AC_Elec_Target_Sector, profile, AC_Climate_Zone) the quarterly CO2 series is built once; each measure's sum over the quarters of its life is then a matrix
 # (measures x quarters) product. Rows are taken in chunks so a large route never holds more than CHUNK x quarters numbers at once.
 
 CHUNK = 20_000
@@ -236,77 +239,92 @@ def _annual_kwh_array(k: np.ndarray, kwh1: np.ndarray, kwh2: np.ndarray, rulq: n
 def price_emissions(measures: pd.DataFrame, acc_version: int = 2024, market_effects_bens: float = 0.0) -> pd.DataFrame:
     """price_emissions_per_measure on arrays (same outputs, same order of columns)."""
     from .. import run_poc
-    nox_idx, comb = _nox_pm10_index(acc_version), _combustion_nox()
+    nox_pm10_by_key, nox_by_combustion_type = _nox_pm10_index(acc_version), _combustion_nox()
     m = run_poc.split_by_baseline_shape(measures).reset_index(drop=True)
     n = len(m)
     if n == 0:
         return price_emissions_per_measure(measures, acc_version, market_effects_bens)
-    f = lambda c: m[c].astype(float).to_numpy()
-    qty, irr_kwh, irr_thm = f("num_units"), f("ir_kwh") * f("rr_kwh"), f("ir_therm") * f("rr_therm")
-    ntg_kwh, ntg_thm = f("NTGRkWh"), f("ntgr_therm")
-    kwh1, kwh2, thm1, thm2 = f("unit_kwh_1st"), f("unit_kwh_2nd"), f("unit_therm_1st"), f("unit_therm_2nd")
-    eul = f("eul_years_exact")
-    rul_raw = f("rul_years_exact")
-    rul = np.where(rul_raw < eul, rul_raw, 0.0)
-    rulq, eulq = rul * 4.0, eul * 4.0
-    install_q = m["claim_year"].astype(int).to_numpy() * 4 + m["claim_quarter"].astype(int).to_numpy()
-    pa, ts, sk = m["PA"].astype(str).to_numpy(), m["target_sector"].astype(str).to_numpy(), m["shape_key"].astype(str).to_numpy()
-    cz = m["climate_zone"].astype(str).to_numpy()
-    routes = pd.Series(list(zip(pa, ts, sk, cz)))
-    codes, uniq = pd.factorize(routes)
 
-    per_unit_kwh = np.zeros(n, dtype=bool)
-    nox_rate, pm_rate = np.zeros(n), np.zeros(n)
-    sums = {k: np.zeros(n) for k in ("fy_co2", "lc_co2", "fy_ak", "lc_ak")}
-    raw_pa, raw_ts, raw_sk = m["PA"].to_numpy(dtype=object), m["target_sector"].to_numpy(dtype=object), m["shape_key"].to_numpy(dtype=object)
-    for r in range(len(uniq)):
-        rows = np.flatnonzero(codes == r)
-        i0 = rows[0]                                          # the lookups get the group's own values, as the reference passes them (a blank shape stays blank)
-        r_pa, r_ts, r_sk, r_cz = raw_pa[i0], raw_ts[i0], raw_sk[i0], cz[i0]
-        nx, pm = nox_idx.get((r_pa, str(r_ts).upper(), r_sk, r_cz.upper()), (0.0, 0.0))
-        nox_rate[rows], pm_rate[rows] = nx, pm
-        if _is_kwh_per_unit(r_pa, r_ts, r_sk, r_cz):
-            per_unit_kwh[rows] = True
-        quarters = _hourly_co2_quarters(r_pa, r_ts, r_sk, r_cz)
-        if not quarters:
+    def _floats(c):
+        return m[c].astype(float).to_numpy()
+
+    NumUnits = _floats("NumUnits")
+    ir_x_rr_kwh = _floats("InstallationRatekWh") * _floats("RealizationRatekWh")
+    ir_x_rr_therm = _floats("InstallationRateTherm") * _floats("RealizationRateTherm")
+    NTGRkWh, NTGRTherm = _floats("NTGRkWh"), _floats("NTGRTherm")
+    kwh_per_unit_1st, kwh_per_unit_2nd = _floats("Used_UnitkWh1stBaseline"), _floats("Used_UnitkWh2ndBaseline")
+    UnitTherm1stBaseline, UnitTherm2ndBaseline = _floats("UnitTherm1stBaseline"), _floats("UnitTherm2ndBaseline")
+    EUL_Yrs = _floats("EUL_Yrs")
+    RUL_Yrs = _floats("RUL_Yrs")
+    rul_for_emissions = np.where(RUL_Yrs < EUL_Yrs, RUL_Yrs, 0.0)                              # CalcCE's InputMeasurevw: RUL >= EUL counts as no RUL
+    rul_quarters, eul_quarters = rul_for_emissions * 4.0, EUL_Yrs * 4.0                       # CalcEmissions' RULq / EULq
+    install_quarter_index = m["Used_Year"].astype(int).to_numpy() * 4 + m["Used_Quarter"].astype(int).to_numpy()   # the claim quarter's Qidx
+    IOU_AC_Territory = m["IOU_AC_Territory"].astype(str).to_numpy()
+    AC_Elec_Target_Sector = m["AC_Elec_Target_Sector"].astype(str).to_numpy()
+    Used_AC_Elec_Impact_Profile = m["Used_AC_Elec_Impact_Profile"].astype(str).to_numpy()
+    AC_Climate_Zone = m["AC_Climate_Zone"].astype(str).to_numpy()
+    routes = pd.Series(list(zip(IOU_AC_Territory, AC_Elec_Target_Sector, Used_AC_Elec_Impact_Profile, AC_Climate_Zone)))
+    route_code, distinct_routes = pd.factorize(routes)
+
+    on_kwh_per_unit_profile = np.zeros(n, dtype=bool)
+    nox_per_kwh, pm10_per_kwh = np.zeros(n), np.zeros(n)
+    sums = {k: np.zeros(n) for k in ("first_year_co2_per_unit", "lifecycle_co2_per_unit", "first_year_kwh_per_unit", "lifecycle_kwh_per_unit")}
+    raw_iou = m["IOU_AC_Territory"].to_numpy(dtype=object)
+    raw_sector = m["AC_Elec_Target_Sector"].to_numpy(dtype=object)
+    raw_profile = m["Used_AC_Elec_Impact_Profile"].to_numpy(dtype=object)
+    for r in range(len(distinct_routes)):
+        route_rows = np.flatnonzero(route_code == r)
+        route_first_row = route_rows[0]                       # the lookups get the group's own values, as the reference passes them (a blank profile stays blank)
+        r_iou, r_sector, r_profile, r_zone = raw_iou[route_first_row], raw_sector[route_first_row], raw_profile[route_first_row], AC_Climate_Zone[route_first_row]
+        nox, pm10 = nox_pm10_by_key.get((r_iou, str(r_sector).upper(), r_profile, r_zone.upper()), (0.0, 0.0))
+        nox_per_kwh[route_rows], pm10_per_kwh[route_rows] = nox, pm10
+        if _is_kwh_per_unit(r_iou, r_sector, r_profile, r_zone):
+            on_kwh_per_unit_profile[route_rows] = True
+        co2_quarters = _hourly_co2_quarters(r_iou, r_sector, r_profile, r_zone)
+        if not co2_quarters:
             continue
-        qidx = np.array([q for q, _ in quarters])
-        co2 = np.array([c for _, c in quarters])
-        for start in range(0, len(rows), CHUNK):
-            idx = rows[start:start + CHUNK]
-            k1, k2 = kwh1[idx].copy(), kwh2[idx].copy()
-            if per_unit_kwh[idx].any():                       # the profile is kWh per unit per hour: see price_emissions_per_measure
-                sub = per_unit_kwh[idx]
-                pu = qty[idx] * ntg_kwh[idx] * irr_kwh[idx]
-                ss1, ss2 = f("shape_scale")[idx], f("shape_scale_2nd")[idx]
+        quarter_index = np.array([q for q, _ in co2_quarters])
+        co2_tonnes_per_kwh = np.array([c for _, c in co2_quarters])
+        for start in range(0, len(route_rows), CHUNK):
+            chunk_rows = route_rows[start:start + CHUNK]
+            kwh_1st, kwh_2nd = kwh_per_unit_1st[chunk_rows].copy(), kwh_per_unit_2nd[chunk_rows].copy()
+            if on_kwh_per_unit_profile[chunk_rows].any():          # the profile is kWh per unit per hour: see price_emissions_per_measure
+                on_profile = on_kwh_per_unit_profile[chunk_rows]
+                units_x_ntg_x_ir_x_rr = NumUnits[chunk_rows] * NTGRkWh[chunk_rows] * ir_x_rr_kwh[chunk_rows]
+                scale_1st = _floats("AC_Net_kWh_ScaledProfile_1st_Baseline")[chunk_rows]
+                scale_2nd = _floats("AC_Net_kWh_ScaledProfile_2nd_Baseline")[chunk_rows]
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    k1 = np.where(sub, np.where(pu != 0, ss1 / pu, 1.0), k1)
-                    k2 = np.where(sub, np.where(pu != 0, ss2 / pu, 1.0), k2)
-            k = qidx[None, :] - install_q[idx, None]
-            counted = (k >= 0) & (k < eulq[idx, None])
-            first = counted & (np.cumsum(counted, axis=1) <= 4)
-            ak = _annual_kwh_array(k, k1, k2, rulq[idx], eulq[idx])
-            sums["lc_co2"][idx] = (np.where(counted, ak, 0.0) * co2).sum(axis=1)
-            sums["fy_co2"][idx] = (np.where(first, ak, 0.0) * co2).sum(axis=1)
-            sums["lc_ak"][idx] = np.where(counted, ak, 0.0).sum(axis=1)
-            sums["fy_ak"][idx] = np.where(first, ak, 0.0).sum(axis=1)
+                    kwh_1st = np.where(on_profile, np.where(units_x_ntg_x_ir_x_rr != 0, scale_1st / units_x_ntg_x_ir_x_rr, 1.0), kwh_1st)
+                    kwh_2nd = np.where(on_profile, np.where(units_x_ntg_x_ir_x_rr != 0, scale_2nd / units_x_ntg_x_ir_x_rr, 1.0), kwh_2nd)
+            quarters_since_install = quarter_index[None, :] - install_quarter_index[chunk_rows, None]
+            in_life = (quarters_since_install >= 0) & (quarters_since_install < eul_quarters[chunk_rows, None])
+            in_first_year = in_life & (np.cumsum(in_life, axis=1) <= 4)
+            AnnualkWh = _annual_kwh_array(quarters_since_install, kwh_1st, kwh_2nd, rul_quarters[chunk_rows], eul_quarters[chunk_rows])
+            sums["lifecycle_co2_per_unit"][chunk_rows] = (np.where(in_life, AnnualkWh, 0.0) * co2_tonnes_per_kwh).sum(axis=1)
+            sums["first_year_co2_per_unit"][chunk_rows] = (np.where(in_first_year, AnnualkWh, 0.0) * co2_tonnes_per_kwh).sum(axis=1)
+            sums["lifecycle_kwh_per_unit"][chunk_rows] = np.where(in_life, AnnualkWh, 0.0).sum(axis=1)
+            sums["first_year_kwh_per_unit"][chunk_rows] = np.where(in_first_year, AnnualkWh, 0.0).sum(axis=1)
 
-    co2_gas = m["PA"].map({p_: discount_settings.get_co2_gas(p_, acc_version) for p_ in m["PA"].unique()}).astype(float).to_numpy()
-    ct = m["combustion_type"]
-    nox_gas = np.array([comb.get(c, 0.0) if isinstance(c, str) else 0.0 for c in ct.to_numpy()]) if len(ct) else np.zeros(n)
-    g_first = np.select([(rul > 0) & (rul >= 1), (rul > 0) & (eul >= 1), rul > 0, (eul > 0) & (eul > 1), eul > 0],
-                        [thm1, rul * thm1 + (1 - rul) * thm2, rul * thm1 + (eul - rul) * thm2, thm1, eul * thm1], default=0.0)
-    g_life = np.select([rul > 0, eul > 0], [rul * thm1 + (eul - rul) * thm2, eul * thm1], default=0.0)
+    CO2Gas = m["IOU_AC_Territory"].map({i: discount_settings.get_co2_gas(i, acc_version) for i in m["IOU_AC_Territory"].unique()}).astype(float).to_numpy()
+    CombustionType = m["CombustionType"]
+    combustion_nox_per_therm = (np.array([nox_by_combustion_type.get(c, 0.0) if isinstance(c, str) else 0.0 for c in CombustionType.to_numpy()])
+                                if len(CombustionType) else np.zeros(n))
+    rul, eul, thm1, thm2 = rul_for_emissions, EUL_Yrs, UnitTherm1stBaseline, UnitTherm2ndBaseline
+    first_year_therms_per_unit = np.select([(rul > 0) & (rul >= 1), (rul > 0) & (eul >= 1), rul > 0, (eul > 0) & (eul > 1), eul > 0],
+                                           [thm1, rul * thm1 + (1 - rul) * thm2, rul * thm1 + (eul - rul) * thm2, thm1, eul * thm1], default=0.0)
+    lifecycle_therms_per_unit = np.select([rul > 0, eul > 0], [rul * thm1 + (eul - rul) * thm2, eul * thm1], default=0.0)
 
-    out = {"measure_id": m["measure_id"].to_numpy()}
-    for scope, co2_s, ak_s, g in (("FirstYear", sums["fy_co2"], sums["fy_ak"], g_first), ("Lifecycle", sums["lc_co2"], sums["lc_ak"], g_life)):
-        for net, tag in ((True, "Net"), (False, "Gross")):
-            fe = qty * ((ntg_kwh + market_effects_bens) if net else 1.0) * irr_kwh
-            fg = qty * ((ntg_thm + market_effects_bens) if net else 1.0) * irr_thm
-            out[f"{scope}{tag}ElecCO2"] = fe * co2_s
-            out[f"{scope}{tag}ElecNOx"] = fe * nox_rate * ak_s / 4.0
-            out[f"{scope}{tag}ElecPM10"] = fe * pm_rate * ak_s / 4.0
-            out[f"{scope}{tag}GasCO2"] = fg * co2_gas * g
-            out[f"{scope}{tag}GasNOx"] = fg * nox_gas * g
+    out = {"CEInputID": m["CEInputID"].to_numpy()}
+    for scope, co2_per_unit, kwh_per_unit, therms_per_unit in (
+            ("FirstYear", sums["first_year_co2_per_unit"], sums["first_year_kwh_per_unit"], first_year_therms_per_unit),
+            ("Lifecycle", sums["lifecycle_co2_per_unit"], sums["lifecycle_kwh_per_unit"], lifecycle_therms_per_unit)):
+        for is_net, net_or_gross in ((True, "Net"), (False, "Gross")):
+            elec_quantity_factor = NumUnits * ((NTGRkWh + market_effects_bens) if is_net else 1.0) * ir_x_rr_kwh
+            gas_quantity_factor = NumUnits * ((NTGRTherm + market_effects_bens) if is_net else 1.0) * ir_x_rr_therm
+            out[f"{scope}{net_or_gross}ElecCO2"] = elec_quantity_factor * co2_per_unit
+            out[f"{scope}{net_or_gross}ElecNOx"] = elec_quantity_factor * nox_per_kwh * kwh_per_unit / 4.0
+            out[f"{scope}{net_or_gross}ElecPM10"] = elec_quantity_factor * pm10_per_kwh * kwh_per_unit / 4.0
+            out[f"{scope}{net_or_gross}GasCO2"] = gas_quantity_factor * CO2Gas * therms_per_unit
+            out[f"{scope}{net_or_gross}GasNOx"] = gas_quantity_factor * combustion_nox_per_therm * therms_per_unit
     res = pd.DataFrame(out)
-    return res.groupby("measure_id", sort=False).sum().reset_index() if res["measure_id"].duplicated().any() else res
+    return res.groupby("CEInputID", sort=False).sum().reset_index() if res["CEInputID"].duplicated().any() else res

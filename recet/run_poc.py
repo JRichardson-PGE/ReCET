@@ -23,8 +23,9 @@ from .pipeline import (
     system_zones,
 )
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
+from .pipeline.data_loading import FIRST_BASELINE_QUANTITIES, SECOND_BASELINE_QUANTITIES
 from .pipeline.engine import (
-    BatchedPricingResult,
+    HourlyPricingResult,
     price_bill_impact,
     price_gas_benefit,
     price_other_ben_cost,
@@ -33,11 +34,16 @@ from .pipeline.engine import (
 )
 
 def _ids_in(df: pd.DataFrame | None) -> set:
-    """The measure_ids present in a pricing result; empty when nothing was priced (such a frame has no columns at all)."""
-    return set() if df is None or df.empty else set(df["measure_id"].unique())          # unique first: a per-measure engine frame has a row per quarter
+    """The CEInputIDs present in a pricing result; empty when nothing was priced (such a frame has no columns at all)."""
+    return set() if df is None or df.empty else set(df["CEInputID"].unique())          # unique first: a per-measure engine frame has a row per quarter
 
 
-ROUTE_COLUMNS = ["shape_key", "PA", "target_sector", "climate_zone"]   # what decides a measure's electric shape and avoided-cost series
+# what decides a priced part's electric profile and avoided-cost series
+ROUTE_COLUMNS = ["Used_AC_Elec_Impact_Profile", "IOU_AC_Territory", "AC_Elec_Target_Sector", "AC_Climate_Zone"]
+ELEC_PROFILES = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline")                     # the profile of each baseline
+ELEC_QUANTITIES = ("AC_Net_kWh_ScaledProfile_1st_Baseline", "AC_Net_kWh_ScaledProfile_2nd_Baseline")   # what each baseline's profile is multiplied by
+GAS_QUANTITIES = ("AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline")
+BILL_QUANTITIES = ("AC_Net_kWh_1st_Baseline", "AC_Net_kWh_2nd_Baseline", "AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline")
 
 
 def _route_keys(df: pd.DataFrame, cols: list[str]) -> list[tuple]:
@@ -56,67 +62,55 @@ def _per_route(df: pd.DataFrame, cols: list[str], fn) -> pd.Series:
     return pd.Series(flags[codes], index=df.index)
 
 
-def split_by_baseline_shape(measures: pd.DataFrame) -> pd.DataFrame:
-    """A measure whose 2nd-baseline years have their own electric shape (shape_key_2nd, from AC_Elec_Impact_Profile_2nd_Baseline) becomes two rows with the same measure_id:
-    the 1st-baseline part on its own shape (2nd-baseline kWh set to 0) and the 2nd-baseline part on the 2nd shape (1st-baseline kWh, gas and water set to 0).
-    The baseline phasing is linear in the two quantities, so the two parts add up to the measure; with one shape the measure is left as one row. Only early
-    replacements (0 < RUL < EUL) have a 2nd baseline to split. Sum results by measure_id afterwards."""
-    if "shape_key_2nd" not in measures.columns:
-        return measures
-    rul, eul = measures["rul_years_exact"], measures["eul_years_exact"]
-    split = (measures["shape_key_2nd"] != measures["shape_key"]) & (rul > 0) & (rul < eul)
-    if not split.any():
-        return measures
-    first, second = measures[split].copy(), measures[split].copy()
-    for c in ("shape_scale_2nd", "unit_kwh_2nd", "annual_net_kwh_2nd"):
-        first[c] = 0.0
-    second["shape_key"] = second["shape_key_2nd"]
-    for c in ("shape_scale", "unit_kwh_1st", "annual_net_kwh_1st", "annual_net_kwh", "unit_therm_1st", "unit_therm_2nd", "annual_net_therms_1st",
-              "annual_net_therms_2nd", "annual_net_therms", "kwh_water_1st", "kwh_water_2nd", "water_scale_1st", "water_scale_2nd"):
-        if c in second.columns:
-            second[c] = 0.0
-    out = pd.concat([measures[~split], first, second])
+def split_by_baseline_shape(measures: pd.DataFrame, profiles: tuple[str, str] = ELEC_PROFILES) -> pd.DataFrame:
+    """The parts of the measures that are priced on one electric profile each, with that profile in Used_AC_Elec_Impact_Profile. A measure whose 2nd-baseline years
+    have their own profile (`profiles[1]`, AC_Elec_Impact_Profile_2nd_Baseline) becomes two rows with the same CEInputID: the 1st-baseline part on `profiles[0]`
+    (every 2nd-baseline quantity set to 0) and the 2nd-baseline part on `profiles[1]` (every 1st-baseline quantity set to 0). The baseline phasing is linear in
+    the two quantities, so the parts add up to the measure; with one profile the measure is one row. Only early replacements (0 < RUL_Yrs < EUL_Yrs) have a 2nd
+    baseline to split. Sum results by CEInputID afterwards."""
+    parts = measures.copy()
+    parts["Used_AC_Elec_Impact_Profile"] = parts[profiles[0]]
+    has_own_2nd_baseline_profile = (parts[profiles[1]] != parts[profiles[0]]) & (parts["RUL_Yrs"] > 0) & (parts["RUL_Yrs"] < parts["EUL_Yrs"])
+    if not has_own_2nd_baseline_profile.any():
+        return parts
+    first_baseline_part, second_baseline_part = parts[has_own_2nd_baseline_profile].copy(), parts[has_own_2nd_baseline_profile].copy()
+    for c in SECOND_BASELINE_QUANTITIES:
+        if c in first_baseline_part.columns:
+            first_baseline_part[c] = 0.0
+    second_baseline_part["Used_AC_Elec_Impact_Profile"] = second_baseline_part[profiles[1]]
+    for c in FIRST_BASELINE_QUANTITIES:
+        if c in second_baseline_part.columns:
+            second_baseline_part[c] = 0.0
+    out = pd.concat([parts[~has_own_2nd_baseline_profile], first_baseline_part, second_baseline_part])
     return out.sort_index(kind="stable").reset_index(drop=True)         # each measure where it was, its 1st-baseline part before its 2nd
 
 
 def _sum_by_measure(df: pd.DataFrame, value_col: str, name: str) -> pd.Series:
-    """Lifetime value per measure_id. An empty result (no measure of this fuel priced -- e.g. an electric-only job has no gas rows) is an empty Series that still
-    carries the measure_id index, so it merges like any other."""
+    """Lifetime value per CEInputID. An empty result (no measure of this fuel priced -- e.g. an electric-only job has no gas rows) is an empty Series that still
+    carries the CEInputID index, so it merges like any other."""
     if df is None or df.empty:
-        return pd.Series(dtype=float, name=name, index=pd.Index([], name="measure_id"))
-    return df.groupby("measure_id")[value_col].sum().rename(name)
+        return pd.Series(dtype=float, name=name, index=pd.Index([], name="CEInputID"))
+    return df.groupby("CEInputID")[value_col].sum().rename(name)
 
 
-def _apply_market_effects_electric(measures: pd.DataFrame, meb: float) -> pd.DataFrame:
-    """A copy of `measures` with the electric benefit's net-to-gross factor NTGRkWh replaced by NTGRkWh + MEBens (CET's run-level Market Effects, 0% or 5%).
-    The hourly pricer reads the NTG-baked `shape_scale`/`shape_scale_2nd`, so those (and `annual_net_kwh_*`, kept consistent) are scaled by (NTG+MEB)/NTG.
-    A measure with NTG = 0 is left alone (its net value is 0 and gross is not recoverable). Costs are not touched: see `run_participant_cost`."""
-    m = measures.copy()
-    if meb:
-        ntg = m["ntgr_kwh"]
-        factor = ((ntg + meb) / ntg).where(ntg > 0, 1.0)
-        for c in ("shape_scale", "shape_scale_2nd", "annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kwh"):
-            m[c] = m[c] * factor
-    return m
-
-
-def _apply_market_effects_gas(measures: pd.DataFrame, meb: float) -> pd.DataFrame:
-    """Same for gas: NTGRThm -> NTGRThm + MEBens on the NTG-baked annual net therms (CalcCE: Qty x (NTGRThm + MEBens) x IRThm x RRThm x Thm x Gas)."""
-    m = measures.copy()
-    if meb:
-        ntg = m["ntgr_therm"]
-        factor = ((ntg + meb) / ntg).where(ntg > 0, 1.0)
-        for c in ("annual_net_therms_1st", "annual_net_therms_2nd", "annual_net_therms"):
-            m[c] = m[c] * factor
-    return m
+def ntg_factor_with_market_effects(ntg: pd.Series, meb: float) -> pd.Series:
+    """(NTG + MEBens) / NTG: turns a net quantity (which carries NTG) into the one a benefit is priced on under CET's run-level Market Effects (MEBens, 0% or
+    5%; CalcCE: Qty x (NTGRkWh + MEBens) x ...). 1 where NTG = 0 (the net value is 0 and gross is not recoverable). Costs are not touched: see
+    `run_participant_cost`."""
+    if not meb:
+        return pd.Series(1.0, index=ntg.index)
+    return ((ntg + meb) / ntg).where(ntg > 0, 1.0)
 
 
 def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024,
                      base_year: int | None = None,
                      discount_rate_fn=discount_settings.get_discount_rate_qtr,
                      market_effects_bens: float = 0.0, component: str | None = None,
-                     gen_only: bool = False):
+                     gen_only: bool = False, quantities: tuple[str, str] = ELEC_QUANTITIES, profiles: tuple[str, str] = ELEC_PROFILES):
     """
+    quantities / profiles: the columns holding what each baseline's profile is multiplied by, and each baseline's profile (the electric benefit's by default;
+    run_water_energy passes the water energy's). The quantities carry NTG, installation and realization rates; market effects are applied here.
+
     ONE ROUTE ONLY (2026-10-02, Jake): every electric measure is priced on the 8,760 path -- its impact profile (user-supplied, or the library's, which now
     includes the Gen-based TOU H-factor 8,760s) re-aligned to the ACC's 2018 weekdays (real_impact_profiles.shift_for_year), times the hourly ACC, summed
     within the ACC quarters. The TOU quarterly route (CEDARS' calculator values, kW-based T&D) and CET's quarterly SCG table are no longer used; SCG is priced
@@ -136,7 +130,7 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     PA-specific discounting, quarterly (not annual) compounding, and
     fractional-EUL/claim-quarter precision.
 
-    base_year defaults to the MIN real claim_year across `measures` -- this
+    base_year defaults to the MIN Used_Year across `measures` -- this
     mirrors a real CET job's "First Year" receipt field, which Jake
     confirmed is the actual discounting reference point (not the static
     BaseYear column in the settings table). Both of this POC's real ground-
@@ -149,8 +143,8 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     NO SYNTHETIC SHAPE FALLBACK for real measures (2026-09-16, Jake's
     direction, replacing the old always-on placeholder substitution): a
     measure with no real 8760-hour CEDARS profile match is now FLAGGED
-    (collected into the returned BatchedPricingResult's
-    `unmatched_measure_ids`) and excluded from pricing, never priced
+    (collected into the returned HourlyPricingResult's
+    `unpriced_ids`) and excluded from pricing, never priced
     against a fabricated shape.
 
     discount_rate_fn (2026-09-17, for SCB/SCH): defaults to the primary
@@ -160,60 +154,63 @@ def run_real_hourly(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     cost_test is "SCT Base"/"SCT High" so this function's discounting
     matches which cost test it's actually pricing.
 
-    Returns the BatchedPricingResult.
+    Returns the HourlyPricingResult.
     """
-    measures = _apply_market_effects_electric(measures, market_effects_bens)
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
+        base_year = int(measures["Used_Year"].min())
 
-    other_measures = split_by_baseline_shape(measures.reset_index(drop=True))     # a separate 2nd-baseline shape prices as a second part
-    # AC_Climate_Zone = System is priced in the profile's System zone (pipeline/system_zones.py): its shape AND its prices come from that real zone
-    other_measures["price_zone"] = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in
-                                    zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"], other_measures["climate_zone"])]
+    priced_parts = split_by_baseline_shape(measures.reset_index(drop=True), profiles)     # a separate 2nd-baseline profile prices as a second part
+    ntg_factor = ntg_factor_with_market_effects(priced_parts["NTGRkWh"], market_effects_bens)
+    priced_parts["Priced_Quantity_1st_Baseline"] = priced_parts[quantities[0]] * ntg_factor
+    priced_parts["Priced_Quantity_2nd_Baseline"] = priced_parts[quantities[1]] * ntg_factor
+    # AC_Climate_Zone = System is priced in the profile's System zone (pipeline/system_zones.py): its profile AND its prices come from that real zone
+    priced_parts["Used_Climate_Zone"] = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in
+                                         zip(priced_parts["Used_AC_Elec_Impact_Profile"], priced_parts["IOU_AC_Territory"], priced_parts["AC_Elec_Target_Sector"],
+                                             priced_parts["AC_Climate_Zone"])]
 
-    match_cache: dict[tuple, tuple | None] = {}   # (shape key, PA, sector, zone) -> (shape, represents_year, source) or None: one library / user-profile lookup per route
+    profile_by_route: dict[tuple, tuple | None] = {}   # (profile, IOU, sector, zone) -> (profile, represents_year, source) or None: one lookup per route
 
     def get_shape(m):
-        key = (m["shape_key"], m["PA"], m["target_sector"], m["price_zone"])
-        if key not in match_cache:
-            match_cache[key] = real_impact_profiles.resolve_shape(m["shape_key"], m["PA"], m["target_sector"], m["price_zone"])   # (shape, year, source)
-        hit = match_cache[key]
+        key = (m["Used_AC_Elec_Impact_Profile"], m["IOU_AC_Territory"], m["AC_Elec_Target_Sector"], m["Used_Climate_Zone"])
+        if key not in profile_by_route:
+            profile_by_route[key] = real_impact_profiles.resolve_shape(*key)   # (profile, year, source)
+        hit = profile_by_route[key]
         if hit is None:
             return None
         return hit[0], hit[1]
 
-    acc_cache: dict[tuple, dict] = {}
+    acc_by_route: dict[tuple, dict] = {}
 
     def get_acc_years(m):
-        key = (m["PA"], m["price_zone"])
-        if key not in acc_cache:
+        key = (m["IOU_AC_Territory"], m["Used_Climate_Zone"])
+        if key not in acc_by_route:
             if gen_only:
-                acc_cache[key] = real_avoided_cost_v2.get_gen_td_series(m["PA"], m["price_zone"], cost_test)[0]
+                acc_by_route[key] = real_avoided_cost_v2.get_gen_td_series(*key, cost_test)[0]
             else:
-                series, _used_blended = real_avoided_cost_v2.get_acc_series(m["PA"], m["price_zone"], cost_test, component)
-                acc_cache[key] = series
-        return acc_cache[key]
+                acc_by_route[key] = real_avoided_cost_v2.get_acc_series(*key, cost_test, component)[0]
+        return acc_by_route[key]
 
-    rate_cache: dict[str, float] = {}
+    discount_rate_qtr_by_iou: dict[str, float] = {}
 
     def get_discount_rate_qtr(m):
-        pa = m["PA"]
-        if pa not in rate_cache:
-            rate_cache[pa] = discount_rate_fn(pa, acc_version)
-        return rate_cache[pa]
+        iou = m["IOU_AC_Territory"]
+        if iou not in discount_rate_qtr_by_iou:
+            discount_rate_qtr_by_iou[iou] = discount_rate_fn(iou, acc_version)
+        return discount_rate_qtr_by_iou[iou]
 
-    batched = price_real_hourly(
-        other_measures, get_shape, get_acc_years, real_impact_profiles.shift_for_year,
+    elec_pricing = price_real_hourly(
+        priced_parts, get_shape, get_acc_years, real_impact_profiles.shift_for_year,
         get_discount_rate_qtr, base_year,
-        route_key=_route_keys(other_measures, ROUTE_COLUMNS),                # shape / ACC series / rate are looked up once per route, not once per measure
+        route_key=_route_keys(priced_parts, ROUTE_COLUMNS),                # profile / ACC series / rate are looked up once per route, not once per measure
     )
 
-    hourly_source = [(match_cache.get(k) or (None, None, ""))[2] for k in zip(other_measures["shape_key"], other_measures["PA"], other_measures["target_sector"],
-                                                                          other_measures["price_zone"])]      # where each measure's 8,760 shape came from (user profile / library ...)
-    batched.route = {}
-    for mid, src in zip(other_measures["measure_id"], hourly_source):        # a measure split by baseline reports its 1st-baseline shape
-        batched.route.setdefault(mid, f"hourly profile | {src}")
-    return batched
+    profile_source = [(profile_by_route.get(k) or (None, None, ""))[2] for k in
+                      zip(priced_parts["Used_AC_Elec_Impact_Profile"], priced_parts["IOU_AC_Territory"], priced_parts["AC_Elec_Target_Sector"],
+                          priced_parts["Used_Climate_Zone"])]      # where each part's 8,760 profile came from (user profile / library ...)
+    elec_pricing.route = {}
+    for mid, src in zip(priced_parts["CEInputID"], profile_source):        # a measure split by baseline reports its 1st-baseline profile
+        elec_pricing.route.setdefault(mid, f"hourly profile | {src}")
+    return elec_pricing
 
 
 def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024, base_year: int | None = None,
@@ -230,7 +227,7 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     year gas ACC rate, End Use/Emission Control approximated from
     AC_Gas_Target_Sector since Measure.csv has no real field for it).
 
-    Only measures with a nonzero annual_net_therms AND a real matching gas
+    Only measures with a nonzero AC_Net_Therms_1st/2nd_Baseline AND a real matching gas
     shape are priced -- most of the small 5-measure sample has no real gas
     savings at all (only electric), so an empty or near-empty result there
     is expected, not a bug.
@@ -238,85 +235,97 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
     Returns (gas_result_df, n_gas_measures, n_matched_shape).
     """
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
-    measures = _apply_market_effects_gas(measures, market_effects_bens)
+        base_year = int(measures["Used_Year"].min())
+    measures = measures.copy()
+    ntg_factor = ntg_factor_with_market_effects(measures["NTGRTherm"], market_effects_bens)
+    measures["Priced_Quantity_1st_Baseline"] = measures[GAS_QUANTITIES[0]] * ntg_factor
+    measures["Priced_Quantity_2nd_Baseline"] = measures[GAS_QUANTITIES[1]] * ntg_factor
 
-    shape_cache: dict[str, np.ndarray | None] = {}
+    profile_by_name: dict[str, np.ndarray | None] = {}
 
     def get_gas_shape(m):
-        key = m["gas_profile_key"]
+        key = m["AC_Gas_Impact_Profile"]
         if pd.isna(key):
             return None
-        if key not in shape_cache:
-            shape_cache[key] = gas_savings_profiles.get_shape(key)
-        return shape_cache[key]
+        if key not in profile_by_name:
+            profile_by_name[key] = gas_savings_profiles.get_shape(key)
+        return profile_by_name[key]
 
-    acc_cache: dict[tuple, dict[int, np.ndarray]] = {}
+    acc_by_route: dict[tuple, dict[int, np.ndarray]] = {}
 
     def get_gas_acc_years(m):
-        key = (m["PA"], m["gas_sector"], m["gas_profile_key"])
-        if key not in acc_cache:
-            acc_cache[key] = gas_avoided_cost.get_years_for_measure(
-                m["PA"], m["gas_sector"], m["gas_profile_key"], cost_test, scc, component
-            )
-        return acc_cache[key]
+        key = (m["IOU_AC_Territory"], m["AC_Gas_Target_Sector"], m["AC_Gas_Impact_Profile"])
+        if key not in acc_by_route:
+            acc_by_route[key] = gas_avoided_cost.get_years_for_measure(*key, cost_test, scc, component)
+        return acc_by_route[key]
 
-    rate_cache: dict[str, float] = {}
+    discount_rate_qtr_by_iou: dict[str, float] = {}
 
     def get_discount_rate_qtr(m):
-        pa = m["PA"]
-        if pa not in rate_cache:
-            rate_cache[pa] = discount_rate_fn(pa, acc_version)
-        return rate_cache[pa]
+        iou = m["IOU_AC_Territory"]
+        if iou not in discount_rate_qtr_by_iou:
+            discount_rate_qtr_by_iou[iou] = discount_rate_fn(iou, acc_version)
+        return discount_rate_qtr_by_iou[iou]
 
-    has_gas_savings = (measures["annual_net_therms_1st"] != 0) | (measures["annual_net_therms_2nd"] != 0)
-    n_gas_measures = int(has_gas_savings.sum())
-    n_matched_shape = int(measures.loc[has_gas_savings, "gas_profile_key"]
-                           .apply(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None).sum())
+    has_gas_savings = (measures["AC_Net_Therms_1st_Baseline"] != 0) | (measures["AC_Net_Therms_2nd_Baseline"] != 0)
+    n_with_gas_savings = int(has_gas_savings.sum())
+    n_with_gas_profile = int(measures.loc[has_gas_savings, "AC_Gas_Impact_Profile"]
+                             .apply(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None).sum())
 
     result = price_gas_benefit(measures, get_gas_shape, get_gas_acc_years, get_discount_rate_qtr, base_year,
-                               route_key=_route_keys(measures, ["gas_profile_key", "PA", "gas_sector"]))   # profile / gas ACC / rate looked up once per route
-    return result, n_gas_measures, n_matched_shape
+                               route_key=_route_keys(measures, ["AC_Gas_Impact_Profile", "IOU_AC_Territory", "AC_Gas_Target_Sector"]))   # one lookup per route
+    return result, n_with_gas_savings, n_with_gas_profile
 
 
-def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2024):
+def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2024, market_effects_bens: float = 0.0, quantities: tuple[str, str, str, str] = BILL_QUANTITIES):
     """
+    quantities: the columns of the annual kWh (1st, 2nd baseline) and therms (1st, 2nd) the bill changes by -- the net ones by default (AC_Net_kWh_1st_Baseline ...);
+    participant_cost_test passes the gross ones. market_effects_bens: NTG -> NTG + MEBens on each (CalcCE prices the bill on Qty x (NTGRkWh + MEBens) / (NTGRThm +
+    MEBens), :15885-15974).
+
     Wires up the real CET retail rate schedules (pipeline/rate_schedules.py)
     for the RIM test's bill-impact columns -- see engine.price_bill_impact's
     docstring for the full mechanics (annual, not quarterly; sign-based
     Reduc/Incr classification).
 
-    Returns a DataFrame with one row per measure: measure_id, LifecycleBillReducElec,
-    LifecycleBillIncrElec, LifecycleBillReducGas, LifecycleBillIncrGas -- NOT a measure_year-per-quarter
+    Returns a DataFrame with one row per measure: CEInputID, LifecycleBillReducElec,
+    LifecycleBillIncrElec, LifecycleBillReducGas, LifecycleBillIncrGas -- NOT a per-quarter
     series like this POC's other run_* functions, since the real quantity
     itself is a single lifetime PV number per measure (see price_bill_impact).
     """
-    elec_cache: dict[tuple, dict[int, float] | None] = {}
+    measures = measures.copy()
+    elec_factor = ntg_factor_with_market_effects(measures["NTGRkWh"], market_effects_bens)
+    gas_factor = ntg_factor_with_market_effects(measures["NTGRTherm"], market_effects_bens)
+    for col, q, f in (("Billed_kWh_1st_Baseline", quantities[0], elec_factor), ("Billed_kWh_2nd_Baseline", quantities[1], elec_factor),
+                      ("Billed_Therms_1st_Baseline", quantities[2], gas_factor), ("Billed_Therms_2nd_Baseline", quantities[3], gas_factor)):
+        measures[col] = measures[q] * f
+
+    elec_rates_by_key: dict[tuple, dict[int, float] | None] = {}
 
     def get_elec_rate_years(m):
-        key = (m["PA"], m["target_sector"], acc_version)
-        if key not in elec_cache:
-            elec_cache[key] = rate_schedules.get_elec_rate_years(m["PA"], m["target_sector"], acc_version)
-        return elec_cache[key]
+        key = (m["IOU_AC_Territory"], m["AC_Elec_Target_Sector"], acc_version)
+        if key not in elec_rates_by_key:
+            elec_rates_by_key[key] = rate_schedules.get_elec_rate_years(*key)
+        return elec_rates_by_key[key]
 
-    gas_cache: dict[tuple, dict[int, float] | None] = {}
+    gas_rates_by_key: dict[tuple, dict[int, float] | None] = {}
 
     def get_gas_rate_years(m):
-        key = (m["PA"], m["gas_sector"], acc_version)
-        if key not in gas_cache:
-            gas_cache[key] = rate_schedules.get_gas_rate_years(m["PA"], m["gas_sector"], acc_version)
-        return gas_cache[key]
+        key = (m["IOU_AC_Territory"], m["AC_Gas_Target_Sector"], acc_version)
+        if key not in gas_rates_by_key:
+            gas_rates_by_key[key] = rate_schedules.get_gas_rate_years(*key)
+        return gas_rates_by_key[key]
 
-    rate_cache: dict[str, float] = {}
+    discount_rate_annual_by_iou: dict[str, float] = {}
 
     def get_discount_rate_annual(m):
-        pa = m["PA"]
-        if pa not in rate_cache:
-            rate_cache[pa] = discount_settings.get_discount_rate_annual(pa, acc_version)
-        return rate_cache[pa]
+        iou = m["IOU_AC_Territory"]
+        if iou not in discount_rate_annual_by_iou:
+            discount_rate_annual_by_iou[iou] = discount_settings.get_discount_rate_annual(iou, acc_version)
+        return discount_rate_annual_by_iou[iou]
 
     return price_bill_impact(measures, get_elec_rate_years, get_gas_rate_years, get_discount_rate_annual,
-                             settings_base_year=discount_settings.get_settings("PGE", acc_version)["settings_base_year"])
+                             run_parameters_base_year=discount_settings.get_settings("PGE", acc_version)["BaseYear"])
 
 
 def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
@@ -329,15 +338,15 @@ def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2024, base_y
     (real SQL: CET_v25.1_documentation_extracted.txt:14891-14916,
     :15135-15136). Returns one row per measure."""
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
+        base_year = int(measures["Used_Year"].min())
 
-    rate_cache: dict[str, float] = {}
+    discount_rate_qtr_by_iou: dict[str, float] = {}
 
     def get_discount_rate_qtr(m):
-        pa = m["PA"]
-        if pa not in rate_cache:
-            rate_cache[pa] = discount_rate_fn(pa, acc_version)
-        return rate_cache[pa]
+        iou = m["IOU_AC_Territory"]
+        if iou not in discount_rate_qtr_by_iou:
+            discount_rate_qtr_by_iou[iou] = discount_rate_fn(iou, acc_version)
+        return discount_rate_qtr_by_iou[iou]
 
     out = price_participant_cost(measures, get_discount_rate_qtr, base_year, market_effects_cost=market_effects_cost)
     # Two participant costs, as CET exports them (CalcCost, CET_v25.1_documentation_extracted.txt:16820-16828): NetParticipantCostPV WITHOUT the market-effects
@@ -348,16 +357,16 @@ def run_participant_cost(measures: pd.DataFrame, acc_version: int = 2024, base_y
     return out
 
 
-def _split_ben_supply(value: pd.Series, is_fuel_sub: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """CalcCE's Ben / SupplyCost split. Fuel-substitution measures (AllElec-New, FuelSub-ToElec, FuelSub-ToGas) book a positive
+def _split_ben_supply(value: pd.Series, fuel_sub_flag: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """CalcCE's Ben / SupplyCost split. Fuel-substitution measures (Fuel_Sub_Flag: AllElec-New, FuelSub-ToElec, FuelSub-ToGas) book a positive
     value as benefit and a negative one as a positive supply cost; every other measure keeps its SIGNED value in the benefit
     column and has no supply cost (ISNULL(ft.FuelType,0)='0' branch of CalcCE's ElecBen/GasBen and its
     `NOT ISNULL(ft.FuelType,0)='0'` guard on ElecSupplyCost/GasSupplyCost). The old unconditional clip was only correct for
     all-fuel-sub filings (SWWH025) and put every non-fuel-sub measure's negative savings into supply cost."""
-    is_fuel_sub = is_fuel_sub.fillna(False).astype(bool)
-    ben = value.where(~is_fuel_sub, value.clip(lower=0.0))
-    supply = (-value).clip(lower=0.0).where(is_fuel_sub, 0.0)
-    return ben, supply
+    fuel_sub_flag = fuel_sub_flag.fillna(False).astype(bool)
+    benefit = value.where(~fuel_sub_flag, value.clip(lower=0.0))
+    supply_cost = (-value).clip(lower=0.0).where(fuel_sub_flag, 0.0)
+    return benefit, supply_cost
 
 
 def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version: int = 2024, base_year: int | None = None,
@@ -366,35 +375,40 @@ def run_water_energy(measures: pd.DataFrame, cost_test: str = "TRC", acc_version
     saves (positive) or uses (negative), priced exactly like the electric benefit but with kWhWater1/2 in place of kWh1/2 and the Gen term only (CalcCE's
     WaterEnergyBen: Qty x (NTGRkWh + MEBens) x IRkWh x RRkWh x (kWhWater1 x Gen_1 + kWhWater2 x Gen_2)). The measure's own electric end-use profile and climate zone
     carry over, on the 8,760 path like the electric benefit, but on the Gen term ALONE: unlike ElecBen there is no T&D term, so total avoided cost minus
-    transmission and distribution (run_real_hourly gen_only). Returns (signed value per measure_id named `water_value`, the BatchedPricingResult for the status columns)."""
-    w = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]
-    if w.empty:
-        return _sum_by_measure(None, "annual_value", "water_value"), BatchedPricingResult(
-            measure_year=pd.DataFrame(columns=["measure_id", "annual_value"]), portfolio_hourly=np.zeros(8760), n_batches=0,
-            elapsed_seconds=0.0, batch_size=0)
-    w = w.reset_index(drop=True).copy()
-    w["shape_scale"], w["shape_scale_2nd"] = w["water_scale_1st"], w["water_scale_2nd"]
-    if "shape_key_water" in w.columns:                                     # AC_Elec_Impact_Profile_Water (blank = the measure's own shape), for both baselines
-        w["shape_key"] = w["shape_key_2nd"] = w["shape_key_water"]
+    transmission and distribution (run_real_hourly gen_only). Returns (signed value per CEInputID named `WaterEnergyValue`, the HourlyPricingResult for the status
+    columns)."""
+    water_measures = measures[(measures["UnitkWhIOUWater1stBaseline"] != 0) | (measures["UnitkWhIOUWater2ndBaseline"] != 0)]
+    if water_measures.empty:
+        return _sum_by_measure(None, "LifetimeValuePV", "WaterEnergyValue"), HourlyPricingResult(values=pd.DataFrame(columns=["CEInputID", "LifetimeValuePV"]))
+    water_measures = water_measures.reset_index(drop=True).copy()
+    # what the water profile (AC_Elec_Impact_Profile_Water, blank = the measure's own profile) is multiplied by, for both baselines
+    for b in ("1st", "2nd"):
+        water_measures[f"AC_Net_kWh_Water_ScaledProfile_{b}_Baseline"] = water_measures[f"AC_Net_kWh_Water_{b}_Baseline"]
     if real_impact_profiles.user_profiles() is not None:
-        # a kWh-per-unit profile (apply_scaled_profiles) is in kWh, not shares: divide by its annual kWh S so the water energy is spread by its shares.
-        # A load-shifting-only profile (S = 0) has no shares, so its water energy is not priced (preflight warns: zero_net_profile_water).
-        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(w["shape_key"], w["PA"], w["target_sector"], w["climate_zone"])]
-        annual = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(w["shape_key"], w["PA"], w["target_sector"], zones)],
-                           index=w.index, dtype=float)
-        scaled = annual.notna()
-        div = annual.where(annual != 0)
-        for c in ("shape_scale", "shape_scale_2nd"):
-            w.loc[scaled, c] = (w[c] / div).fillna(0.0)[scaled]
-    batched = run_real_hourly(w, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_fn,
-                                 market_effects_bens=market_effects_bens, gen_only=True)
-    return _sum_by_measure(batched.measure_year, "annual_value", "water_value"), batched
+        # a kWh-per-unit profile (apply_scaled_profiles) is in kWh, not shares: divide by its annual kWh so the water energy is spread by its shares.
+        # A load-shifting-only profile (annual kWh 0) has no shares, so its water energy is not priced (preflight warns: zero_net_profile_water).
+        wm = water_measures
+        zones = [system_zones.priced_zone(k, iou, ts, cz) for k, iou, ts, cz in
+                 zip(wm["AC_Elec_Impact_Profile_Water"], wm["IOU_AC_Territory"], wm["AC_Elec_Target_Sector"], wm["AC_Climate_Zone"])]
+        profile_annual_kwh_per_unit = pd.Series([real_impact_profiles.scaled_profile(k, iou, ts, z) for k, iou, ts, z in
+                                                 zip(wm["AC_Elec_Impact_Profile_Water"], wm["IOU_AC_Territory"], wm["AC_Elec_Target_Sector"], zones)],
+                                                index=wm.index, dtype=float)
+        on_kwh_per_unit_profile = profile_annual_kwh_per_unit.notna()
+        profile_annual_kwh_nonzero = profile_annual_kwh_per_unit.where(profile_annual_kwh_per_unit != 0)
+        for b in ("1st", "2nd"):
+            c = f"AC_Net_kWh_Water_ScaledProfile_{b}_Baseline"
+            wm.loc[on_kwh_per_unit_profile, c] = (wm[c] / profile_annual_kwh_nonzero).fillna(0.0)[on_kwh_per_unit_profile]
+    water_pricing = run_real_hourly(water_measures, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_fn,
+                                    market_effects_bens=market_effects_bens, gen_only=True,
+                                    quantities=("AC_Net_kWh_Water_ScaledProfile_1st_Baseline", "AC_Net_kWh_Water_ScaledProfile_2nd_Baseline"),
+                                    profiles=("AC_Elec_Impact_Profile_Water", "AC_Elec_Impact_Profile_Water"))
+    return _sum_by_measure(water_pricing.values, "LifetimeValuePV", "WaterEnergyValue"), water_pricing
 
 
-def _split_water(value: pd.Series, kwh_water_1st: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """CalcCE's WaterEnergyBen / WaterEnergyCost split, decided by the SIGN OF THE 1ST-BASELINE water kWh (not of the value): a measure with kWhWater1 > 0 books its
-    value as a benefit, one with kWhWater1 < 0 books the negated value as a (positive) cost, and kWhWater1 = 0 books neither."""
-    return value.where(kwh_water_1st > 0, 0.0), (-value).where(kwh_water_1st < 0, 0.0)
+def _split_water(value: pd.Series, unit_kwh_water_1st: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """CalcCE's WaterEnergyBen / WaterEnergyCost split, decided by the SIGN OF UnitkWhIOUWater1stBaseline (not of the value): a measure with it > 0 books its
+    value as a benefit, one with it < 0 books the negated value as a (positive) cost, and 0 books neither."""
+    return value.where(unit_kwh_water_1st > 0, 0.0), (-value).where(unit_kwh_water_1st < 0, 0.0)
 
 
 # CalcCost's undiscounted cost components and the rest of its participant-cost columns (CET_v25.1_documentation_extracted.txt:16672-16800), from engine.price_participant_cost
@@ -439,83 +453,85 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     out of this function to avoid tripling its already-expensive per-
     measure hourly/monthly runs for callers who only want TRC/PAC/RIM.
 
-    Returns one row per measure: measure_id, ElecBen, ElecSupplyCost,
+    Returns one row per measure: CEInputID, ElecBen, ElecSupplyCost,
     GasBen, GasSupplyCost, OtherBen, OtherCost, TaxCredits, TRCCost,
     PACCost, RIMCost, TRCRatio, PACRatio, RIMRatio.
     """
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
+        base_year = int(measures["Used_Year"].min())
 
-    batched = run_real_hourly(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
-    elec_value = _sum_by_measure(batched.measure_year, "annual_value", "elec_value")
+    elec_pricing = run_real_hourly(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
+    elec_value = _sum_by_measure(elec_pricing.values, "LifetimeValuePV", "ElecValue")
 
-    gas_result, _n_gas, _n_matched = run_gas_benefit(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
-    gas_value = _sum_by_measure(gas_result, "gas_benefit", "gas_value")
-    water_value, water_batched = run_water_energy(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
+    gas_pricing, _n_gas, _n_matched = run_gas_benefit(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
+    gas_value = _sum_by_measure(gas_pricing, "LifetimeValuePV", "GasValue")
+    water_value, water_pricing = run_water_energy(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens)
 
-    participant = run_participant_cost(measures, acc_version=acc_version, base_year=base_year, market_effects_cost=market_effects_cost)
-    other = price_other_ben_cost(measures, market_effects_bens, market_effects_cost)
+    participant_costs = run_participant_cost(measures, acc_version=acc_version, base_year=base_year, market_effects_cost=market_effects_cost)
+    other_bens_costs = price_other_ben_cost(measures, market_effects_bens, market_effects_cost)
     # Bill impacts take market effects too: CalcCE prices them on Qty x (NTGRkWh + MEBens) / (NTGRThm + MEBens) (:15885-15974). Confirmed on CET jobs 121842 /
     # 121841: every BillReduc rises by (NTG + 0.05) / NTG. (Until 2026-10-08 the POC left them unscaled.)
-    bill_impact = run_bill_impact(_apply_market_effects_gas(_apply_market_effects_electric(measures, market_effects_bens), market_effects_bens),
-                                  acc_version=acc_version)
+    bill_impacts = run_bill_impact(measures, acc_version=acc_version, market_effects_bens=market_effects_bens)
 
-    df = measures[["measure_id", "is_fuel_sub"]].merge(elec_value, on="measure_id", how="left")
-    df = df.merge(gas_value, on="measure_id", how="left")
-    df = df.merge(water_value, on="measure_id", how="left")
-    df = df.merge(participant[["measure_id", "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV",
-                               "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"] + PARTICIPANT_EXTRA], on="measure_id", how="left")
-    df = df.merge(other, on="measure_id", how="left")
-    df = df.merge(bill_impact, on="measure_id", how="left")
-    df[["elec_value", "gas_value", "water_value"]] = df[["elec_value", "gas_value", "water_value"]].fillna(0.0)
+    df = measures[["CEInputID", "Fuel_Sub_Flag"]].merge(elec_value, on="CEInputID", how="left")
+    df = df.merge(gas_value, on="CEInputID", how="left")
+    df = df.merge(water_value, on="CEInputID", how="left")
+    df = df.merge(participant_costs[["CEInputID", "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV",
+                                     "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"] + PARTICIPANT_EXTRA], on="CEInputID", how="left")
+    df = df.merge(other_bens_costs, on="CEInputID", how="left")
+    df = df.merge(bill_impacts, on="CEInputID", how="left")
+    df[["ElecValue", "GasValue", "WaterEnergyValue"]] = df[["ElecValue", "GasValue", "WaterEnergyValue"]].fillna(0.0)
 
     # Reporting only: a benefit of 0 can mean "no savings" or "the POC could not price this measure" -- say which. Does not touch any value.
-    ids = df["measure_id"]
-    by_id = measures.set_index("measure_id")
-    has_elec = ids.map((by_id[["annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kw_1st", "annual_net_kw_2nd", "shape_scale", "shape_scale_2nd"]] != 0)
-                       .any(axis=1)).astype(bool)
-    has_gas = ids.map((by_id[["annual_net_therms_1st", "annual_net_therms_2nd"]] != 0).any(axis=1)).astype(bool)
-    route = ids.map(batched.route).fillna("")
+    ids = df["CEInputID"]
+    measures_by_id = measures.set_index("CEInputID")
+    net_kw = measures_by_id[["UnitkW1stBaseline", "UnitkW2ndBaseline"]].mul(measures_by_id["NumUnits"] * measures_by_id["NTGRkW"], axis=0)
+    has_elec_savings = ids.map(((measures_by_id[["AC_Net_kWh_1st_Baseline", "AC_Net_kWh_2nd_Baseline", *ELEC_QUANTITIES]] != 0).any(axis=1)
+                                | (net_kw != 0).any(axis=1))).astype(bool)
+    has_gas_savings = ids.map((measures_by_id[list(GAS_QUANTITIES)] != 0).any(axis=1)).astype(bool)
+    route = ids.map(elec_pricing.route).fillna("")
     route_kind = route.str.split(" | ", regex=False).str[0]                       # always "hourly profile" (the 8,760 path is the only electric route)
-    route_source = route.str.split(" | ", regex=False).str[1].fillna(route_kind)   # user profile / library / library (sector-loose match) / ...
-    elec_priced = ids.isin(_ids_in(batched.measure_year))
+    profile_source = route.str.split(" | ", regex=False).str[1].fillna(route_kind)   # user profile / library / library (sector-loose match) / ...
+    elec_priced = ids.isin(_ids_in(elec_pricing.values))
+    unpriced = ids.isin(set(elec_pricing.unpriced_ids))
     df["ElecPricingStatus"] = np.select(
-        [~has_elec, ids.isin(set(batched.unmatched_measure_ids)) & elec_priced, ids.isin(set(batched.unmatched_measure_ids)), elec_priced],
+        [~has_elec_savings, unpriced & elec_priced, unpriced, elec_priced],
         ["no electric savings", "PARTLY PRICED: no hourly profile for one baseline's shape", "UNPRICED: no hourly profile", "priced: " + route_kind],
         default="UNPRICED: no value returned")
-    df["ProfileSource"] = route_source.where(elec_priced & has_elec, "")
+    df["ProfileSource"] = profile_source.where(elec_priced & has_elec_savings, "")
     # AC_Climate_Zone = System: the real zone it was priced in, and whether that came from the catalog or was calculated for this run (pipeline/system_zones.py)
-    is_sys = ids.map(by_id["climate_zone"]).map(system_zones.is_system).astype(bool) & elec_priced & has_elec
-    choice = [system_zones.resolve(by_id.at[i, "shape_key"], by_id.at[i, "PA"], by_id.at[i, "target_sector"]) if s else None for i, s in zip(ids, is_sys)]
-    df["SystemClimateZone"] = pd.Series([c.zone if c else None for c in choice], index=df.index, dtype=object)
-    df["SystemZoneSource"] = pd.Series([(c.source if c.zone else "no zone could be priced: System shape and blended prices") if c else None for c in choice],
-                                       index=df.index, dtype=object)
-    gas_priced = ids.isin(_ids_in(gas_result))
+    is_system_zone = ids.map(measures_by_id["AC_Climate_Zone"]).map(system_zones.is_system).astype(bool) & elec_priced & has_elec_savings
+    system_zone_choice = [system_zones.resolve(measures_by_id.at[i, "AC_Elec_Impact_Profile"], measures_by_id.at[i, "IOU_AC_Territory"],
+                                               measures_by_id.at[i, "AC_Elec_Target_Sector"]) if s else None for i, s in zip(ids, is_system_zone)]
+    df["SystemClimateZone"] = pd.Series([c.zone if c else None for c in system_zone_choice], index=df.index, dtype=object)
+    df["SystemZoneSource"] = pd.Series([(c.source if c.zone else "no zone could be priced: System shape and blended prices") if c else None
+                                        for c in system_zone_choice], index=df.index, dtype=object)
+    gas_priced = ids.isin(_ids_in(gas_pricing))
     df["GasPricingStatus"] = np.select(
-        [~has_gas, gas_priced], ["no gas savings", "priced"], default="UNPRICED: no gas savings profile match")
-    df["GasProfileSource"] = ids.map(by_id["gas_profile_key"]).map(
-        lambda k: "" if pd.isna(k) else (gas_savings_profiles.source(str(k)) or "")).where(gas_priced & has_gas, "")
-    has_water = ids.map((by_id[["kwh_water_1st", "kwh_water_2nd"]] != 0).any(axis=1)).astype(bool)
+        [~has_gas_savings, gas_priced], ["no gas savings", "priced"], default="UNPRICED: no gas savings profile match")
+    df["GasProfileSource"] = ids.map(measures_by_id["AC_Gas_Impact_Profile"]).map(
+        lambda k: "" if pd.isna(k) else (gas_savings_profiles.source(str(k)) or "")).where(gas_priced & has_gas_savings, "")
+    has_water_energy = ids.map((measures_by_id[["UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"]] != 0).any(axis=1)).astype(bool)
     df["WaterPricingStatus"] = np.select(
-        [~has_water, ids.isin(_ids_in(water_batched.measure_year))], ["no water energy", "priced"],
+        [~has_water_energy, ids.isin(_ids_in(water_pricing.values))], ["no water energy", "priced"],
         default="UNPRICED: no hourly profile")
 
-    df["ElecBen"], df["ElecSupplyCost"] = _split_ben_supply(df["elec_value"], df["is_fuel_sub"])
-    df["GasBen"], df["GasSupplyCost"] = _split_ben_supply(df["gas_value"], df["is_fuel_sub"])
-    df["WaterEnergyBen"], df["WaterEnergyCost"] = _split_water(df["water_value"], ids.map(by_id["kwh_water_1st"]))
+    df["ElecBen"], df["ElecSupplyCost"] = _split_ben_supply(df["ElecValue"], df["Fuel_Sub_Flag"])
+    df["GasBen"], df["GasSupplyCost"] = _split_ben_supply(df["GasValue"], df["Fuel_Sub_Flag"])
+    df["WaterEnergyBen"], df["WaterEnergyCost"] = _split_water(df["WaterEnergyValue"], ids.map(measures_by_id["UnitkWhIOUWater1stBaseline"]))
 
-    supply_and_other_cost = df["ElecSupplyCost"] + df["GasSupplyCost"] + df["WaterEnergyCost"] + df["OtherCost"]
-    df["PACCost"] = df["RebatesandIncentsPV"] + supply_and_other_cost
-    df["TRCCost"] = df["RebatesandIncentsPV"] + df["NetParticipantCostAdjustedPV"] + supply_and_other_cost
+    supply_and_other_costs = df["ElecSupplyCost"] + df["GasSupplyCost"] + df["WaterEnergyCost"] + df["OtherCost"]
+    df["PACCost"] = df["RebatesandIncentsPV"] + supply_and_other_costs
+    df["TRCCost"] = df["RebatesandIncentsPV"] + df["NetParticipantCostAdjustedPV"] + supply_and_other_costs
     df["RIMCost"] = df["LifecycleBillReducElec"] + df["LifecycleBillReducGas"] + df["PACCost"]
 
-    total_ben = df["ElecBen"] + df["GasBen"] + df["WaterEnergyBen"] + df["OtherBen"]
-    df["TRCRatio"] = (total_ben + df["TaxCredits"]) / df["TRCCost"]
-    df["PACRatio"] = total_ben / df["PACCost"]
-    df["RIMRatio"] = (total_ben + df["LifecycleBillIncrElec"] + df["LifecycleBillIncrGas"]) / df["RIMCost"]
-    df = df.merge(participant_cost_test(measures, df, acc_version, base_year), on="measure_id", how="left")
+    total_benefits = df["ElecBen"] + df["GasBen"] + df["WaterEnergyBen"] + df["OtherBen"]
+    df["TRCRatio"] = (total_benefits + df["TaxCredits"]) / df["TRCCost"]
+    df["PACRatio"] = total_benefits / df["PACCost"]
+    df["RIMRatio"] = (total_benefits + df["LifecycleBillIncrElec"] + df["LifecycleBillIncrGas"]) / df["RIMCost"]
+    df = df.merge(participant_cost_test(measures, df, acc_version, base_year), on="CEInputID", how="left")
 
-    return df[["measure_id", "ElecPricingStatus", "ProfileSource", "SystemClimateZone", "SystemZoneSource", "GasPricingStatus", "GasProfileSource", "WaterPricingStatus",
+    return df[["CEInputID", "ElecPricingStatus", "ProfileSource", "SystemClimateZone", "SystemZoneSource", "GasPricingStatus", "GasProfileSource", "WaterPricingStatus",
                "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost", "WaterEnergyBen", "WaterEnergyCost",
                "OtherBen", "OtherCost", "TaxCredits", "OtherBenGross", "OtherCostGross", "TaxCreditsGross",
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
@@ -535,23 +551,28 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
 
     The gross bill impacts are C9's bill impacts with NTG = 1 (same rates, discounting and fuel-substitution split). PVF is the participant-cost discount factor
     of C8 (the claim quarter at the primary rate). Not yet checked against a CPUC specification of the test: CPUC has not published how the CET will define it."""
-    gross = measures.copy()
-    gross["annual_net_kwh_1st"] = gross["num_units"] * gross["unit_kwh_1st"]
-    gross["annual_net_kwh_2nd"] = gross["num_units"] * gross["unit_kwh_2nd"]
-    gross["annual_net_therms_1st"] = gross["num_units"] * gross["unit_therm_1st"] * gross["ir_therm"] * gross["rr_therm"]
-    gross["annual_net_therms_2nd"] = gross["num_units"] * gross["unit_therm_2nd"] * gross["ir_therm"] * gross["rr_therm"]
-    bills = run_bill_impact(gross, acc_version=acc_version).rename(columns={c: f"{c}Gross" for c in ("LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas")})
-    rates = {pa: discount_settings.get_discount_rate_qtr(pa, acc_version) for pa in measures["PA"].unique()}
-    qm = (measures["claim_year"] - base_year) * 4 + (measures["claim_quarter"] - 1)
-    pvf = (1.0 + measures["PA"].map(rates)) ** qm
-    out = measures[["measure_id"]].assign(_pvf=pvf.to_numpy()).merge(bills, on="measure_id", how="left")
-    out = out.merge(priced[["measure_id", "RebatesandIncentsPV", "GrossParticipantCostPV", "TaxCreditsGross"]], on="measure_id", how="left")
+    m = measures
+    # gross (no NTG) annual quantities, with installation and realization rates, as the net AC_Net_* ones
+    gross_quantities = {
+        "AC_Gross_kWh_1st_Baseline": m["NumUnits"] * m["Used_UnitkWh1stBaseline"] * m["InstallationRatekWh"] * m["RealizationRatekWh"],
+        "AC_Gross_kWh_2nd_Baseline": m["NumUnits"] * m["Used_UnitkWh2ndBaseline"] * m["InstallationRatekWh"] * m["RealizationRatekWh"],
+        "AC_Gross_Therms_1st_Baseline": m["NumUnits"] * m["UnitTherm1stBaseline"] * m["InstallationRateTherm"] * m["RealizationRateTherm"],
+        "AC_Gross_Therms_2nd_Baseline": m["NumUnits"] * m["UnitTherm2ndBaseline"] * m["InstallationRateTherm"] * m["RealizationRateTherm"],
+    }
+    gross_bill_impacts = run_bill_impact(m.assign(**gross_quantities), acc_version=acc_version, quantities=tuple(gross_quantities)).rename(
+        columns={c: f"{c}Gross" for c in ("LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas")})
+    discount_rate_qtr_by_iou = {iou: discount_settings.get_discount_rate_qtr(iou, acc_version) for iou in m["IOU_AC_Territory"].unique()}
+    quarters_from_first_year = (m["Used_Year"] - base_year) * 4 + (m["Used_Quarter"] - 1)                                # CalcCE's Qm
+    participant_discount_factor = (1.0 + m["IOU_AC_Territory"].map(discount_rate_qtr_by_iou)) ** quarters_from_first_year     # Rqf ^ Qm
+    out = m[["CEInputID"]].assign(_participant_discount_factor=participant_discount_factor.to_numpy()).merge(gross_bill_impacts, on="CEInputID", how="left")
+    out = out.merge(priced[["CEInputID", "RebatesandIncentsPV", "GrossParticipantCostPV", "TaxCreditsGross"]], on="CEInputID", how="left")
     gross_cols = ["LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross"]
     out[gross_cols] = out[gross_cols].fillna(0.0)
-    out["PCTBen"] = out["LifecycleBillReducElecGross"] + out["LifecycleBillReducGasGross"] + out["RebatesandIncentsPV"] + out["TaxCreditsGross"] / out["_pvf"]
+    out["PCTBen"] = (out["LifecycleBillReducElecGross"] + out["LifecycleBillReducGasGross"] + out["RebatesandIncentsPV"]
+                     + out["TaxCreditsGross"] / out["_participant_discount_factor"])
     out["PCTCost"] = out["GrossParticipantCostPV"] + out["RebatesandIncentsPV"] + out["LifecycleBillIncrElecGross"] + out["LifecycleBillIncrGasGross"]
     out["PCTRatio"] = (out["PCTBen"] / out["PCTCost"].where(out["PCTCost"] != 0)).fillna(0.0)
-    return out[["measure_id"] + gross_cols + ["PCTBen", "PCTCost", "PCTRatio"]]
+    return out[["CEInputID"] + gross_cols + ["PCTBen", "PCTCost", "PCTRatio"]]
 
 
 def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
@@ -602,99 +623,95 @@ def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2
     flat-vs-hourly AQ Adder, and discount rate choice (CEDARS vs. ACC). See
     poc/README.md section 7.
 
-    Returns one row per measure: measure_id, ElecBen_SB, ElecBen_SH,
+    Returns one row per measure: CEInputID, ElecBen_SB, ElecBen_SH,
     ElecSupplyCost_SB, ElecSupplyCost_SH, GasBen_SB, GasBen_SH,
     GasSupplyCost_SB, GasSupplyCost_SH, SCBCost, SCHCost, SCBRatio, SCHRatio.
     """
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
-    sct_rate = discount_settings.get_discount_rate_qtr_sct
+        base_year = int(measures["Used_Year"].min())
+    discount_rate_qtr_sct_fn = discount_settings.get_discount_rate_qtr_sct
 
     def elec_value_for(cost_test):
-        b = run_real_hourly(measures.reset_index(drop=True), cost_test=cost_test, acc_version=acc_version, base_year=base_year,
-                               discount_rate_fn=sct_rate, market_effects_bens=market_effects_bens)
-        return _sum_by_measure(b.measure_year, "annual_value", "elec_value")
+        priced = run_real_hourly(measures.reset_index(drop=True), cost_test=cost_test, acc_version=acc_version, base_year=base_year,
+                                 discount_rate_fn=discount_rate_qtr_sct_fn, market_effects_bens=market_effects_bens)
+        return _sum_by_measure(priced.values, "LifetimeValuePV", "ElecValue")
 
     def gas_value_for(scc):
-        gas_result, _n, _m = run_gas_benefit(measures, cost_test="SCT", acc_version=acc_version,
-                                              base_year=base_year, scc=scc, discount_rate_fn=sct_rate,
+        gas_pricing, _n, _m = run_gas_benefit(measures, cost_test="SCT", acc_version=acc_version,
+                                              base_year=base_year, scc=scc, discount_rate_fn=discount_rate_qtr_sct_fn,
                                               market_effects_bens=market_effects_bens)
-        return _sum_by_measure(gas_result, "gas_benefit", "gas_value")
-
-    elec_sb = elec_value_for("SCT Base").rename("elec_value_sb")
-    elec_sh = elec_value_for("SCT High").rename("elec_value_sh")
-    gas_sb = gas_value_for("Base").rename("gas_value_sb")
-    gas_sh = gas_value_for("High").rename("gas_value_sh")
+        return _sum_by_measure(gas_pricing, "LifetimeValuePV", "GasValue")
 
     def water_value_for(cost_test):
-        return run_water_energy(measures, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=sct_rate,
+        return run_water_energy(measures, cost_test=cost_test, acc_version=acc_version, base_year=base_year, discount_rate_fn=discount_rate_qtr_sct_fn,
                                 market_effects_bens=market_effects_bens)[0]
 
-    water_sb = water_value_for("SCT Base").rename("water_value_sb")
-    water_sh = water_value_for("SCT High").rename("water_value_sh")
+    values = [elec_value_for("SCT Base").rename("ElecValue_SB"), elec_value_for("SCT High").rename("ElecValue_SH"),
+              gas_value_for("Base").rename("GasValue_SB"), gas_value_for("High").rename("GasValue_SH"),
+              water_value_for("SCT Base").rename("WaterEnergyValue_SB"), water_value_for("SCT High").rename("WaterEnergyValue_SH")]
 
-    participant_sct = run_participant_cost(measures, acc_version=acc_version, base_year=base_year,
-                                            discount_rate_fn=sct_rate, market_effects_cost=market_effects_cost)
-    other = price_other_ben_cost(measures, market_effects_bens, market_effects_cost)
+    participant_costs_sct = run_participant_cost(measures, acc_version=acc_version, base_year=base_year,
+                                                 discount_rate_fn=discount_rate_qtr_sct_fn, market_effects_cost=market_effects_cost)
+    other_bens_costs = price_other_ben_cost(measures, market_effects_bens, market_effects_cost)
 
-    df = measures[["measure_id", "is_fuel_sub"]].merge(elec_sb, on="measure_id", how="left")
-    df = df.merge(elec_sh, on="measure_id", how="left")
-    df = df.merge(gas_sb, on="measure_id", how="left")
-    df = df.merge(gas_sh, on="measure_id", how="left")
-    df = df.merge(water_sb, on="measure_id", how="left")
-    df = df.merge(water_sh, on="measure_id", how="left")
-    df = df.merge(participant_sct[["measure_id", "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"]],
-                  on="measure_id", how="left")
-    df = df.merge(other, on="measure_id", how="left")
-    value_cols = ["elec_value_sb", "elec_value_sh", "gas_value_sb", "gas_value_sh", "water_value_sb", "water_value_sh"]
+    df = measures[["CEInputID", "Fuel_Sub_Flag"]]
+    for v in values:
+        df = df.merge(v, on="CEInputID", how="left")
+    df = df.merge(participant_costs_sct[["CEInputID", "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"]],
+                  on="CEInputID", how="left")
+    df = df.merge(other_bens_costs, on="CEInputID", how="left")
+    value_cols = [v.name for v in values]
     df[value_cols] = df[value_cols].fillna(0.0)
 
-    df["ElecBen_SB"], df["ElecSupplyCost_SB"] = _split_ben_supply(df["elec_value_sb"], df["is_fuel_sub"])
-    df["ElecBen_SH"], df["ElecSupplyCost_SH"] = _split_ben_supply(df["elec_value_sh"], df["is_fuel_sub"])
-    df["GasBen_SB"], df["GasSupplyCost_SB"] = _split_ben_supply(df["gas_value_sb"], df["is_fuel_sub"])
-    df["GasBen_SH"], df["GasSupplyCost_SH"] = _split_ben_supply(df["gas_value_sh"], df["is_fuel_sub"])
-    kwh_water_1st = df["measure_id"].map(measures.set_index("measure_id")["kwh_water_1st"])
-    df["WaterEnergyBen_SB"], df["WaterEnergyCost_SB"] = _split_water(df["water_value_sb"], kwh_water_1st)
-    df["WaterEnergyBen_SH"], df["WaterEnergyCost_SH"] = _split_water(df["water_value_sh"], kwh_water_1st)
+    for s in ("_SB", "_SH"):
+        df[f"ElecBen{s}"], df[f"ElecSupplyCost{s}"] = _split_ben_supply(df[f"ElecValue{s}"], df["Fuel_Sub_Flag"])
+        df[f"GasBen{s}"], df[f"GasSupplyCost{s}"] = _split_ben_supply(df[f"GasValue{s}"], df["Fuel_Sub_Flag"])
+    unit_kwh_water_1st = df["CEInputID"].map(measures.set_index("CEInputID")["UnitkWhIOUWater1stBaseline"])
+    df["WaterEnergyBen_SB"], df["WaterEnergyCost_SB"] = _split_water(df["WaterEnergyValue_SB"], unit_kwh_water_1st)
+    df["WaterEnergyBen_SH"], df["WaterEnergyCost_SH"] = _split_water(df["WaterEnergyValue_SH"], unit_kwh_water_1st)
 
-    incentive_pv_sct = df["RebatesandIncentsPV"]
-    net_participant_pv_sct = df["NetParticipantCostAdjustedPV"]          # with the market-effects term, as the TRC cost
-    df["SCBCost"] = (incentive_pv_sct + net_participant_pv_sct + df["ElecSupplyCost_SB"] + df["GasSupplyCost_SB"] + df["WaterEnergyCost_SB"]
-                     + df["OtherCost"])
-    df["SCHCost"] = (incentive_pv_sct + net_participant_pv_sct + df["ElecSupplyCost_SH"] + df["GasSupplyCost_SH"] + df["WaterEnergyCost_SH"]
-                     + df["OtherCost"])
+    rebates_and_incents_pv_sct = df["RebatesandIncentsPV"]
+    net_participant_cost_adjusted_pv_sct = df["NetParticipantCostAdjustedPV"]          # with the market-effects term, as the TRC cost
+    df["SCBCost"] = (rebates_and_incents_pv_sct + net_participant_cost_adjusted_pv_sct + df["ElecSupplyCost_SB"] + df["GasSupplyCost_SB"]
+                     + df["WaterEnergyCost_SB"] + df["OtherCost"])
+    df["SCHCost"] = (rebates_and_incents_pv_sct + net_participant_cost_adjusted_pv_sct + df["ElecSupplyCost_SH"] + df["GasSupplyCost_SH"]
+                     + df["WaterEnergyCost_SH"] + df["OtherCost"])
 
     df["SCBRatio"] = (df["ElecBen_SB"] + df["GasBen_SB"] + df["WaterEnergyBen_SB"] + df["OtherBen"]) / df["SCBCost"]
     df["SCHRatio"] = (df["ElecBen_SH"] + df["GasBen_SH"] + df["WaterEnergyBen_SH"] + df["OtherBen"]) / df["SCHCost"]
 
-    return df[["measure_id", "ElecBen_SB", "ElecBen_SH", "ElecSupplyCost_SB", "ElecSupplyCost_SH",
+    return df[["CEInputID", "ElecBen_SB", "ElecBen_SH", "ElecSupplyCost_SB", "ElecSupplyCost_SH",
                "GasBen_SB", "GasBen_SH", "GasSupplyCost_SB", "GasSupplyCost_SH",
                "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
                "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV",
                "SCBCost", "SCHCost", "SCBRatio", "SCHRatio"]]
 
 
-SOCIETAL_COLUMN_PATTERN = r"(_SB|_SH)(_sct)?$|^SCB|^SCH|_sct$"
+SOCIETAL_COLUMN_PATTERN = r"(_SB|_SH)$|^SCB|^SCH|_SCT$"
 
 
-def _first_year_weights(rul: pd.Series, eul: pd.Series) -> tuple[pd.Series, pd.Series]:
+def _first_year_weights(RUL_Yrs: pd.Series, EUL_Yrs: pd.Series) -> tuple[pd.Series, pd.Series]:
     """CalcSavings' share of the first year on the 1st and 2nd baseline (CET_v25.1_documentation_extracted.txt, "First Year Net"): a measure whose RUL or
     EUL is under a year spends only part of its first year on the 1st baseline, and the rest (up to its EUL) on the 2nd. RUL = 1 exactly falls to the
     ELSE branches (1, 0), as in the SQL."""
-    w1 = np.select([rul > 1, (rul > 0) & (rul < 1), (rul == 0) & (eul < 1)], [1.0, rul, eul], default=1.0)
-    w2 = np.select([(rul > 0) & (rul < 1) & (eul < 1), (rul > 0) & (rul < 1) & (eul >= 1)], [eul - rul, 1.0 - rul], default=0.0)
-    return pd.Series(w1, index=rul.index), pd.Series(w2, index=rul.index)
+    rul, eul = RUL_Yrs, EUL_Yrs
+    first_year_share_1st_baseline = np.select([rul > 1, (rul > 0) & (rul < 1), (rul == 0) & (eul < 1)], [1.0, rul, eul], default=1.0)
+    first_year_share_2nd_baseline = np.select([(rul > 0) & (rul < 1) & (eul < 1), (rul > 0) & (rul < 1) & (eul >= 1)], [eul - rul, 1.0 - rul], default=0.0)
+    return pd.Series(first_year_share_1st_baseline, index=rul.index), pd.Series(first_year_share_2nd_baseline, index=rul.index)
 
 
 def _savings_quantities(m: pd.DataFrame) -> dict[str, pd.Series]:
-    """Per fuel: (units x installation x realization, 1st-baseline amount, 2nd-baseline amount, NTG) -- the pieces every CalcSavings column is built from."""
-    q = m["num_units"].astype(float)
+    """Per fuel: (units_x_ir_x_rr, unit_amount_1st_baseline, unit_amount_2nd_baseline, ntg) -- NumUnits x installation x realization rate, the per-unit
+    1st- and 2nd-baseline amounts and the NTG: the pieces every CalcSavings column is built from. kWh is Used_UnitkWh (a kWh-per-unit profile's own annual kWh)."""
+    units = m["NumUnits"].astype(float)
+    units_x_ir_x_rr_kwh = units * m["InstallationRatekWh"] * m["RealizationRatekWh"]
     return {
-        "KWh": (q * m["ir_kwh"] * m["rr_kwh"], m["unit_kwh_1st"] + m["kwh_water_1st"], m["unit_kwh_2nd"] + m["kwh_water_2nd"], m["ntgr_kwh"]),
-        "KWhSite": (q * m["ir_kwh"] * m["rr_kwh"], m["unit_kwh_1st"], m["unit_kwh_2nd"], m["ntgr_kwh"]),
-        "KWhWater": (q * m["ir_kwh"] * m["rr_kwh"], m["kwh_water_1st"], m["kwh_water_2nd"], m["ntgr_kwh"]),
-        "KW": (q * m["ir_kw"] * m["rr_kw"], m["unit_kw_1st"], m["unit_kw_2nd"], m["ntgr_kw"]),
-        "Thm": (q * m["ir_therm"] * m["rr_therm"], m["unit_therm_1st"], m["unit_therm_2nd"], m["ntgr_therm"]),
+        "KWh": (units_x_ir_x_rr_kwh, m["Used_UnitkWh1stBaseline"] + m["UnitkWhIOUWater1stBaseline"], m["Used_UnitkWh2ndBaseline"] + m["UnitkWhIOUWater2ndBaseline"],
+                m["NTGRkWh"]),
+        "KWhSite": (units_x_ir_x_rr_kwh, m["Used_UnitkWh1stBaseline"], m["Used_UnitkWh2ndBaseline"], m["NTGRkWh"]),
+        "KWhWater": (units_x_ir_x_rr_kwh, m["UnitkWhIOUWater1stBaseline"], m["UnitkWhIOUWater2ndBaseline"], m["NTGRkWh"]),
+        "KW": (units * m["InstallationRatekW"] * m["RealizationRatekW"], m["UnitkW1stBaseline"], m["UnitkW2ndBaseline"], m["NTGRkW"]),
+        "Thm": (units * m["InstallationRateTherm"] * m["RealizationRateTherm"], m["UnitTherm1stBaseline"], m["UnitTherm2ndBaseline"], m["NTGRTherm"]),
     }
 
 
@@ -707,25 +724,25 @@ def savings_outputs(measures: pd.DataFrame, market_effects_bens: float = 0.0) ->
         Annual    = Lifecycle / EUL                                              (the lifetime average)
 
     for a = kWh (site + IOU water: `KWh`), site kWh only (`KWhSite`), IOU water kWh only (`KWhWater`), kW (`KW`; no Lifecycle column) and therms (`Thm`).
-    Uses the raw EUL_Yrs, as CalcSavings does (not the pricing's 0.25-year floor). Quantities, not dollars; nothing is priced."""
+    Quantities, not dollars; nothing is priced."""
     m = measures
-    rul = m["rul_years_exact"].astype(float)
-    eul = m["eul_years_raw"].astype(float) if "eul_years_raw" in m else m["eul_years_exact"].astype(float)
-    w1, w2 = _first_year_weights(rul, eul)
+    rul, eul = m["RUL_Yrs"].astype(float), m["EUL_Yrs"].astype(float)
+    first_year_share_1st, first_year_share_2nd = _first_year_weights(rul, eul)
     meb = float(market_effects_bens or 0.0)
-    out = {"measure_id": m["measure_id"].to_numpy()}
-    for name, (base, a1, a2, ntg) in _savings_quantities(m).items():
-        first = base * (w1 * a1 + w2 * a2)
-        life = base * pd.Series(np.where(rul > 0, a1 * rul + a2 * (eul - rul), eul * a1), index=m.index)
-        annual = (life / eul.where(eul != 0)).fillna(0.0)
-        net = ntg + meb
-        out[f"FirstYearGross{name}"], out[f"FirstYearNet{name}"] = first.to_numpy(), (first * net).to_numpy()
+    out = {"CEInputID": m["CEInputID"].to_numpy()}
+    for name, (units_x_ir_x_rr, unit_amount_1st_baseline, unit_amount_2nd_baseline, ntg) in _savings_quantities(m).items():
+        first_year_gross = units_x_ir_x_rr * (first_year_share_1st * unit_amount_1st_baseline + first_year_share_2nd * unit_amount_2nd_baseline)
+        lifecycle_gross = units_x_ir_x_rr * pd.Series(np.where(rul > 0, unit_amount_1st_baseline * rul + unit_amount_2nd_baseline * (eul - rul),
+                                                               eul * unit_amount_1st_baseline), index=m.index)
+        annual_gross = (lifecycle_gross / eul.where(eul != 0)).fillna(0.0)
+        ntg_plus_meb = ntg + meb
+        out[f"FirstYearGross{name}"], out[f"FirstYearNet{name}"] = first_year_gross.to_numpy(), (first_year_gross * ntg_plus_meb).to_numpy()
         if name != "KW":
-            out[f"LifecycleGross{name}"], out[f"LifecycleNet{name}"] = life.to_numpy(), (life * net).to_numpy()
-        out[f"AnnualGross{name}"], out[f"AnnualNet{name}"] = annual.to_numpy(), (annual * net).to_numpy()
+            out[f"LifecycleGross{name}"], out[f"LifecycleNet{name}"] = lifecycle_gross.to_numpy(), (lifecycle_gross * ntg_plus_meb).to_numpy()
+        out[f"AnnualGross{name}"], out[f"AnnualNet{name}"] = annual_gross.to_numpy(), (annual_gross * ntg_plus_meb).to_numpy()
     order = [f"{p}{gn}{f}" for p in ("FirstYear", "Lifecycle", "Annual") for gn in ("Gross", "Net") for f in ("KWh", "KWhSite", "KWhWater", "KW", "Thm")
              if not (p == "Lifecycle" and f == "KW")]
-    return pd.DataFrame(out)[["measure_id"] + order]
+    return pd.DataFrame(out)[["CEInputID"] + order]
 
 
 def discounted_savings(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0) -> pd.DataFrame:
@@ -743,30 +760,31 @@ def discounted_savings(measures: pd.DataFrame, acc_version: int, base_year: int,
     finding C-3); ReCET's Gross is the Net formula without the NTG, so the two agree whenever NTG + MEB = 1."""
     m = measures
     if m.empty:
-        return pd.DataFrame(columns=["measure_id", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"])
-    ra = m["PA"].map({pa: discount_settings.get_discount_rate_annual(pa, acc_version) for pa in m["PA"].unique()}).astype(float)
-    rq = m["PA"].map({pa: discount_settings.get_discount_rate_qtr(pa, acc_version) for pa in m["PA"].unique()}).astype(float)
-    raf = 1.0 + ra
-    qm = (m["claim_year"] - base_year) * 4 + (m["claim_quarter"] - 1)
-    pv = (1.0 + rq) ** qm
-    rul = m["rul_years_exact"].astype(float)
-    eul = m["eul_years_raw"].astype(float) if "eul_years_raw" in m else m["eul_years_exact"].astype(float)
+        return pd.DataFrame(columns=["CEInputID", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"])
+    ious = m["IOU_AC_Territory"]
+    DiscountRateAnnual = ious.map({i: discount_settings.get_discount_rate_annual(i, acc_version) for i in ious.unique()}).astype(float)
+    DiscountRateQtr = ious.map({i: discount_settings.get_discount_rate_qtr(i, acc_version) for i in ious.unique()}).astype(float)
+    annual_discount_factor = 1.0 + DiscountRateAnnual                                                       # CalcCE's Raf
+    quarters_from_first_year = (m["Used_Year"] - base_year) * 4 + (m["Used_Quarter"] - 1)                  # CalcCE's Qm
+    first_year_discount_factor = (1.0 + DiscountRateQtr) ** quarters_from_first_year                         # Rqf ^ Qm
+    rul, eul = m["RUL_Yrs"].astype(float), m["EUL_Yrs"].astype(float)
 
-    def annuity(n):
-        return 1.0 + (1.0 - raf ** -(n - 1.0)) / ra
+    def discounted_year_count(n):
+        """sum of Raf^-t for t = 0 .. n-1: n years, the first undiscounted"""
+        return 1.0 + (1.0 - annual_discount_factor ** -(n - 1.0)) / DiscountRateAnnual
 
-    out = {"measure_id": m["measure_id"].to_numpy()}
-    q = _savings_quantities(m)
+    out = {"CEInputID": m["CEInputID"].to_numpy()}
+    quantities = _savings_quantities(m)
     meb = float(market_effects_bens or 0.0)
     for name, key in (("kWh", "KWhSite"), ("Thm", "Thm")):
-        base, a1, a2, ntg = q[key]
-        dual = a1 * annuity(rul) + a2 * annuity(eul - rul) / raf ** rul
-        single = a1 * annuity(eul)
-        gross = base * pd.Series(np.where(rul > 0, dual, single), index=m.index) / pv
-        gross = gross.where((a1 != 0) & (eul != 0) & eul.notna(), 0.0).fillna(0.0)
+        units_x_ir_x_rr, amount_1st, amount_2nd, ntg = quantities[key]
+        dual_baseline_sum = amount_1st * discounted_year_count(rul) + amount_2nd * discounted_year_count(eul - rul) / annual_discount_factor ** rul
+        single_baseline_sum = amount_1st * discounted_year_count(eul)
+        gross = units_x_ir_x_rr * pd.Series(np.where(rul > 0, dual_baseline_sum, single_baseline_sum), index=m.index) / first_year_discount_factor
+        gross = gross.where((amount_1st != 0) & (eul != 0) & eul.notna(), 0.0).fillna(0.0)
         out[f"DiscountedSavingsGross{name}"] = gross.to_numpy()
         out[f"DiscountedSavingsNet{name}"] = (gross * (ntg + meb)).to_numpy()
-    return pd.DataFrame(out)[["measure_id", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"]]
+    return pd.DataFrame(out)[["CEInputID", "DiscountedSavingsGrosskWh", "DiscountedSavingsNetkWh", "DiscountedSavingsGrossThm", "DiscountedSavingsNetThm"]]
 
 
 def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFrame | None = None,
@@ -788,7 +806,7 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
     tests -- several minutes at 50,000 measures.
     """
     if base_year is None:
-        base_year = int(measures["claim_year"].min())
+        base_year = int(measures["Used_Year"].min())
     d = price_measure_values(measures, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens,
                              market_effects_cost=market_effects_cost, include_societal=include_societal)
     return apply_program_costs(d, measures, program_costs, acc_version=acc_version, base_year=base_year, market_effects_bens=market_effects_bens,
@@ -800,33 +818,34 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     """The measure-level half of run_full_cost_effectiveness: every value that depends on the ACC (benefits, supply costs, participant PVs, bill impacts, the
     societal variants), one row per measure, before program costs are shared out. Measures priced on different ACC versions (BRD BR-06.5) are priced here
     one group at a time, each under its own ACC, and the groups are joined before apply_program_costs."""
-    trc = run_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
-                                 market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
+    trc_values = run_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
+                                        market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
     if include_societal:
-        sct = run_societal_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
-                                              market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
+        sct_values = run_societal_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
+                                                     market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
     else:   # placeholders so the shared cost-test arithmetic runs; every societal column is blanked again below
-        sct = measures[["measure_id"]].assign(**{c: 0.0 for c in (
+        sct_values = measures[["CEInputID"]].assign(**{c: 0.0 for c in (
             "ElecBen_SB", "ElecBen_SH", "ElecSupplyCost_SB", "ElecSupplyCost_SH", "GasBen_SB", "GasBen_SH", "GasSupplyCost_SB", "GasSupplyCost_SH",
             "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
             "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "SCBCost", "SCHCost", "SCBRatio",
             "SCHRatio")})
-    sct = sct.rename(columns={"RebatesandIncentsPV": "RebatesandIncentsPV_sct", "NetParticipantCostPV": "NetParticipantCostPV_sct",
-                              "NetParticipantCostAdjustedPV": "NetParticipantCostAdjustedPV_sct", "GrossParticipantCostPV": "GrossParticipantCostPV_sct"})
-    sct = sct.drop(columns=["SCBCost", "SCHCost", "SCBRatio", "SCHRatio"])
-    trc = trc.drop(columns=["TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"])
-    d = measures[["measure_id", "prg_id", "NTGRkWh", "ntgr_therm"]].copy()
-    d["NTGRkWh"] = d["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
-    d["ntgr_therm"] = d["ntgr_therm"] + market_effects_bens
-    ds = discounted_savings(measures, acc_version, base_year, market_effects_bens)       # the levelized columns' denominators, at this group's ACC rates
-    return d.merge(trc, on="measure_id").merge(sct, on="measure_id").merge(ds, on="measure_id", how="left")
+    sct_values = sct_values.rename(columns={c: f"{c}_SCT" for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV",
+                                                                    "GrossParticipantCostPV")})
+    sct_values = sct_values.drop(columns=["SCBCost", "SCHCost", "SCBRatio", "SCHRatio"])
+    trc_values = trc_values.drop(columns=["TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"])
+    measure_values = measures[["CEInputID", "PrgID"]].copy()
+    measure_values["NTGRkWh_plus_MEBens"] = measures["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
+    measure_values["NTGRTherm_plus_MEBens"] = measures["NTGRTherm"] + market_effects_bens
+    discounted_savings_values = discounted_savings(measures, acc_version, base_year, market_effects_bens)   # the levelized columns' denominators, at this ACC's rates
+    return (measure_values.merge(trc_values, on="CEInputID").merge(sct_values, on="CEInputID")
+            .merge(discounted_savings_values, on="CEInputID", how="left"))
 
 
 def program_share_totals(d: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Each program's totals of the amounts its program-level shares divide up (the benefits behind WeightedBenefits and the cost tests' program-cost shares),
     over `d` (price_measure_values). A chunked run adds these up over its chunks
     (cost_tests.combine_share_totals) and passes the sum to apply_program_costs, so every measure gets the share it has in the whole job."""
-    return cost_tests.share_totals(cost_tests.share_inputs(d), d["prg_id"])
+    return cost_tests.share_totals(cost_tests.share_inputs(d), d["PrgID"])
 
 
 def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
@@ -836,53 +855,56 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
     passes the job in parts; None = `d` is the whole job."""
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
     out = cost_tests.compute_cost_tests(d, prog, totals)
-    out = out.merge(savings_outputs(measures, market_effects_bens), on="measure_id", how="left")
+    out = out.merge(savings_outputs(measures, market_effects_bens), on="CEInputID", how="left")
     if not include_societal:
         out[[c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]] = float("nan")
     return out
 
 
 def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd.DataFrame:
-    """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit` (BRD BR-06.6). The profile is
-    priced as given: its hourly kWh per unit x NumUnits x NTG x IR x RR, so for a baseline priced on such a profile
+    """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit` (BRD BR-06.6). Such a profile is the
+    unadjusted gross kWh per unit, so it is priced with NumUnits x NTG x IR x RR: for a baseline priced on it
 
-        shape_scale(_2nd) = NumUnits x NTGRkWh x IR x RR            (the profile itself carries the kWh)
+        AC_Net_kWh_ScaledProfile(_1st/_2nd)_Baseline = NumUnits x NTGRkWh x InstallationRatekWh x RealizationRatekWh       (the profile itself carries the kWh)
 
-    and its annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (UnitkWh2ndBaseline) in the
-    annual quantities: annual_net_kwh_* (first-year kWh, bill impacts). The 2nd baseline is priced on its own shape (shape_key_2nd, AC_Elec_Impact_Profile_2nd_Baseline)
-    when it has one; when it shares the 1st baseline's scaled profile it keeps the file's ratio r2 = UnitkWh2ndBaseline / UnitkWh1stBaseline (1 when
-    UnitkWh1stBaseline is 0): shape_scale_2nd = shape_scale x r2 and S x r2 kWh. Baselines on any other shape are unchanged. With statewide allocation
-    (`allocated`), an allocated row is multiplied by its electric factor, as its UnitkWh fields were."""
+    and its annual kWh per unit is the profile's own sum S (0 for a load-shifting-only profile), which replaces UnitkWh1stBaseline (UnitkWh2ndBaseline) in
+    Used_UnitkWh1stBaseline (Used_UnitkWh2ndBaseline), so the gross quantities (Q x IR x RR x S: first-year, lifecycle, the PCT's gross bill impacts) and the net
+    ones (x NTG: AC_Net_kWh_*_Baseline, bill impacts) follow the profile. Scaled_Profile_Flag marks those measures. The 2nd baseline is priced on its own profile
+    (AC_Elec_Impact_Profile_2nd_Baseline) when it has one; when it shares the 1st baseline's scaled profile it keeps the file's ratio r2 = UnitkWh2ndBaseline /
+    UnitkWh1stBaseline (1 when UnitkWh1stBaseline is 0): its multiplier is the 1st's x r2 and its kWh S x r2. Baselines on any other profile are unchanged. With
+    statewide allocation (`allocated`), an allocated row is multiplied by its electric factor, as its UnitkWh fields were."""
     if real_impact_profiles.user_profiles() is None or measures.empty:
         return measures
 
-    def annual_kwh(keys):
-        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(keys, measures["PA"], measures["target_sector"], measures["climate_zone"])]
-        return pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) for k, pa, ts, z in zip(keys, measures["PA"], measures["target_sector"], zones)],
-                         index=measures.index, dtype=float)
-    s1 = annual_kwh(measures["shape_key"])
-    key2 = measures["shape_key_2nd"] if "shape_key_2nd" in measures.columns else measures["shape_key"]
-    same2 = key2 == measures["shape_key"]
-    s2 = s1.where(same2, annual_kwh(key2))
-    if s1.isna().all() and s2.isna().all():
+    def profile_kwh_per_unit(profiles):
+        zones = [system_zones.priced_zone(k, iou, ts, cz) for k, iou, ts, cz in
+                 zip(profiles, measures["IOU_AC_Territory"], measures["AC_Elec_Target_Sector"], measures["AC_Climate_Zone"])]
+        return pd.Series([real_impact_profiles.scaled_profile(k, iou, ts, z) for k, iou, ts, z in
+                          zip(profiles, measures["IOU_AC_Territory"], measures["AC_Elec_Target_Sector"], zones)], index=measures.index, dtype=float)
+    profile_kwh_per_unit_1st = profile_kwh_per_unit(measures["AC_Elec_Impact_Profile"])
+    same_profile_both_baselines = measures["AC_Elec_Impact_Profile_2nd_Baseline"] == measures["AC_Elec_Impact_Profile"]
+    profile_kwh_per_unit_2nd = profile_kwh_per_unit_1st.where(same_profile_both_baselines, profile_kwh_per_unit(measures["AC_Elec_Impact_Profile_2nd_Baseline"]))
+    if profile_kwh_per_unit_1st.isna().all() and profile_kwh_per_unit_2nd.isna().all():
         return measures
     m = measures.copy()
-    f = statewide_allocation.electric_factors(m["prg_id"], m["claim_year"]) if allocated else pd.Series(1.0, index=m.index)
-    u1, u2 = m["unit_kwh_1st"].astype(float), m["unit_kwh_2nd"].astype(float)
-    r2 = (u2 / u1.where(u1 != 0)).fillna(1.0)
-    for c in ("unit_kwh_1st", "unit_kwh_2nd", "annual_net_kwh_1st", "annual_net_kwh_2nd", "annual_net_kwh", "shape_scale", "shape_scale_2nd"):
-        m[c] = m[c].astype(float)                     # a whole-number file reads as int64, which cannot take the profile's kWh
-    per_unit = m["num_units"] * f * m["NTGRkWh"] * m["ir_kwh"] * m["rr_kwh"]
-    first = s1.notna()
-    m.loc[first, "unit_kwh_1st"], m.loc[first, "shape_scale"] = (s1 * f)[first], per_unit[first]
-    shared = same2 & first                            # the 2nd baseline on the same scaled profile: the file's 2nd / 1st ratio
-    m.loc[shared, "unit_kwh_2nd"], m.loc[shared, "shape_scale_2nd"] = (s1 * f * r2)[shared], (per_unit * r2)[shared]
-    own = ~same2 & s2.notna()                         # the 2nd baseline on its own scaled profile
-    m.loc[own, "unit_kwh_2nd"], m.loc[own, "shape_scale_2nd"] = (s2 * f)[own], per_unit[own]
-    changed = first | shared | own
+    statewide_electric_factor = (statewide_allocation.electric_factors(m["PrgID"], m["Used_Year"]) if allocated else pd.Series(1.0, index=m.index))
+    filed_1st, filed_2nd = m["UnitkWh1stBaseline"].astype(float), m["UnitkWh2ndBaseline"].astype(float)
+    ratio_2nd_to_1st_baseline_kwh = (filed_2nd / filed_1st.where(filed_1st != 0)).fillna(1.0)
+    profile_scale_kwh_per_unit = m["NumUnits"] * statewide_electric_factor * m["NTGRkWh"] * m["InstallationRatekWh"] * m["RealizationRatekWh"]
+    on_profile_1st = profile_kwh_per_unit_1st.notna()
+    m.loc[on_profile_1st, "Used_UnitkWh1stBaseline"] = (profile_kwh_per_unit_1st * statewide_electric_factor)[on_profile_1st]
+    m.loc[on_profile_1st, "AC_Net_kWh_ScaledProfile_1st_Baseline"] = profile_scale_kwh_per_unit[on_profile_1st]
+    on_profile_2nd_shared = same_profile_both_baselines & on_profile_1st   # the 2nd baseline on the same scaled profile: the file's 2nd / 1st ratio
+    m.loc[on_profile_2nd_shared, "Used_UnitkWh2ndBaseline"] = (profile_kwh_per_unit_1st * statewide_electric_factor * ratio_2nd_to_1st_baseline_kwh)[on_profile_2nd_shared]
+    m.loc[on_profile_2nd_shared, "AC_Net_kWh_ScaledProfile_2nd_Baseline"] = (profile_scale_kwh_per_unit * ratio_2nd_to_1st_baseline_kwh)[on_profile_2nd_shared]
+    on_profile_2nd_own = ~same_profile_both_baselines & profile_kwh_per_unit_2nd.notna()   # the 2nd baseline on its own scaled profile
+    m.loc[on_profile_2nd_own, "Used_UnitkWh2ndBaseline"] = (profile_kwh_per_unit_2nd * statewide_electric_factor)[on_profile_2nd_own]
+    m.loc[on_profile_2nd_own, "AC_Net_kWh_ScaledProfile_2nd_Baseline"] = profile_scale_kwh_per_unit[on_profile_2nd_own]
+    unit_kwh_from_profile = on_profile_1st | on_profile_2nd_shared | on_profile_2nd_own
     for b in ("1st", "2nd"):
-        m.loc[changed, f"annual_net_kwh_{b}"] = (m["num_units"] * m[f"unit_kwh_{b}"] * m["NTGRkWh"])[changed]
-    m.loc[changed, "annual_net_kwh"] = m.loc[changed, "annual_net_kwh_1st"]
+        m.loc[unit_kwh_from_profile, f"AC_Net_kWh_{b}_Baseline"] = (m["NumUnits"] * m[f"Used_UnitkWh{b}Baseline"] * m["NTGRkWh"] * m["InstallationRatekWh"]
+                                                                    * m["RealizationRatekWh"])[unit_kwh_from_profile]
+    m.loc[unit_kwh_from_profile, "Scaled_Profile_Flag"] = True
     return m
 
 

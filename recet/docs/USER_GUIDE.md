@@ -308,7 +308,9 @@ started from the window, start in about a second. Nothing in the cache is ever t
 |---|---|
 | "Measure.csv lacks required column(s) ..." | The file is not in CET's layout or the header is wrong; compare with `recet template measure --out header.csv`. |
 | "The header has no '\|', ',' or tab" (`no_delimiter`) | The file has one column or is not a CET-format file; save it as pipe- or comma-delimited text with CET's header. |
-| "blank_required_value" | `NumUnits`, `EUL_Yrs`, `NTGRkWh` or `UnitkWh1stBaseline` is blank on the listed measures; enter a value (0 if none). |
+| "blank_required_value" | A numeric field CET requires (`NumUnits`, the kWh / kW / therm savings of both baselines, the measure costs, the four NTGs, `EUL_Yrs`, `RUL_Yrs`, the installation and realization rates, the gas-infrastructure, refrigerant and miscellaneous benefits and costs) is blank on the listed measures; enter a value (0 if none). |
+| "negative_life" | `EUL_Yrs` or `RUL_Yrs` is negative on the listed measures. |
+| "rul_above_eul" | `RUL_Yrs` is greater than `EUL_Yrs` on the listed measures: the existing equipment's remaining life cannot exceed the measure's life. |
 | Many `UNPRICED` electric measures | `AC_Elec_Impact_Profile` (or the sector / IOU) does not match a profile; the preflight lists examples. Fix the spelling, or supply a profile for that end use. |
 | "electric ACC file for version ... not found" | The reference data folder is not set or lacks `acc/<version>/electric_hourly.parquet`; see the status line and `recet data status`. |
 | A supplied ACC "is not usable" | The message names the problem (a missing column, a block without 8,760 rows, gaps in the years). `recet check acc-electric FILE` re-checks a file on its own. |

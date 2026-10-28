@@ -107,15 +107,15 @@ def derive(r: dict) -> dict:
     d["irr_therm"] = f("InstallationRateTherm", 1.0) * f("RealizationRateTherm", 1.0)
     d["eul"] = max(float(r["EUL_Yrs"]), 0.25)
     d["rul"] = max(f("RUL_Yrs"), 0.0)
-    d["claim_year"], d["claim_quarter"] = int(str(r["ClaimYearQuarter"])[:4]), int(str(r["ClaimYearQuarter"])[-1])
-    d["shape_scale_1st"] = d["qty"] * d["kwh1"] * d["ntg_kwh"] * d["irr_kwh"]
-    d["shape_scale_2nd"] = d["qty"] * d["kwh2"] * d["ntg_kwh"] * d["irr_kwh"]
+    d["Used_Year"], d["Used_Quarter"] = int(str(r["ClaimYearQuarter"])[:4]), int(str(r["ClaimYearQuarter"])[-1])
+    d["AC_Net_kWh_1st_Baseline"] = d["qty"] * d["kwh1"] * d["ntg_kwh"] * d["irr_kwh"]
+    d["AC_Net_kWh_2nd_Baseline"] = d["qty"] * d["kwh2"] * d["ntg_kwh"] * d["irr_kwh"]
     d["therms_1st"] = d["qty"] * d["th1"] * d["ntg_therm"] * d["irr_therm"]
     d["therms_2nd"] = d["qty"] * d["th2"] * d["ntg_therm"] * d["irr_therm"]
-    d["water_scale_1st"] = d["qty"] * d["w1"] * d["ntg_kwh"] * d["irr_kwh"]
-    d["water_scale_2nd"] = d["qty"] * d["w2"] * d["ntg_kwh"] * d["irr_kwh"]
+    d["AC_Net_kWh_Water_1st_Baseline"] = d["qty"] * d["w1"] * d["ntg_kwh"] * d["irr_kwh"]
+    d["AC_Net_kWh_Water_2nd_Baseline"] = d["qty"] * d["w2"] * d["ntg_kwh"] * d["irr_kwh"]
     fuel_sub = str(r.get("FuelID") or "") in ("AllElec-New", "FuelSub-ToElec", "FuelSub-ToGas") or "FuelSub" in str(r.get("MeasImpactType") or "")
-    d["is_fuel_sub"] = fuel_sub
+    d["Fuel_Sub_Flag"] = fuel_sub
     return d
 
 
@@ -125,7 +125,7 @@ def elec_value(d, shape, represents_year, acc, rate_qtr, first_year, scale_1st, 
     ntg = d["ntg_kwh"] if ntg is None else ntg
     factor = (ntg + meb) / ntg if (meb and ntg > 0) else 1.0
     total = 0.0
-    for k, y, q, w in quarter_schedule(d["claim_year"], d["claim_quarter"], d["eul"]):
+    for k, y, q, w in quarter_schedule(d["Used_Year"], d["Used_Quarter"], d["eul"]):
         a, b = QUARTER_HOURS[q]
         price = acc[nearest(acc.keys(), y)]
         hourly = shift_shape(shape, y, represents_year) * price
@@ -139,7 +139,7 @@ def gas_value(d, shape, acc, rate_qtr, first_year, meb=0.0):
     factor = (d["ntg_therm"] + meb) / d["ntg_therm"] if (meb and d["ntg_therm"] > 0) else 1.0
     total = 0.0
     lo, hi = min(acc), max(acc)
-    for k, y, q, w in quarter_schedule(d["claim_year"], d["claim_quarter"], d["eul"]):
+    for k, y, q, w in quarter_schedule(d["Used_Year"], d["Used_Quarter"], d["eul"]):
         a, b = GAS_QUARTER_MONTHS[q]
         therms = phased(k, d["rul"] * 4.0, d["therms_1st"] * factor, d["therms_2nd"] * factor)
         monthly = shape * therms * acc[min(max(y, lo), hi)]
@@ -172,7 +172,7 @@ def participant(r, d, rate_qtr, first_year, mec):
     f = lambda k: 0.0 if r.get(k) in (None, "") else float(r[k])
     q = d["qty"]
     rqf = 1.0 + rate_qtr
-    qm = (d["claim_year"] - first_year) * 4 + (d["claim_quarter"] - 1)
+    qm = (d["Used_Year"] - first_year) * 4 + (d["Used_Quarter"] - 1)
     pvf = rqf ** qm
     incents_di = q * (f("UnitIncentiveToOthers") + f("UnitDirectInstallLab") + f("UnitDirectInstallMat"))
     rebates = q * f("UnitEndUserRebate")
@@ -197,7 +197,7 @@ def participant(r, d, rate_qtr, first_year, mec):
             "NetParticipantCostAdjusted": d["ntg_cost"] * (gross + excess) + mark}
 
 
-PARTICIPANT_SCT = ("RebatesandIncentsPV", "GrossParticipantCostPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV")      # the tool's _sct participant columns
+PARTICIPANT_SCT = ("RebatesandIncentsPV", "GrossParticipantCostPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV")      # the tool's _SCT participant columns
 
 
 # ---------------------------------------------------------------------------------------------------------------- C19: savings quantities
@@ -242,7 +242,7 @@ def discounted_savings(r, d, rate_annual, rate_qtr, first_year, meb):
     """C19.5: the 1st-baseline years and the 2nd-baseline years each summed as an annuity at the annual rate, the 2nd brought back RUL years, the whole to
     the First Year at the quarterly rate. 0 when the 1st-baseline amount is 0."""
     eul, rul = float(r["EUL_Yrs"]), d["rul"]
-    raf, pvf = 1.0 + rate_annual, (1.0 + rate_qtr) ** ((d["claim_year"] - first_year) * 4 + (d["claim_quarter"] - 1))
+    raf, pvf = 1.0 + rate_annual, (1.0 + rate_qtr) ** ((d["Used_Year"] - first_year) * 4 + (d["Used_Quarter"] - 1))
 
     def annuity(n):                                      # sum of raf^-t for t = 0 .. n-1 (n may be fractional)
         return 1.0 + (1.0 - raf ** -(n - 1.0)) / rate_annual
@@ -264,7 +264,7 @@ def bill_pv(d, s1, s2, rates, rate_annual, base_year):
     """C9: annual PV of the bill change; the boundary and every 2nd-baseline year are discounted by Raf^(Year - BaseYear) (CalcCE's Qy), the pure 1st-baseline years by
     Raf^(years since claim)."""
     raf = 1.0 + rate_annual
-    yr1 = d["claim_year"] - base_year
+    yr1 = d["Used_Year"] - base_year
     eul, rul = d["eul"], d["rul"]
     full = int(eul)
     rem = eul - full
@@ -273,20 +273,20 @@ def bill_pv(d, s1, s2, rates, rate_annual, base_year):
     boundary = (rul - floor_rul) if rul > 0 else 1.0
     total = 0.0
     for k in range(min(floor_rul, n)):
-        if d["claim_year"] + k in rates:
-            total += s1 * rates[d["claim_year"] + k] / raf ** k
+        if d["Used_Year"] + k in rates:
+            total += s1 * rates[d["Used_Year"] + k] / raf ** k
     for k in range(floor_rul, n):
-        if d["claim_year"] + k not in rates:
+        if d["Used_Year"] + k not in rates:
             continue
         w = rem if (k == n - 1 and rem > 1e-9) else 1.0
         v = boundary * s1 + (1.0 - boundary) * s2 if k == floor_rul else s2
-        total += w * v * rates[d["claim_year"] + k] / raf ** (k + yr1)
+        total += w * v * rates[d["Used_Year"] + k] / raf ** (k + yr1)
     return total
 
 
 def participant_test(d, part, tax_credits_gross, bills_gross, rate_qtr, first_year):
     """C12: the Participant Cost Test on gross bill impacts (`bills_gross`: the four ...Gross bill columns)."""
-    pvf = (1.0 + rate_qtr) ** ((d["claim_year"] - first_year) * 4 + (d["claim_quarter"] - 1))
+    pvf = (1.0 + rate_qtr) ** ((d["Used_Year"] - first_year) * 4 + (d["Used_Quarter"] - 1))
     ben = bills_gross["LifecycleBillReducElecGross"] + bills_gross["LifecycleBillReducGasGross"] + part["RebatesandIncentsPV"] + tax_credits_gross / pvf
     cost = part["GrossParticipantCostPV"] + part["RebatesandIncentsPV"] + bills_gross["LifecycleBillIncrElecGross"] + bills_gross["LifecycleBillIncrGasGross"]
     return {**bills_gross, "PCTBen": ben, "PCTCost": cost, "PCTRatio": ben / cost if cost else 0.0}
@@ -330,7 +330,7 @@ def emissions(d, quarters, nox, pm10, co2_gas, nox_gas, meb):
     eul = d["eul"]
     rul = d["rul"] if d["rul"] < eul else 0.0
     rulq, eulq = rul * 4.0, eul * 4.0
-    install = d["claim_year"] * 4 + d["claim_quarter"]
+    install = d["Used_Year"] * 4 + d["Used_Quarter"]
     fy = {"co2": 0.0, "nox": 0.0, "pm": 0.0}
     lc = dict(fy)
     seq = 0
@@ -377,9 +377,9 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
         for prg, g in program.groupby("PrgID"):
             tot = g[COST_FIELDS].fillna(0.0).sum(axis=1)
             n = g["Year"] - first_year
-            sums[prg] = {"SumCosts": float(tot.sum()), "npv": float((tot / (1 + st["annual"]) ** n).sum()), "npv_sct": float((tot / (1 + st["annual_sct"]) ** n).sum()),
+            sums[prg] = {"SumCosts": float(tot.sum()), "SumCostsNPV": float((tot / (1 + st["annual"]) ** n).sum()), "SumCostsNPV_SCT": float((tot / (1 + st["annual_sct"]) ** n).sum()),
                          **{c: float(g[c].fillna(0.0).sum()) for c in COST_FIELDS}}
-    zero = {"SumCosts": 0.0, "npv": 0.0, "npv_sct": 0.0, **{c: 0.0 for c in COST_FIELDS}}
+    zero = {"SumCosts": 0.0, "SumCostsNPV": 0.0, "SumCostsNPV_SCT": 0.0, **{c: 0.0 for c in COST_FIELDS}}
 
     def share(rows_, kind_cols, gross=False):
         ben = [sum(pos(r[c]) for c in kind_cols(r, gross)) for r in rows_]
@@ -419,20 +419,20 @@ def cost_tests(rows: list[dict], program: pd.DataFrame | None, first_year: int, 
         r["TotalExpenditures"] = r["RebatesandIncents"] + r["WeightedProgramCost"]                                   # C11.3
         sup = r["ElecSupplyCost"] + r["GasSupplyCost"] + r["WaterEnergyCost"] + r["OtherCost"]
         sup_g = r["ElecSupplyCostGross"] + r["GasSupplyCostGross"] + r["WaterEnergyCostGross"] + r["OtherCostGross"]
-        inc, inc_s = r["RebatesandIncentsPV"], r["RebatesandIncentsPV_sct"]
+        inc, inc_s = r["RebatesandIncentsPV"], r["RebatesandIncentsPV_SCT"]
         r["PACCostNoAdmin"] = inc + sup
-        r["PACCost"] = sh_trc[i] * ps["npv"] + r["PACCostNoAdmin"]
+        r["PACCost"] = sh_trc[i] * ps["SumCostsNPV"] + r["PACCostNoAdmin"]
         r["TRCCostNoAdmin"] = inc + r["NetParticipantCostAdjustedPV"] + sup
-        r["TRCCost"] = sh_trc[i] * ps["npv"] + r["TRCCostNoAdmin"]
-        r["TRCCostGross"] = sh_trc_g[i] * ps["npv"] + inc + r["GrossParticipantCostPV"] + sup_g
+        r["TRCCost"] = sh_trc[i] * ps["SumCostsNPV"] + r["TRCCostNoAdmin"]
+        r["TRCCostGross"] = sh_trc_g[i] * ps["SumCostsNPV"] + inc + r["GrossParticipantCostPV"] + sup_g
         r["RIMCostNoAdmin"] = r["LifecycleBillReducElec"] + r["LifecycleBillReducGas"] + r["PACCostNoAdmin"]
         r["RIMCost"] = r["LifecycleBillReducElec"] + r["LifecycleBillReducGas"] + r["PACCost"]
         for name, s, sh, sh_g in (("SCB", "_SB", sh_sb, sh_sb_g), ("SCH", "_SH", sh_sh, sh_sh_g)):
             sup_s = r[f"ElecSupplyCost{s}"] + r[f"GasSupplyCost{s}"] + r[f"WaterEnergyCost{s}"] + r["OtherCost"]
             sup_sg = r[f"ElecSupplyCostGross{s}"] + r[f"GasSupplyCostGross{s}"] + r[f"WaterEnergyCostGross{s}"] + r["OtherCostGross"]
-            r[f"{name}CostNoAdmin"] = inc_s + r["NetParticipantCostAdjustedPV_sct"] + sup_s
-            r[f"{name}Cost"] = sh[i] * ps["npv_sct"] + r[f"{name}CostNoAdmin"]
-            r[f"{name}CostGross"] = sh_g[i] * ps["npv_sct"] + inc_s + r["GrossParticipantCostPV_sct"] + sup_sg
+            r[f"{name}CostNoAdmin"] = inc_s + r["NetParticipantCostAdjustedPV_SCT"] + sup_s
+            r[f"{name}Cost"] = sh[i] * ps["SumCostsNPV_SCT"] + r[f"{name}CostNoAdmin"]
+            r[f"{name}CostGross"] = sh_g[i] * ps["SumCostsNPV_SCT"] + inc_s + r["GrossParticipantCostPV_SCT"] + sup_sg
         b = r["ElecBen"] + r["GasBen"] + r["WaterEnergyBen"] + r["OtherBen"]
         r["TRCRatio"], r["TRCRatioNoAdmin"] = ratio(b + r["TaxCredits"], r["TRCCost"]), ratio(b + r["TaxCredits"], r["TRCCostNoAdmin"])
         r["PACRatio"], r["PACRatioNoAdmin"] = ratio(b, r["PACCost"]), ratio(b, r["PACCostNoAdmin"])

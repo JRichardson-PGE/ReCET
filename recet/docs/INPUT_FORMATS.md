@@ -209,7 +209,7 @@ give the same results. A file chosen separately (for example a run-parameters CS
 
 One folder `<out>/<run name>_acc<version>/`:
 
-* `measure_level_acc<version>.csv` - one row per measure: the input columns, the derived pricing inputs (`Used_Year`, `AC_kWh_1st_Baseline` ...), `ElecPricingStatus` / `ProfileSource` / `GasPricingStatus` /
+* `measure_level_acc<version>.csv` - one row per measure: the input columns, the derived pricing inputs (`Used_Year`, `AC_Net_kWh_1st_Baseline` ...), `ElecPricingStatus` / `ProfileSource` / `GasPricingStatus` /
   `GasProfileSource`, then every output (benefits, supply costs, participant and bill-impact PVs, Gross / NoAdmin variants, TRC / PAC / RIM / SCB / SCH costs and ratios,
   program-cost weighting, CO2 / NOx / PM10), `ElecValue_*` / `GasValue_*` in components mode, `CreditedPA` (the `PA` of the measure's program in `ProgramCost.csv`; with statewide
   allocation, the IOU each statewide share went to), and the program metadata (`Prg_MatchedOn`, `Prg_<column>`).

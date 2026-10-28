@@ -17,7 +17,6 @@ routes) were moved to the CEDARS review research repository (poc/research_lib) o
 """
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -27,23 +26,12 @@ import pandas as pd
 HOURS_PER_YEAR = 8760
 
 @dataclass
-class BatchedPricingResult:
-    # price_real_hourly: one row per priced measure, its lifetime discounted value in annual_value.
-    # price_real_hourly_per_measure: one row per priced (measure_id, year, quarter), the quarter's discounted value in annual_value.
-    measure_year: pd.DataFrame
-    portfolio_hourly: np.ndarray        # length HOURS_PER_YEAR, this run's aggregate
-    n_batches: int
-    elapsed_seconds: float
-    batch_size: int
-    # Only populated by price_real_hourly() -- how many measures got a real
-    # CEDARS impact-profile shape vs. fell back to a synthetic placeholder
-    # (n_fallback_shape is 0 whenever the caller passes fallback_shape=None,
-    # i.e. synthetic substitution is disabled -- see run_poc.py's
-    # 2026-09-16 change: unmatched measures are now flagged, not faked).
-    n_real_shape: int = 0
-    n_fallback_shape: int = 0
-    unmatched_measure_ids: list = field(default_factory=list)  # populated by price_real_hourly() when fallback_shape is None
-    # measure_id -> how run_poc.run_real_hourly routed it ("hourly profile | <profile source>"); reporting only.
+class HourlyPricingResult:
+    # price_real_hourly: one row per priced measure (CEInputID, LifetimeValuePV = its lifetime discounted value, signed).
+    # price_real_hourly_per_measure: one row per priced (CEInputID, Year, Quarter), the quarter's discounted value in QuarterValuePV.
+    values: pd.DataFrame
+    unpriced_ids: list = field(default_factory=list)   # CEInputIDs with no 8,760 profile (flagged, never priced on a made-up shape)
+    # CEInputID -> how run_poc.run_real_hourly routed it ("hourly profile | <profile source>"); reporting only.
     route: dict = field(default_factory=dict)
 
 
@@ -54,7 +42,7 @@ class BatchedPricingResult:
 QUARTER_BOUNDS = [(0, 2160), (2160, 4344), (4344, 6552), (6552, 8760)]
 
 
-def _phased_scale(k: int, rul_quarters: float, scale_1st: float, scale_2nd: float) -> float:
+def _baseline_quantity_in_quarter(k: int, rul_quarters: float, quantity_1st: float, quantity_2nd: float) -> float:
     """RUL-based dual-baseline blend for the k-th (0-based) quarter since a
     measure's claim date (2026-09-16 fix -- found comparing this POC
     against a live CET run on a real 73,024-measure accelerated-replacement
@@ -78,11 +66,11 @@ def _phased_scale(k: int, rul_quarters: float, scale_1st: float, scale_2nd: floa
     EUL -- a pure generalization of this project's original single-
     baseline behavior, not a change to it."""
     if rul_quarters <= 0 or k + 1 <= rul_quarters:
-        return scale_1st
+        return quantity_1st
     if k >= rul_quarters:
-        return scale_2nd
-    frac_1st = rul_quarters - k
-    return frac_1st * scale_1st + (1.0 - frac_1st) * scale_2nd
+        return quantity_2nd
+    share_on_1st_baseline = rul_quarters - k
+    return share_on_1st_baseline * quantity_1st + (1.0 - share_on_1st_baseline) * quantity_2nd
 
 
 def price_real_hourly_per_measure(
@@ -92,11 +80,11 @@ def price_real_hourly_per_measure(
     shift_fn: Callable[[np.ndarray, int, int], np.ndarray],
     get_discount_rate_qtr: Callable[[pd.Series], float],
     base_year: int,
-    fallback_shape: Callable[[pd.Series], np.ndarray] | None = None,
-) -> BatchedPricingResult:
+) -> HourlyPricingResult:
     """
     THE PER-MEASURE VERSION: the reference for `price_real_hourly` below (which gives the same values, organised by distinct route so that the shift-and-sum work is done
-    once per route instead of once per measure) and the only one that can also fill the portfolio 8,760 accumulator or use a fallback shape. Tests require the two to agree.
+    once per route instead of once per measure). Tests require the two to agree. Reads Priced_Quantity_1st/2nd_Baseline (the quantity each baseline's profile is
+    multiplied by), EUL_Yrs, RUL_Yrs, Used_Year and Used_Quarter.
 
     The methodology lesson from CEDARS QAC Validation, PLUS the real CET
     discounting mechanism (found 2026-09-15 in the actual CalcCE SQL and
@@ -135,21 +123,10 @@ def price_real_hourly_per_measure(
        regardless of its real claim_quarter.
 
     get_shape(measure_row) -> (normalized_8760_shape, represents_year), or
-    None if no real CEDARS profile could be matched -- fallback_shape is
-    used instead (represents_year defaults to the measure's own claim
-    year, i.e. "assume no shift needed", since a synthetic shape has no
-    real represents_year to shift from).
-
-    fallback_shape=None (2026-09-16, Jake's direction): a measure with no
-    real 8760-hour profile match is FLAGGED, not silently priced against a
-    synthetic placeholder -- its measure_id is collected into the returned
-    result's `unmatched_measure_ids` and it's excluded from pricing
-    entirely (no row emitted, same as before this list existed -- the
-    `else: continue` branch already did this, it just didn't record WHICH
-    measures got skipped). Pass a real fallback_shape callable only for a
-    deliberately-synthetic measure that isn't meant to represent real
-    CEDARS data at all (e.g. run_poc.py's own demo load-shifting measure),
-    not as a general substitute for an unmatched real measure.
+    None if no real CEDARS profile could be matched: such a measure is
+    FLAGGED (2026-09-16, Jake's direction), never priced against a made-up
+    shape -- its CEInputID is collected into the result's `unpriced_ids`
+    and it gets no row.
 
     get_acc_years(measure_row) -> {year: array(8760,)}; a year outside
     what's returned clamps to the nearest available year.
@@ -164,150 +141,133 @@ def price_real_hourly_per_measure(
     methodology easy to line up against CEDARS QAC Validation's own code
     and the real CalcCE SQL.
     """
-    start = time.perf_counter()
-    portfolio_hourly = np.zeros(HOURS_PER_YEAR)
     rows: list[dict] = []
-    n_real_shape = 0
-    n_fallback_shape = 0
-    unmatched_measure_ids: list = []
+    unpriced_ids: list = []
 
     for _, m in measures.iterrows():
-        shape_result = get_shape(m)
-        if shape_result is not None:
-            shape, represents_year = shape_result
-            n_real_shape += 1
-        elif fallback_shape is not None:
-            shape, represents_year = fallback_shape(m), int(m["claim_year"])
-            n_fallback_shape += 1
-        else:
-            unmatched_measure_ids.append(m["measure_id"])
+        profile_hit = get_shape(m)
+        if profile_hit is None:
+            unpriced_ids.append(m["CEInputID"])
             continue
+        shape, represents_year = profile_hit
 
         acc_years = get_acc_years(m)
-        available_years = sorted(acc_years)
-        claim_year = int(m["claim_year"])
-        claim_quarter = int(m["claim_quarter"])  # 1-4, real ClaimYearQuarter field
-        rqf = 1.0 + get_discount_rate_qtr(m)
+        acc_years_available = sorted(acc_years)
+        claim_year = int(m["Used_Year"])
+        claim_quarter = int(m["Used_Quarter"])  # 1-4, from ClaimYearQuarter
+        quarterly_discount_factor = 1.0 + get_discount_rate_qtr(m)          # CalcCE's Rqf
 
-        eul_quarters = float(m["eul_years_exact"]) * 4.0
-        full_quarters = int(eul_quarters)
-        frac_remainder = eul_quarters - full_quarters  # prorates the final quarter, per real CalcCE
-        n_billed_quarters = full_quarters + (1 if frac_remainder > 1e-9 else 0)
-        rul_quarters = float(m["rul_years_exact"]) * 4.0
-        scale_1st = float(m["shape_scale"])
-        scale_2nd = float(m["shape_scale_2nd"])
+        eul_quarters = float(m["EUL_Yrs"]) * 4.0                            # CalcCE's eulq
+        whole_quarters = int(eul_quarters)
+        last_quarter_fraction = eul_quarters - whole_quarters  # prorates the final quarter, per real CalcCE
+        n_priced_quarters = whole_quarters + (1 if last_quarter_fraction > 1e-9 else 0)
+        rul_quarters = float(m["RUL_Yrs"]) * 4.0                            # CalcCE's rulq
+        quantity_1st = float(m["Priced_Quantity_1st_Baseline"])
+        quantity_2nd = float(m["Priced_Quantity_2nd_Baseline"])
 
-        # shape*acc_year is cached per calendar year (unscaled) -- the
-        # RUL-phased scale is applied per-quarter below, since two quarters
-        # in the SAME calendar year can straddle the RUL boundary and need
-        # different scales even though they share one hourly array.
-        year_hourly_cache: dict[int, np.ndarray] = {}
-        for k in range(n_billed_quarters):
-            abs_quarter = (claim_quarter - 1) + k  # 0-based quarters elapsed since claim_year's own Q1
-            target_year = claim_year + abs_quarter // 4
-            quarter_idx = abs_quarter % 4  # 0=Q1 .. 3=Q4
+        # profile x price is cached per calendar year -- the baseline quantity is applied per quarter below, since two quarters in the SAME calendar year can
+        # straddle the RUL boundary and need different quantities even though they share one hourly array.
+        profile_x_price_by_year: dict[int, np.ndarray] = {}
+        for k in range(n_priced_quarters):
+            quarters_since_claim_year = (claim_quarter - 1) + k  # 0-based quarters elapsed since the claim year's own Q1
+            priced_year = claim_year + quarters_since_claim_year // 4
+            priced_quarter = quarters_since_claim_year % 4  # 0=Q1 .. 3=Q4
 
-            if target_year not in year_hourly_cache:
-                acc_year = min(available_years, key=lambda y: abs(y - target_year))
-                shifted = shift_fn(shape, target_year, represents_year)
-                year_hourly_cache[target_year] = shifted * acc_years[acc_year]
-            scale = _phased_scale(k, rul_quarters, scale_1st, scale_2nd)
-            hourly_value = year_hourly_cache[target_year] * scale
+            if priced_year not in profile_x_price_by_year:
+                nearest_acc_year = min(acc_years_available, key=lambda y: abs(y - priced_year))
+                aligned_profile = shift_fn(shape, priced_year, represents_year)
+                profile_x_price_by_year[priced_year] = aligned_profile * acc_years[nearest_acc_year]
+            quantity_this_quarter = _baseline_quantity_in_quarter(k, rul_quarters, quantity_1st, quantity_2nd)
+            hourly_value = profile_x_price_by_year[priced_year] * quantity_this_quarter
 
-            q_start, q_end = QUARTER_BOUNDS[quarter_idx]
-            is_last = k == n_billed_quarters - 1
-            frac = frac_remainder if (is_last and frac_remainder > 1e-9) else 1.0
+            q_start, q_end = QUARTER_BOUNDS[priced_quarter]
+            is_last = k == n_priced_quarters - 1
+            quarter_weight = last_quarter_fraction if (is_last and last_quarter_fraction > 1e-9) else 1.0
 
-            quarter_value = float(hourly_value[q_start:q_end].sum()) * frac
-            qac = (target_year - base_year) * 4 + quarter_idx  # quarters since BaseYear's own Q1
-            discount_factor = 1.0 / (rqf ** qac)
+            quarter_value = float(hourly_value[q_start:q_end].sum()) * quarter_weight
+            quarters_from_first_year = (priced_year - base_year) * 4 + priced_quarter  # CalcCE's Qac: quarters since the First Year's own Q1
+            discount_factor = 1.0 / (quarterly_discount_factor ** quarters_from_first_year)
 
             rows.append({
-                "measure_id": m["measure_id"],
-                "year": target_year,
-                "quarter": quarter_idx + 1,
-                "annual_value": quarter_value * discount_factor,
+                "CEInputID": m["CEInputID"],
+                "Year": priced_year,
+                "Quarter": priced_quarter + 1,
+                "QuarterValuePV": quarter_value * discount_factor,
             })
-            portfolio_hourly[q_start:q_end] += hourly_value[q_start:q_end] * frac
 
-    elapsed = time.perf_counter() - start
-    return BatchedPricingResult(
-        measure_year=pd.DataFrame(rows),
-        portfolio_hourly=portfolio_hourly,
-        n_batches=1,
-        elapsed_seconds=elapsed,
-        batch_size=len(measures),
-        n_real_shape=n_real_shape,
-        n_fallback_shape=n_fallback_shape,
-        unmatched_measure_ids=unmatched_measure_ids,
-    )
+    return HourlyPricingResult(values=pd.DataFrame(rows, columns=["CEInputID", "Year", "Quarter", "QuarterValuePV"]), unpriced_ids=unpriced_ids)
 
 
-def _quarter_rows(claim_year: np.ndarray, claim_quarter: np.ndarray, eul_years: np.ndarray, rul_years: np.ndarray, scale_1st: np.ndarray, scale_2nd: np.ndarray,
-                  rqf: np.ndarray, base_year: int):
+def _quarter_rows(claim_year: np.ndarray, claim_quarter: np.ndarray, EUL_Yrs: np.ndarray, RUL_Yrs: np.ndarray, quantity_1st: np.ndarray, quantity_2nd: np.ndarray,
+                  quarterly_discount_factor: np.ndarray, base_year: int):
     """Expand measures (one entry per measure in every input array) into one row per (measure, quarter of its life), with everything CalcCE applies per quarter:
-    returns (measure index, calendar year, quarter 0-3, weight, phased scale, discount factor).
-      weight  = 1, or the fraction of the last quarter of a fractional life (`(eulq - floor(eulq))`);
-      scale   = `_phased_scale`: the 1st-baseline quantity before the RUL, the 2nd after, a blend in the quarter that contains it;
-      discount = 1 / Rqf ^ Qac, Qac = calendar quarters from Q1 of the First Year.
+    returns (row_measure, priced_year, priced_quarter 0-3, quarter_weight, quantity_this_quarter, discount_factor).
+      quarter_weight        = 1, or the fraction of the last quarter of a fractional life (`(eulq - floor(eulq))`);
+      quantity_this_quarter = `_baseline_quantity_in_quarter`: the 1st-baseline quantity before the RUL, the 2nd after, a blend in the quarter that contains it;
+      discount_factor       = 1 / Rqf ^ Qac, Qac = calendar quarters from Q1 of the First Year.
     The same arithmetic as the per-measure loops, evaluated on flat arrays."""
-    eq = eul_years * 4.0                                                                  # EUL in quarters
-    full = eq.astype(np.int64)
-    rem = eq - full                                                                       # the last, partial quarter
-    n_q = full + (rem > 1e-9)
-    rul_q = rul_years * 4.0
-    total = int(n_q.sum())
-    m_idx = np.repeat(np.arange(len(n_q)), n_q)
-    k = np.arange(total) - np.repeat(np.cumsum(n_q) - n_q, n_q)
-    a = (claim_quarter[m_idx] - 1) + k                                                     # 0-based quarters elapsed since the claim year's Q1
-    year = claim_year[m_idx] + a // 4
-    quarter = a % 4                                                                        # 0 = Q1 .. 3 = Q4
-    weight = np.where((k == n_q[m_idx] - 1) & (rem[m_idx] > 1e-9), rem[m_idx], 1.0)
-    rq = rul_q[m_idx]
-    blend = rq - k
-    scale = np.where((rq <= 0) | (k + 1 <= rq), scale_1st[m_idx], np.where(k >= rq, scale_2nd[m_idx], blend * scale_1st[m_idx] + (1.0 - blend) * scale_2nd[m_idx]))
-    discount = 1.0 / (rqf[m_idx] ** ((year - base_year) * 4 + quarter))
-    return m_idx, year, quarter, weight, scale, discount
+    eul_quarters = EUL_Yrs * 4.0                                                          # CalcCE's eulq
+    whole_quarters = eul_quarters.astype(np.int64)
+    last_quarter_fraction = eul_quarters - whole_quarters                                 # the last, partial quarter
+    n_priced_quarters = whole_quarters + (last_quarter_fraction > 1e-9)
+    rul_quarters = RUL_Yrs * 4.0                                                          # CalcCE's rulq
+    total = int(n_priced_quarters.sum())
+    row_measure = np.repeat(np.arange(len(n_priced_quarters)), n_priced_quarters)
+    life_quarter = np.arange(total) - np.repeat(np.cumsum(n_priced_quarters) - n_priced_quarters, n_priced_quarters)   # k: 0-based quarter of life
+    quarters_since_claim_year = (claim_quarter[row_measure] - 1) + life_quarter          # 0-based quarters elapsed since the claim year's Q1
+    priced_year = claim_year[row_measure] + quarters_since_claim_year // 4
+    priced_quarter = quarters_since_claim_year % 4                                         # 0 = Q1 .. 3 = Q4
+    is_last = life_quarter == n_priced_quarters[row_measure] - 1
+    quarter_weight = np.where(is_last & (last_quarter_fraction[row_measure] > 1e-9), last_quarter_fraction[row_measure], 1.0)
+    rq = rul_quarters[row_measure]
+    share_on_1st_baseline = rq - life_quarter
+    q1, q2 = quantity_1st[row_measure], quantity_2nd[row_measure]
+    quantity_this_quarter = np.where((rq <= 0) | (life_quarter + 1 <= rq), q1,
+                                     np.where(life_quarter >= rq, q2, share_on_1st_baseline * q1 + (1.0 - share_on_1st_baseline) * q2))
+    discount_factor = 1.0 / (quarterly_discount_factor[row_measure] ** ((priced_year - base_year) * 4 + priced_quarter))
+    return row_measure, priced_year, priced_quarter, quarter_weight, quantity_this_quarter, discount_factor
 
 
-def _lifetime_values(g_m: np.ndarray, claim_year: np.ndarray, claim_quarter: np.ndarray, eul_years: np.ndarray, rul_years: np.ndarray,
-                     scale_1st: np.ndarray, scale_2nd: np.ndarray, rqf_group: np.ndarray, base_year: int,
-                     fill_unit: Callable[[int, list[int]], np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+def _lifetime_values(route_of_measure: np.ndarray, claim_year: np.ndarray, claim_quarter: np.ndarray, EUL_Yrs: np.ndarray, RUL_Yrs: np.ndarray,
+                     quantity_1st: np.ndarray, quantity_2nd: np.ndarray, quarterly_discount_factor_by_route: np.ndarray, base_year: int,
+                     fill_value_per_unit_quantity: Callable[[int, list[int]], np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     """Lifetime discounted value of each measure (one entry per measure in every input array; g_m = its route), without a row per measure-quarter.
 
-    The per-measure value is  SUM_k scale(k) * weight(k) * discount(k) * U(route, year_k, quarter_k)  (`_quarter_rows`), and scale(k) is the 1st-baseline quantity
-    times f(k) plus the 2nd times 1 - f(k), with f(k) = 1 before the RUL, 0 after and the blend in the quarter that holds it. So
-        value = scale_1st * A + scale_2nd * B,   A = SUM_k f(k) * weight(k) * discount(k) * U,   B = SUM_k (1 - f(k)) * weight(k) * discount(k) * U
+    The per-measure value is  SUM_k quantity(k) * weight(k) * discount(k) * U(route, year_k, quarter_k)  (`_quarter_rows`), and quantity(k) is the 1st-baseline
+    quantity times f(k) plus the 2nd times 1 - f(k), with f(k) = 1 before the RUL, 0 after and the blend in the quarter that holds it. So
+        value = quantity_1st * A + quantity_2nd * B,   A = SUM_k f(k) * weight(k) * discount(k) * U,   B = SUM_k (1 - f(k)) * weight(k) * discount(k) * U
     where A and B depend only on (route, claim year, claim quarter, EUL, RUL) -- the route fixes the discount rate. Every quarter is still discounted on its own,
     exactly as before; A and B are computed once per distinct key instead of once per measure.
 
-    fill_unit(g, years) -> array (len(years), 4): U for route g in each listed year's four quarters.
+    fill_value_per_unit_quantity(g, years) -> array (len(years), 4): U for route g in each listed year's four quarters.
     Returns (value per measure, has_life per measure: False where the EUL gives no quarter at all, which the per-measure versions leave without a row)."""
-    keys = np.column_stack([g_m, claim_year, claim_quarter, eul_years, rul_years]).astype(np.float64)
-    uniq, inverse = np.unique(keys, axis=0, return_inverse=True)
-    inverse = inverse.ravel()
-    n_keys = len(uniq)
-    k_g = uniq[:, 0].astype(np.int64)
-    k_idx, year, quarter, weight, f1, discount = _quarter_rows(
-        uniq[:, 1].astype(np.int64), uniq[:, 2].astype(np.int64), uniq[:, 3], uniq[:, 4], np.ones(n_keys), np.zeros(n_keys), rqf_group[k_g], base_year)
-    has_life = np.bincount(k_idx, minlength=n_keys) > 0
-    if not len(k_idx):
-        return np.zeros(len(g_m)), has_life[inverse]
+    life_keys = np.column_stack([route_of_measure, claim_year, claim_quarter, EUL_Yrs, RUL_Yrs]).astype(np.float64)
+    distinct_lives, life_of_measure = np.unique(life_keys, axis=0, return_inverse=True)
+    life_of_measure = life_of_measure.ravel()
+    n_lives = len(distinct_lives)
+    route_of_life = distinct_lives[:, 0].astype(np.int64)
+    row_life, priced_year, priced_quarter, quarter_weight, share_on_1st_baseline, discount_factor = _quarter_rows(
+        distinct_lives[:, 1].astype(np.int64), distinct_lives[:, 2].astype(np.int64), distinct_lives[:, 3], distinct_lives[:, 4], np.ones(n_lives),
+        np.zeros(n_lives), quarterly_discount_factor_by_route[route_of_life], base_year)       # quantities 1 and 0: the 1st-baseline share of each quarter
+    has_life = np.bincount(row_life, minlength=n_lives) > 0
+    if not len(row_life):
+        return np.zeros(len(route_of_measure)), has_life[life_of_measure]
 
     # --- U(route, year, quarter), once per route and year
-    y0, y1 = int(year.min()), int(year.max())
-    unit = np.zeros((int(k_g.max()) + 1, y1 - y0 + 1, 4))
-    g_row = k_g[k_idx]
-    order = np.argsort(g_row, kind="stable")
-    for rows in np.split(order, np.flatnonzero(np.diff(g_row[order])) + 1):
-        g = int(g_row[rows[0]])
-        years = [int(y) for y in np.unique(year[rows])]
-        unit[g, [y - y0 for y in years]] = fill_unit(g, years)
+    first_year, last_year = int(priced_year.min()), int(priced_year.max())
+    value_per_unit_quantity = np.zeros((int(route_of_life.max()) + 1, last_year - first_year + 1, 4))
+    row_route = route_of_life[row_life]
+    by_route = np.argsort(row_route, kind="stable")
+    for route_rows in np.split(by_route, np.flatnonzero(np.diff(row_route[by_route])) + 1):
+        g = int(row_route[route_rows[0]])
+        years = [int(y) for y in np.unique(priced_year[route_rows])]
+        value_per_unit_quantity[g, [y - first_year for y in years]] = fill_value_per_unit_quantity(g, years)
 
-    wdu = weight * discount * unit[g_row, year - y0, quarter]
-    a = np.bincount(k_idx, weights=f1 * wdu, minlength=n_keys)
-    b = np.bincount(k_idx, weights=(1.0 - f1) * wdu, minlength=n_keys)
-    return scale_1st * a[inverse] + scale_2nd * b[inverse], has_life[inverse]
+    discounted_unit_value = quarter_weight * discount_factor * value_per_unit_quantity[row_route, priced_year - first_year, priced_quarter]
+    pv_per_unit_1st_baseline = np.bincount(row_life, weights=share_on_1st_baseline * discounted_unit_value, minlength=n_lives)
+    pv_per_unit_2nd_baseline = np.bincount(row_life, weights=(1.0 - share_on_1st_baseline) * discounted_unit_value, minlength=n_lives)
+    return (quantity_1st * pv_per_unit_1st_baseline[life_of_measure] + quantity_2nd * pv_per_unit_2nd_baseline[life_of_measure],
+            has_life[life_of_measure])
 
 
 def price_real_hourly(
@@ -317,82 +277,74 @@ def price_real_hourly(
     shift_fn: Callable[[np.ndarray, int, int], np.ndarray],
     get_discount_rate_qtr: Callable[[pd.Series], float],
     base_year: int,
-    fallback_shape: Callable[[pd.Series], np.ndarray] | None = None,
     route_key=None,
-    need_portfolio_hourly: bool = False,
-) -> BatchedPricingResult:
+) -> HourlyPricingResult:
     """The same pricing as `price_real_hourly_per_measure` (read its docstring for the mechanics and the lessons behind each step), organised so that work is done once
     per DISTINCT SITUATION instead of once per measure.
 
-    A measure's lifetime value is  SUM over its quarters k of  phased_scale(k) * weight(k) * discount(k) * U,  where
-        U = SUM over the hours of quarter(k) of  (calendar-aligned shape)(h) * (avoided cost of the nearest ACC year)(h)
-    depends only on the measure's shape, its avoided-cost series (IOU and zone), the pricing year and the quarter -- never on how many kWh the measure saves. Real jobs
-    have few of those: 169 distinct (shape, IOU, sector, zone) routes in a 5,518-measure job, 48 in a 73,024-measure filing. So U is computed once per (route, year,
-    quarter), and the sum over quarters once per distinct (route, claim year, claim quarter, EUL, RUL) -- `_lifetime_values` -- with no row per measure-quarter.
+    A measure's lifetime value is  SUM over its quarters k of  quantity(k) * weight(k) * discount(k) * U,  where
+        U = SUM over the hours of quarter(k) of  (calendar-aligned profile)(h) * (avoided cost of the nearest ACC year)(h)
+    depends only on the measure's profile, its avoided-cost series (IOU and zone), the pricing year and the quarter -- never on how many kWh the measure saves. Real
+    jobs have few of those: 169 distinct (profile, IOU, sector, zone) routes in a 5,518-measure job, 48 in a 73,024-measure filing. So U is computed once per (route,
+    year, quarter), and the sum over quarters once per distinct (route, claim year, claim quarter, EUL, RUL) -- `_lifetime_values` -- with no row per measure-quarter.
+    quantity(k) is Priced_Quantity_1st_Baseline / _2nd_Baseline (filled by the caller) phased by the RUL.
 
     route_key: one hashable per measure (aligned with `measures`) naming its route; `get_shape`, `get_acc_years` and `get_discount_rate_qtr` are called once per route, on
     that route's first measure, and must give the same answer for every measure of it. None = every measure is its own route. The result has one row per priced
-    measure (measure_id, annual_value = its lifetime discounted value): the per-measure version's (measure_id, year, quarter, annual_value) rows summed by measure, to
-    rounding (the multiplications are ordered differently).
-
-    need_portfolio_hourly / fallback_shape: the portfolio 8,760 accumulator and synthetic fallbacks need each measure's hourly array, so they run the per-measure
-    version."""
-    if need_portfolio_hourly or fallback_shape is not None:
-        return price_real_hourly_per_measure(measures, get_shape, get_acc_years, shift_fn, get_discount_rate_qtr, base_year, fallback_shape)
-    start = time.perf_counter()
+    measure (CEInputID, LifetimeValuePV = its lifetime discounted value): the per-measure version's (CEInputID, Year, Quarter, QuarterValuePV) rows summed by measure,
+    to rounding (the multiplications are ordered differently)."""
     n = len(measures)
-    ids = measures["measure_id"].to_numpy()
+    ids = measures["CEInputID"].to_numpy()
     if route_key is None:
-        codes = np.arange(n)
+        route_code = np.arange(n)
     else:
-        codes, _uniques = pd.factorize(pd.Series(list(route_key), dtype=object))
-    n_groups = int(codes.max()) + 1 if n else 0
-    _, first_pos = np.unique(codes, return_index=True) if n else (None, np.array([], dtype=int))
+        route_code, _uniques = pd.factorize(pd.Series(list(route_key), dtype=object))
+    n_routes = int(route_code.max()) + 1 if n else 0
+    _, route_first_row = np.unique(route_code, return_index=True) if n else (None, np.array([], dtype=int))
 
-    # --- one shape / ACC series / rate per route, read off the route's first measure (one row lookup for all of them, not one per route)
-    shapes: dict[int, tuple[np.ndarray, int]] = {}
-    acc: dict[int, dict[int, np.ndarray]] = {}
-    rqf_group = np.ones(n_groups)
-    for g, rep in enumerate(measures.iloc[first_pos].to_dict("records") if n else []):
+    # --- one profile / ACC series / rate per route, read off the route's first measure (one row lookup for all of them, not one per route)
+    profile_by_route: dict[int, tuple[np.ndarray, int]] = {}
+    acc_by_route: dict[int, dict[int, np.ndarray]] = {}
+    quarterly_discount_factor_by_route = np.ones(n_routes)                     # CalcCE's Rqf = 1 + DiscountRateQtr
+    for g, rep in enumerate(measures.iloc[route_first_row].to_dict("records") if n else []):
         hit = get_shape(rep)
         if hit is None:
             continue
-        shapes[g] = hit
-        acc[g] = get_acc_years(rep)
-        rqf_group[g] = 1.0 + get_discount_rate_qtr(rep)
-    matched_group = np.zeros(max(n_groups, 1), dtype=bool)
-    matched_group[list(shapes)] = True
-    matched = matched_group[codes] if n else np.zeros(0, dtype=bool)
-    unmatched_ids = ids[~matched].tolist()
+        profile_by_route[g] = hit
+        acc_by_route[g] = get_acc_years(rep)
+        quarterly_discount_factor_by_route[g] = 1.0 + get_discount_rate_qtr(rep)
+    route_has_profile = np.zeros(max(n_routes, 1), dtype=bool)
+    route_has_profile[list(profile_by_route)] = True
+    has_profile = route_has_profile[route_code] if n else np.zeros(0, dtype=bool)
+    unpriced_ids = ids[~has_profile].tolist()
 
-    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "annual_value": pd.Series(dtype=float)})
-    if not matched.any():
-        return BatchedPricingResult(measure_year=empty, portfolio_hourly=np.zeros(HOURS_PER_YEAR), n_batches=1, elapsed_seconds=time.perf_counter() - start,
-                                    batch_size=n, n_real_shape=0, n_fallback_shape=0, unmatched_measure_ids=unmatched_ids)
+    if not has_profile.any():
+        return HourlyPricingResult(values=pd.DataFrame({"CEInputID": pd.Series(dtype=object), "LifetimeValuePV": pd.Series(dtype=float)}),
+                                   unpriced_ids=unpriced_ids)
 
-    once = getattr(shift_fn, "year_independent", False)       # the production shift (real_impact_profiles.shift_for_year) ignores the year: shift once per route
+    align_once_per_route = getattr(shift_fn, "year_independent", False)       # the production shift (real_impact_profiles.shift_for_year) ignores the year
 
-    def fill_unit(g: int, years: list[int]) -> np.ndarray:
-        """U(route g, year, quarter): the four quarterly sums of shape x price, against the nearest ACC year."""
-        shape, represents_year = shapes[g]
-        series = acc[g]
-        available = sorted(series)
+    def fill_value_per_unit_quantity(g: int, years: list[int]) -> np.ndarray:
+        """U(route g, year, quarter): the four quarterly sums of aligned profile x price, against the nearest ACC year."""
+        shape, represents_year = profile_by_route[g]
+        series = acc_by_route[g]
+        acc_years_available = sorted(series)
         out = np.zeros((len(years), 4))
-        aligned = shift_fn(shape, years[0], represents_year) if once else None
+        aligned_profile = shift_fn(shape, years[0], represents_year) if align_once_per_route else None
         for i, y in enumerate(years):
-            nearest = min(available, key=lambda v: abs(v - y))
-            hourly = (aligned if once else shift_fn(shape, y, represents_year)) * series[nearest]
+            nearest_acc_year = min(acc_years_available, key=lambda v: abs(v - y))
+            profile_x_price = (aligned_profile if align_once_per_route else shift_fn(shape, y, represents_year)) * series[nearest_acc_year]
             for q, (lo, hi) in enumerate(QUARTER_BOUNDS):
-                out[i, q] = float(hourly[lo:hi].sum())
+                out[i, q] = float(profile_x_price[lo:hi].sum())
         return out
 
+    m = measures
     value, has_life = _lifetime_values(
-        codes[matched], measures["claim_year"].to_numpy()[matched].astype(np.int64), measures["claim_quarter"].to_numpy()[matched].astype(np.int64),
-        measures["eul_years_exact"].to_numpy(dtype=np.float64)[matched], measures["rul_years_exact"].to_numpy(dtype=np.float64)[matched],
-        measures["shape_scale"].to_numpy(dtype=np.float64)[matched], measures["shape_scale_2nd"].to_numpy(dtype=np.float64)[matched], rqf_group, base_year, fill_unit)
-    measure_year = pd.DataFrame({"measure_id": ids[matched][has_life], "annual_value": value[has_life]})
-    return BatchedPricingResult(measure_year=measure_year, portfolio_hourly=np.zeros(HOURS_PER_YEAR), n_batches=1, elapsed_seconds=time.perf_counter() - start,
-                                batch_size=n, n_real_shape=int(matched.sum()), n_fallback_shape=0, unmatched_measure_ids=unmatched_ids)
+        route_code[has_profile], m["Used_Year"].to_numpy()[has_profile].astype(np.int64), m["Used_Quarter"].to_numpy()[has_profile].astype(np.int64),
+        m["EUL_Yrs"].to_numpy(dtype=np.float64)[has_profile], m["RUL_Yrs"].to_numpy(dtype=np.float64)[has_profile],
+        m["Priced_Quantity_1st_Baseline"].to_numpy(dtype=np.float64)[has_profile], m["Priced_Quantity_2nd_Baseline"].to_numpy(dtype=np.float64)[has_profile],
+        quarterly_discount_factor_by_route, base_year, fill_value_per_unit_quantity)
+    return HourlyPricingResult(values=pd.DataFrame({"CEInputID": ids[has_profile][has_life], "LifetimeValuePV": value[has_life]}), unpriced_ids=unpriced_ids)
 
 
 # Real calendar quarters as 0-based [start, end) MONTH slices (Jan..Dec == indices 0..11) --
@@ -411,7 +363,7 @@ def price_gas_benefit_per_measure(
     THE PER-MEASURE VERSION: the reference for `price_gas_benefit` below, which gives the same values organised by distinct route.
 
     Real gas benefit: a measure's real monthly gas-savings shape
-    (pipeline/gas_savings_profiles.py) times its real annual_net_therms,
+    (pipeline/gas_savings_profiles.py) times its annual net therms,
     times the real monthly gas avoided cost for THAT quarter's own target
     year (pipeline/gas_avoided_cost.py, extracted from the actual 2024 Gas
     ACC model's real 2024-2054 series), aggregated into real calendar
@@ -435,23 +387,24 @@ def price_gas_benefit_per_measure(
     never wired in -- see gas_avoided_cost.py's docstring). Years beyond
     2054 (or before 2024) clamp to the nearest covered year.
 
-    Measures with no real gas shape match or zero annual_net_therms
+    Measures with no real gas shape match or zero annual net therms
     (BOTH baseline phases -- see below) are skipped (no row emitted)
     rather than priced at a meaningless zero.
 
     DUAL-BASELINE / accelerated-replacement measures (2026-09-16 fix, same
-    root cause and fix as the electric side -- see engine._phased_scale()
+    root cause and fix as the electric side -- see engine._baseline_quantity_in_quarter()
     and data_loading.py's _derive_fields() docstring for the full
-    real-world evidence): annual_net_therms_1st applies for quarters within
-    the pre-existing equipment's Remaining Useful Life, annual_net_therms_2nd
-    for quarters after. rul_years_exact<=0 (not an early replacement, the
-    normal case) always uses annual_net_therms_1st for the whole EUL.
+    real-world evidence): the 1st-baseline therms apply for quarters within
+    the pre-existing equipment's Remaining Useful Life, the 2nd-baseline
+    therms for quarters after. RUL_Yrs <= 0 (not an early replacement, the
+    normal case) always uses the 1st-baseline therms for the whole EUL.
+    The therms are Priced_Quantity_1st_Baseline / _2nd_Baseline (run_poc.run_gas_benefit: AC_Net_Therms_*, with market effects).
     """
     rows: list[dict] = []
 
     for _, m in measures.iterrows():
-        therms_1st = float(m["annual_net_therms_1st"])
-        therms_2nd = float(m["annual_net_therms_2nd"])
+        therms_1st = float(m["Priced_Quantity_1st_Baseline"])
+        therms_2nd = float(m["Priced_Quantity_2nd_Baseline"])
         if therms_1st == 0 and therms_2nd == 0:
             continue
         shape = get_gas_shape(m)
@@ -459,42 +412,42 @@ def price_gas_benefit_per_measure(
             continue
 
         acc_years = get_gas_acc_years(m)
-        rul_quarters = float(m["rul_years_exact"]) * 4.0
+        rul_quarters = float(m["RUL_Yrs"]) * 4.0                            # CalcCE's rulq
 
-        claim_year = int(m["claim_year"])
-        claim_quarter = int(m["claim_quarter"])
-        rqf = 1.0 + get_discount_rate_qtr(m)
+        claim_year = int(m["Used_Year"])
+        claim_quarter = int(m["Used_Quarter"])
+        quarterly_discount_factor = 1.0 + get_discount_rate_qtr(m)          # CalcCE's Rqf
 
-        eul_quarters = float(m["eul_years_exact"]) * 4.0
-        full_quarters = int(eul_quarters)
-        frac_remainder = eul_quarters - full_quarters
-        n_billed_quarters = full_quarters + (1 if frac_remainder > 1e-9 else 0)
+        eul_quarters = float(m["EUL_Yrs"]) * 4.0                            # CalcCE's eulq
+        whole_quarters = int(eul_quarters)
+        last_quarter_fraction = eul_quarters - whole_quarters
+        n_priced_quarters = whole_quarters + (1 if last_quarter_fraction > 1e-9 else 0)
 
-        for k in range(n_billed_quarters):
-            abs_quarter = (claim_quarter - 1) + k
-            target_year = claim_year + abs_quarter // 4
-            quarter_idx = abs_quarter % 4
-            is_last = k == n_billed_quarters - 1
-            frac = frac_remainder if (is_last and frac_remainder > 1e-9) else 1.0
+        for k in range(n_priced_quarters):
+            quarters_since_claim_year = (claim_quarter - 1) + k
+            priced_year = claim_year + quarters_since_claim_year // 4
+            priced_quarter = quarters_since_claim_year % 4
+            is_last = k == n_priced_quarters - 1
+            quarter_weight = last_quarter_fraction if (is_last and last_quarter_fraction > 1e-9) else 1.0
 
-            annual_net_therms = _phased_scale(k, rul_quarters, therms_1st, therms_2nd)
-            clamped_year = min(max(target_year, min(acc_years)), max(acc_years))
-            monthly_acc = acc_years[clamped_year]
-            monthly_value = shape * annual_net_therms * monthly_acc
-            a, b = GAS_QUARTER_MONTHS[quarter_idx]
-            quarter_value = monthly_value[a:b].sum()
+            therms_this_quarter = _baseline_quantity_in_quarter(k, rul_quarters, therms_1st, therms_2nd)
+            acc_year_used = min(max(priced_year, min(acc_years)), max(acc_years))          # years outside the gas ACC use its first / last year
+            monthly_price = acc_years[acc_year_used]
+            monthly_value = shape * therms_this_quarter * monthly_price
+            first_month, end_month = GAS_QUARTER_MONTHS[priced_quarter]
+            quarter_value = monthly_value[first_month:end_month].sum()
 
-            qac = (target_year - base_year) * 4 + quarter_idx
-            discount_factor = 1.0 / (rqf ** qac)
+            quarters_from_first_year = (priced_year - base_year) * 4 + priced_quarter       # CalcCE's Qac
+            discount_factor = 1.0 / (quarterly_discount_factor ** quarters_from_first_year)
 
             rows.append({
-                "measure_id": m["measure_id"],
-                "year": target_year,
-                "quarter": quarter_idx + 1,
-                "gas_benefit": quarter_value * frac * discount_factor,
+                "CEInputID": m["CEInputID"],
+                "Year": priced_year,
+                "Quarter": priced_quarter + 1,
+                "QuarterValuePV": quarter_value * quarter_weight * discount_factor,
             })
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["CEInputID", "Year", "Quarter", "QuarterValuePV"])
 
 
 def price_gas_benefit(
@@ -510,49 +463,51 @@ def price_gas_benefit(
     and U depends only on the measure's profile, IOU, gas sector and the pricing year, so it is computed once per (route, year, quarter), and the sum over quarters once
     per distinct (route, claim year, claim quarter, EUL, RUL) (`_lifetime_values`). route_key: one hashable per measure naming its route (the callbacks are called once
     per route, on its first measure with gas savings, and must give the same answer for every measure of it); None = every measure is its own route.
-    Returns one row per priced measure (measure_id, gas_benefit = its lifetime discounted value): the per-measure version's rows summed by measure. Measures with no
-    therms or no matching profile get no row."""
+    Returns one row per priced measure (CEInputID, LifetimeValuePV = its lifetime discounted value): the per-measure version's rows summed by measure. Measures with
+    no therms or no matching profile get no row."""
     n = len(measures)
-    therms_1st = measures["annual_net_therms_1st"].to_numpy(dtype=np.float64)
-    therms_2nd = measures["annual_net_therms_2nd"].to_numpy(dtype=np.float64)
-    has_gas = (therms_1st != 0) | (therms_2nd != 0)
-    empty = pd.DataFrame({"measure_id": pd.Series(dtype=object), "gas_benefit": pd.Series(dtype=float)})
-    if not has_gas.any():
+    therms_1st = measures["Priced_Quantity_1st_Baseline"].to_numpy(dtype=np.float64)
+    therms_2nd = measures["Priced_Quantity_2nd_Baseline"].to_numpy(dtype=np.float64)
+    has_gas_savings = (therms_1st != 0) | (therms_2nd != 0)
+    empty = pd.DataFrame({"CEInputID": pd.Series(dtype=object), "LifetimeValuePV": pd.Series(dtype=float)})
+    if not has_gas_savings.any():
         return empty
-    codes = np.arange(n) if route_key is None else pd.factorize(pd.Series(list(route_key), dtype=object))[0]
-    n_groups = int(codes.max()) + 1
-    gas_pos = np.flatnonzero(has_gas)
-    groups_with_gas, first = np.unique(codes[gas_pos], return_index=True)              # each route's first measure with gas savings
-    shapes: dict[int, np.ndarray] = {}
-    acc: dict[int, dict[int, np.ndarray]] = {}
-    rqf_group = np.ones(n_groups)
-    for g, rep in zip(groups_with_gas.tolist(), measures.iloc[gas_pos[first]].to_dict("records")):
+    route_code = np.arange(n) if route_key is None else pd.factorize(pd.Series(list(route_key), dtype=object))[0]
+    n_routes = int(route_code.max()) + 1
+    gas_rows = np.flatnonzero(has_gas_savings)
+    gas_routes, gas_route_first_row = np.unique(route_code[gas_rows], return_index=True)              # each route's first measure with gas savings
+    profile_by_route: dict[int, np.ndarray] = {}
+    acc_by_route: dict[int, dict[int, np.ndarray]] = {}
+    quarterly_discount_factor_by_route = np.ones(n_routes)                     # CalcCE's Rqf
+    for g, rep in zip(gas_routes.tolist(), measures.iloc[gas_rows[gas_route_first_row]].to_dict("records")):
         shape = get_gas_shape(rep)
         if shape is None:
             continue
-        shapes[g] = shape
-        acc[g] = get_gas_acc_years(rep)
-        rqf_group[g] = 1.0 + get_discount_rate_qtr(rep)
-    priced_group = np.zeros(n_groups, dtype=bool)
-    priced_group[list(shapes)] = True
-    priced = has_gas & priced_group[codes]
+        profile_by_route[g] = shape
+        acc_by_route[g] = get_gas_acc_years(rep)
+        quarterly_discount_factor_by_route[g] = 1.0 + get_discount_rate_qtr(rep)
+    route_has_profile = np.zeros(n_routes, dtype=bool)
+    route_has_profile[list(profile_by_route)] = True
+    priced = has_gas_savings & route_has_profile[route_code]
     if not priced.any():
         return empty
-    def fill_unit(g: int, years: list[int]) -> np.ndarray:
-        shape, series = shapes[g], acc[g]
-        lo, hi = min(series), max(series)                                      # years outside the gas ACC use its first / last year
+
+    def fill_value_per_unit_quantity(g: int, years: list[int]) -> np.ndarray:
+        shape, series = profile_by_route[g], acc_by_route[g]
+        first_acc_year, last_acc_year = min(series), max(series)               # years outside the gas ACC use its first / last year
         out = np.zeros((len(years), 4))
         for i, y in enumerate(years):
-            weighted = shape * series[min(max(y, lo), hi)]
-            for q, (a, b) in enumerate(GAS_QUARTER_MONTHS):
-                out[i, q] = float(weighted[a:b].sum())
+            share_x_price = shape * series[min(max(y, first_acc_year), last_acc_year)]
+            for q, (first_month, end_month) in enumerate(GAS_QUARTER_MONTHS):
+                out[i, q] = float(share_x_price[first_month:end_month].sum())
         return out
 
+    m = measures
     value, has_life = _lifetime_values(
-        codes[priced], measures["claim_year"].to_numpy()[priced].astype(np.int64), measures["claim_quarter"].to_numpy()[priced].astype(np.int64),
-        measures["eul_years_exact"].to_numpy(dtype=np.float64)[priced], measures["rul_years_exact"].to_numpy(dtype=np.float64)[priced],
-        therms_1st[priced], therms_2nd[priced], rqf_group, base_year, fill_unit)
-    return pd.DataFrame({"measure_id": measures["measure_id"].to_numpy()[priced][has_life], "gas_benefit": value[has_life]})
+        route_code[priced], m["Used_Year"].to_numpy()[priced].astype(np.int64), m["Used_Quarter"].to_numpy()[priced].astype(np.int64),
+        m["EUL_Yrs"].to_numpy(dtype=np.float64)[priced], m["RUL_Yrs"].to_numpy(dtype=np.float64)[priced],
+        therms_1st[priced], therms_2nd[priced], quarterly_discount_factor_by_route, base_year, fill_value_per_unit_quantity)
+    return pd.DataFrame({"CEInputID": m["CEInputID"].to_numpy()[priced][has_life], "LifetimeValuePV": value[has_life]})
 
 
 def price_bill_impact_per_measure(
@@ -560,9 +515,12 @@ def price_bill_impact_per_measure(
     get_elec_rate_years: Callable[[pd.Series], dict[int, float] | None],
     get_gas_rate_years: Callable[[pd.Series], dict[int, float] | None],
     get_discount_rate_annual: Callable[[pd.Series], float],
-    settings_base_year: int = 2024,
+    run_parameters_base_year: int = 2024,
 ) -> pd.DataFrame:
     """
+    The quantities billed are Billed_kWh_1st/2nd_Baseline and Billed_Therms_1st/2nd_Baseline (filled by run_poc.run_bill_impact: net annual kWh / therms with
+    installation and realization rates, and market effects). run_parameters_base_year is RunParameters' BaseYear (CalcCE's Yr1 = claim year - BaseYear).
+
     Real ratepayer bill impact (`LifecycleBillReducElec`/`LifecycleBillIncrElec`/
     `LifecycleBillReducGas`/`LifecycleBillIncrGas` -- the RIM test's other half, alongside
     system avoided cost: `RIMCost = LifecycleBillReducElec + LifecycleBillReducGas +
@@ -595,7 +553,7 @@ def price_bill_impact_per_measure(
     what CalcCE's real SQL does) this function must reproduce, not
     "correct". Verified exactly (ratio 0.99999995) against one real
     SCE/RUL=8.33 SWWH025 measure's actual `LifecycleBillIncrElec` before trusting
-    it at scale. `_phased_scale()` isn't used here for this reason -- its
+    it at scale. `_baseline_quantity_in_quarter()` isn't used here for this reason -- its
     single-exponent design can't express two different discount bases for
     the same boundary year, so the split is done directly.
 
@@ -621,66 +579,65 @@ def price_bill_impact_per_measure(
     rows: list[dict] = []
 
     for _, m in measures.iterrows():
-        claim_year = int(m["claim_year"])
-        yr1 = claim_year - settings_base_year  # CalcCE's own Yr1 (RunParameters BaseYear: 2024 for Versions 2026 and 2027) -- see docstring's discount-asymmetry note
-        raf = 1.0 + get_discount_rate_annual(m)
-        rul_years = float(m["rul_years_exact"])
-        eul_years = float(m["eul_years_exact"])
-        full_years = int(eul_years)
-        frac_remainder = eul_years - full_years
-        n_billed_years = full_years + (1 if frac_remainder > 1e-9 else 0)
+        claim_year = int(m["Used_Year"])
+        years_from_base_year = claim_year - run_parameters_base_year  # CalcCE's own Yr1 (RunParameters BaseYear: 2024 for Versions 2026 and 2027) -- see docstring
+        annual_discount_factor = 1.0 + get_discount_rate_annual(m)               # CalcCE's Raf
+        RUL_Yrs = float(m["RUL_Yrs"])
+        EUL_Yrs = float(m["EUL_Yrs"])
+        whole_years = int(EUL_Yrs)
+        last_year_fraction = EUL_Yrs - whole_years
+        n_billed_years = whole_years + (1 if last_year_fraction > 1e-9 else 0)
         # eul1 (real CalcCE field, InputMeasurevw): RUL if 0 < RUL < EUL, else
         # the WHOLE EUL -- i.e. RUL_Yrs==0 means "1st baseline for 100% of the
-        # EUL", same convention as _phased_scale() elsewhere in this file.
-        floor_rul = int(rul_years) if rul_years > 0 else full_years
+        # EUL", same convention as _baseline_quantity_in_quarter() elsewhere in this file.
+        years_on_1st_baseline = int(RUL_Yrs) if RUL_Yrs > 0 else whole_years
         # Share of the boundary year that is still 1st baseline: the fractional part of RUL, 0 when RUL is a whole number, and 1 when RUL <= 0 (a single-baseline
-        # measure's fractional last year is entirely 1st baseline). Until 2026-09-21 this was `rul_years - floor_rul`, which for RUL = 0 is -full_years: a
+        # measure's fractional last year is entirely 1st baseline). Until 2026-09-21 this was `RUL - floor(RUL)` also for RUL = 0, which is -whole_years: a
         # single-baseline measure with a fractional EUL (e.g. 4.97 years) booked a NEGATIVE last year and priced at ~0.70x CET (BillReduc/RIM).
-        frac_1st_boundary = (rul_years - floor_rul) if rul_years > 0 else 1.0
+        boundary_year_share_1st = (RUL_Yrs - years_on_1st_baseline) if RUL_Yrs > 0 else 1.0
 
-        def pv_sum(scale_1st: float, scale_2nd: float, rate_years: dict[int, float] | None) -> float | None:
-            if rate_years is None:
+        def bill_pv(quantity_1st: float, quantity_2nd: float, retail_rates: dict[int, float] | None) -> float | None:
+            if retail_rates is None:
                 return None
             total = 0.0
             # RE1: pure 1st-baseline years, discounted by k = Qy - Yr1
-            for k in range(min(floor_rul, n_billed_years)):
-                rate = rate_years.get(claim_year + k)
+            for k in range(min(years_on_1st_baseline, n_billed_years)):
+                rate = retail_rates.get(claim_year + k)
                 if rate is not None:
-                    total += scale_1st * rate / (raf ** k)
+                    total += quantity_1st * rate / (annual_discount_factor ** k)
             # boundary year + RE2: 2nd-baseline (and the boundary's 1st-baseline
-            # remainder), discounted by Qy = k + yr1 instead -- see docstring
-            for k in range(floor_rul, n_billed_years):
-                rate = rate_years.get(claim_year + k)
+            # remainder), discounted by Qy = k + Yr1 instead -- see docstring
+            for k in range(years_on_1st_baseline, n_billed_years):
+                rate = retail_rates.get(claim_year + k)
                 if rate is None:
                     continue
                 is_last = k == n_billed_years - 1
-                frac = frac_remainder if (is_last and frac_remainder > 1e-9) else 1.0
-                value = frac_1st_boundary * scale_1st + (1.0 - frac_1st_boundary) * scale_2nd if k == floor_rul else scale_2nd
-                total += frac * value * rate / (raf ** (k + yr1))
+                year_weight = last_year_fraction if (is_last and last_year_fraction > 1e-9) else 1.0
+                quantity_this_year = (boundary_year_share_1st * quantity_1st + (1.0 - boundary_year_share_1st) * quantity_2nd
+                                      if k == years_on_1st_baseline else quantity_2nd)
+                total += year_weight * quantity_this_year * rate / (annual_discount_factor ** (k + years_from_base_year))
             return total
 
-        # CalcCE's RIM bill impact multiplies by IR x RR (electric) too; annual_net_therms already carries IRThm x RRThm.
-        irr_kwh = float(m["ir_kwh"]) * float(m["rr_kwh"])
-        elec_pv = pv_sum(float(m["annual_net_kwh_1st"]) * irr_kwh, float(m["annual_net_kwh_2nd"]) * irr_kwh, get_elec_rate_years(m))
-        gas_pv = pv_sum(float(m["annual_net_therms_1st"]), float(m["annual_net_therms_2nd"]), get_gas_rate_years(m))
+        elec_bill_pv = bill_pv(float(m["Billed_kWh_1st_Baseline"]), float(m["Billed_kWh_2nd_Baseline"]), get_elec_rate_years(m))
+        gas_bill_pv = bill_pv(float(m["Billed_Therms_1st_Baseline"]), float(m["Billed_Therms_2nd_Baseline"]), get_gas_rate_years(m))
 
         # Reduc/Incr split (CalcCE 15880-15992): a fuel-substitution measure books a negative value as an INCREASE (Incr, positive);
         # every other measure keeps its signed value in Reduc and has Incr = 0 (`ISNULL(ft.FuelType,0)='0'` branch).
-        is_fs = bool(m.get("is_fuel_sub", True))  # default True = the original (fuel-sub-only) behavior for frames without the flag
+        Fuel_Sub_Flag = bool(m.get("Fuel_Sub_Flag", True))  # default True = the original (fuel-sub-only) behavior for frames without the flag
 
         def split(pv):
             if pv is None:
                 return 0.0, 0.0
-            return (max(pv, 0.0), max(-pv, 0.0)) if is_fs else (pv, 0.0)
+            return (max(pv, 0.0), max(-pv, 0.0)) if Fuel_Sub_Flag else (pv, 0.0)
 
-        reduc_e, incr_e = split(elec_pv)
-        reduc_g, incr_g = split(gas_pv)
+        LifecycleBillReducElec, LifecycleBillIncrElec = split(elec_bill_pv)
+        LifecycleBillReducGas, LifecycleBillIncrGas = split(gas_bill_pv)
         rows.append({
-            "measure_id": m["measure_id"],
-            "LifecycleBillReducElec": reduc_e,
-            "LifecycleBillIncrElec": incr_e,
-            "LifecycleBillReducGas": reduc_g,
-            "LifecycleBillIncrGas": incr_g,
+            "CEInputID": m["CEInputID"],
+            "LifecycleBillReducElec": LifecycleBillReducElec,
+            "LifecycleBillIncrElec": LifecycleBillIncrElec,
+            "LifecycleBillReducGas": LifecycleBillReducGas,
+            "LifecycleBillIncrGas": LifecycleBillIncrGas,
         })
 
     return pd.DataFrame(rows)
@@ -715,8 +672,8 @@ def price_participant_cost_per_measure(
     baseline year-loop here at all, just a single PV division.
 
     DUAL-BASELINE (RUL>0) measure cost: `GrossMeasCost` counts the FULL
-    1st-baseline measure cost (`unit_meas_cost_1st`) when RUL_Yrs==0, but
-    only the 2nd-baseline cost (`unit_meas_cost_2nd`) when RUL_Yrs>0 (the
+    1st-baseline measure cost (`UnitMeaCost1stBaseline`) when RUL_Yrs==0, but
+    only the 2nd-baseline cost (`UnitMeaCost2ndBaseline`) when RUL_Yrs>0 (the
     real SQL's `UnitMeasureGrossCost - (UnitMeasureGrossCost -
     MeasIncrCost)` reduces to exactly `MeasIncrCost` when RUL>0) -- i.e.
     an early-replacement measure's cost-effectiveness only counts the
@@ -747,73 +704,73 @@ def price_participant_cost_per_measure(
     rows: list[dict] = []
 
     for _, m in measures.iterrows():
-        qty = float(m["num_units"])
-        rqf = 1.0 + get_discount_rate_qtr(m)
-        qm = (int(m["claim_year"]) - base_year) * 4 + (int(m["claim_quarter"]) - 1)
-        pv_factor = rqf ** qm
+        NumUnits = float(m["NumUnits"])
+        quarterly_discount_factor = 1.0 + get_discount_rate_qtr(m)                         # CalcCE's Rqf
+        quarters_from_first_year = (int(m["Used_Year"]) - base_year) * 4 + (int(m["Used_Quarter"]) - 1)    # CalcCE's Qm
+        participant_discount_factor = quarterly_discount_factor ** quarters_from_first_year  # Rqf ^ Qm: brings a claim-quarter amount back to the First Year
 
-        incentive_to_others = qty * float(m["unit_incentive_to_others"])
-        di_labor = qty * float(m["unit_di_labor"])
-        di_material = qty * float(m["unit_di_material"])
-        end_user_rebate = qty * float(m["unit_end_user_rebate"])
-        rebates_and_incents = incentive_to_others + di_labor + di_material + end_user_rebate
-        rebates_and_incents_pv = rebates_and_incents / pv_factor
+        IncentiveToOthers = NumUnits * float(m["UnitIncentiveToOthers"])
+        DILaborCost = NumUnits * float(m["UnitDirectInstallLab"])
+        DIMaterialCost = NumUnits * float(m["UnitDirectInstallMat"])
+        EndUserRebate = NumUnits * float(m["UnitEndUserRebate"])
+        RebatesandIncents = IncentiveToOthers + DILaborCost + DIMaterialCost + EndUserRebate
+        RebatesandIncentsPV = RebatesandIncents / participant_discount_factor
 
-        incents_and_di = incentive_to_others + di_labor + di_material
-        rebates = end_user_rebate
-        incents_and_di_pv = incents_and_di / pv_factor
-        rebates_pv = rebates / pv_factor
+        incentives_and_di = IncentiveToOthers + DILaborCost + DIMaterialCost          # the incentives other than end-user rebates
+        incentives_and_di_pv = incentives_and_di / participant_discount_factor
+        EndUserRebatePV = EndUserRebate / participant_discount_factor
 
-        unit_gross_cost = float(m["unit_meas_cost_1st"])
-        meas_incr_cost = float(m["unit_meas_cost_2nd"])
-        rul_years = float(m["rul_years_exact"])
-        gross_meas_cost = qty * (unit_gross_cost - (unit_gross_cost - meas_incr_cost if rul_years > 0 else 0.0))
-        if rul_years > 0:
-            inflation_factor = ((1.0 + float(m["meas_inflation"]) / 4.0) / rqf) ** (rul_years * 4.0)
-            pv_subtraction = (unit_gross_cost - meas_incr_cost) * inflation_factor
+        UnitMeaCost1stBaseline = float(m["UnitMeaCost1stBaseline"])
+        UnitMeaCost2ndBaseline = float(m["UnitMeaCost2ndBaseline"])
+        RUL_Yrs = float(m["RUL_Yrs"])
+        GrossMeasureCost = NumUnits * (UnitMeaCost2ndBaseline if RUL_Yrs > 0 else UnitMeaCost1stBaseline)
+        if RUL_Yrs > 0:
+            # the 1st-minus-2nd-baseline cost difference carried to the end of the RUL (at MeasInflation) and discounted back to the claim quarter
+            inflation_discount_over_rul = ((1.0 + float(m["MeasInflation"]) / 4.0) / quarterly_discount_factor) ** (RUL_Yrs * 4.0)
+            deferred_cost_difference_pv = (UnitMeaCost1stBaseline - UnitMeaCost2ndBaseline) * inflation_discount_over_rul
         else:
-            pv_subtraction = 0.0
-        gross_meas_cost_pv = qty * (unit_gross_cost - pv_subtraction) / pv_factor
+            deferred_cost_difference_pv = 0.0
+        GrossMeasCostPV = NumUnits * (UnitMeaCost1stBaseline - deferred_cost_difference_pv) / participant_discount_factor
 
-        excess_incentives = max(incents_and_di - gross_meas_cost, 0.0) if incents_and_di > gross_meas_cost else 0.0
-        excess_incentives_pv = max(incents_and_di_pv - gross_meas_cost_pv, 0.0) if incents_and_di_pv > gross_meas_cost_pv else 0.0
+        ExcessIncentives = max(incentives_and_di - GrossMeasureCost, 0.0) if incentives_and_di > GrossMeasureCost else 0.0
+        ExcessIncentivesPV = max(incentives_and_di_pv - GrossMeasCostPV, 0.0) if incentives_and_di_pv > GrossMeasCostPV else 0.0
 
-        mark_effect_plus_excess_inc = market_effects_cost * (gross_meas_cost + excess_incentives_pv)
-        mark_effect_plus_excess_inc_pv = market_effects_cost * (gross_meas_cost_pv + excess_incentives_pv)
+        MarkEffectPlusExcessInc = market_effects_cost * (GrossMeasureCost + ExcessIncentivesPV)
+        MarkEffectPlusExcessIncPV = market_effects_cost * (GrossMeasCostPV + ExcessIncentivesPV)
 
-        gross_participant_cost = gross_meas_cost - (incents_and_di + rebates)
-        gross_participant_cost_pv = gross_meas_cost_pv - (incents_and_di_pv + rebates_pv)
-        gross_participant_cost_adjusted = gross_participant_cost + excess_incentives + mark_effect_plus_excess_inc
-        gross_participant_cost_adjusted_pv = gross_participant_cost_pv + excess_incentives_pv + mark_effect_plus_excess_inc_pv
+        GrossParticipantCost = GrossMeasureCost - (incentives_and_di + EndUserRebate)
+        GrossParticipantCostPV = GrossMeasCostPV - (incentives_and_di_pv + EndUserRebatePV)
+        GrossParticipantCostAdjusted = GrossParticipantCost + ExcessIncentives + MarkEffectPlusExcessInc
+        GrossParticipantCostAdjustedPV = GrossParticipantCostPV + ExcessIncentivesPV + MarkEffectPlusExcessIncPV
 
-        ntgr_cost = float(m["ntgr_cost"])
-        net_participant_cost = ntgr_cost * (gross_participant_cost + excess_incentives)
-        net_participant_cost_pv = ntgr_cost * (gross_participant_cost_pv + excess_incentives_pv)
-        net_participant_cost_adjusted = net_participant_cost + mark_effect_plus_excess_inc
-        net_participant_cost_adjusted_pv = net_participant_cost_pv + mark_effect_plus_excess_inc_pv
+        NTGRCost = float(m["NTGRCost"])
+        NetParticipantCost = NTGRCost * (GrossParticipantCost + ExcessIncentives)
+        NetParticipantCostPV = NTGRCost * (GrossParticipantCostPV + ExcessIncentivesPV)
+        NetParticipantCostAdjusted = NetParticipantCost + MarkEffectPlusExcessInc
+        NetParticipantCostAdjustedPV = NetParticipantCostPV + MarkEffectPlusExcessIncPV
 
         rows.append({
-            "measure_id": m["measure_id"],
-            "IncentiveToOthers": incentive_to_others,
-            "DILaborCost": di_labor,
-            "DIMaterialCost": di_material,
-            "EndUserRebate": end_user_rebate,
-            "RebatesandIncents": rebates_and_incents,
-            "RebatesandIncentsPV": rebates_and_incents_pv,
-            "GrossMeasureCost": gross_meas_cost,
-            "GrossMeasCostPV": gross_meas_cost_pv,
-            "ExcessIncentives": excess_incentives,
-            "ExcessIncentivesPV": excess_incentives_pv,
-            "MarkEffectPlusExcessInc": mark_effect_plus_excess_inc,
-            "MarkEffectPlusExcessIncPV": mark_effect_plus_excess_inc_pv,
-            "GrossParticipantCost": gross_participant_cost,
-            "GrossParticipantCostPV": gross_participant_cost_pv,
-            "GrossParticipantCostAdjusted": gross_participant_cost_adjusted,
-            "GrossParticipantCostAdjustedPV": gross_participant_cost_adjusted_pv,
-            "NetParticipantCost": net_participant_cost,
-            "NetParticipantCostPV": net_participant_cost_pv,
-            "NetParticipantCostAdjusted": net_participant_cost_adjusted,
-            "NetParticipantCostAdjustedPV": net_participant_cost_adjusted_pv,
+            "CEInputID": m["CEInputID"],
+            "IncentiveToOthers": IncentiveToOthers,
+            "DILaborCost": DILaborCost,
+            "DIMaterialCost": DIMaterialCost,
+            "EndUserRebate": EndUserRebate,
+            "RebatesandIncents": RebatesandIncents,
+            "RebatesandIncentsPV": RebatesandIncentsPV,
+            "GrossMeasureCost": GrossMeasureCost,
+            "GrossMeasCostPV": GrossMeasCostPV,
+            "ExcessIncentives": ExcessIncentives,
+            "ExcessIncentivesPV": ExcessIncentivesPV,
+            "MarkEffectPlusExcessInc": MarkEffectPlusExcessInc,
+            "MarkEffectPlusExcessIncPV": MarkEffectPlusExcessIncPV,
+            "GrossParticipantCost": GrossParticipantCost,
+            "GrossParticipantCostPV": GrossParticipantCostPV,
+            "GrossParticipantCostAdjusted": GrossParticipantCostAdjusted,
+            "GrossParticipantCostAdjustedPV": GrossParticipantCostAdjustedPV,
+            "NetParticipantCost": NetParticipantCost,
+            "NetParticipantCostPV": NetParticipantCostPV,
+            "NetParticipantCostAdjusted": NetParticipantCostAdjusted,
+            "NetParticipantCostAdjustedPV": NetParticipantCostAdjustedPV,
         })
 
     return pd.DataFrame(rows)
@@ -851,26 +808,19 @@ def price_other_ben_cost_per_measure(
     """
     rows: list[dict] = []
     for _, m in measures.iterrows():
-        qty = float(m["num_units"])
-        ntgr_kwh = float(m["NTGRkWh"])
-        other_ben = qty * (ntgr_kwh + market_effects_bens) * (
-            float(m["unit_gas_infra_bens"]) + float(m["unit_refrig_bens"]) + float(m["unit_misc_bens"])
-        )
-        other_cost = qty * (ntgr_kwh + market_effects_cost) * (
-            float(m["unit_refrig_costs"]) + float(m["unit_misc_costs"])
-        )
-        tax_credits = qty * (ntgr_kwh + market_effects_bens) * float(m["unit_tax_credits"])
-        gross_ben = qty * (float(m["unit_gas_infra_bens"]) + float(m["unit_refrig_bens"]) + float(m["unit_misc_bens"]))
-        gross_cost = qty * (float(m["unit_refrig_costs"]) + float(m["unit_misc_costs"]))
+        NumUnits = float(m["NumUnits"])
+        NTGRkWh = float(m["NTGRkWh"])
+        unit_other_bens = float(m["UnitGasInfraBens"]) + float(m["UnitRefrigBens"]) + float(m["UnitMiscBens"])
+        unit_other_costs = float(m["UnitRefrigCosts"]) + float(m["UnitMiscCosts"])
         rows.append({
-            "measure_id": m["measure_id"],
-            "OtherBen": other_ben,
-            "OtherCost": other_cost,
-            "TaxCredits": tax_credits,
+            "CEInputID": m["CEInputID"],
+            "OtherBen": NumUnits * (NTGRkWh + market_effects_bens) * unit_other_bens,
+            "OtherCost": NumUnits * (NTGRkWh + market_effects_cost) * unit_other_costs,
+            "TaxCredits": NumUnits * (NTGRkWh + market_effects_bens) * float(m["UnitTaxCredits"]),
             # Gross = same formulas with no NTG / market-effects factor (CalcCE lines 13862, 13936, 14417)
-            "OtherBenGross": gross_ben,
-            "OtherCostGross": gross_cost,
-            "TaxCreditsGross": qty * float(m["unit_tax_credits"]),
+            "OtherBenGross": NumUnits * unit_other_bens,
+            "OtherCostGross": NumUnits * unit_other_costs,
+            "TaxCreditsGross": NumUnits * float(m["UnitTaxCredits"]),
         })
     return pd.DataFrame(rows)
 
@@ -880,7 +830,8 @@ def price_other_ben_cost_per_measure(
 # few hundred thousand rows through DataFrame.iterrows is what made these three the slowest steps of a large run (about 55% of the pricing time at 100,000
 # records); here only the bill impact loops, over the years of a life (at most a few dozen), not over measures.
 
-def _col(m: pd.DataFrame, name: str, default: float = 0.0) -> np.ndarray:
+def _column_or_default(m: pd.DataFrame, name: str, default: float = 0.0) -> np.ndarray:
+    """A column as a float array, or `default` for every row when the frame has no such column."""
     return m[name].astype(float).to_numpy() if name in m.columns else np.full(len(m), default)
 
 
@@ -904,29 +855,30 @@ def price_bill_impact(
     get_elec_rate_years: Callable[[pd.Series], dict[int, float] | None],
     get_gas_rate_years: Callable[[pd.Series], dict[int, float] | None],
     get_discount_rate_annual: Callable[[pd.Series], float],
-    settings_base_year: int = 2024,
+    run_parameters_base_year: int = 2024,
 ) -> pd.DataFrame:
-    """price_bill_impact_per_measure on arrays. The callbacks are called once per distinct (PA, target_sector), (PA, gas_sector) and PA (the fields they read
-    in run_poc.run_bill_impact). Years with no rate count 0, a fuel with no rate table gives 0, exactly as in the reference."""
+    """price_bill_impact_per_measure on arrays. The callbacks are called once per distinct (IOU_AC_Territory, AC_Elec_Target_Sector), (IOU_AC_Territory,
+    AC_Gas_Target_Sector) and IOU_AC_Territory (the fields they read in run_poc.run_bill_impact). Years with no rate count 0, a fuel with no rate table gives 0,
+    exactly as in the reference."""
     m = measures
     n_rows = len(m)
     if n_rows == 0:
-        return pd.DataFrame(columns=["measure_id", "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas"])
-    claim_year = m["claim_year"].astype(int).to_numpy()
-    yr1 = claim_year - settings_base_year
-    raf = 1.0 + np.asarray(_by_key(m, ["PA"], get_discount_rate_annual), dtype=float)
-    rul = _col(m, "rul_years_exact")
-    eul = _col(m, "eul_years_exact")
-    full = np.floor(eul).astype(int)
-    frac_rem = eul - full
-    n_years = full + (frac_rem > 1e-9).astype(int)
-    floor_rul = np.where(rul > 0, np.floor(rul), full).astype(int)
-    f1 = np.where(rul > 0, rul - floor_rul, 1.0)
-    k_max = int(n_years.max()) if n_rows else 0
+        return pd.DataFrame(columns=["CEInputID", "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas"])
+    claim_year = m["Used_Year"].astype(int).to_numpy()
+    years_from_base_year = claim_year - run_parameters_base_year                                        # CalcCE's Yr1
+    annual_discount_factor = 1.0 + np.asarray(_by_key(m, ["IOU_AC_Territory"], get_discount_rate_annual), dtype=float)   # CalcCE's Raf
+    RUL_Yrs = _column_or_default(m, "RUL_Yrs")
+    EUL_Yrs = _column_or_default(m, "EUL_Yrs")
+    whole_years = np.floor(EUL_Yrs).astype(int)
+    last_year_fraction = EUL_Yrs - whole_years
+    n_billed_years = whole_years + (last_year_fraction > 1e-9).astype(int)
+    years_on_1st_baseline = np.where(RUL_Yrs > 0, np.floor(RUL_Yrs), whole_years).astype(int)
+    boundary_year_share_1st = np.where(RUL_Yrs > 0, RUL_Yrs - years_on_1st_baseline, 1.0)
+    max_billed_years = int(n_billed_years.max()) if n_rows else 0
 
     def rate_matrix(tables: list) -> tuple[np.ndarray, np.ndarray]:
         """(rates[i, k] for the year claim_year[i] + k, 0 where missing; has_table[i])"""
-        r = np.zeros((n_rows, max(k_max, 1)))
+        r = np.zeros((n_rows, max(max_billed_years, 1)))
         has = np.array([t is not None for t in tables])
         cache: dict = {}
         for i, (t, y0) in enumerate(zip(tables, claim_year)):
@@ -938,30 +890,33 @@ def price_bill_impact(
             r[i] = cache[key]
         return r, has
 
-    def pv_sum(s1: np.ndarray, s2: np.ndarray, rates: np.ndarray) -> np.ndarray:
+    def bill_pv(quantity_1st: np.ndarray, quantity_2nd: np.ndarray, retail_rates: np.ndarray) -> np.ndarray:
         total = np.zeros(n_rows)
-        for k in range(k_max):
-            rate = rates[:, k]
-            first = k < np.minimum(floor_rul, n_years)                                   # RE1: discounted by k
-            total += np.where(first, s1 * rate / raf ** k, 0.0)
-            after = (k >= floor_rul) & (k < n_years)                                      # boundary year and RE2: discounted by k + Yr1 (CalcCE's Qy)
-            frac = np.where((k == n_years - 1) & (frac_rem > 1e-9), frac_rem, 1.0)
-            value = np.where(k == floor_rul, f1 * s1 + (1.0 - f1) * s2, s2)
-            total += np.where(after, frac * value * rate / raf ** (k + yr1), 0.0)
+        for k in range(max_billed_years):
+            rate = retail_rates[:, k]
+            in_1st_baseline_years = k < np.minimum(years_on_1st_baseline, n_billed_years)                 # RE1: discounted by k
+            total += np.where(in_1st_baseline_years, quantity_1st * rate / annual_discount_factor ** k, 0.0)
+            in_boundary_or_2nd_years = (k >= years_on_1st_baseline) & (k < n_billed_years)                 # boundary year and RE2: by k + Yr1 (CalcCE's Qy)
+            year_weight = np.where((k == n_billed_years - 1) & (last_year_fraction > 1e-9), last_year_fraction, 1.0)
+            quantity_this_year = np.where(k == years_on_1st_baseline,
+                                          boundary_year_share_1st * quantity_1st + (1.0 - boundary_year_share_1st) * quantity_2nd, quantity_2nd)
+            total += np.where(in_boundary_or_2nd_years,
+                              year_weight * quantity_this_year * rate / annual_discount_factor ** (k + years_from_base_year), 0.0)
         return total
 
-    irr = _col(m, "ir_kwh", 1.0) * _col(m, "rr_kwh", 1.0)
-    rates_e, has_e = rate_matrix(_by_key(m, ["PA", "target_sector"], get_elec_rate_years))
-    rates_g, has_g = rate_matrix(_by_key(m, ["PA", "gas_sector"], get_gas_rate_years))
-    pv_e = np.where(has_e, pv_sum(_col(m, "annual_net_kwh_1st") * irr, _col(m, "annual_net_kwh_2nd") * irr, rates_e), 0.0)
-    pv_g = np.where(has_g, pv_sum(_col(m, "annual_net_therms_1st"), _col(m, "annual_net_therms_2nd"), rates_g), 0.0)
-    fs = m["is_fuel_sub"].fillna(True).astype(bool).to_numpy() if "is_fuel_sub" in m.columns else np.ones(n_rows, dtype=bool)
+    elec_rates, has_elec_rates = rate_matrix(_by_key(m, ["IOU_AC_Territory", "AC_Elec_Target_Sector"], get_elec_rate_years))
+    gas_rates, has_gas_rates = rate_matrix(_by_key(m, ["IOU_AC_Territory", "AC_Gas_Target_Sector"], get_gas_rate_years))
+    elec_bill_pv = np.where(has_elec_rates, bill_pv(_column_or_default(m, "Billed_kWh_1st_Baseline"), _column_or_default(m, "Billed_kWh_2nd_Baseline"),
+                                                    elec_rates), 0.0)
+    gas_bill_pv = np.where(has_gas_rates, bill_pv(_column_or_default(m, "Billed_Therms_1st_Baseline"), _column_or_default(m, "Billed_Therms_2nd_Baseline"),
+                                                  gas_rates), 0.0)
+    Fuel_Sub_Flag = (m["Fuel_Sub_Flag"].fillna(True).astype(bool).to_numpy() if "Fuel_Sub_Flag" in m.columns else np.ones(n_rows, dtype=bool))
     return pd.DataFrame({
-        "measure_id": m["measure_id"].to_numpy(),
-        "LifecycleBillReducElec": np.where(fs, np.maximum(pv_e, 0.0), pv_e),
-        "LifecycleBillIncrElec": np.where(fs, np.maximum(-pv_e, 0.0), 0.0),
-        "LifecycleBillReducGas": np.where(fs, np.maximum(pv_g, 0.0), pv_g),
-        "LifecycleBillIncrGas": np.where(fs, np.maximum(-pv_g, 0.0), 0.0),
+        "CEInputID": m["CEInputID"].to_numpy(),
+        "LifecycleBillReducElec": np.where(Fuel_Sub_Flag, np.maximum(elec_bill_pv, 0.0), elec_bill_pv),
+        "LifecycleBillIncrElec": np.where(Fuel_Sub_Flag, np.maximum(-elec_bill_pv, 0.0), 0.0),
+        "LifecycleBillReducGas": np.where(Fuel_Sub_Flag, np.maximum(gas_bill_pv, 0.0), gas_bill_pv),
+        "LifecycleBillIncrGas": np.where(Fuel_Sub_Flag, np.maximum(-gas_bill_pv, 0.0), 0.0),
     })
 
 
@@ -975,36 +930,41 @@ def price_participant_cost(
     m = measures
     if m.empty:
         return price_participant_cost_per_measure(m, get_discount_rate_qtr, base_year, market_effects_cost)
-    qty = _col(m, "num_units")
-    rqf = 1.0 + np.asarray(_by_key(m, ["PA"], get_discount_rate_qtr), dtype=float)
-    qm = (m["claim_year"].astype(int).to_numpy() - base_year) * 4 + (m["claim_quarter"].astype(int).to_numpy() - 1)
-    pvf = rqf ** qm
-    ito, lab, mat, reb = (qty * _col(m, c) for c in ("unit_incentive_to_others", "unit_di_labor", "unit_di_material", "unit_end_user_rebate"))
-    incents_di = ito + lab + mat
-    unit_gross, incr = _col(m, "unit_meas_cost_1st"), _col(m, "unit_meas_cost_2nd")
-    rul = _col(m, "rul_years_exact")
-    gross_meas = qty * np.where(rul > 0, incr, unit_gross)
-    pv_sub = np.where(rul > 0, (unit_gross - incr) * ((1.0 + _col(m, "meas_inflation") / 4.0) / rqf) ** (rul * 4.0), 0.0)
-    gross_meas_pv = qty * (unit_gross - pv_sub) / pvf
-    excess = np.maximum(incents_di - gross_meas, 0.0)
-    excess_pv = np.maximum(incents_di / pvf - gross_meas_pv, 0.0)
-    mark = market_effects_cost * (gross_meas + excess_pv)
-    mark_pv = market_effects_cost * (gross_meas_pv + excess_pv)
-    gross = gross_meas - (incents_di + reb)
-    gross_pv = gross_meas_pv - (incents_di + reb) / pvf
-    ntgr_cost = _col(m, "ntgr_cost")
-    net, net_pv = ntgr_cost * (gross + excess), ntgr_cost * (gross_pv + excess_pv)
+    NumUnits = _column_or_default(m, "NumUnits")
+    quarterly_discount_factor = 1.0 + np.asarray(_by_key(m, ["IOU_AC_Territory"], get_discount_rate_qtr), dtype=float)          # CalcCE's Rqf
+    quarters_from_first_year = (m["Used_Year"].astype(int).to_numpy() - base_year) * 4 + (m["Used_Quarter"].astype(int).to_numpy() - 1)   # CalcCE's Qm
+    participant_discount_factor = quarterly_discount_factor ** quarters_from_first_year                  # Rqf ^ Qm
+    IncentiveToOthers, DILaborCost, DIMaterialCost, EndUserRebate = (
+        NumUnits * _column_or_default(m, c) for c in ("UnitIncentiveToOthers", "UnitDirectInstallLab", "UnitDirectInstallMat", "UnitEndUserRebate"))
+    incentives_and_di = IncentiveToOthers + DILaborCost + DIMaterialCost                                 # the incentives other than end-user rebates
+    UnitMeaCost1stBaseline, UnitMeaCost2ndBaseline = _column_or_default(m, "UnitMeaCost1stBaseline"), _column_or_default(m, "UnitMeaCost2ndBaseline")
+    RUL_Yrs = _column_or_default(m, "RUL_Yrs")
+    GrossMeasureCost = NumUnits * np.where(RUL_Yrs > 0, UnitMeaCost2ndBaseline, UnitMeaCost1stBaseline)
+    # early replacement: the 1st-minus-2nd-baseline cost difference carried to the end of the RUL (at MeasInflation) and discounted back to the claim quarter
+    deferred_cost_difference_pv = np.where(RUL_Yrs > 0, (UnitMeaCost1stBaseline - UnitMeaCost2ndBaseline)
+                                           * ((1.0 + _column_or_default(m, "MeasInflation") / 4.0) / quarterly_discount_factor) ** (RUL_Yrs * 4.0), 0.0)
+    GrossMeasCostPV = NumUnits * (UnitMeaCost1stBaseline - deferred_cost_difference_pv) / participant_discount_factor
+    ExcessIncentives = np.maximum(incentives_and_di - GrossMeasureCost, 0.0)
+    ExcessIncentivesPV = np.maximum(incentives_and_di / participant_discount_factor - GrossMeasCostPV, 0.0)
+    MarkEffectPlusExcessInc = market_effects_cost * (GrossMeasureCost + ExcessIncentivesPV)
+    MarkEffectPlusExcessIncPV = market_effects_cost * (GrossMeasCostPV + ExcessIncentivesPV)
+    RebatesandIncents = incentives_and_di + EndUserRebate
+    GrossParticipantCost = GrossMeasureCost - RebatesandIncents
+    GrossParticipantCostPV = GrossMeasCostPV - RebatesandIncents / participant_discount_factor
+    NTGRCost = _column_or_default(m, "NTGRCost")
+    NetParticipantCost, NetParticipantCostPV = NTGRCost * (GrossParticipantCost + ExcessIncentives), NTGRCost * (GrossParticipantCostPV + ExcessIncentivesPV)
     return pd.DataFrame({
-        "measure_id": m["measure_id"].to_numpy(),
-        "IncentiveToOthers": ito, "DILaborCost": lab, "DIMaterialCost": mat, "EndUserRebate": reb,
-        "RebatesandIncents": incents_di + reb, "RebatesandIncentsPV": (incents_di + reb) / pvf,
-        "GrossMeasureCost": gross_meas, "GrossMeasCostPV": gross_meas_pv,
-        "ExcessIncentives": excess, "ExcessIncentivesPV": excess_pv,
-        "MarkEffectPlusExcessInc": mark, "MarkEffectPlusExcessIncPV": mark_pv,
-        "GrossParticipantCost": gross, "GrossParticipantCostPV": gross_pv,
-        "GrossParticipantCostAdjusted": gross + excess + mark, "GrossParticipantCostAdjustedPV": gross_pv + excess_pv + mark_pv,
-        "NetParticipantCost": net, "NetParticipantCostPV": net_pv,
-        "NetParticipantCostAdjusted": net + mark, "NetParticipantCostAdjustedPV": net_pv + mark_pv,
+        "CEInputID": m["CEInputID"].to_numpy(),
+        "IncentiveToOthers": IncentiveToOthers, "DILaborCost": DILaborCost, "DIMaterialCost": DIMaterialCost, "EndUserRebate": EndUserRebate,
+        "RebatesandIncents": RebatesandIncents, "RebatesandIncentsPV": RebatesandIncents / participant_discount_factor,
+        "GrossMeasureCost": GrossMeasureCost, "GrossMeasCostPV": GrossMeasCostPV,
+        "ExcessIncentives": ExcessIncentives, "ExcessIncentivesPV": ExcessIncentivesPV,
+        "MarkEffectPlusExcessInc": MarkEffectPlusExcessInc, "MarkEffectPlusExcessIncPV": MarkEffectPlusExcessIncPV,
+        "GrossParticipantCost": GrossParticipantCost, "GrossParticipantCostPV": GrossParticipantCostPV,
+        "GrossParticipantCostAdjusted": GrossParticipantCost + ExcessIncentives + MarkEffectPlusExcessInc,
+        "GrossParticipantCostAdjustedPV": GrossParticipantCostPV + ExcessIncentivesPV + MarkEffectPlusExcessIncPV,
+        "NetParticipantCost": NetParticipantCost, "NetParticipantCostPV": NetParticipantCostPV,
+        "NetParticipantCostAdjusted": NetParticipantCost + MarkEffectPlusExcessInc, "NetParticipantCostAdjustedPV": NetParticipantCostPV + MarkEffectPlusExcessIncPV,
     })
 
 
@@ -1015,16 +975,16 @@ def price_other_ben_cost(
 ) -> pd.DataFrame:
     """price_other_ben_cost_per_measure on arrays."""
     m = measures
-    qty, ntg = _col(m, "num_units"), _col(m, "NTGRkWh")
-    bens = _col(m, "unit_gas_infra_bens") + _col(m, "unit_refrig_bens") + _col(m, "unit_misc_bens")
-    costs = _col(m, "unit_refrig_costs") + _col(m, "unit_misc_costs")
-    tax = _col(m, "unit_tax_credits")
+    NumUnits, NTGRkWh = _column_or_default(m, "NumUnits"), _column_or_default(m, "NTGRkWh")
+    unit_other_bens = _column_or_default(m, "UnitGasInfraBens") + _column_or_default(m, "UnitRefrigBens") + _column_or_default(m, "UnitMiscBens")
+    unit_other_costs = _column_or_default(m, "UnitRefrigCosts") + _column_or_default(m, "UnitMiscCosts")
+    UnitTaxCredits = _column_or_default(m, "UnitTaxCredits")
     return pd.DataFrame({
-        "measure_id": m["measure_id"].to_numpy(),
-        "OtherBen": qty * (ntg + market_effects_bens) * bens,
-        "OtherCost": qty * (ntg + market_effects_cost) * costs,
-        "TaxCredits": qty * (ntg + market_effects_bens) * tax,
-        "OtherBenGross": qty * bens,
-        "OtherCostGross": qty * costs,
-        "TaxCreditsGross": qty * tax,
+        "CEInputID": m["CEInputID"].to_numpy(),
+        "OtherBen": NumUnits * (NTGRkWh + market_effects_bens) * unit_other_bens,
+        "OtherCost": NumUnits * (NTGRkWh + market_effects_cost) * unit_other_costs,
+        "TaxCredits": NumUnits * (NTGRkWh + market_effects_bens) * UnitTaxCredits,
+        "OtherBenGross": NumUnits * unit_other_bens,
+        "OtherCostGross": NumUnits * unit_other_costs,
+        "TaxCreditsGross": NumUnits * UnitTaxCredits,
     })

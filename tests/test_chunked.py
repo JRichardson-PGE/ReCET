@@ -8,7 +8,7 @@ import pytest
 from recet import outputs, preflight, templates
 from recet.jobs import RunConfig, run_job
 from recet.pipeline import delimited
-from conftest import make_electric_acc, make_flat_profile_csv
+from conftest import fill_cet_required, make_electric_acc, make_flat_profile_csv
 
 N = 40           # measures; parts of CHUNK rows -> 6 parts, the last one short
 CHUNK = 7
@@ -29,7 +29,7 @@ def _job(tmp_path, n=N):
                   "RealizationRateTherm": "1", "InstallationRatekW": "1", "InstallationRatekWh": "1", "InstallationRateTherm": "1", "MeasInflation": "0",
                   "UnitMeaCost1stBaseline": str(20 + i), "UnitEndUserRebate": str(i % 7), "UnitkWhIOUWater1stBaseline": "5" if i % 9 == 0 else "",
                   "CombustionType": "" if i < CHUNK else ("Commercial" if i % 2 else "Residential")})
-        rows.append(r)
+        rows.append(fill_cet_required(r))
     m = tmp_path / "Measure.csv"
     m.write_text("\n".join(["|".join(templates.MEASURE_COLUMNS)] + ["|".join(r[c] for c in templates.MEASURE_COLUMNS) for r in rows]) + "\n", encoding="utf-8")
     pc_rows = []

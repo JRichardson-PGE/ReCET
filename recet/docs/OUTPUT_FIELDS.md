@@ -38,8 +38,9 @@ or cannot be computed.
 ### 0.1 Notation, defaults and run-level values
 
 * **Input fields** are written exactly as in the file (`NumUnits`, `UnitkWh1stBaseline`); **output fields** the same way, and a formula that uses another output column says so.
-* **Blank inputs** take the default the tool uses (INPUT_FIELDS.md gives each): a blank quantity (`UnitkWh2ndBaseline`, `UnitTherm1stBaseline`, ...) is 0; a blank
-  `InstallationRate...` or `RealizationRate...` is 1; a blank `NTGRkW`, `NTGRTherm` or `NTGRCost` takes `NTGRkWh`; `EUL_Yrs` is at least 0.25; a blank `RUL_Yrs` is 0.
+* **Blank inputs.** Every numeric field CET requires is used as filed: a blank one stops the run (preflight `blank_required_value`). The fields CET does not
+  require read a blank as 0: `UnitkWhIOUWater1stBaseline`, `UnitkWhIOUWater2ndBaseline`, `UnitDirectInstallLab`, `UnitDirectInstallMat`, `UnitEndUserRebate`,
+  `UnitIncentiveToOthers`, `UnitTaxCredits`, `MeasInflation`. `EUL_Yrs` and `RUL_Yrs` may not be negative, nor `RUL_Yrs` above `EUL_Yrs` (preflight errors).
 * **Operators.** `SUM over k ... of` is a sum; `pos(x) = max(x, 0)`; `ratio(n, d) = n / d`, and 0 when `d = 0` (the way CET's ratio columns behave); `^` is a power;
   `floor(x)` rounds down.
 * **Run settings.** `F` is the run's **First Year** (the "First Year" box or `--base-year`; blank = the earliest claim year in the job). `MEB` is the market-effects adder on
@@ -105,24 +106,24 @@ the 1st baseline, quarter 4 is a half-and-half blend (`RQ - k` = 0.5) and quarte
 Electricity, gas and the electricity embedded in water are each priced as an annual quantity spread over the year. These are output columns of section 1.2, in kWh per year, therms per year and kWh per year embedded in water, for the 1st and 2nd baseline:
 
 ```text
-AC_kWh_1st_Baseline           = NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
-AC_kWh_2nd_Baseline       = NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
-AC_Therms_1st_Baseline = NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
-AC_Therms_2nd_Baseline = NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
-AC_kWh_Water_1st_Baseline       = NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
-AC_kWh_Water_2nd_Baseline       = NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_1st_Baseline           = NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_2nd_Baseline       = NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_Therms_1st_Baseline = NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
+AC_Net_Therms_2nd_Baseline = NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
+AC_Net_kWh_Water_1st_Baseline       = NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_Water_2nd_Baseline       = NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
 ```
 
 When the run applies market effects to benefits, each is scaled by `(NTG + MEB) / NTG` (`NTG` = `NTGRkWh` for electric and water, `NTGRTherm` for gas; the scaling is 1 when `MEB = 0`
 or `NTG = 0`). Then, in quarter `k`, the quantities in force are
 
 ```text
-Elec(k) = phased( k ;  AC_kWh_1st_Baseline     * (NTGRkWh + MEB) / NTGRkWh ,
-                       AC_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )                            annual kWh in force in quarter k
-Gas(k)  = phased( k ;  AC_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
-                       AC_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )                  annual therms
-Wat(k)  = phased( k ;  AC_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,
-                       AC_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )                            annual kWh embedded in water
+Elec(k) = phased( k ;  AC_Net_kWh_1st_Baseline     * (NTGRkWh + MEB) / NTGRkWh ,
+                       AC_Net_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )                            annual kWh in force in quarter k
+Gas(k)  = phased( k ;  AC_Net_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
+                       AC_Net_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )                  annual therms
+Wat(k)  = phased( k ;  AC_Net_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,
+                       AC_Net_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )                            annual kWh embedded in water
 ```
 
 *Example A* (no market effects): `Elec(k)` = 34,200 kWh, `Gas(k)` = 1,620 therms, `Wat(k)` = 205.2 kWh in every quarter. *Example B* (`MEB` = 0.05, second baseline): `Elec(0)` = -27,000 x (0.75 + 0.05) / 0.75
@@ -204,15 +205,18 @@ section 3.5.
 |---|---|---|
 | `Used_Year` | The start year of the measure claim year quarter. Year. | first four characters of `ClaimYearQuarter` |
 | `Used_Quarter` | The start quarter of the measure claim year quarter. 1-4. | last character of `ClaimYearQuarter` |
-| `AC_kWh_1st_Baseline` | The annual kWh the electric benefit for the 1st baseline is priced on. kWh per year. | `NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
-| `AC_kWh_2nd_Baseline` | The annual kWh the electric benefit for the 2nd baseline is priced on. kWh per year. | `NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
-| `AC_Therms_1st_Baseline` | The annual Therms the gas benefit for the 1st baseline is priced on. Therms per year. | `NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm` |
-| `AC_Therms_2nd_Baseline` | The annual Therms the gas benefit for the 2nd baseline is priced on. Therms per year. | `NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm` |
-| `AC_kWh_Water_1st_Baseline` | The annual kWh the water savings electric benefit for the 1st baseline is priced on. kWh per year. | `NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
-| `AC_kWh_Water_2nd_Baseline` | The annual kWh the water savings electric benefit for the 2nd baseline is priced on. kWh per year. | `NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
+| `AC_Net_kWh_1st_Baseline` | The annual kWh the electric benefit for the 1st baseline is priced on. kWh per year. | `NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
+| `AC_Net_kWh_2nd_Baseline` | The annual kWh the electric benefit for the 2nd baseline is priced on. kWh per year. | `NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
+| `AC_Net_Therms_1st_Baseline` | The annual Therms the gas benefit for the 1st baseline is priced on. Therms per year. | `NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm` |
+| `AC_Net_Therms_2nd_Baseline` | The annual Therms the gas benefit for the 2nd baseline is priced on. Therms per year. | `NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm` |
+| `AC_Net_kWh_Water_1st_Baseline` | The annual kWh the water savings electric benefit for the 1st baseline is priced on. kWh per year. | `NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
+| `AC_Net_kWh_Water_2nd_Baseline` | The annual kWh the water savings electric benefit for the 2nd baseline is priced on. kWh per year. | `NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh` |
 | `Fuel_Sub_Flag` | Whether the measure is treated as fuel substitution, so its negative fuel values become supply costs. True / false. | true if `FuelID` is `AllElec-New`, `FuelSub-ToElec` or `FuelSub-ToGas`, or if `MeasImpactType` contains `FuelSub` |
+| `Scaled_Profile_Flag` | Whether the measure's annual kWh per unit came from a scaled (kWh-per-unit) 8,760 profile rather than from `UnitkWh1stBaseline` / `UnitkWh2ndBaseline`. True / false. | true if a baseline is priced on a user profile with `profile_basis = kwh_per_unit` (CALCULATIONS C4.5); its `AC_Net_kWh_*_Baseline` then use the profile's annual kWh per unit in place of `UnitkWh1stBaseline` (`UnitkWh2ndBaseline`) |
 
-Blank inputs take their defaults (0.1): a blank `NTGRTherm` is `NTGRkWh`, then 1; a blank installation or realization rate is 1; a blank 2nd-baseline or water quantity is 0.
+Every numeric field CET requires is used as filed: a blank one stops the run (preflight `blank_required_value`). The fields CET does not require read a blank as 0:
+`UnitkWhIOUWater1stBaseline`, `UnitkWhIOUWater2ndBaseline`, `UnitDirectInstallLab`, `UnitDirectInstallMat`, `UnitEndUserRebate`, `UnitIncentiveToOthers`, `UnitTaxCredits`,
+`MeasInflation`.
 The priced quantities are net (`NTGR...`) and after installation and realization rates, without market effects (the benefit formulas add `MEB`).
 
 **A measure priced on an already-scaled 8,760 profile** (kWh per unit per hour, `ProfileSource = user profile (kWh per unit)`, CALCULATIONS C4.5) is the exception: its
@@ -253,12 +257,12 @@ ElecBen = pos(V_elec)         if Fuel_Sub_Flag is true           (the negative p
 ```text
 V_elec = SUM over k = 0 ... n-1 of
            w(k) * DF(k)
-           * phased( k ;  AC_kWh_1st_Baseline     * (NTGRkWh + MEB) / NTGRkWh ,
-                          AC_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
+           * phased( k ;  AC_Net_kWh_1st_Baseline     * (NTGRkWh + MEB) / NTGRkWh ,
+                          AC_Net_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
            * ( SUM over the hours i of quarter(k) of  shape(i) * total_avoided_cost(y*(k), i) / 1000 )
 
-AC_kWh_1st_Baseline     = NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
-AC_kWh_2nd_Baseline = NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_1st_Baseline     = NumUnits * UnitkWh1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_2nd_Baseline = NumUnits * UnitkWh2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
 ```
 
 `n`, `w(k)`, `year(k)`, `quarter(k)`: 0.2. `DF(k)`: 0.3. `phased`: 0.4. `shape(i)`, the ACC row and `y*(k)`: 0.6. `Fuel_Sub_Flag`: 1.2.
@@ -301,12 +305,12 @@ GasBen = pos(V_gas)           if Fuel_Sub_Flag is true
 ```text
 V_gas = SUM over k = 0 ... n-1 of
           w(k) * DF(k)
-          * phased( k ;  AC_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
-                         AC_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )
+          * phased( k ;  AC_Net_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
+                         AC_Net_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )
           * ( SUM over the months m of quarter(k) of  gasshape(m) * ACg(y^(k), m) )
 
-AC_Therms_1st_Baseline = NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
-AC_Therms_2nd_Baseline = NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
+AC_Net_Therms_1st_Baseline = NumUnits * UnitTherm1stBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
+AC_Net_Therms_2nd_Baseline = NumUnits * UnitTherm2ndBaseline * NTGRTherm * InstallationRateTherm * RealizationRateTherm
 ACg(y, m) = market_m + td_m + nox + co2 + upstream_methane + air_quality_adder  [ + behind_meter_methane ]
 ```
 
@@ -349,12 +353,12 @@ WaterEnergyBen = 0           otherwise
 ```text
 V_water = SUM over k = 0 ... n-1 of
             w(k) * DF(k)
-            * phased( k ;  AC_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,
-                           AC_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
+            * phased( k ;  AC_Net_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,
+                           AC_Net_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
             * ( SUM over the hours i of quarter(k) of  shape(i) * Gen(y*(k), i) )
 
-AC_kWh_Water_1st_Baseline = NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
-AC_kWh_Water_2nd_Baseline = NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_Water_1st_Baseline = NumUnits * UnitkWhIOUWater1stBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
+AC_Net_kWh_Water_2nd_Baseline = NumUnits * UnitkWhIOUWater2ndBaseline * NTGRkWh * InstallationRatekWh * RealizationRatekWh
 Gen(y, i) = ( total_avoided_cost - transmission - distribution )(y, i) / 1000
 ```
 
@@ -663,8 +667,8 @@ The customer's bill change, the ratepayer cost in the RIM test: the present valu
 **Formula**
 
 ```text
-PV_elec = PV( fe * AC_kWh_1st_Baseline ,            fe * AC_kWh_2nd_Baseline ,       RateE )        fe = ( NTGRkWh + MEB ) / NTGRkWh
-PV_gas  = PV( ft * AC_Therms_1st_Baseline ,  ft * AC_Therms_2nd_Baseline , RateG )        ft = ( NTGRTherm + MEB ) / NTGRTherm
+PV_elec = PV( fe * AC_Net_kWh_1st_Baseline ,            fe * AC_Net_kWh_2nd_Baseline ,       RateE )        fe = ( NTGRkWh + MEB ) / NTGRkWh
+PV_gas  = PV( ft * AC_Net_Therms_1st_Baseline ,  ft * AC_Net_Therms_2nd_Baseline , RateG )        ft = ( NTGRTherm + MEB ) / NTGRTherm
    (fe, ft = 1 when MEB = 0 or the NTG is 0: the quantities of 1.2 already carry NTG, this swaps it for NTG + MEB, as CET's bill calculation does)
 
 LifecycleBillReducElec = PV_elec      LifecycleBillIncrElec = 0               if Fuel_Sub_Flag is false
@@ -688,7 +692,7 @@ PV(s1, s2, rate) =   SUM over j = 0 ... min(floor_rul, ny) - 1 of        s1 * ra
 `RateE` is the retail electric rate ($ per kWh, by calendar year) of the schedule that (`PA`, `AC_Elec_Target_Sector`) maps to and `RateG` the gas rate ($ per therm) for (`PA`, `AC_Gas_Target_Sector`), both from CET's E3
 tables. The second sum's exponent `j + yr1` (years since `BaseYear`, not since the claim) reproduces what CET's own calculation does for the boundary year and every 2nd-baseline year, so it is kept.
 A measure whose sector has no schedule mapping, or a year outside the schedule's range, gets no bill impact for that fuel.
-**Inputs:** the fields of `AC_kWh_1st_Baseline` / `AC_Therms_1st_Baseline` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`, `AC_Elec_Target_Sector`, `AC_Gas_Target_Sector`, `FuelID`, `MeasImpactType`; ACC version (E3 rate tables and discount rate); the market-effects setting.
+**Inputs:** the fields of `AC_Net_kWh_1st_Baseline` / `AC_Net_Therms_1st_Baseline` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`, `AC_Elec_Target_Sector`, `AC_Gas_Target_Sector`, `FuelID`, `MeasImpactType`; ACC version (E3 rate tables and discount rate); the market-effects setting.
 Scaling by market effects matches CET exactly (every `BillReduc` of CET job 121841 is (NTG + 0.05) / NTG times job 121842's).
 
 Example A (single baseline, `EUL_Yrs` 2.4: `ny` = 3, `floor_rul` = 2, `yr1` = 4, so the last, partial year has `wt` = 0.4 and is discounted by `Raf^6`). `RateE` for 2028 / 2029 / 2030 is
@@ -719,8 +723,8 @@ The participant's own bill change for the Participant Cost Test (1.10): the bill
 **Formula**
 
 ```text
-PV_elec_gross = PV( NumUnits * UnitkWh1stBaseline * IR * RR ,  NumUnits * UnitkWh2ndBaseline * IR * RR ,  RateE )      IR, RR: InstallationRatekWh, RealizationRatekWh (blank = 1)
-PV_gas_gross  = PV( NumUnits * UnitTherm1stBaseline * IRt * RRt ,  NumUnits * UnitTherm2ndBaseline * IRt * RRt ,  RateG )   IRt, RRt: the therm rates (blank = 1)
+PV_elec_gross = PV( NumUnits * UnitkWh1stBaseline * IR * RR ,  NumUnits * UnitkWh2ndBaseline * IR * RR ,  RateE )      IR, RR: InstallationRatekWh, RealizationRatekWh
+PV_gas_gross  = PV( NumUnits * UnitTherm1stBaseline * IRt * RRt ,  NumUnits * UnitTherm2ndBaseline * IRt * RRt ,  RateG )   IRt, RRt: the therm rates
 the Reduc / Incr split and PV(s1, s2, rate): exactly as for LifecycleBillReducElec ... LifecycleBillIncrGas above
 ```
 
@@ -760,7 +764,7 @@ ElecSupplyCost_SB = 0                   if Fuel_Sub_Flag is false        ElecSup
 
 V_elec_SB = SUM over k = 0 ... n-1 of
               w(k) * DF_sct(k)
-              * phased( k ;  AC_kWh_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,  AC_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
+              * phased( k ;  AC_Net_kWh_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh ,  AC_Net_kWh_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
               * ( SUM over the hours i of quarter(k) of  shape(i) * total_avoided_cost[SCT Base](y*(k), i) / 1000 )
 V_elec_SH: the same with the SCT High row
 ```
@@ -794,8 +798,8 @@ GasSupplyCost_SB = 0                  if Fuel_Sub_Flag is false        GasSupply
 
 V_gas_SB = SUM over k = 0 ... n-1 of
              w(k) * DF_sct(k)
-             * phased( k ;  AC_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
-                            AC_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )
+             * phased( k ;  AC_Net_Therms_1st_Baseline * (NTGRTherm + MEB) / NTGRTherm ,
+                            AC_Net_Therms_2nd_Baseline * (NTGRTherm + MEB) / NTGRTherm )
              * ( SUM over the months m of quarter(k) of  gasshape(m) * ACg[SCT, scc = Base](y^(k), m) )
 V_gas_SH: the same with the SCT rows with scc = High
 ```
@@ -824,7 +828,7 @@ WaterEnergyCost_SB = -V_water_SB  if UnitkWhIOUWater1stBaseline < 0, else 0     
 
 V_water_SB = SUM over k = 0 ... n-1 of
                w(k) * DF_sct(k)
-               * phased( k ; AC_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh , AC_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
+               * phased( k ; AC_Net_kWh_Water_1st_Baseline * (NTGRkWh + MEB) / NTGRkWh , AC_Net_kWh_Water_2nd_Baseline * (NTGRkWh + MEB) / NTGRkWh )
                * ( SUM over the hours i of quarter(k) of  shape(i) * Gen[SCT Base](y*(k), i) )
 Gen[SCT Base](y, i) = ( total_avoided_cost - transmission - distribution )[SCT Base](y, i) / 1000
 ```
@@ -838,20 +842,20 @@ Gen[SCT Base](y, i) = ( total_avoided_cost - transmission - distribution )[SCT B
 - Example A, `WaterEnergyCost_SB`: `UnitkWhIOUWater1stBaseline` = 3, not below 0 = **0.00**
 - Example B, `WaterEnergyBen_SB`: `UnitkWhIOUWater1stBaseline` = -6, not above 0 = **0.00**
 
-#### `RebatesandIncentsPV_sct`, `GrossParticipantCostPV_sct`, `NetParticipantCostPV_sct`, `NetParticipantCostAdjustedPV_sct`
+#### `RebatesandIncentsPV_SCT`, `GrossParticipantCostPV_SCT`, `NetParticipantCostPV_SCT`, `NetParticipantCostAdjustedPV_SCT`
 
-- `RebatesandIncentsPV_sct`: Incentives, direct-install costs and rebates paid to or for participants, present-valued at the claim quarter using the Societal discount rate. Unit: Dollars (PV at the societal rate).
-- `GrossParticipantCostPV_sct`: Participant cost before net-to-gross: the measure cost less the incentives and rebates. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
-- `NetParticipantCostPV_sct`: Participant cost after net-to-gross, plus the excess-incentive term; without the market-effects term. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
-- `NetParticipantCostAdjustedPV_sct`: Participant cost after net-to-gross, plus the excess-incentive term and the market-effects term. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
+- `RebatesandIncentsPV_SCT`: Incentives, direct-install costs and rebates paid to or for participants, present-valued at the claim quarter using the Societal discount rate. Unit: Dollars (PV at the societal rate).
+- `GrossParticipantCostPV_SCT`: Participant cost before net-to-gross: the measure cost less the incentives and rebates. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
+- `NetParticipantCostPV_SCT`: Participant cost after net-to-gross, plus the excess-incentive term; without the market-effects term. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
+- `NetParticipantCostAdjustedPV_SCT`: Participant cost after net-to-gross, plus the excess-incentive term and the market-effects term. Discounted using the Societal discount rate. Unit: Dollars (PV at the societal rate).
 
 **Formula:** exactly the formulas of `RebatesandIncentsPV`, `GrossParticipantCostPV`, `NetParticipantCostPV` and `NetParticipantCostAdjustedPV` with `Rqf_sct` in place of `Rqf` everywhere (in `PVF` and in `PVsub`):
 
 ```text
-RebatesandIncentsPV_sct    = ( IncentsDI + Rebates ) / PVF_sct                                       PVF_sct = Rqf_sct ^ Qm
-GrossParticipantCostPV_sct = GrossMeasCostPV_sct - ( IncentsDI + Rebates ) / PVF_sct
-NetParticipantCostPV_sct   = NTGRCost * ( GrossParticipantCostPV_sct + ExcessIncentivesPV_sct )
-NetParticipantCostAdjustedPV_sct = NetParticipantCostPV_sct + MEC * ( GrossMeasCostPV_sct + ExcessIncentivesPV_sct )
+RebatesandIncentsPV_SCT    = ( IncentsDI + Rebates ) / PVF_sct                                       PVF_sct = Rqf_sct ^ Qm
+GrossParticipantCostPV_SCT = GrossMeasCostPV_sct - ( IncentsDI + Rebates ) / PVF_sct
+NetParticipantCostPV_SCT   = NTGRCost * ( GrossParticipantCostPV_SCT + ExcessIncentivesPV_sct )
+NetParticipantCostAdjustedPV_SCT = NetParticipantCostPV_SCT + MEC * ( GrossMeasCostPV_sct + ExcessIncentivesPV_sct )
    GrossMeasCostPV_sct = NumUnits * ( UnitMeaCost1stBaseline - PVsub_sct ) / PVF_sct
    PVsub_sct = ( UnitMeaCost1stBaseline - UnitMeaCost2ndBaseline ) * ( (1 + MeasInflation / 4) / Rqf_sct ) ^ ( 4 * RUL_Yrs )
                if RUL_Yrs > 0, else 0
@@ -860,14 +864,14 @@ NetParticipantCostAdjustedPV_sct = NetParticipantCostPV_sct + MEC * ( GrossMeasC
 
 **Inputs:** those of the 1.5 entries; `DiscountRateQtr_SCT`.
 
-- Example A, `RebatesandIncentsPV_sct`: (4000 + 2000) / 1.012575^2 = **5,851.90**
-- Example A, `GrossParticipantCostPV_sct`: 100 * 200 / 1.012575^2 - (4000 + 2000) / 1.012575^2 = **13,654.43**
-- Example A, `NetParticipantCostPV_sct`: 0.9 * (13654.4319 + 0.0000) = **12,288.99**
-- Example B, `RebatesandIncentsPV_sct`: (9500 + 4000) / 1.012575^1 = **13,332.35**
-- Example B, `GrossParticipantCostPV_sct`: 10 * (9000 - 2900.3214) / 1.012575^1 - (9500 + 4000) / 1.012575^1 = **46,906.93** (`PVsub_sct` = (9000 - 6000) * ((1 + 0.02 / 4) / 1.012575)^4.5)
-- Example A, `NetParticipantCostAdjustedPV_sct`: 12288.9887 + 0.0000 = **12,288.99**
-- Example B, `NetParticipantCostPV_sct`: 0.8 * (46906.9312 + 0.0000) = **37,525.54**
-- Example B, `NetParticipantCostAdjustedPV_sct`: 37525.5450 + 0.05 * (60239.2769 + 0.0000) = **40,537.51**
+- Example A, `RebatesandIncentsPV_SCT`: (4000 + 2000) / 1.012575^2 = **5,851.90**
+- Example A, `GrossParticipantCostPV_SCT`: 100 * 200 / 1.012575^2 - (4000 + 2000) / 1.012575^2 = **13,654.43**
+- Example A, `NetParticipantCostPV_SCT`: 0.9 * (13654.4319 + 0.0000) = **12,288.99**
+- Example B, `RebatesandIncentsPV_SCT`: (9500 + 4000) / 1.012575^1 = **13,332.35**
+- Example B, `GrossParticipantCostPV_SCT`: 10 * (9000 - 2900.3214) / 1.012575^1 - (9500 + 4000) / 1.012575^1 = **46,906.93** (`PVsub_sct` = (9000 - 6000) * ((1 + 0.02 / 4) / 1.012575)^4.5)
+- Example A, `NetParticipantCostAdjustedPV_SCT`: 12288.9887 + 0.0000 = **12,288.99**
+- Example B, `NetParticipantCostPV_SCT`: 0.8 * (46906.9312 + 0.0000) = **37,525.54**
+- Example B, `NetParticipantCostAdjustedPV_SCT`: 37525.5450 + 0.05 * (60239.2769 + 0.0000) = **40,537.51**
 
 ### 1.7 Gross variants
 
@@ -1132,9 +1136,9 @@ RIMCost        = LifecycleBillReducElec + LifecycleBillReducGas + PACCost
 **Formula**
 
 ```text
-SCBCostNoAdmin = RebatesandIncentsPV_sct + NetParticipantCostAdjustedPV_sct + Sup_SB
+SCBCostNoAdmin = RebatesandIncentsPV_SCT + NetParticipantCostAdjustedPV_SCT + Sup_SB
 SCBCost        = share_SB_m * SumCostsNPV_SCT + SCBCostNoAdmin
-SCBCostGross   = share_SB_gross_m * SumCostsNPV_SCT + RebatesandIncentsPV_sct + GrossParticipantCostPV_sct + SupSBGross
+SCBCostGross   = share_SB_gross_m * SumCostsNPV_SCT + RebatesandIncentsPV_SCT + GrossParticipantCostPV_SCT + SupSBGross
 
 Sup_SB      = ElecSupplyCost_SB + GasSupplyCost_SB + WaterEnergyCost_SB + OtherCost
 SupSBGross  = ElecSupplyCostGross_SB + GasSupplyCostGross_SB + WaterEnergyCostGross_SB + OtherCostGross
@@ -1143,7 +1147,7 @@ share_SB_gross_m = the same share computed on the gross versions of those benefi
 (SCHCostNoAdmin, SCHCost, SCHCostGross: the same with _SH)
 ```
 
-`SumCostsNPV_SCT` discounts program costs at the societal rate (CET uses the primary rate for them; see CALCULATIONS C17). **Inputs:** `RebatesandIncentsPV_sct`, `NetParticipantCostAdjustedPV_sct`, `GrossParticipantCostPV_sct`, the `_SB` / `_SH` supply-cost and gross columns, `OtherCost`, `ProgramCost.csv`, the First Year and `DiscountRateAnnual_SCT`.
+`SumCostsNPV_SCT` discounts program costs at the societal rate (CET uses the primary rate for them; see CALCULATIONS C17). **Inputs:** `RebatesandIncentsPV_SCT`, `NetParticipantCostAdjustedPV_SCT`, `GrossParticipantCostPV_SCT`, the `_SB` / `_SH` supply-cost and gross columns, `OtherCost`, `ProgramCost.csv`, the First Year and `DiscountRateAnnual_SCT`.
 
 - Example A, `SCBCostNoAdmin`: 5851.8994 + 12288.9887 + 80.00 = **18,220.89**
 - Example A, `SCBCost`: 2952.1089 + 18220.8880 = **21,173.00** (`SumCostsNPV_SCT` = 2000 / 1.0503^0 + 1000 / 1.0503^1)
@@ -1591,8 +1595,8 @@ w1 = 1      if RUL_Yrs > 1           w2 = EUL_Yrs - RUL_Yrs   if 0 < RUL_Yrs < 1
    = 1 otherwise
 ```
 
-`IR` / `RR` are the installation and realization rates of each fuel (blank = 1); `NTGRkW` and `NTGRTherm` blank take `NTGRkWh`, then 1. `MEB` is 0.05 with market
-effects on, else 0. `EUL_Yrs` is the value as filed (the pricing's 0.25-year floor is not applied here, as in CET). A measure with an RUL of exactly 1 year takes
+`IR` / `RR` are the installation and realization rates of each fuel. `MEB` is 0.05 with market
+effects on, else 0. `EUL_Yrs` is the value as filed, as everywhere. A measure with an RUL of exactly 1 year takes
 the "otherwise" branches (w1 = 1, w2 = 0), as CET's SQL does. **Inputs:** `NumUnits`, the 1st/2nd-baseline kWh, kW, therm and IOU water fields, `NTGRkWh`, `NTGRkW`, `NTGRTherm`, the installation
 and realization rates, `EUL_Yrs`, `RUL_Yrs`; the market-effects setting.
 
@@ -1782,15 +1786,19 @@ A run creates `<output folder>/<run name>_acc<version>/` (a timestamp `run_YYYYM
 
 The table of section 1.
 
-**Column names (0.1.50).** Several columns were renamed from the field dictionary, and the restated inputs (`poc_*`), `ProgramCosts`, `WeightedSavings` and the
-per-record check columns (`FilingValidation`, `FilingRules`, `ACCCheck`) are no longer written. Output templates and saved Results views that use an old name still work
-(the new name is used). CET's own outputs file keeps CET's names; the CET comparison (2.6) reads them as ReCET's.
+**Column names (0.1.50, 0.1.55).** Several columns were renamed from the field dictionary (0.1.50) and when the calculation code took the input and output field
+names (0.1.55: the annual quantities say they are net, and the societal participant PVs take CalcCE's `_SCT` suffix), and the restated inputs (`poc_*`),
+`ProgramCosts`, `WeightedSavings` and the per-record check columns (`FilingValidation`, `FilingRules`, `ACCCheck`) are no longer written. Output templates and saved
+Results views that use an old name still work (the new name is used). CET's own outputs file keeps CET's names; the CET comparison (2.6) reads them as ReCET's.
 
-| ReCET writes | Before 0.1.50 | CET's outputs file |
+| ReCET writes | Before | CET's outputs file |
 |---|---|---|
+| `AC_Net_kWh_1st_Baseline`, `AC_Net_kWh_2nd_Baseline`, `AC_Net_Therms_1st_Baseline`, `AC_Net_Therms_2nd_Baseline` (0.1.55) | `AC_kWh_1st_Baseline`, `AC_kWh_2nd_Baseline`, `AC_Therms_1st_Baseline`, `AC_Therms_2nd_Baseline` (0.1.50-0.1.54) | (none) |
+| `AC_Net_kWh_Water_1st_Baseline`, `AC_Net_kWh_Water_2nd_Baseline` (0.1.55) | `AC_kWh_Water_1st_Baseline`, `AC_kWh_Water_2nd_Baseline` (0.1.50-0.1.54) | (none) |
+| `<RebatesandIncentsPV/NetParticipantCostPV/NetParticipantCostAdjustedPV/GrossParticipantCostPV>_SCT` (0.1.55) | the same with `_sct` | (none) |
 | `Used_ACCVersion`, `Used_Year`, `Used_Quarter` | `POC_ACC`, `poc_claim_year`, `poc_claim_quarter` | (none) |
-| `AC_kWh_1st_Baseline`, `AC_kWh_2nd_Baseline`, `AC_Therms_1st_Baseline`, `AC_Therms_2nd_Baseline` | `poc_shape_scale`, `poc_shape_scale_2nd`, `poc_annual_net_therms_1st`, `poc_annual_net_therms_2nd` | (none) |
-| `AC_kWh_Water_1st_Baseline`, `AC_kWh_Water_2nd_Baseline`, `Fuel_Sub_Flag` | `poc_water_scale_1st`, `poc_water_scale_2nd`, `poc_is_fuel_sub` | (none) |
+| `AC_Net_kWh_1st_Baseline`, `AC_Net_kWh_2nd_Baseline`, `AC_Net_Therms_1st_Baseline`, `AC_Net_Therms_2nd_Baseline` | `poc_shape_scale`, `poc_shape_scale_2nd`, `poc_annual_net_therms_1st`, `poc_annual_net_therms_2nd` | (none) |
+| `AC_Net_kWh_Water_1st_Baseline`, `AC_Net_kWh_Water_2nd_Baseline`, `Fuel_Sub_Flag` | `poc_water_scale_1st`, `poc_water_scale_2nd`, `poc_is_fuel_sub` | (none) |
 | `LifecycleBill<Reduc/Incr><Elec/Gas>` | `Bill<Reduc/Incr><Elec/Gas>` | the old name |
 | `LifecycleBill<Reduc/Incr><Elec/Gas>Gross` | `Bill<Reduc/Incr><Elec/Gas>Gross` | (none) |
 | `FirstYear<Net/Gross><Elec/Gas><CO2/NOx>`, `FirstYear<Net/Gross>ElecPM10` | `<Net/Gross><Elec/Gas><CO2/NOx>`, `<Net/Gross>PM10` | the old name |
@@ -1870,16 +1878,16 @@ end_m   = start_m + max(EUL_Yrs, 0.25)
 overlap(A, B) = the length in years of the overlap of the two intervals A and B
 
 if 0 < RUL_Yrs < EUL_Yrs:
-   weight_m(Y) = overlap( [Y, Y+1), [start_m, start_m + RUL) ) * AC_kWh_1st_Baseline
-                 + overlap( [Y, Y+1), [start_m + RUL, end_m) ) * AC_kWh_2nd_Baseline
+   weight_m(Y) = overlap( [Y, Y+1), [start_m, start_m + RUL) ) * AC_Net_kWh_1st_Baseline
+                 + overlap( [Y, Y+1), [start_m + RUL, end_m) ) * AC_Net_kWh_2nd_Baseline
 otherwise:
-   weight_m(Y) = overlap( [Y, Y+1), [start_m, end_m) ) * AC_kWh_1st_Baseline
+   weight_m(Y) = overlap( [Y, Y+1), [start_m, end_m) ) * AC_Net_kWh_1st_Baseline
 
 shape_m,Y(i) = the measure's 8,760 shape for hour i, rotated onto the ACC's weekdays (0.6); the same in every year Y
 ```
 
-`AC_kWh_1st_Baseline` and `AC_kWh_2nd_Baseline` are the net kWh with installation and realization rates and without market effects (market effects are an accounting adder, not physical savings, so they are
-not in this profile). A measure with no 8,760 profile is left out and listed in 2.5. **Inputs:** the fields of `AC_kWh_1st_Baseline` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`,
+`AC_Net_kWh_1st_Baseline` and `AC_Net_kWh_2nd_Baseline` are the net kWh with installation and realization rates and without market effects (market effects are an accounting adder, not physical savings, so they are
+not in this profile). A measure with no 8,760 profile is left out and listed in 2.5. **Inputs:** the fields of `AC_Net_kWh_1st_Baseline` (0.5), `EUL_Yrs`, `RUL_Yrs`, `ClaimYearQuarter`, `IOU_AC_Territory`,
 the electric-profile fields of `ElecBen`; the "Year(s)" setting.
 
 - Example A, `net_kwh_2028`: overlap([2028, 2029), [2028.5, 2030.9)) = 0.5, so 0.5 * 34200 / 8760 = **1.9521** kWh in every hour (a flat shape)
@@ -1892,8 +1900,8 @@ The measures left out of the combined profile because they have no 8,760 profile
 
 | Field | Meaning and unit | Formula |
 |---|---|---|
-| `measure_id` | The `CEInputID`. Text. | `CEInputID` |
-| `PA`, `shape_key`, `target_sector`, `climate_zone` | The measure's key fields. Text. | `IOU_AC_Territory`, `AC_Elec_Impact_Profile`, `AC_Elec_Target_Sector`, `AC_Climate_Zone` |
+| `CEInputID` | The measure. Text. | `CEInputID` |
+| `IOU_AC_Territory`, `AC_Elec_Impact_Profile`, `AC_Elec_Target_Sector`, `AC_Climate_Zone` | The measure's key fields (`AC_Elec_Impact_Profile`: the 2nd-baseline part's own profile when it has one). Text. | the input fields |
 | `kwh_<Y>` | The annual-equivalent net kWh the measure delivers in year `Y`: its share of the "unshaped" total. kWh. | `weight_m(Y)` of 2.4 |
 
 ### 2.6 `cet_comparison_measures_acc<version>` and `cet_comparison_summary_acc<version>` (with a CET outputs file)
@@ -1940,7 +1948,7 @@ run writes it at the end (a run in parts adds it up part by part as it writes th
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count, the first-year net kWh or therms its records carry (`no_electric_profile`, `loose_profile_match`,
 `no_gas_profile`) and examples (for `loose_profile_match`: end use | IOU | the AC_Elec_Target_Sector given). Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`, `missing_descriptive_column` (warning: `MeasDescription` or `Sector` left out, read as blank),
-`missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value`, `blank_second_baseline`, `outside_cet_range`, `rul_not_below_eul`, `program_alignment`,
+`missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value` (a numeric field CET requires is blank), `negative_life` (`EUL_Yrs` or `RUL_Yrs` below 0), `rul_above_eul` (`RUL_Yrs` greater than `EUL_Yrs`), `outside_cet_range`, `rul_not_below_eul` (warning: `RUL_Yrs` equals `EUL_Yrs`), `program_alignment`,
 `no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, `program_costs_unreadable` (a job checked in parts could not read `ProgramCost.csv`), and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`),
@@ -2155,13 +2163,14 @@ refer to.
 | `Used_ACCVersion` | 2026 ACC (Avoided Cost Version 2028) | 2026 ACC (Avoided Cost Version 2028) |
 | `Used_Year` | 2028 | 2028 |
 | `Used_Quarter` | 3 | 2 |
-| `AC_kWh_1st_Baseline` | 34200 | -27000 |
-| `AC_kWh_2nd_Baseline` | 0 | -16875 |
-| `AC_Therms_1st_Baseline` | 1620 | 4845 |
-| `AC_Therms_2nd_Baseline` | 0 | 3230 |
-| `AC_kWh_Water_1st_Baseline` | 205.2 | -40.5 |
-| `AC_kWh_Water_2nd_Baseline` | 0 | -27 |
+| `AC_Net_kWh_1st_Baseline` | 34200 | -27000 |
+| `AC_Net_kWh_2nd_Baseline` | 0 | -16875 |
+| `AC_Net_Therms_1st_Baseline` | 1620 | 4845 |
+| `AC_Net_Therms_2nd_Baseline` | 0 | 3230 |
+| `AC_Net_kWh_Water_1st_Baseline` | 205.2 | -40.5 |
+| `AC_Net_kWh_Water_2nd_Baseline` | 0 | -27 |
 | `Fuel_Sub_Flag` | false | true |
+| `Scaled_Profile_Flag` | false | false |
 | `ElecPricingStatus` | priced: hourly profile | priced: hourly profile |
 | `ProfileSource` | user profile | user profile |
 | `SystemClimateZone` | (blank) | (blank) |
@@ -2224,10 +2233,10 @@ refer to.
 | `WaterEnergyBen_SH` | 39.218 | 0 |
 | `WaterEnergyCost_SB` | 0 | 6.46961 |
 | `WaterEnergyCost_SH` | 0 | 7.13316 |
-| `RebatesandIncentsPV_sct` | 5851.9 | 13332.3 |
-| `NetParticipantCostPV_sct` | 12289 | 37525.5 |
-| `NetParticipantCostAdjustedPV_sct` | 12289 | 40537.5 |
-| `GrossParticipantCostPV_sct` | 13654.4 | 46906.9 |
+| `RebatesandIncentsPV_SCT` | 5851.9 | 13332.3 |
+| `NetParticipantCostPV_SCT` | 12289 | 37525.5 |
+| `NetParticipantCostAdjustedPV_SCT` | 12289 | 40537.5 |
+| `GrossParticipantCostPV_SCT` | 13654.4 | 46906.9 |
 | `DiscountedSavingsGrosskWh` | 93907.9 | -67117.5 |
 | `DiscountedSavingsNetkWh` | 75126.3 | -53694 |
 | `DiscountedSavingsGrossThm` | 3954.02 | 10917.8 |

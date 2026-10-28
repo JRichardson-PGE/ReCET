@@ -63,7 +63,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
 
     def load(f):
         measures, _ = run_poc.load_job(f, None, allocate_statewide=cfg.allocate_statewide, dtypes=dtypes)
-        measures["acc_version"] = measures["acc_version"].replace("", acc.key)
+        measures["Used_ACCVersion_Key"] = measures["ACCVersion"].replace("", acc.key)    # the ACC each measure is priced on (blank = this run's)
         return measures
 
     # ---- pass 1: every measure-level value, part by part
@@ -77,7 +77,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         measures = load(f)
         vals, ems, comps = [], [], []
         for k, g in groups.items():
-            sub = measures[measures["acc_version"] == k].reset_index(drop=True) if len(groups) > 1 else measures
+            sub = measures[measures["Used_ACCVersion_Key"] == k].reset_index(drop=True) if len(groups) > 1 else measures
             if sub.empty:
                 continue
             if g is not acc:
@@ -98,7 +98,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if comps:
             c = pd.concat(comps, ignore_index=True)
             c.to_parquet(spill / f"components_{i:04d}.parquet", index=False)
-            comp_checks.append((d[["measure_id", "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost"]], c))
+            comp_checks.append((d[["CEInputID", "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost"]], c))
         if years:
             profiles.append(profile8760.portfolio_profile(measures, years, log=lambda s: None))
         n_measures += len(measures)
@@ -147,14 +147,14 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         res = run_poc.apply_program_costs(pd.read_parquet(spill / f"values_{i:04d}.parquet"), measures, program, acc_version=acc.settings_acc,
                                           base_year=base_year, market_effects_bens=meb, include_societal=societal, totals=totals)
         if cfg.emissions:
-            res = res.merge(pd.read_parquet(spill / f"emissions_{i:04d}.parquet"), on="measure_id", how="left")
+            res = res.merge(pd.read_parquet(spill / f"emissions_{i:04d}.parquet"), on="CEInputID", how="left")
         frame = outputs.assemble_measure_level(outputs.read_raw(f, cfg.allocate_statewide), measures, res,
-                                               measures["acc_version"].map(labels) if len(groups) > 1 else acc.label,
+                                               measures["Used_ACCVersion_Key"].map(labels) if len(groups) > 1 else acc.label,
                                                credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
         if cfg.components:
-            frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
+            frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), on="CEInputID", how="left")
             frame = frame[[c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]]
-        frame = outputs.attach_programs(frame, measures["prg_id"])
+        frame = outputs.attach_programs(frame, measures["PrgID"])
         writer.write(frame)
         summary_parts.add(frame)
         km_parts.append(key_metrics.sums(frame))

@@ -3,8 +3,9 @@
 measure-level table -- one row per measure, column groups left to right:
   Used_ACCVersion                  which ACC version the run priced against
   <raw Measure.csv columns>        exactly as in the input file (text preserved)
-  Used_Year ... Fuel_Sub_Flag      the few derived values a reader cannot see in the inputs (DERIVED_OUTPUTS): the claim year and quarter used, the annual
-                                   kWh / therms each baseline is priced on (net, with installation and realization rates), the fuel-substitution flag
+  Used_Year ... Scaled_Profile_Flag   the few derived values a reader cannot see in the inputs (DERIVED_OUTPUTS): the claim year and quarter used, the annual
+                                   net kWh / therms each baseline is priced on (with installation and realization rates), the fuel-substitution flag and
+                                   whether UnitkWh came from a scaled (kWh-per-unit) profile
   ElecPricingStatus, ProfileSource, GasPricingStatus, GasProfileSource, WaterPricingStatus
                                    how each fuel was priced, from which profile, or that it was UNPRICED (a 0 benefit alone cannot tell "no savings" from "could not price")
   <outputs>                        benefits (electric, gas, water energy, other), supply costs, participant / bill-impact PVs, Gross and NoAdmin variants, TRC/PAC/RIM/SCB/SCH costs and ratios,
@@ -29,17 +30,10 @@ import pandas as pd
 
 from .pipeline.delimited import read_cet_csv
 
-# the loader's derived fields that are written, under their measure-level names; the others restate an input column (or another output) and are not written.
-# The two kWh columns are the annual net kWh x installation and realization rates (the loader's shape_scale, except on an already-scaled kWh-per-unit profile,
-# where shape_scale is a multiplier of the profile and the annual kWh is the profile's own).
-DERIVED_OUTPUTS = {
-    "claim_year": "Used_Year", "claim_quarter": "Used_Quarter",
-    "annual_net_kwh_1st": "AC_kWh_1st_Baseline", "annual_net_kwh_2nd": "AC_kWh_2nd_Baseline",
-    "annual_net_therms_1st": "AC_Therms_1st_Baseline", "annual_net_therms_2nd": "AC_Therms_2nd_Baseline",
-    "water_scale_1st": "AC_kWh_Water_1st_Baseline", "water_scale_2nd": "AC_kWh_Water_2nd_Baseline",
-    "is_fuel_sub": "Fuel_Sub_Flag",
-}
-DROP_FROM_RESULT = {"measure_id", "prg_id", "NTGRkWh", "ntgr_therm"}   # restate CEInputID / PrgID / derived NTG columns already present
+# the loader's derived columns that are written (the loader names them as written); its other columns restate an input and are not written
+DERIVED_OUTPUTS = ["Used_Year", "Used_Quarter", "AC_Net_kWh_1st_Baseline", "AC_Net_kWh_2nd_Baseline", "AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline",
+                   "AC_Net_kWh_Water_1st_Baseline", "AC_Net_kWh_Water_2nd_Baseline", "Fuel_Sub_Flag", "Scaled_Profile_Flag"]
+DROP_FROM_RESULT = {"CEInputID", "PrgID", "NTGRkWh_plus_MEBens", "NTGRTherm_plus_MEBens"}   # restate an input, or a working value of the cost tests
 
 # the columns compared between two runs / against CET, and the totals in the summary
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
@@ -72,7 +66,7 @@ def credited_pa(measures: pd.DataFrame, programcost_csv, allocate_statewide: boo
     else:
         st = Path(programcost_csv).stat()
         by_year, by_prg = _credited_maps(str(programcost_csv), False, st.st_size, st.st_mtime_ns)
-    vals = [by_year.get((p, int(y)), by_prg.get(p, "")) for p, y in zip(measures["prg_id"].astype(str).str.strip(), measures["claim_year"])]
+    vals = [by_year.get((p, int(y)), by_prg.get(p, "")) for p, y in zip(measures["PrgID"].astype(str).str.strip(), measures["Used_Year"])]
     return pd.Series(vals, index=measures.index, dtype=object)
 
 
@@ -94,8 +88,8 @@ def _credited_maps(path: str, allocate_statewide: bool, size: int, mtime_ns: int
 def _aligned_raw(raw: pd.DataFrame, measures: pd.DataFrame) -> pd.DataFrame:
     if not raw["CEInputID"].is_unique:
         raise ValueError("CEInputID is not unique")
-    raw = raw.set_index("CEInputID", drop=False).reindex(measures["measure_id"]).reset_index(drop=True)
-    if raw["CEInputID"].isna().any() or not (raw["CEInputID"].to_numpy() == measures["measure_id"].to_numpy()).all():
+    raw = raw.set_index("CEInputID", drop=False).reindex(measures["CEInputID"]).reset_index(drop=True)
+    if raw["CEInputID"].isna().any() or not (raw["CEInputID"].to_numpy() == measures["CEInputID"].to_numpy()).all():
         raise ValueError("raw Measure.csv rows and loaded measures do not line up on CEInputID")
     return raw
 
@@ -104,11 +98,8 @@ def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd
                            credited: pd.Series | None = None) -> pd.DataFrame:
     """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
     raw = _aligned_raw(raw, measures)
-    result = result.set_index("measure_id").reindex(measures["measure_id"]).reset_index()
-    derived = measures[list(DERIVED_OUTPUTS)].rename(columns=DERIVED_OUTPUTS).reset_index(drop=True)
-    rates = (measures["ir_kwh"].astype(float) * measures["rr_kwh"].astype(float)).to_numpy()
-    for c in ("AC_kWh_1st_Baseline", "AC_kWh_2nd_Baseline"):
-        derived[c] = derived[c].astype(float) * rates
+    result = result.set_index("CEInputID").reindex(measures["CEInputID"]).reset_index()
+    derived = measures[DERIVED_OUTPUTS].reset_index(drop=True)
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
     frame = pd.concat([raw.reset_index(drop=True), derived, out], axis=1).copy()   # copy: one block, so the two columns added below do not warn
     frame.insert(0, "Used_ACCVersion", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())   # one label, or one per measure (mixed ACC versions)
