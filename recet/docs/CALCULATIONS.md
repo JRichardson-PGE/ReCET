@@ -739,9 +739,10 @@ weight_m(Y) = overlap( [Y, Y+1), 1st-baseline period ) * S1e + overlap( [Y, Y+1)
 ```
 
 `S1e`, `S2e` are `AC_Net_kWh_ScaledProfile_*_Baseline` (net, with IR and RR, without market effects). Each measure's 8,760 profile (supplied or library) is aligned to the ACC's weekdays (C4.2), and the `datetime` column labels the hours on the ACC's calendar (2018 or 2020); a measure with no shape is left out and listed in `portfolio_8760_unshaped_*`. Positive = savings, negative = added load. `net_kwh_<Y>` sums all IOUs, `net_kwh_<Y>_<PA>` by
-territory.
+territory and `net_kwh_<Y>_CZ<zone>` by climate zone (BRD BR-06.13); `portfolio_8760_peaks_*` gives each one's peak savings hour, largest added load and kWh in the
+portfolio's peak hour (OUTPUT_FIELDS 2.4b).
 
-**C16.3 Portfolio summary.** `portfolio_summary_*` has one row for all measures, one per `IOU_AC_Territory`, one per `CreditedPA` and one per program segment (`Prg_ProgramSegment`, from the program metadata), with the sum of each of: `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`,
+**C16.3 Portfolio summary.** `portfolio_summary_*` has one row for all measures, one per `IOU_AC_Territory`, one per `CreditedPA`, one per program segment (`Prg_ProgramSegment`, from the program metadata) and one per program year (`Used_Year`, BRD BR-04.1), with the sum of each of: `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`,
 `WaterEnergyCost`, `TotalSystemBenefit`, `TRCBen`, `PACBen`, `RIMBen`, `SCBBen`, `SCHBen`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost`, `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, and portfolio ratios on CET's receipt definition (plus `PCT_ratio = sum(PCTBen) / sum(PCTCost)`):
 
 ```text
@@ -807,6 +808,9 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 10. `DiscountedSavingsGross...` on early-replacement measures (`RUL_Yrs` > 0): ReCET's is the net formula without NTG (C19.5). CET's gross kWh counts one 2nd-baseline year too many
    (`Raf ^ -(EUL - RUL)` where its net version has `- 1`) and its gross therms leave the 2nd baseline undiscounted (a misplaced bracket), so CET's gross and net disagree even at NTG = 1.
    Single-baseline measures match CET.
+11. **PrgIDs that do not line up between `Measure.csv` and `ProgramCost.csv`** do not stop the run (BRD BR-06.16, 0.1.59). CET stops the job on either kind. A measure whose program
+   has no `ProgramCost.csv` row is priced with no program costs (C11: its share is of a program total of 0), and a `ProgramCost.csv` row whose program has no measures is charged to
+   none; preflight warns about both (`measures_without_program_costs`, `program_costs_without_measures`, with the costs left out). A job whose PrgIDs all line up gives CET's results.
 
 **Limitations.**
 

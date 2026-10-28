@@ -1,7 +1,9 @@
-"""The Results tab's tables: a run's measure-level results filtered to one PA and shown at five levels, with columns chosen by a saved view. No tkinter here.
+"""The Results tab's tables: a run's measure-level results filtered to one PA and to the program years picked, and shown at six levels, with columns chosen by
+a saved view. No tkinter here.
 
-Levels (`LEVELS`): measure, program (PrgID), program sector (the program's PrimarySector from the Programs list), program segment (its ProgramSegment) and
-portfolio. Every level above the measure is a sum over its measures; ratio columns are recomputed from the summed benefits and costs (`outputs.group_ratios`,
+Levels (`LEVELS`): measure, program (PrgID), program year (the claim year, `Used_Year`; BRD BR-04.1), program sector (the program's PrimarySector from the
+Programs list), program segment (its ProgramSegment) and portfolio. `years` (a list of program years; empty = every year) limits every level to those
+years, so a multi-year filing's tests and TSB can be totalled over the years chosen. Every level above the measure is a sum over its measures; ratio columns are recomputed from the summed benefits and costs (`outputs.group_ratios`,
 the same definition the portfolio summary and CET's run receipt use), never averaged.
 
 The PA of a measure (`pa_of`) is its program's administrator: the `PA` of its ProgramCost row (`CreditedPA`), else the program's PA in the Programs list
@@ -11,9 +13,9 @@ Columns: `catalog(frame)` lists what a view can show - the run's additive output
 the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, derived pricing inputs (`Used_Year`, `AC_Net_kWh_1st_Baseline` ...), measure-level ratios, shares and statuses are not offered: they do not
 add up across measures. `DEFAULT_VIEW` is the built-in view; users save their own (`load_views` / `save_views`, kept in the tool's config file).
 
-Memory (`RunResults`): every level above the measure is built from the run's GROUP SUMS -- one row per (PA, PrgID, program name, sector, segment) with each
+Memory (`RunResults`): every level above the measure is built from the run's GROUP SUMS -- one row per (PA, PrgID, program name, sector, segment, year) with each
 summable column added up and the measure count -- not from the measure rows. For a results file they are computed by reading the file in batches of only the
-columns needed and kept beside it (`<RESULTS_DIR>/group_sums1_<file>.parquet`), so a 1,000,000-measure run is never loaded whole (it took about 4 GB). The measure
+columns needed and kept beside it (`<RESULTS_DIR>/group_sums2_<file>.parquet`), so a 1,000,000-measure run is never loaded whole (it took about 4 GB). The measure
 level is offered only for a run of at most `MAX_RUN_MEASURE_ROWS` measures, and shows at most `MAX_MEASURE_ROWS` rows (pick one PA); its rows are read from the
 file the same way, filtered to the PA as they are read. A larger run's measure-level table is in its download only.
 """
@@ -30,11 +32,12 @@ from . import outputs, paths, templates
 MAX_MEASURE_ROWS = 5000            # above this many measures (after the PA filter) the measure-level tab is turned off: open the measure-level file instead
 MAX_RUN_MEASURE_ROWS = 50_000      # a run with more measures than this has no measure-level tab at all (its measure-level table is in the download only)
 BATCH_ROWS = 20_000                # rows read at a time from a results file
-KEYS = ["_pa", "_prg", "_prgname", "_sector", "_segment"]      # the group-sum keys (names start with "_" so the catalog never offers them)
+KEYS = ["_pa", "_prg", "_prgname", "_sector", "_segment", "_year"]      # the group-sum keys (names start with "_" so the catalog never offers them)
 COUNT = "_n"
-CUBE_VERSION = 1                   # in the kept group-sums file's name: change it when the group sums change, so old files are rebuilt
-LEVELS = [("measure", "Measure level"), ("program", "Program level"), ("sector", "Program sector level"), ("segment", "Program segment level"),
-          ("portfolio", "Portfolio level")]
+CUBE_VERSION = 2                   # in the kept group-sums file's name: change it when the group sums change, so old files are rebuilt (2: + _year, 0.1.60)
+LEVELS = [("measure", "Measure level"), ("program", "Program level"), ("year", "Program year level"), ("sector", "Program sector level"),
+          ("segment", "Program segment level"), ("portfolio", "Portfolio level")]
+YEAR_COLUMNS = ("Used_Year", "poc_year")      # a measure's program year (poc_year: a run written before 0.1.50)
 ALL_PAS = "All PAs"
 VIEWS_KEY = "gui_result_views"
 DEFAULT_VIEW_NAME = "Default"
@@ -194,8 +197,33 @@ def available_pas(frame: pd.DataFrame) -> list[str]:
     return [ALL_PAS] + sorted(pa_of(frame).unique())
 
 
-def filter_pa(frame: pd.DataFrame, pa: str) -> pd.DataFrame:
-    return frame if pa in (None, "", ALL_PAS) else frame[pa_of(frame) == pa]
+def filter_pa(frame: pd.DataFrame, pa: str, years=None) -> pd.DataFrame:
+    """The measures of one PA (ALL_PAS = every one) in the program years given (None or empty = every year)."""
+    f = frame if pa in (None, "", ALL_PAS) else frame[pa_of(frame) == pa]
+    if years:
+        f = f[year_of(f).isin({str(y) for y in years})]
+    return f
+
+
+def year_of(frame: pd.DataFrame) -> pd.Series:
+    """Each measure's program year as text (its claim year, `Used_Year`), else the first four characters of ClaimYearQuarter; "(blank)" if neither."""
+    for col in YEAR_COLUMNS:
+        if col in frame:
+            return pd.to_numeric(frame[col], errors="coerce").astype("Int64").astype(str).replace("<NA>", "(blank)")
+    if "ClaimYearQuarter" in frame:
+        return frame["ClaimYearQuarter"].fillna("").astype(str).str[:4].replace("", "(blank)")
+    return pd.Series("(blank)", index=frame.index)
+
+
+def parse_years(values) -> list[str]:
+    """Program years from a request or a setting: any mix of lists and comma-separated text, as sorted unique four-digit years ("" -> every year)."""
+    out = set()
+    for v in values if isinstance(values, (list, tuple, set)) else [values]:
+        for y in str(v or "").split(","):
+            y = y.strip()
+            if len(y) == 4 and y.isdigit():
+                out.add(y)
+    return sorted(out)
 
 
 def _group_key(frame: pd.DataFrame, level: str) -> pd.Series | None:
@@ -248,11 +276,12 @@ def _key_frame(frame: pd.DataFrame) -> pd.DataFrame:
         k["_prgname"] = frame["Prg_ProgramName"].fillna("").astype(str).to_numpy()
     k["_sector"] = _group_key(frame, "sector").to_numpy()
     k["_segment"] = _group_key(frame, "segment").to_numpy()
+    k["_year"] = year_of(frame).to_numpy()
     return k
 
 
 def group_sums(frame: pd.DataFrame) -> pd.DataFrame:
-    """One row per distinct (PA, PrgID, program name, sector, segment): COUNT measures and every summable numeric column added up (NaN where it is NaN in
+    """One row per distinct (PA, PrgID, program name, sector, segment, program year): COUNT measures and every summable numeric column added up (NaN where it is NaN in
     all of the group's measures, as a sum over the measures would be)."""
     cols = [c for c in frame.columns if _summable(c) and pd.api.types.is_numeric_dtype(frame[c])]
     k = _key_frame(frame)
@@ -274,7 +303,8 @@ def _combine(parts: list[pd.DataFrame]) -> pd.DataFrame:
     return allp.groupby(keys, sort=False, dropna=False)[cols].sum(min_count=1).reset_index()
 
 
-KEY_SOURCES = {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", "PrgID", "Prg_ProgramName", "Prg_PrimarySector", "Prg_ProgramSegment"}
+KEY_SOURCES = {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", "PrgID", "Prg_ProgramName", "Prg_PrimarySector", "Prg_ProgramSegment",
+               *YEAR_COLUMNS, "ClaimYearQuarter"}
 
 
 def _needed_for_sums(schema) -> list[str]:
@@ -373,35 +403,45 @@ class RunResults:
     def pas(self) -> list[str]:
         return [ALL_PAS] + sorted(self.sums["_pa"].unique()) if len(self.sums) else [ALL_PAS]
 
-    def _of(self, pa: str) -> pd.DataFrame:
-        return self.sums if pa in (None, "", ALL_PAS) else self.sums[self.sums["_pa"] == pa]
+    def years(self) -> list[str]:
+        """The run's program years, in order (BR-04.1): the choices of the years filter."""
+        return sorted(self.sums["_year"].astype(str).unique()) if len(self.sums) and "_year" in self.sums else []
 
-    def count(self, pa: str) -> int:
-        s = self._of(pa)
+    def _of(self, pa: str, years=None) -> pd.DataFrame:
+        s = self.sums if pa in (None, "", ALL_PAS) else self.sums[self.sums["_pa"] == pa]
+        if years and "_year" in s:
+            s = s[s["_year"].astype(str).isin({str(y) for y in years})]
+        return s
+
+    def count(self, pa: str, years=None) -> int:
+        s = self._of(pa, years)
         return int(s[COUNT].sum()) if len(s) else 0
 
     def measure_level_available(self) -> bool:
         """False for a run too large to show measure by measure at all (MAX_RUN_MEASURE_ROWS): its measure-level table is in the download only."""
         return self.n <= MAX_RUN_MEASURE_ROWS
 
-    def measure_level_allowed(self, pa: str) -> bool:
-        return self.measure_level_available() and self.count(pa) <= MAX_MEASURE_ROWS
+    def measure_level_allowed(self, pa: str, years=None) -> bool:
+        return self.measure_level_available() and self.count(pa, years) <= MAX_MEASURE_ROWS
 
-    def table(self, level: str, pa: str, keys: list[str]) -> pd.DataFrame:
-        """The rows of one level for one PA, with identifier columns first and then `keys` (unknown keys are skipped). Values are numbers, unformatted.
-        The measure level must be allowed (measure_level_allowed): it raises otherwise."""
+    def table(self, level: str, pa: str, keys: list[str], years=None) -> pd.DataFrame:
+        """The rows of one level for one PA and the program years given (None or empty = every year), with identifier columns first and then `keys`
+        (unknown keys are skipped). Values are numbers, unformatted. The measure level must be allowed (measure_level_allowed): it raises otherwise."""
         cat = self.catalog()
         cols = [cat[k] for k in keys if k in cat]
         if level == "measure":
-            if not self.measure_level_allowed(pa):
-                raise ValueError(f"the measure level is off for this run ({self.count(pa):,} measures)")
-            return _measure_table(self._measure_rows(pa, cols), cols)
-        s = self._of(pa)
+            if not self.measure_level_allowed(pa, years):
+                raise ValueError(f"the measure level is off for this run ({self.count(pa, years):,} measures)")
+            return _measure_table(self._measure_rows(pa, cols, years), cols)
+        s = self._of(pa, years)
         if level == "portfolio":
             label = "All PAs" if pa in (None, "", ALL_PAS) else pa
-            return pd.DataFrame([{"Portfolio": label, "Measures": int(s[COUNT].sum()) if len(s) else 0, **_values(s, cols)}])
-        key = {"program": "_prg", "sector": "_sector", "segment": "_segment"}[level]
-        name = {"program": "PrgID", "sector": "Program sector", "segment": "Program segment"}[level]
+            row = {"Portfolio": label}
+            if years:
+                row["Program years"] = ", ".join(str(y) for y in sorted(years))
+            return pd.DataFrame([{**row, "Measures": int(s[COUNT].sum()) if len(s) else 0, **_values(s, cols)}])
+        key = {"program": "_prg", "year": "_year", "sector": "_sector", "segment": "_segment"}[level]
+        name = {"program": "PrgID", "year": "Program year", "sector": "Program sector", "segment": "Program segment"}[level]
         rows = []
         if key in s:
             for k, g in s.groupby(key, sort=True):
@@ -414,39 +454,40 @@ class RunResults:
                 rows.append(row)
         return pd.DataFrame(rows)
 
-    def _measure_rows(self, pa: str, cols: list[Column]) -> pd.DataFrame:
-        """The measure rows of one PA: from memory, or read from the results file in batches of only the columns the table uses."""
+    def _measure_rows(self, pa: str, cols: list[Column], years=None) -> pd.DataFrame:
+        """The measure rows of one PA and those years: from memory, or read from the results file in batches of only the columns the table uses."""
         if self.frame is not None:
-            return filter_pa(self.frame, pa)
+            return filter_pa(self.frame, pa, years)
         if self.path.suffix.lower() != ".parquet":
-            return filter_pa(outputs.read_table(self.path), pa)
+            return filter_pa(outputs.read_table(self.path), pa, years)
         import pyarrow.parquet as pq
         pf = pq.ParquetFile(self.path)
-        want = {"CEInputID", "MeasDescription", "PrgID", *(KEY_SOURCES & {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA"})}
+        want = {"CEInputID", "MeasDescription", "PrgID", *(KEY_SOURCES & {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", *YEAR_COLUMNS,
+                                                                        "ClaimYearQuarter"})}
         for c in cols:
             want |= set(c.parts) if c.kind == "derived" else (RATIO_INPUTS if c.kind == "ratio" else {c.key})
         names = [n for n in pf.schema_arrow.names if n in want]
-        out = [filter_pa(b.to_pandas(), pa) for b in pf.iter_batches(batch_size=BATCH_ROWS, columns=names, use_threads=False)]
+        out = [filter_pa(b.to_pandas(), pa, years) for b in pf.iter_batches(batch_size=BATCH_ROWS, columns=names, use_threads=False)]
         return pd.concat(out, ignore_index=True) if out else pf.schema_arrow.empty_table().select(names).to_pandas()
 
 
 def _measure_table(f: pd.DataFrame, cols: list[Column]) -> pd.DataFrame:
     ids = pd.DataFrame({"CEInputID": f.get("CEInputID", pd.Series(index=f.index, dtype=object)),
                         "Description": f.get("MeasDescription", pd.Series("", index=f.index)), "PrgID": f.get("PrgID", pd.Series("", index=f.index)),
-                        "PA": pa_of(f)})
+                        "PA": pa_of(f), "Program year": year_of(f)})
     return pd.concat([ids, _row_values(f, cols)], axis=1).reset_index(drop=True)
 
 
-def table(frame: pd.DataFrame, level: str, pa: str, keys: list[str]) -> pd.DataFrame:
+def table(frame: pd.DataFrame, level: str, pa: str, keys: list[str], years=None) -> pd.DataFrame:
     """RunResults.from_frame(frame).table(...), without the measure-level size limits (a caller holding the whole frame decides that itself)."""
     if level == "measure":
         cat = catalog(frame)
-        return _measure_table(filter_pa(frame, pa), [cat[k] for k in keys if k in cat])
-    return RunResults.from_frame(frame).table(level, pa, keys)
+        return _measure_table(filter_pa(frame, pa, years), [cat[k] for k in keys if k in cat])
+    return RunResults.from_frame(frame).table(level, pa, keys, years)
 
 
-def measure_level_allowed(frame: pd.DataFrame, pa: str) -> bool:
-    return len(frame) <= MAX_RUN_MEASURE_ROWS and len(filter_pa(frame, pa)) <= MAX_MEASURE_ROWS
+def measure_level_allowed(frame: pd.DataFrame, pa: str, years=None) -> bool:
+    return len(frame) <= MAX_RUN_MEASURE_ROWS and len(filter_pa(frame, pa, years)) <= MAX_MEASURE_ROWS
 
 
 def format_value(col: Column | None, v) -> str:
@@ -493,3 +534,35 @@ def current_keys(keys) -> list[str]:
 
 def save_views(views: dict[str, list[str]], current: str) -> None:
     paths.save_config(**{VIEWS_KEY: {"views": {k: v for k, v in views.items() if k != DEFAULT_VIEW_NAME}, "current": current}})
+
+
+# ----------------------------------------------------------------------------------------------------------------------------- two runs side by side
+COMPARE_LEVELS = [("portfolio", "Portfolio"), ("year", "Program year"), ("segment", "Program segment"), ("sector", "Program sector"), ("program", "Program")]
+SIDES = ("a", "b", "diff", "pct")
+
+
+def compare(a: RunResults, b: RunResults, level: str, keys: list[str], pa: str = ALL_PAS, years=None) -> pd.DataFrame:
+    """Two runs side by side at one level (BRD BR-06.11, any two runs, not only two ACCs of one job): one row per group present in either run, matched
+    on the group (the PrgID, program year, sector or segment; the portfolio is one row), and for each key `<key>__a`, `<key>__b`, `<key>__diff` (b - a) and
+    `<key>__pct` (diff / |a|, blank when a is 0; ratios are recomputed in each run from its own sums, as everywhere). Measures counts as a key too.
+    Keys only one run has are blank for the other."""
+    ta, tb = a.table(level, pa, keys, years), b.table(level, pa, keys, years)
+    idcol = {"portfolio": "Portfolio", "program": "PrgID", "year": "Program year", "sector": "Program sector", "segment": "Program segment"}[level]
+    for t in (ta, tb):
+        if level == "portfolio" and len(t):
+            t[idcol] = "All PAs" if pa in (None, "", ALL_PAS) else pa
+    extra = [c for c in ("Program name", "PA") if c in ta or c in tb]
+    values = ["Measures"] + [k for k in keys if k in ta.columns or k in tb.columns]
+    ja = ta.set_index(idcol) if len(ta) else pd.DataFrame(columns=values + extra).rename_axis(idcol)
+    jb = tb.set_index(idcol) if len(tb) else pd.DataFrame(columns=values + extra).rename_axis(idcol)
+    index = list(dict.fromkeys(list(ja.index) + list(jb.index)))
+    out = pd.DataFrame(index=pd.Index(index, name=idcol))
+    for c in extra:
+        out[c] = ja[c].reindex(index).fillna(jb[c].reindex(index)) if c in ja else jb[c].reindex(index)
+    for k in values:
+        va = pd.to_numeric(ja[k], errors="coerce").reindex(index) if k in ja else pd.Series(float("nan"), index=index)
+        vb = pd.to_numeric(jb[k], errors="coerce").reindex(index) if k in jb else pd.Series(float("nan"), index=index)
+        out[f"{k}__a"], out[f"{k}__b"] = va.to_numpy(), vb.to_numpy()
+        out[f"{k}__diff"] = (vb - va).to_numpy()
+        out[f"{k}__pct"] = ((vb - va) / va.abs()).where(va != 0).to_numpy()
+    return out.reset_index()
