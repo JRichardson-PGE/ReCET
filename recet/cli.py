@@ -13,6 +13,7 @@
     recet data build-system-zones [OUT]     rebuild the System climate zone catalog (every library profile x each built-in ACC; ~4 minutes)
     recet openbca run --program-input P.xlsm --configuration C.xlsm --out results     OpenBCA's own engine on its workbooks (needs RECET_OPENBCA_HOME)
     recet openbca compare A/openbca.db B/openbca.db                                  every OpenBCA table of two runs
+    recet openbca compare-recet --measures M.csv --programcost P.csv --out cmp        a CET job priced in ReCET and in OpenBCA, measure by measure
 """
 from __future__ import annotations
 
