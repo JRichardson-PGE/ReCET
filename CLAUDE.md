@@ -90,6 +90,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.54 (2026-10-28, Jake): output templates are built with a two-list field picker (web Templates page: `static/app.js` over a JSON catalog in the
+  page, the textarea kept as the submitted value and the paste box; window: `gui_templates.py`, replacing the text box). Left list: Show = all / input
+  fields / program fields (Prg_*) / output fields / one OUTPUT_FIELDS group (`output_templates.KINDS`, `kind()`), search over names and definitions;
+  right list in file order with Top / Up / Down / Bottom. A saved default template starts new runs: web `user_settings` table (key
+  `default_output_template`; a fresh New run page preselects it, a rerun keeps its own), window config key `default_output_template` (applied at
+  startup over the restored last-run template once a default is set). Skipped 0.1.53 (PR #39, ratio numerators, used it).
 - 0.1.52 (2026-10-27, Jake): `docs/ARCHITECTURE.md` (requirements, layers, every module, run flow, data, web deployment and security, performance
   design; its module map and web settings table are checked by tests). The web Docs pages draw ```mermaid blocks: Mermaid 11.4.1 is vendored in
   `web/static/vendor/mermaid/` (npm tarball, integrity checked; the CSP allows only same-origin scripts, so never load it from a CDN) and `static/docs.js`

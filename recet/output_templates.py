@@ -6,6 +6,8 @@ measure-level file (RunConfig.output_template); the Results tables still read ev
     check(columns)               (known, unknown) names
     read_file(path)              a template saved as a file: JSON {"name": ..., "columns": [...]}, or text with one column per line
     load_saved() / save(...)     the window's saved templates (the tool's config file); the web app keeps each user's in its database
+    default_name() / set_default the template new runs start with (the window's config file; the web app keeps each user's in its database)
+    KINDS, kind(group)           the field picker's categories: input, program and output fields (output by OUTPUT_FIELDS.md group)
     current(columns)             a template's columns under the names a run writes now (columns renamed in 0.1.50 accepted by their old names)
 
 A column the run did not produce (an SCT column with the Societal Cost Tests off, a component column without components mode) is left out of the file, and
@@ -21,7 +23,9 @@ from pathlib import Path
 from . import field_docs, paths, templates
 
 CONFIG_KEY = "output_templates"
+DEFAULT_KEY = "default_output_template"
 ALL = "All columns"
+KINDS = ("Input fields", "Program fields", "Output fields")   # the field picker's categories (kind()); each output group can also be picked on its own
 BUILTIN: dict[str, list[str]] = {
     "Key results": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "IOU_AC_Territory", "Used_ACCVersion", "ElecPricingStatus", "GasPricingStatus",
                     "TotalSystemBenefit", "ElecBen", "GasBen", "OtherBen", "TRCCost", "PACCost", "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio",
@@ -60,6 +64,11 @@ def catalog() -> list[tuple[str, str, str, str]]:
 def _def(column: str) -> tuple[str, str]:
     d = field_docs.definition(column)
     return (d.text, d.link) if d else ("", "")
+
+
+def kind(group: str) -> str:
+    """The picker category of a catalog group: the input columns, the program metadata (Prg_*) or an output group."""
+    return "Input fields" if group == "Input columns" else "Program fields" if group == "Program metadata" else "Output fields"
 
 
 def names() -> set[str]:
@@ -129,3 +138,17 @@ def save(name: str, columns: list[str] | None) -> None:
     if columns is not None:
         saved[name] = list(columns)
     paths.save_config(**{CONFIG_KEY: saved})
+
+
+def default_name(saved: dict[str, list[str]] | None = None) -> str:
+    """The window's default template for new runs: ALL unless one was set and still exists. (Until a default is set, the window keeps the template of
+    its last run.)"""
+    name = str(paths.read_config().get(DEFAULT_KEY) or "")
+    return name if name in (load_saved() if saved is None else saved) else ALL
+
+
+def set_default(name: str) -> None:
+    """Make a template (or ALL) the one new runs start with."""
+    if name != ALL and name not in load_saved():
+        raise ValueError(f"no template named {name!r}")
+    paths.save_config(**{DEFAULT_KEY: name})

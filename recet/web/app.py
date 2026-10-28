@@ -541,21 +541,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return out
     ctx.user_templates = user_templates
 
+    def default_template(uid: int, mine: dict[str, list[str]] | None = None) -> str:
+        """The template this user's new runs start with: "All columns" unless one was set and still exists."""
+        from .. import output_templates as ot
+        r = ctx.db.one("SELECT value FROM user_settings WHERE user_id = ? AND key = 'default_output_template'", (uid,))
+        name = r["value"] if r else ""
+        return name if name in (user_templates(uid) if mine is None else mine) else ot.ALL
+    ctx.default_template = default_template
+
+    def set_default_template(uid: int, name: str) -> None:
+        from .. import output_templates as ot
+        if name == ot.ALL:
+            ctx.db.run("DELETE FROM user_settings WHERE user_id = ? AND key = 'default_output_template'", (uid,))
+        else:
+            ctx.db.run("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, 'default_output_template', ?)", (uid, name))
+
     def templates_page(request: Request, status_code: int = 200, **kw):
         from .. import output_templates as ot
         u = ctx.need_user(request)
-        groups: dict[str, list] = {}
-        for g, col, text, link in ot.catalog():
-            groups.setdefault(g, []).append((col, text, link))
+        fields = [{"c": col, "g": g, "k": ot.kind(g), "d": text, "l": ctx.u("/docs/" + link) if link else ""} for g, col, text, link in ot.catalog()]
+        groups = list(dict.fromkeys(f["g"] for f in fields if f["k"] == "Output fields"))
         mine = user_templates(u["id"])
         editing = kw.pop("editing", "")
         kw.setdefault("columns", mine.get(editing, []))
-        return ctx.render(request, "output_templates.html", status_code=status_code, all_templates=mine, builtin=set(ot.BUILTIN),
-                          catalog=list(groups.items()), editing=editing, **{"error": "", "saved_ok": "", **kw})
+        return ctx.render(request, "output_templates.html", status_code=status_code, all_templates=mine, builtin=set(ot.BUILTIN), all_name=ot.ALL,
+                          fields=fields, kinds=ot.KINDS, output_groups=groups, editing=editing, default=default_template(u["id"], mine),
+                          **{"error": "", "saved_ok": "", **kw})
 
     @app.get("/output-templates", response_class=HTMLResponse)
-    async def output_templates_page(request: Request, edit: str = "", saved: str = ""):
-        return templates_page(request, editing=edit, saved_ok=saved)
+    async def output_templates_page(request: Request, edit: str = "", saved: str = "", default: str = ""):
+        return templates_page(request, editing=edit, saved_ok=saved, default_ok=bool(default))
 
     @app.post("/output-templates")
     async def output_templates_save(request: Request):
@@ -564,6 +579,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         name = str(form.get("name", "")).strip()[:60]
+        if form.get("set_default"):                                  # "Default for new runs"
+            if name != ot.ALL and name not in user_templates(u["id"]):
+                return templates_page(request, 400, error="Unknown output template.")
+            set_default_template(u["id"], name)
+            return ctx.redirect("/output-templates?default=1")
         if form.get("delete"):
             ctx.db.run("DELETE FROM output_templates WHERE user_id = ? AND name = ?", (u["id"], name))
             return ctx.redirect("/output-templates")
@@ -574,6 +594,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if error:
             return templates_page(request, 400, editing=name, columns=ot.parse(str(form.get("columns", ""))), error=error)
         ctx.db.run("INSERT OR REPLACE INTO output_templates (user_id, name, columns) VALUES (?,?,?)", (u["id"], name, json.dumps(cols)))
+        if form.get("make_default"):
+            set_default_template(u["id"], name)
         from urllib.parse import quote
         return ctx.redirect(f"/output-templates?edit={quote(name)}&saved={quote(name)}")
 
@@ -746,7 +768,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             job_files = [JOB_FILE_LABELS[f] for f in job]
             source_run = from_run
         kw.setdefault("form", {})
-        return ctx.render(request, "new_run.html", status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
+        return ctx.render(request, "new_run.html", default_template=ctx.default_template(request.state.user["id"]), status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
                           acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), output_templates=list(ctx.user_templates(request.state.user["id"])),
                           uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
