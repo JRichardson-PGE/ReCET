@@ -46,6 +46,7 @@ CEDARS.
 | Program costs need not line up (BR-06.16) | calculate measures whose program has no program-cost record | a measure with no `ProgramCost.csv` row is priced with no program costs, and a row with no measures is charged to none; preflight warns about both (`preflight._program_alignment`; C17 item 11) | met |
 | Minimal input set (BR-06.15) | an exploratory run needs only the fields that change a result | descriptive columns may be left out (`templates.with_defaults`); a missing calculation column is still an error | met, except lifecycle savings as input (not built, by decision) |
 | Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); an email to the owner when a run finishes or fails (`web/notify.py`); each run in its own process | partly met: scaling and isolation are not built (section 11) |
+| Compare and share runs (BR-06.11) | compare any two runs; share a run with another user | the web Compare page and CSV (`results_view.compare`: each run's value, the difference and the % change at the portfolio, program year, segment, sector or program level); a run shared read-only by email (`run_shares`) | met for the web app; the desktop window still compares two ACCs of one job only |
 | Statewide allocation (BR-06.7) | split a statewide program across the IOUs; the allocated totals reconcile to the unallocated ones | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15); `statewide_reconciliation` table (`statewide_allocation.reconciliation`) | met; factors come from a file, not a Programs module |
 | Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
 | Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
@@ -361,7 +362,7 @@ owners can start them again. The health check is `GET /healthz`.
 ### 8.2 State
 
 The SQLite database (`recet_web.sqlite3`, WAL mode, a new connection per call) holds: `users`, `sessions` (hashed tokens), `setup_links` (hashed one-time
-tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `user_settings` (each user's default output template), `value_list_changes` and `audit` (sign-ins, runs, user
+tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `user_settings` (each user's default output template and run-email choice), `run_shares` (runs shared read-only with another user), `value_list_changes` and `audit` (sign-ins, runs, user
 changes). Everything else is files: `runs/<id>/` (`inputs/`, `config.json`, `log.txt`, `progress.json`, `progress_log.jsonl`, `estimate.json`, `out/`) and
 `drafts/<id>/` (`draft.json`, an optional base workbook, a rerun's settings and supplied files). Runs are kept `RECET_WEB_RETENTION_DAYS` (7) and untouched
 drafts `RECET_WEB_DRAFT_DAYS` (30).
@@ -401,7 +402,9 @@ running runs' own time left, and a calibration against this server's recent runs
   HTTPS-only by default (`RECET_WEB_SECURE_COOKIES`). Disabling a user or resetting a password deletes their sessions.
 * Every form carries the session's CSRF token (the Edit inputs page sends it as a header).
 * Login is rate-limited: 5 failures per account or 20 per address in 15 minutes lock further attempts.
-* A run or draft belongs to its creator; other users get "not found", admins see everything.
+* A run or draft belongs to its creator; other users get "not found", admins see everything. A run's owner may share it, read-only, with another
+  active user (`run_shares`): they can open its pages, results and files, compare it and rerun its inputs as a run of their own, but Stop, Delete and
+  sharing stay with the owner (`Ctx.run_for(owner=True)`).
 * Uploads are capped per file (`RECET_WEB_MAX_UPLOAD_MB`, 150) and a job zip by its unzipped size (`RECET_WEB_MAX_UNZIPPED_MB`, 1,024), counted as it is
   extracted whatever the zip's headers claim. Only `Measure` and `ProgramCost` members are accepted, each written to a fixed name, so a crafted path cannot
   write elsewhere. Uploaded files are stored under fixed names, never the uploader's.

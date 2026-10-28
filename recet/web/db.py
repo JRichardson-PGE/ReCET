@@ -1,7 +1,7 @@
 """The web app's SQLite store. One file in the state folder; a new connection per call, WAL mode, so the request threads and the run workers never share one.
 
 Tables: users, sessions (hashed tokens), setup_links (hashed one-time tokens), login_failures (rate limits), runs, drafts, views (saved Results columns per user),
-output_templates, user_settings (the default output template), value_list_changes, audit (sign-ins, runs, user changes).
+output_templates, user_settings (the default output template, run emails), run_shares (runs shared read-only with another user), value_list_changes, audit (sign-ins, runs, user changes).
 """
 from __future__ import annotations
 
@@ -64,6 +64,13 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, created_at);
 CREATE INDEX IF NOT EXISTS runs_by_status ON runs(status, created_at);
+CREATE TABLE IF NOT EXISTS run_shares (            -- a run its owner shared, read-only, with another user (BRD BR-06.11)
+    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    shared_by INTEGER NOT NULL REFERENCES users(id),
+    created_at REAL NOT NULL,
+    PRIMARY KEY (run_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),

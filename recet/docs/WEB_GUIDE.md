@@ -62,11 +62,16 @@ The run page opens as soon as the run is queued.
 - **Rerun with different settings** opens New run with this run's files and settings: change a setting (or a file) and start it. Nothing is uploaded
   again.
 - **Edit inputs and rerun** copies the run's tables into a new Edit inputs draft (jobs of up to 500 measures).
+- **Compare with another run** (a finished run) puts it beside any other finished run of yours, or one shared with you: each level (portfolio, program
+  year, segment, sector, program) with both runs' values, the difference (B - A) and the % change, using your Results views' columns and program-year
+  choice; **Download this table (CSV)** saves it (BRD BR-06.11). A group found in one run only is blank for the other.
+- **Sharing** (your own runs) shares the run read-only with another user by their sign-in email. They find it under **Shared with you** on the runs list
+  and can open its results and files, compare it and rerun its inputs as their own run; they cannot stop, delete or share it. **Stop sharing** takes it back.
 - **Stop** a queued or running run; **Delete** a finished one. A run and its files are deleted automatically 7 days after it starts (the run page and
   the runs list say when).
 
 **Runs** lists your runs, newest first, with their settings, measures, status, how long they took and when they will be deleted. Expired runs are hidden
-until you show them. Queued and running runs update in place.
+until you show them. Queued and running runs update in place. Runs other users shared with you are listed below yours, under **Shared with you**.
 
 ## 4. Results
 

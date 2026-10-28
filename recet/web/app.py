@@ -142,13 +142,21 @@ class Ctx:
         resp.set_cookie(name, value, max_age=max_age, path=self.s.prefix or "/", secure=self.s.secure_cookies, httponly=True, samesite="lax")
 
     # --- runs
-    def run_for(self, request: Request, run_id: str):
-        """The run if this user may see it (owner or admin), else 404."""
+    def run_for(self, request: Request, run_id: str, owner: bool = False):
+        """The run if this user may see it (its owner, an admin, or a user it is shared with), else 404. `owner`: only its owner or an admin, for what
+        changes the run (Stop, Delete, sharing); a user it is shared with may read everything else and rerun its inputs as a run of their own."""
         u = self.need_user(request)
         row = self.db.one("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id WHERE r.id = ?", (run_id,))
-        if row is None or (row["user_id"] != u["id"] and u["role"] != "admin"):
+        if row is None:
             raise HTTPException(404)
+        if row["user_id"] != u["id"] and u["role"] != "admin":
+            shared = self.db.one("SELECT 1 FROM run_shares WHERE run_id = ? AND user_id = ?", (run_id, u["id"])) is not None
+            if not shared or owner:
+                raise HTTPException(404)
         return row
+
+    def shared_with(self, run_id: str) -> list:
+        return self.db.all("SELECT u.id, u.email FROM run_shares s JOIN users u ON u.id = s.user_id WHERE s.run_id = ? ORDER BY u.email", (run_id,))
 
     def queue_run(self, request: Request, u, run_id: str, cfg: dict, label: str, names: list[str]) -> None:
         """Write a run's config.json and log header (its inputs are already in its folder), add it to the queue and the audit log."""
@@ -739,7 +747,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                               "expires": expires_text(r, s.retention_days) if r["status"] not in ("queued", "running") else "",
                               "settings": settings_summary(ctx.run_config(r)) if r["status"] != "expired" else ""}
         live_ids = [r["id"] for r in rows if r["status"] in ("queued", "running")]
-        return ctx.render(request, "runs.html", runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
+        shared = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id JOIN run_shares s ON s.run_id = r.id "
+                            "WHERE s.user_id = ? AND r.status != 'expired' ORDER BY r.created_at DESC LIMIT 200", (u["id"],))
+        return ctx.render(request, "runs.html", shared=shared, runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
                           n_expired=n_expired, show_expired=bool(expired), live_ids=live_ids)
 
     @app.get("/runs/live")
@@ -977,7 +987,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         editable = n is None or n <= editor.MAX_EDIT_ROWS
         check = check_summary(ctx.preflight_report(run)) if run["status"] not in ("queued", "expired") else None
         headline = ctx.headline(run) if run["status"] == "finished" and run["result_dir"] else []
-        return ctx.render(request, "run.html", status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
+        u = request.state.user
+        owner = run["user_id"] == u["id"] or u["role"] == "admin"
+        sharing = dict(owner=owner, shared_with=ctx.shared_with(run["id"]) if owner else [],
+                       candidates=compare_candidates(u, run["id"]) if run["status"] == "finished" and run["result_dir"] and not run["preflight_only"] else [])
+        return ctx.render(request, "run.html", **sharing, status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
                           retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run),
                           settings=settings_summary(ctx.run_config(run), size) if has_inputs else "", editable=editable, n_measures=n,
                           max_edit_rows=editor.MAX_EDIT_ROWS, check=check, headline=headline, expires=expires_text(run, s.retention_days))
@@ -1074,7 +1088,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/runs/{run_id}/cancel")
     async def run_cancel(request: Request, run_id: str):
-        run = ctx.run_for(request, run_id)
+        run = ctx.run_for(request, run_id, owner=True)
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         ctx.runner.cancel(run["id"])
@@ -1083,7 +1097,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/runs/{run_id}/delete")
     async def run_delete(request: Request, run_id: str):
-        run = ctx.run_for(request, run_id)
+        run = ctx.run_for(request, run_id, owner=True)
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         if run["status"] in ("queued", "running"):
@@ -1252,6 +1266,90 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         t = res.table(level, pa, keys, years).rename(columns={k: c.label for k, c in cat.items()})
         name = f"recet_{run_id}_{level}.csv"
         return Response(t.to_csv(index=False), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    # ----------------------------------------------------------------------------------------------------------------- sharing and comparing runs
+    def compare_candidates(u, run_id: str) -> list:
+        """Finished runs with results this user may compare a run with: their own and the ones shared with them, newest first."""
+        return ctx.db.all("SELECT r.id, r.label, r.acc_version, r.created_at, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
+                          "WHERE r.status = 'finished' AND r.result_dir IS NOT NULL AND r.preflight_only = 0 AND r.id != ? "
+                          "AND (r.user_id = ? OR r.id IN (SELECT run_id FROM run_shares WHERE user_id = ?)) ORDER BY r.created_at DESC LIMIT 100",
+                          (run_id, u["id"], u["id"]))
+
+    @app.post("/runs/{run_id}/share")
+    async def run_share(request: Request, run_id: str):
+        """Share a run read-only with another user, by their email (owner or admin only). They see it under Shared with you on the runs list."""
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        email = str(form.get("email", "")).strip()
+        target = ctx.db.one("SELECT id, email FROM users WHERE email = ? AND disabled = 0", (email,)) if email else None
+        if target is None:
+            return run_page_for(request, run, 400, f"No active user has the email {email!r}: an admin adds users on the Users page.")
+        if target["id"] == run["user_id"]:
+            return run_page_for(request, run, 400, "That is the run's owner.")
+        ctx.db.run("INSERT OR IGNORE INTO run_shares (run_id, user_id, shared_by, created_at) VALUES (?,?,?,?)",
+                   (run_id, target["id"], request.state.user["id"], time.time()))
+        ctx.db.audit("run shared", request.state.user, detail=f"{run_id} with {target['email']}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    @app.post("/runs/{run_id}/unshare")
+    async def run_unshare(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        uid = int(str(form.get("user_id", "0")) or 0)
+        ctx.db.run("DELETE FROM run_shares WHERE run_id = ? AND user_id = ?", (run["id"], uid))
+        ctx.db.audit("run unshared", request.state.user, detail=f"{run_id} user {uid}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    def compare_tables(request: Request, run_id: str, other: str, level: str, view: str, columns: str, years):
+        """(run a, run b, its results a and b, keys, level, years, the compare frame) for the compare page and its CSV."""
+        from .. import results_view as rv
+        a, b = ctx.run_for(request, run_id), ctx.run_for(request, other)
+        def source(r):
+            base = ctx.result_path(r)
+            return outputs.results_source(base) if base else None
+        sa, sb = source(a), source(b)
+        if sa is None or sb is None:
+            raise HTTPException(404, "Both runs need results to compare them.")
+        ra, rb = ctx.results(sa), ctx.results(sb)
+        cat = {**rb.catalog(), **ra.catalog()}
+        views = user_views(request.state.user["id"])
+        keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
+        level = level if level in {k for k, _ in rv.COMPARE_LEVELS} else "portfolio"
+        known = sorted(set(ra.years()) | set(rb.years()))
+        years = [y for y in rv.parse_years(years) if y in known]
+        if set(years) == set(known):
+            years = []
+        return a, b, cat, keys, level, known, years, rv.compare(ra, rb, level, keys, years=years)
+
+    @app.get("/runs/{run_id}/compare", response_class=HTMLResponse)
+    async def run_compare(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                          columns: str = "", years: list[str] = Query(default=[])):
+        """Any two runs the user may see, side by side at one level (BRD BR-06.11): each run's value, the difference (b - a) and the % change."""
+        from .. import results_view as rv
+        u = ctx.need_user(request)
+        if not other:
+            return ctx.redirect(f"/runs/{run_id}")
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        views = user_views(u["id"])
+        return ctx.render(request, "compare.html", a=a, b=b, table=table, ids=[c for c in table.columns if "__" not in c], keys=["Measures"] + [k for k in keys if k in cat], catalog=cat, level=level,
+                          levels=rv.COMPARE_LEVELS, view=view if view in views else ("" if columns else rv.DEFAULT_VIEW_NAME), views=views,
+                          columns=columns, all_years=known, years=years, years_param=",".join(years),
+                          labels={k: rv.display_label(c) for k, c in cat.items()}, rv=rv, candidates=compare_candidates(u, run_id))
+
+    @app.get("/runs/{run_id}/compare.csv")
+    async def run_compare_csv(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                              columns: str = "", years: list[str] = Query(default=[])):
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        side = {"a": f"run {a['id']}", "b": f"run {b['id']}", "diff": "difference", "pct": "% change"}
+
+        def name(c: str) -> str:
+            k, _, part = c.rpartition("__")
+            return f"{cat[k].label if k in cat else k} ({side[part]})" if k and part in side else c
+        name_csv = f"recet_compare_{a['id']}_{b['id']}_{level}.csv"
+        return Response(table.rename(columns=name).to_csv(index=False), media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{name_csv}"'})
 
     @app.post("/views")
     async def save_view(request: Request):
