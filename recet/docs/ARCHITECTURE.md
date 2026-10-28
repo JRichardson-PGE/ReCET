@@ -45,7 +45,7 @@ CEDARS.
 | Output templates and key metrics (BR-06.10) | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
 | Program costs need not line up (BR-06.16) | calculate measures whose program has no program-cost record | a measure with no `ProgramCost.csv` row is priced with no program costs, and a row with no measures is charged to none; preflight warns about both (`preflight._program_alignment`; C17 item 11) | met |
 | Minimal input set (BR-06.15) | an exploratory run needs only the fields that change a result | descriptive columns may be left out (`templates.with_defaults`); a missing calculation column is still an error | met, except lifecycle savings as input (not built, by decision) |
-| Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); each run in its own process | partly met (section 11) |
+| Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); an email to the owner when a run finishes or fails (`web/notify.py`); each run in its own process | partly met: scaling and isolation are not built (section 11) |
 | Statewide allocation (BR-06.7) | split a statewide program across the IOUs; the allocated totals reconcile to the unallocated ones | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15); `statewide_reconciliation` table (`statewide_allocation.reconciliation`) | met; factors come from a file, not a Programs module |
 | Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
 | Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
@@ -134,6 +134,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
 | `web/eta.py` | interface | when a queued run should start and finish |
+| `web/notify.py` | interface | the email to a run's owner when it finishes or fails (SMTP) |
 | `web/jobzip.py` | interface | the job upload: one zip with `Measure.csv` and an optional `ProgramCost.csv`, extracted safely |
 | `web/auth.py` | interface | passwords, sessions, setup links, CSRF tokens, login rate limits |
 | `web/db.py` | interface | the SQLite store |
@@ -422,11 +423,24 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
 | `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
 | `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"parquet_row_group": 50000}`, parquet row groups of 50,000) |
+| `RECET_WEB_BASE_URL` | none | the site's address (`https://example.org`), for the links in run emails |
+| `RECET_WEB_SMTP_HOST` | none | the SMTP server for run emails; none = no emails (section 8.6) |
+| `RECET_WEB_SMTP_PORT` | 587 | its port |
+| `RECET_WEB_SMTP_SECURITY` | `starttls` | `starttls`, `ssl` (port 465) or `none` (a local relay) |
+| `RECET_WEB_SMTP_USER`, `RECET_WEB_SMTP_PASSWORD` | none | the sign-in, if the server needs one (the password in the server's `.env`, never in git) |
+| `RECET_WEB_SMTP_FROM` | `RECET_WEB_SMTP_USER` | the From address |
 | `RECET_MEM_LIMIT` | `1400m` | the container's memory limit (docker-compose) |
 | `RECET_DATA` | `/data` in the image | the reference data folder |
 | `RECET_HOME` | `~/.recet` | the config folder (and the web state's parent) |
 | `RECET_CACHE`, `RECET_NO_CACHE` | `~/.recet/cache` | where the cache is, or no cache |
 | `RECET_PROGRESS_FILE` | set by the runner | where a run writes its progress |
+
+### 8.6 Run emails
+
+When a run ends the worker hands it to `web/notify.py` on a thread of its own: if `RECET_WEB_SMTP_HOST` is set and the owner has not turned it off (Account
+page, `user_settings` key `notify_runs`), the owner gets one email with the run's name, status, time taken, headline totals (finished) or status message
+(failed) and the run page's link. Stopped runs and input checks that pass are not emailed; nothing from the inputs or the log is. Each attempt is in the
+audit log; a mail failure never changes the run.
 
 ## 9. Performance and memory design
 
@@ -462,7 +476,7 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
 
 ## 11. Limits and what is not built
 
-* **BR-06.2 is only partly met.** Queue position, progress and time estimates are built; email on finish or failure, adding workers under heavy load, and
+* **BR-06.2 is only partly met.** Queue position, progress, time estimates and email on finish or failure are built; adding workers under heavy load and
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
   one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
