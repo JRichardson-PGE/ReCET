@@ -217,7 +217,7 @@ One folder `<out>/<run name>_acc<version>/`:
   main drivers), `preflight.txt`, `preflight_findings.xlsx` (the input check's findings and every flagged cell), `run_settings.json` (everything needed to reproduce the run).
 * With CEDARS filing checks: `filing_validation_*.csv` (each record CEDARS would reject or warn on).
 * With statewide allocation: `statewide_reconciliation_*.csv` (each allocated field of each statewide program, before allocation and by IOU, and whether it reconciles).
-* Optional: `components_summary_*.csv`, `portfolio_8760_*.csv` (+ `_unshaped`), `cet_comparison_*.csv`, and for a two-version run `comparison_acc<A>_vs_acc<B>.csv`.
+* Optional: `components_summary_*.csv`, `portfolio_8760_*.csv` (by PA and climate zone; + `_peaks`, each one's peak hours, and `_unshaped`), `cet_comparison_*.csv`, and for a two-version run `comparison_acc<A>_vs_acc<B>.csv`.
 
 **Water energy** is priced like the electric benefit but on the `Gen` term alone (no T&D, no kW term) with the measure's own electric profile: `WaterEnergyBen` when
 `UnitkWhIOUWater1stBaseline > 0`, `WaterEnergyCost` when it is `< 0` (plus `_SB`/`_SH` and `Gross` variants). Both go into TSB; the cost goes into TRC/PAC/RIM/SCB/SCH costs, the

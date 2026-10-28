@@ -1881,6 +1881,7 @@ The portfolio's net electric savings hour by hour, for each requested calendar y
 | `datetime` | That index laid on the ACC's calendar `A`: 2018 for the 2024/2026 ACCs, 2020 for the 2021/2022 ACCs (every forecast year of an ACC follows one calendar's weekdays, and the shapes are aligned to it; a 2020 calendar includes 29 February and ends on 30 December). Timestamp. | `A-01-01 00:00 plus (hour_of_year - 1) hours` |
 | `net_kwh_<Y>` | The portfolio's net kWh in that hour of calendar year `Y`, all IOUs. Positive = savings, negative = added load. kWh. | `SUM over measures m of weight_m(Y) * shape_m,Y(i)`, `i` = `hour_of_year` |
 | `net_kwh_<Y>_<PA>` | The same for the measures of one IOU territory `PA`. kWh. | the same sum over the measures with `IOU_AC_Territory` = `PA` |
+| `net_kwh_<Y>_CZ<zone>` | The same for the measures of one climate zone (BRD BR-06.13): the measure's `AC_Climate_Zone` as filed, `CZ` prepended when it is a bare number (`13` -> `CZ13`; `System` -> `CZSystem`). The zones add up to `net_kwh_<Y>`. kWh. | the same sum over the measures with that `AC_Climate_Zone` |
 
 **Where**
 
@@ -1906,6 +1907,23 @@ the electric-profile fields of `ElecBen`; the "Year(s)" setting.
 - Example A, `net_kwh_2028`: overlap([2028, 2029), [2028.5, 2030.9)) = 0.5, so 0.5 * 34200 / 8760 = **1.9521** kWh in every hour (a flat shape)
 - Example A, `net_kwh_2029`: overlap([2029, 2030), [2028.5, 2030.9)) = 1, so 1 * 34200 / 8760 = **3.9041** kWh in every hour
 - Example A, `net_kwh_2030`: overlap([2030, 2031), [2028.5, 2030.9)) = 0.9, so 0.9 * 34200 / 8760 = **3.5137** kWh in every hour
+
+### 2.4b `portfolio_8760_peaks_acc<version>` (combined 8760 mode)
+
+The peaks of the combined profile (BRD BR-06.13): one row per year `Y` and group, the portfolio first, then each IOU territory, then each climate zone.
+
+| Field | Meaning and unit | Formula |
+|---|---|---|
+| `year` | The calendar year `Y`. | the "Year(s)" setting |
+| `group`, `value` | `portfolio` / `all measures`, `IOU territory (PA)` / the PA, or `climate zone` / the zone (`CZ13` ...). Text. | |
+| `net_kwh` | The group's net kWh over the year. kWh. | `SUM over hours of the group's column of 2.4` |
+| `peak_hour_of_year`, `peak_datetime`, `peak_kwh` | The hour of the group's largest net savings, on the ACC calendar, and its kWh (its own, non-coincident peak). | `argmax` and `max` of the group's column |
+| `max_added_load_hour_of_year`, `max_added_load_kwh` | The hour of the group's largest added load (most negative hour, from fuel substitution) and its kWh; blank and 0 when no hour is negative. | `argmin` and `min` of the column, when below 0 |
+| `kwh_at_portfolio_peak` | The group's kWh in the portfolio's peak hour (coincident with the portfolio peak). kWh. | the group's column at the portfolio's `peak_hour_of_year` |
+| `share_of_portfolio_peak` | That as a share of the portfolio's peak kWh; the PAs (and the zones) add up to 1. | `kwh_at_portfolio_peak / portfolio peak_kwh` |
+
+The peak is the hour of the largest net savings in the combined profile, not a system-peak definition such as the DEER peak period: use the hourly columns of 2.4 for any
+other definition.
 
 ### 2.5 `portfolio_8760_unshaped_acc<version>` (only when some measures have no shape)
 

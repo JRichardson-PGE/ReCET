@@ -146,7 +146,7 @@ def test_every_measure_level_column_is_documented_and_every_documented_column_ex
 def test_secondary_output_files_are_documented(tmp_path):
     from recet import outputs
     text = TEXT["OUTPUT_FIELDS.md"]
-    for name in ("measure_level_acc", "portfolio_summary_acc", "components_summary_acc", "portfolio_8760_acc", "portfolio_8760_unshaped_acc", "cet_comparison_measures_acc",
+    for name in ("measure_level_acc", "portfolio_summary_acc", "components_summary_acc", "portfolio_8760_acc", "portfolio_8760_peaks_acc", "portfolio_8760_unshaped_acc", "cet_comparison_measures_acc",
                  "cet_comparison_summary_acc", "comparison_acc", "comparison_summary_acc", "preflight.txt", "preflight_findings.xlsx", "run_settings.json", "filing_validation_acc",
                  "field_definitions_acc", "key_metrics_acc", "statewide_reconciliation_acc"):
         assert name in text, name
