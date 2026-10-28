@@ -70,8 +70,58 @@ def find_checkout(home: str | Path | None = None, python: str | Path | None = No
     return Checkout(home.resolve(), py.absolute())  # absolute, not resolved: resolving the venv's symlink would leave the venv
 
 
-def stage(checkout: Checkout, workspace: Path, program_input: Path, configuration: Path) -> Path:
-    """Copy the checkout's projects into `workspace` and the two workbooks into its input_templates folder. Returns the workspace."""
+# A jurisdiction's tables (ca_config.TABLES) replace these parser models in the staged copy: each reads <workspace>/jurisdiction/<table>.parquet.
+JURISDICTION_MODEL = """from typing import Any
+from pathlib import Path
+from sqlmesh import model, ExecutionContext
+import pandas as pd
+
+# Written by ReCET (recet/openbca/run.py): this run's jurisdiction table, built by ReCET, replaces OpenBCA's Configuration-workbook parser.
+SOURCE = {source!r}   # a plain string: SQLmesh serializes a model's globals, and a Path cannot be
+
+
+@model(name="openbca_input.{table}", kind="FULL", columns={columns!r})
+def execute(context: ExecutionContext, **kwargs: Any):
+    df = pd.read_parquet(Path(SOURCE))
+    if df.empty:
+        yield from ()
+    else:
+        yield df
+"""
+JURISDICTION_MODELS = {
+    "avoided_costs_ts": ("openbca_input_avoided_costs_ts.py", {"avoided_cost": "string", "avoided_cost_subset": "string", "year": "int", "quarter": "int",
+                         "month": "int", "day_of_year": "int", "hour_of_day": "int", "hour_of_year": "int", "avoided_cost_value": "float"}),
+    "value_stream_groups": ("openbca_input_value_stream_groups.py", {"avoided_cost": "string", "impact_category": "string", "include_in_test": "boolean",
+                            "calc_type": "string", "pct_adder": "float", "value_stream_group": "string", "marginal_ghg": "boolean"}),
+    "global_parameters": ("openbca_input_global_parameters.py", {"inflation_rate": "float", "dollar_year": "int", "discount_rate": "float",
+                          "discount_cadence": "int", "electric_line_loss": "float", "peak_capacity_line_loss": "float",
+                          "natural_gas_line_loss": "float", "cost_treatment": "string"}),
+    "first_year_avoided_costs_by_id": ("first_year_avoided_costs_by_id.py", {"id": "string", "year": "int", "value_stream": "string",
+                                       "gross_dollar_value": "float"}),
+}
+
+
+def stub_configuration(path: Path) -> Path:
+    """A Configuration workbook with only what OpenBCA's measures parser still reads when the jurisdiction comes from ReCET: the five custom value
+    streams on 'Configuration Data' (the 5 rows before the last 5 under the header in C:D), named CUSTOM 1-5 with no impact category, which the parser
+    marks STANDARD_n with no savings. Every other Configuration read is replaced (JURISDICTION_MODELS)."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Configuration Data"
+    ws["C4"], ws["D4"] = "Value Stream", "Impact Category"
+    for i in range(10):
+        ws.cell(row=5 + i, column=3, value=f"CUSTOM {i + 1}" if i < 5 else "(not used)")
+    wb.save(path)
+    return path
+
+
+def stage(checkout: Checkout, workspace: Path, program_input: Path, configuration: Path | None = None, jurisdiction: Path | None = None) -> Path:
+    """Copy the checkout's projects into `workspace` and the workbooks into its input_templates folder. With `jurisdiction` (a folder of the
+    ca_config.TABLES parquet files) the staged parser models for those tables read them instead of a Configuration workbook, and a stub workbook stands
+    in for the Configuration when none is given. Returns the workspace."""
+    if configuration is None and jurisdiction is None:
+        raise ValueError("a Configuration workbook or a jurisdiction folder is needed")
     if workspace.exists():
         shutil.rmtree(workspace)
     for d in PROJECT_DIRS:
@@ -79,7 +129,17 @@ def stage(checkout: Checkout, workspace: Path, program_input: Path, configuratio
     templates = workspace / "excel_input_parsing" / "input_templates"
     templates.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(program_input, templates / PROGRAM_INPUT)
-    shutil.copyfile(configuration, templates / CONFIGURATION)
+    if configuration is not None:
+        shutil.copyfile(configuration, templates / CONFIGURATION)
+    else:
+        stub_configuration(templates / CONFIGURATION)
+    if jurisdiction is not None:
+        shutil.copytree(jurisdiction, workspace / "jurisdiction")
+        for table, (filename, columns) in JURISDICTION_MODELS.items():
+            if not (workspace / "jurisdiction" / f"{table}.parquet").exists():
+                raise FileNotFoundError(f"{jurisdiction} has no {table}.parquet")
+            (workspace / "excel_input_parsing" / "models" / filename).write_text(JURISDICTION_MODEL.format(
+                table=table, columns=columns, source=str((workspace / "jurisdiction" / f"{table}.parquet").resolve())))
     shutil.copyfile(ENGINE, workspace / ENGINE.name)
     return workspace
 
@@ -94,8 +154,8 @@ def _engine(checkout: Checkout, args: list[str], cwd: Path, log: Log) -> int:
     return proc.wait()
 
 
-def run_openbca(program_input: str | Path, configuration: str | Path, out_dir: str | Path, run_name: str = "", fmt: str = "csv",
-                checkout: Checkout | None = None, log: Log = print) -> OpenBCAResult:
+def run_openbca(program_input: str | Path, configuration: str | Path | None, out_dir: str | Path, run_name: str = "", fmt: str = "csv",
+                checkout: Checkout | None = None, log: Log = print, jurisdiction: str | Path | None = None) -> OpenBCAResult:
     """Run OpenBCA on one job. Writes <out_dir>/<run_name>/: openbca/ (the staged projects and openbca.db, kept for inspection) and OpenBCA's output
     tables (EXPORTS in engine.py) in `fmt`."""
     checkout = checkout or find_checkout()
@@ -104,7 +164,8 @@ def run_openbca(program_input: str | Path, configuration: str | Path, out_dir: s
     run_dir.mkdir(parents=True, exist_ok=True)
     result = OpenBCAResult(run_dir=run_dir, version=checkout.version)
     log(f"OpenBCA {result.version} from {checkout.home}")
-    workspace = stage(checkout, run_dir / "openbca", Path(program_input), Path(configuration))
+    workspace = stage(checkout, run_dir / "openbca", Path(program_input), Path(configuration) if configuration else None,
+                      Path(jurisdiction) if jurisdiction else None)
     export = workspace / "export"
     code = _engine(checkout, ["run", str(workspace), str(workspace / "openbca.db"), str(export)], workspace, log)
     if code:
@@ -129,7 +190,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="action", required=True)
     p = sub.add_parser("run", help="run OpenBCA on a Program Input and a Configuration workbook")
     p.add_argument("--program-input", required=True)
-    p.add_argument("--configuration", required=True)
+    p.add_argument("--configuration", help="an OpenBCA Configuration workbook (or --jurisdiction)")
+    p.add_argument("--jurisdiction", help="a folder of jurisdiction tables (recet.openbca.ca_config.build) instead of a Configuration workbook")
     p.add_argument("--out", required=True)
     p.add_argument("--name", default="")
     p.add_argument("--format", default="csv", choices=outputs.FORMATS)
@@ -141,7 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     checkout = find_checkout(a.openbca_home)
     if a.action == "run":
-        run_openbca(a.program_input, a.configuration, a.out, a.name, a.format, checkout)
+        if not (a.configuration or a.jurisdiction):
+            ap.error("give --configuration or --jurisdiction")
+        run_openbca(a.program_input, a.configuration, a.out, a.name, a.format, checkout, jurisdiction=a.jurisdiction)
         return 0
     return 0 if compare_dbs(a.db_a, a.db_b, checkout) else 1
 
