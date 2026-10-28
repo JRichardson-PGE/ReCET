@@ -12,6 +12,7 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   run_settings.json              everything needed to reproduce the run (options, resolved ACC files, supplied files with sizes, package version, timings)
   field_definitions_<acc>        one row per column of the measure-level file, in order: its definition and documentation link (field_docs.py)
   key_metrics_<acc>              the headline results with their definitions, and the main drivers by program, sector and end use (key_metrics.py)
+  statewide_reconciliation_<acc> (statewide allocation) each statewide program's allocated fields: total before allocation, each IOU's share, the difference
   components_summary_<acc>.csv   (components mode) portfolio value of each ACC component, with the sum-check against the totals
   portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh; portfolio_8760_unshaped_<acc>.csv lists measures left out
   cet_comparison_*.csv           (when a CET outputs file is given) POC vs CET, per measure and in total
@@ -304,6 +305,25 @@ def write_findings(rep, cfg: RunConfig, run_dir: Path) -> Path | None:
         return None
 
 
+def write_reconciliation(cfg: RunConfig, parts, run_dir: Path, tag: str, excel, result: RunResult, log: Log) -> None:
+    """statewide_reconciliation_<tag> (BRD BR-06.7): each statewide program's allocated fields, before allocation and by IOU, with the difference
+    (statewide_allocation.reconciliation). A field that does not reconcile is a note in the log and in RunResult.notes; the run goes on."""
+    from . import outputs
+    from .pipeline import statewide_allocation
+    t = statewide_allocation.reconciliation([p[0] for p in parts] if parts is not None else [cfg.measures], cfg.programcost)
+    result.files["statewide_reconciliation"] = outputs.write_table(t, run_dir / f"statewide_reconciliation_{tag}", cfg.output_format, excel)
+    progs = t[["Year", "PrgID"]].drop_duplicates()
+    bad = t[~t["reconciles"].astype(bool)]
+    log(f"statewide allocation: {len(progs):,} program-year(s), {len(t):,} allocated field total(s); "
+        + ("every one reconciles to its unallocated total" if bad.empty else f"{len(bad):,} do not reconcile (see statewide_reconciliation_{tag})"))
+    for r in bad.head(20).itertuples(index=False):
+        note = f"statewide allocation: {r.table} {r.field} of {r.PrgID} ({r.Year}) allocates {r.allocated_total:,.2f} of {r.unallocated_total:,.2f}: {r.note}"
+        result.notes.append(note)
+        log(f"note: {note}")
+    if len(bad) > 20:
+        result.notes.append(f"statewide allocation: {len(bad) - 20:,} more field total(s) do not reconcile")
+
+
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     t_start = time.time()
     if not cfg.measures and not cfg.workbook:
@@ -376,6 +396,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     if cfg.preflight_only:
         log("\npreflight only: stopping before pricing")
         return result
+    if cfg.allocate_statewide:
+        write_reconciliation(cfg, parts, run_dir, tag, excel, result, log)
     if parts is not None:
         from . import chunked
         return chunked.run_parts(cfg, acc, run_dir, result, parts, dtypes, values, log, t_start)
