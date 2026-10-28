@@ -11,6 +11,8 @@
     recet check acc-electric FILE | acc-gas FILE | profiles-8760 FILE | profiles-gas FILE | run-parameters FILE | sw-factors FILE | programs FILE
     recet data status | set-dir PATH | build DEST | verify DIR [--full] | pack DIR OUT | unpack PARTS DEST | clear-cache
     recet data build-system-zones [OUT]     rebuild the System climate zone catalog (every library profile x each built-in ACC; ~4 minutes)
+    recet openbca run --program-input P.xlsm --configuration C.xlsm --out results     OpenBCA's own engine on its workbooks (needs RECET_OPENBCA_HOME)
+    recet openbca compare A/openbca.db B/openbca.db                                  every OpenBCA table of two runs
 """
 from __future__ import annotations
 
@@ -223,6 +225,11 @@ def _cmd_data(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_openbca(a) -> int:
+    from .openbca import run
+    return run.main(a.rest)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="recet", description="ReCET, the rebuilt CEDARS Cost Effectiveness Tool", formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"recet {__version__}")
@@ -252,6 +259,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--link", action="store_true", help="build: hard-link instead of copy (same drive)")
     p.add_argument("--part-gb", type=float, default=4.0, help="pack: part size in GB")
     p.set_defaults(func=_cmd_data)
+    p = sub.add_parser("openbca", help="run OpenBCA's own engine on its workbooks (see `recet openbca -h`)", add_help=False)
+    p.add_argument("rest", nargs=argparse.REMAINDER)
+    p.set_defaults(func=_cmd_openbca)
     return ap
 
 
