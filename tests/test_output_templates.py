@@ -120,6 +120,37 @@ def test_templates_are_saved_in_the_config(tmp_path):
     assert "Mine" not in ot.load_saved()
 
 
+def test_the_default_template_and_the_picker_categories():
+    assert ot.default_name() == ot.ALL                                          # nothing set
+    ot.save("Mine", ["CEInputID", "ElecBen"])
+    ot.set_default("Mine")
+    assert ot.default_name() == "Mine"
+    with pytest.raises(ValueError):
+        ot.set_default("Nope")
+    ot.save("Mine", None)                                                       # a deleted default falls back to every column
+    assert ot.default_name() == ot.ALL
+    ot.set_default("Key results")
+    assert ot.default_name() == "Key results"
+    ot.set_default(ot.ALL)
+    kinds = {ot.kind(g) for g, *_ in ot.catalog()}
+    assert kinds == set(ot.KINDS)
+    by_kind = {k: [c for g, c, *_ in ot.catalog() if ot.kind(g) == k] for k in ot.KINDS}
+    assert "CEInputID" in by_kind["Input fields"] and "Prg_ProgramName" in by_kind["Program fields"] and "TRCRatio" in by_kind["Output fields"]
+    assert all(c.startswith("Prg_") for c in by_kind["Program fields"])
+
+
+def test_the_picker_moves_columns():
+    from recet.gui_templates import move
+    cols = ["A", "B", "C", "D", "E"]
+    assert move(cols, ["C"], "up") == ["A", "C", "B", "D", "E"]
+    assert move(cols, ["B", "D"], "up") == ["B", "A", "D", "C", "E"]
+    assert move(cols, ["A", "C"], "up") == ["A", "C", "B", "D", "E"]               # A is already at the top; C still moves
+    assert move(cols, ["D", "E"], "down") == cols
+    assert move(cols, ["B", "D"], "down") == ["A", "C", "B", "E", "D"]
+    assert move(cols, ["D", "B"], "top") == ["B", "D", "A", "C", "E"]              # kept in the template's order
+    assert move(cols, ["A", "C"], "bottom") == ["B", "D", "E", "A", "C"]
+
+
 def test_every_catalog_column_has_a_definition_and_a_link_that_resolves():
     slugs = {}
     for doc in ("OUTPUT_FIELDS.md", "INPUT_FIELDS.md"):

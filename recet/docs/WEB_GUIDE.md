@@ -29,8 +29,14 @@ Open **New run**.
    **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
 4. **Outputs.** CSV (each file zipped), Excel (for jobs of up to 50,000 measures; a larger job writes zipped CSV), or Parquet. **Output template**
-   picks the measure-level file's columns and their order: all columns, a built-in template, or one you saved on the **Templates** page (name it, list
-   the columns one per line or press **Add** beside a column in the list, each linked to its definition). The Results tables, the summary and the key
+   picks the measure-level file's columns and their order: all columns, a built-in template, or one you saved on the **Templates** page. It starts on
+   your default template (marked "your default"; set it under **Default for new runs** on the Templates page, or tick **Use for new runs** when you save
+   one); a rerun keeps the template of the run it came from. On the Templates page, name the template and pick its columns with the two lists: on the
+   left, **Show** chooses input fields, program fields, output fields or one output group, and the search box matches names and definitions; **Add**
+   (or double-click, or Enter) moves the selected fields to the template on the right, **Add shown** moves every field listed; on the right, **Top**,
+   **Up**, **Down** and **Bottom** (or Alt+Up / Alt+Down) reorder the selected columns and **Remove** (or double-click, or Delete) takes them out. The
+   definition of the last field clicked shows below the lists, linked to its entry. **Columns as text** holds the same list one column per line, to
+   paste or copy a list. The Results tables, the summary and the key
    metrics still use every column; each run also writes `field_definitions` (each column of the file, defined and linked) and `key_metrics` (the
    headline results and their main drivers by program, sector and end use). Emissions, leaving
    `Exclude_From_CE` programs out of the portfolio summary, and a combined 8,760 electric load profile are options.

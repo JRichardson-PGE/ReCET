@@ -1,7 +1,7 @@
 """The web app's SQLite store. One file in the state folder; a new connection per call, WAL mode, so the request threads and the run workers never share one.
 
 Tables: users, sessions (hashed tokens), setup_links (hashed one-time tokens), login_failures (rate limits), runs, drafts, views (saved Results columns per user),
-audit (sign-ins, runs, user changes).
+output_templates, user_settings (the default output template), value_list_changes, audit (sign-ins, runs, user changes).
 """
 from __future__ import annotations
 
@@ -83,6 +83,12 @@ CREATE TABLE IF NOT EXISTS output_templates (       -- each user's saved output 
     name TEXT NOT NULL,
     columns TEXT NOT NULL,                        -- JSON list of measure-level column names, in order
     PRIMARY KEY (user_id, name)
+);
+CREATE TABLE IF NOT EXISTS user_settings (         -- small per-user preferences: default_output_template (the template new runs start with)
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
 );
 CREATE TABLE IF NOT EXISTS value_list_changes (     -- admin changes over the shipped CET value lists (recet/web/value_lists.py)
     list TEXT NOT NULL,

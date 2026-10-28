@@ -846,7 +846,7 @@ def test_output_templates_are_saved_per_user_and_shape_a_run(web, tmp_path):
     _user(ctx, "ot@example.com")
     c = _login(app, "ot@example.com")
     page = c.get(f"{P}/output-templates").text
-    assert "Key results" in page and 'data-add-column="ElecBen"' in page and "OUTPUT_FIELDS.md#elecben" in page
+    assert "Key results" in page and 'id="field-picker"' in page and '"c": "ElecBen"' in page and "OUTPUT_FIELDS.md#elecben" in page
     bad = c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "columns": "CEInputID\nNoSuchColumn"})
     assert bad.status_code == 400 and "NoSuchColumn" in bad.text
     assert c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Key results", "columns": "CEInputID"}).status_code == 400
@@ -859,3 +859,26 @@ def test_output_templates_are_saved_per_user_and_shape_a_run(web, tmp_path):
     assert c.post(f"{P}/runs", data={"csrf": _csrf(c), "acc_version": "2026", "input_mode": "files", "output_template": "Theirs"}, files=files).status_code == 400
     c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "delete": "1"})
     assert "Mine" not in c.get(f"{P}/output-templates").text
+
+
+def test_the_default_output_template_is_kept_per_user_and_starts_new_runs(web):
+    """A user picks the template new runs start with (Default for new runs, or "Use for new runs" when saving); New run preselects it, a rerun keeps
+    its own template, and deleting the template falls back to All columns."""
+    import re
+    app, ctx = web
+    _user(ctx, "def@example.com")
+    _user(ctx, "other@example.com")
+    c = _login(app, "def@example.com")
+    chosen = lambda html: re.search(r'<select name="output_template">.*?</select>', html, re.S).group(0)
+    assert "selected" not in chosen(c.get(f"{P}/runs/new").text)                 # no default: All columns
+    assert c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Nope", "set_default": "1"}).status_code == 400
+    c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Participant costs", "set_default": "1"})
+    assert 'value="Participant costs" selected' in chosen(c.get(f"{P}/runs/new").text)
+    c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "columns": "TRCRatio, CEInputID", "make_default": "1"})
+    page = c.get(f"{P}/output-templates").text
+    assert 'Mine <span class="tag">default</span>' in page
+    assert 'value="Mine" selected' in chosen(c.get(f"{P}/runs/new").text)
+    other = _login(app, "other@example.com")                               # someone else's default is their own
+    assert "selected" not in chosen(other.get(f"{P}/runs/new").text)
+    c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Mine", "delete": "1"})
+    assert "selected" not in chosen(c.get(f"{P}/runs/new").text)

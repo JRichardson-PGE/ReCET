@@ -85,7 +85,7 @@ Every outside source enters as a file, read at run time. Nothing is fetched from
 
 ```mermaid
 flowchart TB
-    IF["<b>Interfaces</b><br/>gui.py, gui_editor.py, gui_results.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
+    IF["<b>Interfaces</b><br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
     JOB["<b>Job layer</b><br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
     CORE["<b>Pricing core</b><br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills, participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
     DATA["<b>Data access</b><br/>pipeline/acc_store.py: memory-mapped ACC<br/>pipeline/real_avoided_cost_v2.py: price lookups<br/>pipeline/real_impact_profiles.py, system_zones.py<br/>pipeline/gas_avoided_cost.py, gas_savings_profiles.py<br/>pipeline/delimited.py, fieldnames.py, paths.py, datapack.py"]
@@ -113,6 +113,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `gui.py` | interface | the desktop window: Job, Edit inputs, Supplied inputs, Options, Reference data, Log and Results tabs; runs jobs in a child process |
 | `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
 | `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
+| `gui_templates.py` | interface | the window's output-template editor: two-list field picker and the default template (over `output_templates.py`) |
 | `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data` |
 | `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
@@ -314,7 +315,7 @@ owners can start them again. The health check is `GET /healthz`.
 ### 8.2 State
 
 The SQLite database (`recet_web.sqlite3`, WAL mode, a new connection per call) holds: `users`, `sessions` (hashed tokens), `setup_links` (hashed one-time
-tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `value_list_changes` and `audit` (sign-ins, runs, user
+tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `user_settings` (each user's default output template), `value_list_changes` and `audit` (sign-ins, runs, user
 changes). Everything else is files: `runs/<id>/` (`inputs/`, `config.json`, `log.txt`, `progress.json`, `progress_log.jsonl`, `estimate.json`, `out/`) and
 `drafts/<id>/` (`draft.json`, an optional base workbook, a rerun's settings and supplied files). Runs are kept `RECET_WEB_RETENTION_DAYS` (7) and untouched
 drafts `RECET_WEB_DRAFT_DAYS` (30).
