@@ -18,7 +18,7 @@ Python 3.10+. Needs `numpy`, `pandas`, `pyarrow` (installed automatically); the 
 
 ## The reference data folder (the big files)
 
-The two electric ACC files (~1 GB each) and the CEDARS 8,760-hour profile library (~9 GB) are too large for GitHub, so they are **not in the package**. They live in a
+The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021 and 2022 ones are smaller and optional) and the CEDARS 8,760-hour profile library (~9 GB) are too large for GitHub, so they are **not in the package**. They live in a
 *reference data folder* you can put anywhere (another drive, a share) and change at any time:
 
 * the **Reference data folder** box in the window (with *Save as default*), or
@@ -30,20 +30,20 @@ The two electric ACC files (~1 GB each) and the CEDARS 8,760-hour profile librar
     recet data pack D:\cedars_reference_data D:\parts     split it into <= 4 GB parts (+ SHA256SUMS) for transfer
     recet data unpack D:\parts E:\cedars_reference_data   rebuild it on the other machine
 
-Everything small (E3 settings and tables, gas profile library, both gas ACCs, statewide-allocation factors) is inside the package.
+Everything small (the run parameters and CET tables, gas profile library, the four gas ACCs, statewide-allocation factors, the CEDARS Programs list and filing rules) is inside the package.
 
 The tool also keeps a rebuildable **cache** of what it derives from those files (the ACC as memory-mapped arrays, the impact profiles a job used) in `~/.recet/cache` so later runs start fast;
 `recet data clear-cache` removes it and `RECET_NO_CACHE=1` runs without it.
 
 ## In the window
 
-1. **Job inputs** - one Excel job workbook (sheets Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760), or `Measure.csv` and optional
+1. **Job inputs** - one Excel job workbook (sheets Measure, ProgramCost, RunParameters, SWAllocation, Programs, GasProfiles, Profiles8760), or `Measure.csv` and optional
    `ProgramCost.csv`; an output folder.
-2. **ACC version** - 2024 or 2026 (or type a new label), and CET's *First Year*.
+2. **ACC version** - 2021, 2022, 2024 or 2026 (the 2021 and 2022 ACCs are TRC only), or type a new label; and CET's *First Year*.
 3. **Separate inputs** - 8,760 electric profiles, gas monthly profiles, run parameters (discount rates, base year, gas CO2 per PA), SW allocation factors,
    program metadata (the CEDARS Programs list), an electric ACC, a gas ACC. Each has a **Template…** button. *A supplied item that matches a built-in
-   one replaces it; one that matches nothing is added.* Formats and matching rules: `recet/docs/INPUT_FORMATS.md` (Help > Input format guide).
-4. **Modes** - calculate ACC components separately; produce a combined 8760 electric load profile; apply 5% market effects (optionally to costs too); include societal
+   one replaces it; one that matches nothing is added.* Formats and matching rules: `recet/docs/INPUT_FORMATS.md` (Help > Documentation).
+4. **Modes** - calculate ACC components separately; produce a combined 8760 electric load profile; apply 5% market effects (benefits and costs together); include societal
    tests (SCB/SCH); include emissions; allocate statewide programs; leave Exclude_From_CE programs out of the summary; run a second ACC version and compare measure by measure; compare
    with a CET outputs file; preflight only; CEDARS filing checks (Quarterly Claims or Budget filing: CEDARS' own upload checks, shipped as it publishes them in
    `recet/data/cet_rules/`, flag the records it would reject or warn on; they are still priced; `recet/filing_rules.py`).
