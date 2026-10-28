@@ -8,7 +8,7 @@ The PA of a measure (`pa_of`) is its program's administrator: the `PA` of its Pr
 (`Prg_PA`), else the IOU territory the measure is priced in. So a REN or CCA program filters under the REN or CCA, and an unallocated statewide program under SW.
 
 Columns: `catalog(frame)` lists what a view can show - the run's additive output columns (benefits, costs, savings, emissions, bill impacts, components ...),
-the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, derived pricing inputs (`Used_Year`, `AC_kWh_1st_Baseline` ...), measure-level ratios, shares and statuses are not offered: they do not
+the recomputed ratios and a few derived sums (total CO2 avoided). Inputs, derived pricing inputs (`Used_Year`, `AC_Net_kWh_1st_Baseline` ...), measure-level ratios, shares and statuses are not offered: they do not
 add up across measures. `DEFAULT_VIEW` is the built-in view; users save their own (`load_views` / `save_views`, kept in the tool's config file).
 
 Memory (`RunResults`): every level above the measure is built from the run's GROUP SUMS -- one row per (PA, PrgID, program name, sector, segment) with each
@@ -84,7 +84,7 @@ LABELS = {
 }
 NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}     # WeightedSavings: a run written before 0.1.50
 _INPUTS = set(templates.MEASURE_COLUMNS)
-_DERIVED = {"Used_ACCVersion", *outputs.DERIVED_OUTPUTS.values()}
+_DERIVED = {"Used_ACCVersion", *outputs.DERIVED_OUTPUTS}
 
 
 def pa_of(frame: pd.DataFrame) -> pd.Series:
@@ -103,7 +103,7 @@ def _is_ratio_column(c: str) -> bool:
 
 
 def _summable(c: str) -> bool:
-    """A column a group total may add up (when it is numeric): not an input, a derived pricing input (Used_Year, AC_kWh_1st_Baseline ...; poc_ before
+    """A column a group total may add up (when it is numeric): not an input, a derived pricing input (Used_Year, AC_Net_kWh_1st_Baseline ...; poc_ before
     0.1.50), a Prg_ field, a share, a per-measure ratio or a group-sum key."""
     return not (c in _INPUTS or c in _DERIVED or c.startswith(("poc_", "Prg_", "_")) or c in NOT_ADDITIVE or _is_ratio_column(c))
 
@@ -133,7 +133,7 @@ _WORDS = {"Elec": "electric", "Ben": "benefits", "Bens": "benefits", "Incr": "in
           "Thm": "therms", "Mark": "market", "Effect": "effects", "Rebatesand": "rebates and", "Qty": "quantity", "Meas": "measure", "Wtd": "weighted",
           "Prg": "program", "Gen": "generation", "Seq": "sequestration"}
 _KEEP = {"PV", "CO2", "NOx", "PM10", "TRC", "PAC", "RIM", "PCT", "SCB", "SCH", "kWh", "kW", "IOU"}
-_SUFFIXES = [("_SB", " (SCT Base)"), ("_SH", " (SCT High)"), ("_sct", " (SCT)"), ("_SCT", " (SCT)"), ("_NoAdmin", " (no admin)"), ("NoAdmin", " (no admin)")]
+_SUFFIXES = [("_SB", " (SCT Base)"), ("_SH", " (SCT High)"), ("_SCT", " (SCT)"), ("_NoAdmin", " (no admin)"), ("NoAdmin", " (no admin)")]
 
 
 def display_label(col: Column) -> str:
@@ -167,7 +167,7 @@ def column_group(col: Column) -> str:
         return "Ratios"
     if any(x in k for x in ("CO2", "NOx", "PM10")):
         return "Emissions"
-    if k.endswith(("_SB", "_SH", "_sct", "_SCT")) or k.startswith(("SCB", "SCH")):
+    if k.endswith(("_SB", "_SH", "_SCT")) or k.startswith(("SCB", "SCH")):
         return "Societal Cost Tests (SCT)"
     if col.fmt in ("energy", "kw") or "Savings" in k:
         return "Savings"

@@ -49,18 +49,18 @@ def to_cet(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------- output columns
-# Measure-level output columns renamed in 0.1.50 (from the field dictionary): the name used before -> the name ReCET writes now. Old names are still
+# Measure-level output columns renamed in 0.1.50 (from the field dictionary) and 0.1.55: the name used before -> the name ReCET writes now. Old names are still
 # accepted wherever a user names output columns (output templates, saved Results views), and a CET outputs file's own names are read through this map.
 OUTPUT_RENAMES = {
     "POC_ACC": "Used_ACCVersion",
     "poc_claim_year": "Used_Year",
     "poc_claim_quarter": "Used_Quarter",
-    "poc_shape_scale": "AC_kWh_1st_Baseline",
-    "poc_shape_scale_2nd": "AC_kWh_2nd_Baseline",
-    "poc_annual_net_therms_1st": "AC_Therms_1st_Baseline",
-    "poc_annual_net_therms_2nd": "AC_Therms_2nd_Baseline",
-    "poc_water_scale_1st": "AC_kWh_Water_1st_Baseline",
-    "poc_water_scale_2nd": "AC_kWh_Water_2nd_Baseline",
+    "poc_shape_scale": "AC_Net_kWh_1st_Baseline",
+    "poc_shape_scale_2nd": "AC_Net_kWh_2nd_Baseline",
+    "poc_annual_net_therms_1st": "AC_Net_Therms_1st_Baseline",
+    "poc_annual_net_therms_2nd": "AC_Net_Therms_2nd_Baseline",
+    "poc_water_scale_1st": "AC_Net_kWh_Water_1st_Baseline",
+    "poc_water_scale_2nd": "AC_Net_kWh_Water_2nd_Baseline",
     "poc_is_fuel_sub": "Fuel_Sub_Flag",
     "BillReducElec": "LifecycleBillReducElec",
     "BillIncrElec": "LifecycleBillIncrElec",
@@ -91,6 +91,17 @@ OUTPUT_RENAMES = {
     "NetGasNOxLifecycle": "LifecycleNetGasNOx",
     "GrossGasNOxLifecycle": "LifecycleGrossGasNOx",
     "CreditedIOU": "CreditedPA",
+    # 0.1.55 (the renaming of the calculation code): the annual quantities say they are net, the societal participant PVs take CalcCE's _SCT suffix
+    "AC_kWh_1st_Baseline": "AC_Net_kWh_1st_Baseline",
+    "AC_kWh_2nd_Baseline": "AC_Net_kWh_2nd_Baseline",
+    "AC_Therms_1st_Baseline": "AC_Net_Therms_1st_Baseline",
+    "AC_Therms_2nd_Baseline": "AC_Net_Therms_2nd_Baseline",
+    "AC_kWh_Water_1st_Baseline": "AC_Net_kWh_Water_1st_Baseline",
+    "AC_kWh_Water_2nd_Baseline": "AC_Net_kWh_Water_2nd_Baseline",
+    "RebatesandIncentsPV_sct": "RebatesandIncentsPV_SCT",
+    "NetParticipantCostPV_sct": "NetParticipantCostPV_SCT",
+    "NetParticipantCostAdjustedPV_sct": "NetParticipantCostAdjustedPV_SCT",
+    "GrossParticipantCostPV_sct": "GrossParticipantCostPV_SCT",
 }
 # Measure-level columns no longer written (0.1.50): restatements of an input or of another output, and the per-record checks, which are in the
 # preflight findings and filing_validation files instead. A user's template or view naming one simply drops it.
@@ -104,7 +115,7 @@ OUTPUT_REMOVED = frozenset({
 })
 # ReCET's name -> CET's name, for the renamed columns CET's outputs file also has (the bill impacts without Gross, and the emissions)
 OUTPUT_TO_CET = {OUTPUT_RENAMES[old]: old for old in OUTPUT_RENAMES if old in ("BillReducElec", "BillIncrElec", "BillReducGas", "BillIncrGas")
-                 or old.startswith(("Net", "Gross"))}
+                 or (old.startswith(("Net", "Gross")) and not old.endswith("_sct"))}
 
 
 def output_name(column: str) -> str:

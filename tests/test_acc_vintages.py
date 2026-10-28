@@ -27,7 +27,7 @@ def test_run_parameters_are_picked_by_acc_version():
     assert 2027 not in discount_settings.known_versions()                        # 2027 was CET's number for the 2026 ACC, not an ACC
     for acc, base in ((2021, 2021), (2022, 2022), (2024, 2024), (2026, 2024)):
         s = discount_settings.get_settings("PGE", acc)
-        assert s["settings_base_year"] == base and s["discount_rate_annual"] == pytest.approx(0.0766)
+        assert s["BaseYear"] == base and s["DiscountRateAnnual"] == pytest.approx(0.0766)
 
 
 def test_old_saved_config_with_cet_e3_version_is_converted():

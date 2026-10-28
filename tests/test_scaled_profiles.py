@@ -56,7 +56,7 @@ def test_kwh_per_unit_profile_gives_the_same_value_as_a_share_profile_and_the_kw
     share = _run(tmp_path, {"UnitkWh1stBaseline": "1000"}, _profile(tmp_path / "u.csv", flat / 1000.0, basis="share"), "share").frame.iloc[0]
     assert scaled["ElecBen"] == pytest.approx(share["ElecBen"], rel=1e-12)
     assert scaled["FirstYearNetKWh"] == pytest.approx(share["FirstYearNetKWh"], rel=1e-12) == pytest.approx(1000.0)
-    assert scaled["AC_kWh_1st_Baseline"] == pytest.approx(share["AC_kWh_1st_Baseline"], rel=1e-12)    # the profile's own annual kWh, not UnitkWh1stBaseline (0)
+    assert scaled["AC_Net_kWh_1st_Baseline"] == pytest.approx(share["AC_Net_kWh_1st_Baseline"], rel=1e-12)    # the profile's own annual kWh, not UnitkWh1stBaseline (0)
 
 
 def test_loader_rejects_an_all_zero_or_mixed_basis_profile(tmp_path):

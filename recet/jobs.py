@@ -388,7 +388,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     if cfg.subset_step > 1:
         measures = measures.iloc[::cfg.subset_step].reset_index(drop=True)
         log(f"SUBSET RUN: every {cfg.subset_step}th measure only ({len(measures):,}); program costs then weight a partial job")
-    base_year = cfg.base_year or int(measures["claim_year"].min())
+    base_year = cfg.base_year or int(measures["Used_Year"].min())
     meb = float(cfg.market_effects or 0.0)
     mec = meb                                               # one setting: the same adder on benefits (MEBens) and on costs (MECost)
     log(f"{len(measures):,} measures, First Year {base_year}, market effects {meb:.0%} on benefits and costs")
@@ -400,10 +400,10 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     # ---- ACC versions: a measure may name its own (ACCVersion column, BRD BR-06.5); blank = this run's version
     from . import runtime, versions
-    measures["acc_version"] = measures["acc_version"].replace("", acc.key)
-    groups = {k: (acc if k == acc.key else versions.resolve_acc(k)) for k in sorted(measures["acc_version"].unique(), key=lambda k: (k != acc.key, k))}
+    acc_keys = measures["ACCVersion"].replace("", acc.key)          # the ACC each measure is priced on: its ACCVersion, blank = this run's
+    groups = {k: (acc if k == acc.key else versions.resolve_acc(k)) for k in sorted(acc_keys.unique(), key=lambda k: (k != acc.key, k))}
     if len(groups) > 1:
-        log("measures by ACC version: " + ", ".join(f"{g.label} {int((measures['acc_version'] == k).sum()):,}" for k, g in groups.items())
+        log("measures by ACC version: " + ", ".join(f"{g.label} {int((acc_keys == k).sum()):,}" for k, g in groups.items())
             + f"; program costs are discounted at the {acc.label}'s rates")
         if cfg.acc_electric_file or cfg.acc_gas_file:
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
@@ -416,7 +416,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     t0 = time.time()
     parts, em_parts, comp_parts = [], [], []
     for k, g in groups.items():
-        sub = measures[measures["acc_version"] == k].reset_index(drop=True) if len(groups) > 1 else measures
+        sub = measures[acc_keys == k].reset_index(drop=True) if len(groups) > 1 else measures
         if g is not acc:
             runtime.switch_acc(g)
             log(f"  pricing {len(sub):,} measure(s) on the {g.label}")
@@ -433,7 +433,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     log(f"priced in {time.time() - t0:.0f}s")
     if cfg.emissions:
         log("\n== emissions ==")
-        res = res.merge(pd.concat(em_parts, ignore_index=True), on="measure_id", how="left")
+        res = res.merge(pd.concat(em_parts, ignore_index=True), on="CEInputID", how="left")
 
     comps = None
     if cfg.components:
@@ -451,14 +451,14 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
 
     # ---- assemble and write
     log("\n== writing results ==")
-    acc_labels = measures["acc_version"].map({k: g.label for k, g in groups.items()})
+    acc_labels = acc_keys.map({k: g.label for k, g in groups.items()})
     frame = outputs.assemble_measure_level(raw, measures, res, acc_labels if len(groups) > 1 else acc.label,
                                            credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
     if comps is not None:
-        frame = frame.merge(comps, left_on="CEInputID", right_on="measure_id", how="left").drop(columns="measure_id")
+        frame = frame.merge(comps, on="CEInputID", how="left")
         cols = [c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]
         frame = frame[cols]
-    frame = outputs.attach_programs(frame, measures["prg_id"])
+    frame = outputs.attach_programs(frame, measures["PrgID"])
     result.frame = frame
     progress.report("writing")
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel,

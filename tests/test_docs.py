@@ -95,9 +95,9 @@ def test_worked_example_quarter_table_follows_the_formulas(tmp_path):
         assert (year, q, hours) == (2028 + (2 + k) // 4, (2 + k) % 4, [2160, 2184, 2208, 2208][q])
         df = 1 / rqf ** ((year - 2028) * 4 + q)
         assert float(df_) == pytest.approx(df, abs=5e-7)
-        e = f["AC_kWh_1st_Baseline"] * 0.080 * hours / 8760 * weight * df
-        g = f["AC_Therms_1st_Baseline"] * 1.0 * 3 / 12 * weight * df
-        w = f["AC_kWh_Water_1st_Baseline"] * 0.070 * hours / 8760 * weight * df
+        e = f["AC_Net_kWh_1st_Baseline"] * 0.080 * hours / 8760 * weight * df
+        g = f["AC_Net_Therms_1st_Baseline"] * 1.0 * 3 / 12 * weight * df
+        w = f["AC_Net_kWh_Water_1st_Baseline"] * 0.070 * hours / 8760 * weight * df
         for cell, want in ((v_e, e), (v_g, g), (v_w, w)):
             value, tol = _number(cell)
             assert want == pytest.approx(value, abs=tol)

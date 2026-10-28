@@ -172,9 +172,9 @@ EFFECTS = {
         "RUL_Yrs": ("lifetime values (the switch to the 2nd baseline), the measure cost in the participant cost, bill impacts, emissions, " + _REST,
                     "Above 0 makes an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after, and the measure cost uses UnitMeaCost2ndBaseline."),
         "NTGRkWh": ("net electric and water-energy values, other benefits and costs, tax credits, electric emissions, " + _REST,
-                    "Net-to-gross for kWh (the Gross columns divide it back out); also the default for a blank NTGRTherm, NTGRCost or NTGRkW."),
-        "NTGRTherm": ("net gas benefits and supply costs, gas emissions, the gas bill impact, " + _REST, "Net-to-gross for therms (blank = NTGRkWh, then 1)."),
-        "NTGRCost": ("the net participant cost, so the TRC and SCT costs and ratios", "Scales the participant cost (blank = NTGRkWh, then 1)."),
+                    "Net-to-gross for kWh (the Gross columns divide it back out). Required."),
+        "NTGRTherm": ("net gas benefits and supply costs, gas emissions, the gas bill impact, " + _REST, "Net-to-gross for therms. Required."),
+        "NTGRCost": ("the net participant cost, so the TRC and SCT costs and ratios", "Scales the participant cost. Required."),
         "RealizationRatekWh": (_ELEC + ", water-energy value, the electric bill impact, electric emissions, " + _REST, "Multiplies the kWh savings that are priced."),
         "InstallationRatekWh": (_ELEC + ", water-energy value, the electric bill impact, electric emissions, " + _REST, "Multiplies the kWh savings that are priced."),
         "RealizationRateTherm": (_GAS + ", the gas bill impact, gas emissions, " + _REST, "Multiplies the therm savings that are priced."),
@@ -692,12 +692,15 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                     add("Measure", i, c, "warning", f"outside CET's allowed range {rng}: CET would reject this upload (the POC still prices it)")
         for c in preflight.NEEDED_VALUES:
             if not g(c):
-                add("Measure", i, c, "error", f"{c} is blank (CET requires a value; the measure's results would come out blank)")
-        rul, eul = vals.get("RUL_Yrs") or 0.0, vals.get("EUL_Yrs")
-        if rul > 0 and not g("UnitkWh2ndBaseline"):
-            add("Measure", i, "UnitkWh2ndBaseline", "error", "blank on an early-replacement measure (RUL_Yrs > 0): it is priced on this after the RUL")
-        if rul > 0 and eul is not None and rul >= eul:
-            add("Measure", i, "RUL_Yrs", "warning", "RUL_Yrs is not below EUL_Yrs: the measure is treated as single-baseline for its whole life")
+                add("Measure", i, c, "error", f"{c} is blank (CET requires a value; enter 0 if there is none)")
+        rul, eul = vals.get("RUL_Yrs"), vals.get("EUL_Yrs")
+        for c, v in (("EUL_Yrs", eul), ("RUL_Yrs", rul)):
+            if v is not None and v < 0:
+                add("Measure", i, c, "error", f"{c} is negative (CET allows 0 or more)")
+        if rul is not None and eul is not None and rul > eul:
+            add("Measure", i, "RUL_Yrs", "error", "RUL_Yrs is greater than EUL_Yrs: the remaining useful life of the existing equipment cannot exceed the measure's life")
+        elif rul is not None and rul > 0 and eul is not None and rul == eul:
+            add("Measure", i, "RUL_Yrs", "warning", "RUL_Yrs equals EUL_Yrs: the measure is treated as single-baseline for its whole life")
         for c in FLAG_COLUMNS:
             if g(c) and g(c).lower() not in ("0", "1", "true", "false"):
                 add("Measure", i, c, "warning", f"{c} should be 0 or 1")

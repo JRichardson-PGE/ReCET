@@ -32,6 +32,17 @@ def _isolated_config(tmp_path, monkeypatch):
     programs.set_user_programs(None)
 
 
+def fill_cet_required(row: dict) -> dict:
+    """`row` with every field CET requires (preflight.NEEDED_VALUES) given a value where it is blank, as the loader used to fill them before blanks became errors:
+    NTGRkW / NTGRTherm / NTGRCost take NTGRkWh, installation and realization rates 1, every other field 0. For fixtures that leave such fields blank."""
+    from recet import preflight
+    ntg = str(row.get("NTGRkWh", "")).strip() or "1"
+    for c in preflight.NEEDED_VALUES:
+        if str(row.get(c, "")).strip() == "":
+            row[c] = ntg if c in ("NTGRkW", "NTGRTherm", "NTGRCost") else ("1" if c.startswith(("InstallationRate", "RealizationRate")) else "0")
+    return row
+
+
 def make_measure_csv(path, **overrides):
     """A one-measure CET Measure.csv: PGE, zone 13, claim 2028Q1, 1-year life, 1,000 kWh, NTG 1, no costs."""
     row = {c: "" for c in templates._CET_MEASURE_HEADER}
@@ -40,7 +51,8 @@ def make_measure_csv(path, **overrides):
                 "EUL_Yrs": "1", "RUL_Yrs": "0", "NumUnits": "1", "UnitkWh1stBaseline": "1000", "UnitkW1stBaseline": "0", "UnitTherm1stBaseline": "0",
                 "UnitkW2ndBaseline": "0", "UnitkWh2ndBaseline": "0", "UnitTherm2ndBaseline": "0",
                 "NTGRkW": "1", "NTGRkWh": "1", "NTGRTherm": "1", "NTGRCost": "1", "RealizationRatekW": "1", "RealizationRatekWh": "1", "RealizationRateTherm": "1",
-                "InstallationRatekW": "1", "InstallationRatekWh": "1", "InstallationRateTherm": "1", "MeasInflation": "0"})
+                "InstallationRatekW": "1", "InstallationRatekWh": "1", "InstallationRateTherm": "1", "MeasInflation": "0", "UnitMeaCost1stBaseline": "0",
+                "UnitMeaCost2ndBaseline": "0", "UnitGasInfraBens": "0", "UnitRefrigCosts": "0", "UnitRefrigBens": "0", "UnitMiscCosts": "0", "UnitMiscBens": "0"})
     row.update({k: str(v) for k, v in overrides.items()})
     header = list(row)
     path.write_text("|".join(header) + "\n" + "|".join(row[c] for c in header) + "\n", encoding="utf-8")

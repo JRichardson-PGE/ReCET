@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 import reference_calc as ref
+from conftest import fill_cet_required
 from recet import templates, versions
 from recet.jobs import RunConfig, run_job
 from recet.pipeline.engine import price_bill_impact
@@ -146,6 +147,7 @@ def write_measures(path, measures: dict[str, dict]):
         row.update(base)
         row.update(fields)
         row["CEInputID"] = cid
+        fill_cet_required(row)
         lines.append("|".join(row[c] for c in templates._CET_MEASURE_HEADER))
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -172,42 +174,42 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         sfx = {"": ("TRC", None, st["qtr"], st["annual"]), "_SB": ("SCT Base", "Base", st["qtr_sct"], st["annual_sct"]), "_SH": ("SCT High", "High", st["qtr_sct"], st["annual_sct"])}
         has_gas = d["therms_1st"] != 0 or d["therms_2nd"] != 0
         for s, (test, scc, q, _a) in sfx.items():
-            v_e = ref.elec_value(d, shape, REPRESENTS, elec_acc(test), q, first_year, d["shape_scale_1st"], d["shape_scale_2nd"], meb)
-            v_w = ref.elec_value(d, shape, REPRESENTS, elec_acc(test, gen_only=True), q, first_year, d["water_scale_1st"], d["water_scale_2nd"], meb)
+            v_e = ref.elec_value(d, shape, REPRESENTS, elec_acc(test), q, first_year, d["AC_Net_kWh_1st_Baseline"], d["AC_Net_kWh_2nd_Baseline"], meb)
+            v_w = ref.elec_value(d, shape, REPRESENTS, elec_acc(test, gen_only=True), q, first_year, d["AC_Net_kWh_Water_1st_Baseline"], d["AC_Net_kWh_Water_2nd_Baseline"], meb)
             v_g = 0.0
             if has_gas:
                 gshare = gas_shares[gas_shares.Profile == raw["AC_Gas_Impact_Profile"]].sort_values("Month").Impact.to_numpy()
                 btm = raw["AC_Gas_Target_Sector"] == "Residential" and "FuelSub" in raw["AC_Gas_Impact_Profile"]
                 v_g = ref.gas_value(d, gshare, gas_acc(scc, btm), q, first_year, meb)
-            e[f"ElecBen{s}"], e[f"ElecSupplyCost{s}"] = ref.split_ben_supply(v_e, d["is_fuel_sub"])
-            e[f"GasBen{s}"], e[f"GasSupplyCost{s}"] = ref.split_ben_supply(v_g, d["is_fuel_sub"])
+            e[f"ElecBen{s}"], e[f"ElecSupplyCost{s}"] = ref.split_ben_supply(v_e, d["Fuel_Sub_Flag"])
+            e[f"GasBen{s}"], e[f"GasSupplyCost{s}"] = ref.split_ben_supply(v_g, d["Fuel_Sub_Flag"])
             e[f"WaterEnergyBen{s}"], e[f"WaterEnergyCost{s}"] = ref.split_water(v_w, w1)
         e.update(ref.other(raw, d, meb, mec))
         p1, p2 = ref.participant(raw, d, st["qtr"], first_year, mec), ref.participant(raw, d, st["qtr_sct"], first_year, mec)
         e.update(p1)
-        e.update({f"{k}_sct": p2[k] for k in ref.PARTICIPANT_SCT})                    # the tool's _sct participant columns
+        e.update({f"{k}_SCT": p2[k] for k in ref.PARTICIPANT_SCT})                    # the tool's _SCT participant columns
         e.update(ref.savings(raw, d, meb))
         e.update(ref.discounted_savings(raw, d, st["annual"], st["qtr"], first_year, meb))
         rates_e = ref.rate_series("elec", "PGE", E3_VERSION, raw["AC_Elec_Target_Sector"])
         rates_g = ref.rate_series("gas", "PGE", E3_VERSION, raw["AC_Gas_Target_Sector"])
         fe = (d["ntg_kwh"] + meb) / d["ntg_kwh"] if (meb and d["ntg_kwh"] > 0) else 1.0           # C9: bill impacts use NTG + MEB as well
         ft = (d["ntg_therm"] + meb) / d["ntg_therm"] if (meb and d["ntg_therm"] > 0) else 1.0
-        pv_e = ref.bill_pv(d, fe * d["shape_scale_1st"], fe * d["shape_scale_2nd"], rates_e, st["annual"], st["base_year"])
+        pv_e = ref.bill_pv(d, fe * d["AC_Net_kWh_1st_Baseline"], fe * d["AC_Net_kWh_2nd_Baseline"], rates_e, st["annual"], st["base_year"])
         pv_g = ref.bill_pv(d, ft * d["therms_1st"], ft * d["therms_2nd"], rates_g, st["annual"], st["base_year"])
-        e["LifecycleBillReducElec"], e["LifecycleBillIncrElec"] = ref.split_ben_supply(pv_e, d["is_fuel_sub"])
-        e["LifecycleBillReducGas"], e["LifecycleBillIncrGas"] = ref.split_ben_supply(pv_g, d["is_fuel_sub"])
+        e["LifecycleBillReducElec"], e["LifecycleBillIncrElec"] = ref.split_ben_supply(pv_e, d["Fuel_Sub_Flag"])
+        e["LifecycleBillReducGas"], e["LifecycleBillIncrGas"] = ref.split_ben_supply(pv_g, d["Fuel_Sub_Flag"])
         gross_e = ref.bill_pv(d, d["qty"] * d["kwh1"] * d["irr_kwh"], d["qty"] * d["kwh2"] * d["irr_kwh"], rates_e, st["annual"], st["base_year"])
         gross_g = ref.bill_pv(d, d["qty"] * d["th1"] * d["irr_therm"], d["qty"] * d["th2"] * d["irr_therm"], rates_g, st["annual"], st["base_year"])
         bg = {}
-        bg["LifecycleBillReducElecGross"], bg["LifecycleBillIncrElecGross"] = ref.split_ben_supply(gross_e, d["is_fuel_sub"])
-        bg["LifecycleBillReducGasGross"], bg["LifecycleBillIncrGasGross"] = ref.split_ben_supply(gross_g, d["is_fuel_sub"])
+        bg["LifecycleBillReducElecGross"], bg["LifecycleBillIncrElecGross"] = ref.split_ben_supply(gross_e, d["Fuel_Sub_Flag"])
+        bg["LifecycleBillReducGasGross"], bg["LifecycleBillIncrGasGross"] = ref.split_ben_supply(gross_g, d["Fuel_Sub_Flag"])
         e.update(ref.participant_test(d, p1, e["TaxCreditsGross"], bg, st["qtr"], first_year))
         e["prg"], e["ntg_kwh"], e["ntg_therm"] = raw["PrgID"], d["ntg_kwh"], d["ntg_therm"]
         nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["AC_Elec_Target_Sector"], raw["AC_Elec_Impact_Profile"], raw["AC_Climate_Zone"])
         nox_gas = 0.0092 if raw.get("CombustionType") else 0.0
         e.update(ref.emissions(d, ref.hourly_co2_quarters(shape, REPRESENTS, {y: _emission_rate(y) for y in YEARS}), nox, pm10, st["co2_gas"], nox_gas, meb))
-        e["AC_kWh_1st_Baseline"], e["AC_kWh_2nd_Baseline"] = d["shape_scale_1st"], d["shape_scale_2nd"]
-        e["AC_Therms_1st_Baseline"], e["AC_kWh_Water_1st_Baseline"] = d["therms_1st"], d["water_scale_1st"]
+        e["AC_Net_kWh_1st_Baseline"], e["AC_Net_kWh_2nd_Baseline"] = d["AC_Net_kWh_1st_Baseline"], d["AC_Net_kWh_2nd_Baseline"]
+        e["AC_Net_Therms_1st_Baseline"], e["AC_Net_kWh_Water_1st_Baseline"] = d["therms_1st"], d["AC_Net_kWh_Water_1st_Baseline"]
         rows.append(e)
         per[cid] = e
     for cid, out in zip(MEASURES, ref.cost_tests(rows, program, first_year, st, meb)):
@@ -285,8 +287,8 @@ def test_every_ratio_is_its_numerator_column_over_its_cost_column(tmp_path):
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------- regressions found while documenting
 def _bill_measure(eul, rul, s1=1000.0, s2=0.0):
-    return pd.DataFrame([{"measure_id": "m", "claim_year": 2028, "rul_years_exact": rul, "eul_years_exact": eul, "ir_kwh": 1.0, "rr_kwh": 1.0, "annual_net_kwh_1st": s1,
-                          "annual_net_kwh_2nd": s2, "annual_net_therms_1st": 0.0, "annual_net_therms_2nd": 0.0, "is_fuel_sub": False}])
+    return pd.DataFrame([{"CEInputID": "m", "Used_Year": 2028, "RUL_Yrs": rul, "EUL_Yrs": eul, "Billed_kWh_1st_Baseline": s1,
+                          "Billed_kWh_2nd_Baseline": s2, "Billed_Therms_1st_Baseline": 0.0, "Billed_Therms_2nd_Baseline": 0.0, "Fuel_Sub_Flag": False}])
 
 
 def test_bill_impact_of_a_single_baseline_measure_with_a_fractional_life():
@@ -377,5 +379,5 @@ def test_library_route_matches_the_reference_formulas(tmp_path, meb):
     for cid, arr, rep in (("LIB1", LIB_ZONE13, 2009), ("LIB2", LIB_SYSTEM, 2009), ("LIB3", LIB_SYSTEM, 2010), ("TOU1", LIB_TOU, 2025)):
         d = ref.derive(LIB_MEASURES[cid])
         for s, test, q in (("", "TRC", st["qtr"]), ("_SB", "SCT Base", st["qtr_sct"]), ("_SH", "SCT High", st["qtr_sct"])):
-            want = ref.elec_value(d, arr / arr.sum(), rep, elec_acc(test), q, first_year, d["shape_scale_1st"], d["shape_scale_2nd"], meb)
+            want = ref.elec_value(d, arr / arr.sum(), rep, elec_acc(test), q, first_year, d["AC_Net_kWh_1st_Baseline"], d["AC_Net_kWh_2nd_Baseline"], meb)
             assert frame.loc[cid, f"ElecBen{s}"] == pytest.approx(want, rel=1e-9), (cid, s)

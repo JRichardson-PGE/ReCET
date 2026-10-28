@@ -225,12 +225,12 @@ def test_gas_component_index_matches_the_row_filter_it_replaced():
 
 def test_discount_settings_lookups_are_cached_but_safe():
     s = discount_settings.get_settings("PGE", 2026)                                 # keyed by ACC version (the 2026 ACC = CET Version 2027)
-    s["discount_rate_qtr"] = 99.0                                                   # a caller changing its copy...
-    assert discount_settings.get_settings("PGE", 2026)["discount_rate_qtr"] == pytest.approx(0.01915)   # ...does not change the next call's
+    s["DiscountRateQtr"] = 99.0                                                   # a caller changing its copy...
+    assert discount_settings.get_settings("PGE", 2026)["DiscountRateQtr"] == pytest.approx(0.01915)   # ...does not change the next call's
     assert discount_settings.get_co2_gas("PGE", 2026) == pytest.approx(0.00531)
     assert discount_settings.get_co2_gas("pge", 2026) == discount_settings.get_co2_gas("PGE", 2026)
-    assert discount_settings.get_settings("PGE", 2022)["settings_base_year"] == 2022   # CET Version 2024
-    assert discount_settings.get_settings("PGE", 2021)["settings_base_year"] == 2021   # CET Version 2022
+    assert discount_settings.get_settings("PGE", 2022)["BaseYear"] == 2022   # CET Version 2024
+    assert discount_settings.get_settings("PGE", 2021)["BaseYear"] == 2021   # CET Version 2022
     with pytest.raises(KeyError):
         discount_settings.get_settings("PGE", 2027)                                 # no 2027 ACC
     with pytest.raises(KeyError):
@@ -239,13 +239,13 @@ def test_discount_settings_lookups_are_cached_but_safe():
 
 def test_per_route_helper_equals_the_row_by_row_apply():
     from recet import run_poc
-    df = pd.DataFrame({"measure_id": ["a", "b", "c", "d", "e"], "shape_key": ["s1", "s1", "s2", "s1", "s2"], "PA": ["PGE"] * 5,
-                       "target_sector": ["R", "R", "R", "R", "C"], "climate_zone": ["13", "13", "13", "13", "13"]})
+    df = pd.DataFrame({"CEInputID": ["a", "b", "c", "d", "e"], "Used_AC_Elec_Impact_Profile": ["s1", "s1", "s2", "s1", "s2"], "IOU_AC_Territory": ["PGE"] * 5,
+                       "AC_Elec_Target_Sector": ["R", "R", "R", "R", "C"], "AC_Climate_Zone": ["13", "13", "13", "13", "13"]})
     calls = []
 
     def fn(m):
-        calls.append(m["measure_id"])
-        return m["shape_key"] == "s1"
+        calls.append(m["CEInputID"])
+        return m["Used_AC_Elec_Impact_Profile"] == "s1"
 
     got = run_poc._per_route(df, run_poc.ROUTE_COLUMNS, fn)
     assert len(calls) == 3                                                          # one call per route (a, b, d share one; c; e), not one per row
@@ -256,11 +256,11 @@ def test_per_route_helper_equals_the_row_by_row_apply():
 def _engine_inputs(seed: int, n: int = 90):
     rng = np.random.default_rng(seed)
     measures = pd.DataFrame({
-        "measure_id": [f"m{i}" for i in range(n)],
-        "claim_year": rng.integers(2026, 2032, n), "claim_quarter": rng.integers(1, 5, n),
-        "eul_years_exact": rng.choice([0.25, 1.0, 2.4, 3.5, 5.0, 7.33, 12.9, 31.0], n),
-        "rul_years_exact": rng.choice([0.0, 0.0, 0.0, 1.0, 1.4, 2.5, 9.0, 40.0], n),          # includes whole, fractional and RUL >= EUL
-        "shape_scale": rng.normal(1000, 400, n), "shape_scale_2nd": rng.normal(500, 300, n),
+        "CEInputID": [f"m{i}" for i in range(n)],
+        "Used_Year": rng.integers(2026, 2032, n), "Used_Quarter": rng.integers(1, 5, n),
+        "EUL_Yrs": rng.choice([0.25, 1.0, 2.4, 3.5, 5.0, 7.33, 12.9, 31.0], n),
+        "RUL_Yrs": rng.choice([0.0, 0.0, 0.0, 1.0, 1.4, 2.5, 9.0, 40.0], n),          # includes whole, fractional and RUL >= EUL
+        "Priced_Quantity_1st_Baseline": rng.normal(1000, 400, n), "Priced_Quantity_2nd_Baseline": rng.normal(500, 300, n),
         "route": rng.integers(0, 7, n)})
     shapes = {}
     for r in range(6):                                                                         # route 6 has no shape: its measures are unmatched
@@ -278,11 +278,11 @@ def test_grouped_engine_equals_the_per_measure_engine(seed):
     ref = engine.price_real_hourly_per_measure(*args)
     grouped = engine.price_real_hourly(*args, route_key=measures["route"])
     own_route = engine.price_real_hourly(*args)                                                    # every measure its own route
-    lifetime = ref.measure_year.groupby("measure_id", sort=False)["annual_value"].sum().reset_index()      # the grouped engine returns lifetime values per measure
+    lifetime = ref.values.groupby("CEInputID", sort=False)["QuarterValuePV"].sum().rename("LifetimeValuePV").reset_index()   # the grouped engine: lifetime values
     for got in (grouped, own_route):
-        pd.testing.assert_frame_equal(got.measure_year.reset_index(drop=True), lifetime, check_dtype=False, rtol=1e-12, atol=1e-9)
-        assert got.unmatched_measure_ids == ref.unmatched_measure_ids and got.n_real_shape == ref.n_real_shape
-    assert len(ref.unmatched_measure_ids) > 0 and ref.n_real_shape > 0
+        pd.testing.assert_frame_equal(got.values.reset_index(drop=True), lifetime, check_dtype=False, rtol=1e-12, atol=1e-9)
+        assert got.unpriced_ids == ref.unpriced_ids
+    assert len(ref.unpriced_ids) > 0 and len(ref.values) > 0
 
 
 def test_grouped_engine_shifts_per_year_when_the_shift_depends_on_the_year():
@@ -292,19 +292,19 @@ def test_grouped_engine_shifts_per_year_when_the_shift_depends_on_the_year():
     assert shift_for_year.year_independent and not getattr(cedars_shift_for_year, "year_independent", False)
     measures, shapes, acc = _engine_inputs(7)
     args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], cedars_shift_for_year, lambda m: 0.019, 2028)
-    ref = engine.price_real_hourly_per_measure(*args).measure_year.groupby("measure_id", sort=False)["annual_value"].sum().reset_index()
-    pd.testing.assert_frame_equal(engine.price_real_hourly(*args, route_key=measures["route"]).measure_year.reset_index(drop=True), ref,
+    ref = engine.price_real_hourly_per_measure(*args).values.groupby("CEInputID", sort=False)["QuarterValuePV"].sum().rename("LifetimeValuePV").reset_index()
+    pd.testing.assert_frame_equal(engine.price_real_hourly(*args, route_key=measures["route"]).values.reset_index(drop=True), ref,
                                   check_dtype=False, rtol=1e-12, atol=1e-9)
 
 
 def _gas_inputs(seed: int, n: int = 90):
     rng = np.random.default_rng(seed)
     measures = pd.DataFrame({
-        "measure_id": [f"g{i}" for i in range(n)],
-        "claim_year": rng.integers(2026, 2032, n), "claim_quarter": rng.integers(1, 5, n),
-        "eul_years_exact": rng.choice([0.25, 1.0, 2.4, 3.5, 5.0, 7.33, 12.9, 31.0], n),
-        "rul_years_exact": rng.choice([0.0, 0.0, 0.0, 1.0, 1.4, 2.5, 9.0, 40.0], n),
-        "annual_net_therms_1st": rng.choice([0.0, 0.0, 120.0, -60.0, 900.5], n), "annual_net_therms_2nd": rng.choice([0.0, 0.0, 30.0, 400.0], n),
+        "CEInputID": [f"g{i}" for i in range(n)],
+        "Used_Year": rng.integers(2026, 2032, n), "Used_Quarter": rng.integers(1, 5, n),
+        "EUL_Yrs": rng.choice([0.25, 1.0, 2.4, 3.5, 5.0, 7.33, 12.9, 31.0], n),
+        "RUL_Yrs": rng.choice([0.0, 0.0, 0.0, 1.0, 1.4, 2.5, 9.0, 40.0], n),
+        "Priced_Quantity_1st_Baseline": rng.choice([0.0, 0.0, 120.0, -60.0, 900.5], n), "Priced_Quantity_2nd_Baseline": rng.choice([0.0, 0.0, 30.0, 400.0], n),
         "route": rng.integers(0, 7, n)})
     shapes = {}
     for r in range(6):                                                                         # route 6 has no profile: its measures get no rows
@@ -319,26 +319,26 @@ def test_grouped_gas_engine_equals_the_per_measure_engine(seed):
     measures, shapes, acc = _gas_inputs(seed)
     args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], lambda m: 0.0191 + 0.0004 * m["route"], 2028)
     ref = engine.price_gas_benefit_per_measure(*args)
-    lifetime = ref.groupby("measure_id", sort=False)["gas_benefit"].sum().reset_index()
+    lifetime = ref.groupby("CEInputID", sort=False)["QuarterValuePV"].sum().rename("LifetimeValuePV").reset_index()
     for got in (engine.price_gas_benefit(*args, route_key=measures["route"]), engine.price_gas_benefit(*args)):
         pd.testing.assert_frame_equal(got.reset_index(drop=True), lifetime, check_dtype=False, rtol=1e-12, atol=1e-9)
-    assert len(ref) > 0 and set(ref["measure_id"]) < set(measures["measure_id"])                # some measures (no therms, no profile) are rightly absent
+    assert len(ref) > 0 and set(ref["CEInputID"]) < set(measures["CEInputID"])                # some measures (no therms, no profile) are rightly absent
 
 
 def test_grouped_gas_engine_with_nothing_to_price_is_empty_with_columns():
     measures, shapes, acc = _gas_inputs(4)
     none_priced = engine.price_gas_benefit(measures, lambda m: None, lambda m: acc[0], lambda m: 0.019, 2028, route_key=measures["route"])
-    no_therms = engine.price_gas_benefit(measures.assign(annual_net_therms_1st=0.0, annual_net_therms_2nd=0.0), lambda m: shapes[0], lambda m: acc[0], lambda m: 0.019, 2028)
+    no_therms = engine.price_gas_benefit(measures.assign(Priced_Quantity_1st_Baseline=0.0, Priced_Quantity_2nd_Baseline=0.0), lambda m: shapes[0], lambda m: acc[0], lambda m: 0.019, 2028)
     for got in (none_priced, no_therms):
-        assert got.empty and list(got.columns) == ["measure_id", "gas_benefit"]
+        assert got.empty and list(got.columns) == ["CEInputID", "LifetimeValuePV"]
 
 
 def test_grouped_engine_with_nothing_priced_returns_an_empty_frame_with_columns():
     measures, shapes, acc = _engine_inputs(4)
     from recet.pipeline.real_impact_profiles import shift_for_year
     got = engine.price_real_hourly(measures, lambda m: None, lambda m: acc[0], shift_for_year, lambda m: 0.019, 2028, route_key=measures["route"])
-    assert got.measure_year.empty and list(got.measure_year.columns) == ["measure_id", "annual_value"]
-    assert got.unmatched_measure_ids == measures["measure_id"].tolist()
+    assert got.values.empty and list(got.values.columns) == ["CEInputID", "LifetimeValuePV"]
+    assert got.unpriced_ids == measures["CEInputID"].tolist()
 
 
 def test_lifetime_values_share_work_between_measures_and_keep_each_quarter_discounted():
@@ -346,24 +346,16 @@ def test_lifetime_values_share_work_between_measures_and_keep_each_quarter_disco
     gives no quarter is left without a row, as the per-measure engine leaves it."""
     from recet.pipeline.real_impact_profiles import shift_for_year
     measures, shapes, acc = _engine_inputs(6, n=40)
-    measures = pd.concat([measures, measures.assign(measure_id=measures["measure_id"] + "x", shape_scale=measures["shape_scale"] * 3,
-                                                    shape_scale_2nd=measures["shape_scale_2nd"] * 3)], ignore_index=True)
-    measures.loc[0, "eul_years_exact"] = 0.0
+    measures = pd.concat([measures, measures.assign(CEInputID=measures["CEInputID"] + "x", Priced_Quantity_1st_Baseline=measures["Priced_Quantity_1st_Baseline"] * 3,
+                                                    Priced_Quantity_2nd_Baseline=measures["Priced_Quantity_2nd_Baseline"] * 3)], ignore_index=True)
+    measures.loc[0, "EUL_Yrs"] = 0.0
     args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], shift_for_year, lambda m: 0.0191 + 0.0004 * m["route"], 2028)
-    got = engine.price_real_hourly(*args, route_key=measures["route"]).measure_year.set_index("measure_id")["annual_value"]
-    ref = engine.price_real_hourly_per_measure(*args).measure_year.groupby("measure_id")["annual_value"].sum()
+    got = engine.price_real_hourly(*args, route_key=measures["route"]).values.set_index("CEInputID")["LifetimeValuePV"]
+    ref = engine.price_real_hourly_per_measure(*args).values.groupby("CEInputID")["QuarterValuePV"].sum()
     assert "m0" not in got.index and "m0" not in ref.index
     pd.testing.assert_series_equal(got.sort_index(), ref.sort_index(), check_names=False, rtol=1e-12, atol=1e-9)
     tripled = [i for i in got.index if i.endswith("x") and i[:-1] in got.index]
     assert tripled and np.allclose(got[tripled].to_numpy(), 3 * got[[i[:-1] for i in tripled]].to_numpy())
-
-
-def test_portfolio_accumulator_still_comes_from_the_per_measure_engine():
-    from recet.pipeline.real_impact_profiles import shift_for_year
-    measures, shapes, acc = _engine_inputs(5, n=12)
-    args = (measures, lambda m: shapes.get(m["route"]), lambda m: acc[m["route"]], shift_for_year, lambda m: 0.019, 2028)
-    got = engine.price_real_hourly(*args, route_key=measures["route"], need_portfolio_hourly=True)
-    assert got.portfolio_hourly.sum() > 0 and np.allclose(got.portfolio_hourly, engine.price_real_hourly_per_measure(*args).portfolio_hourly)
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------ the cache command
@@ -387,18 +379,17 @@ def _cost_inputs(seed: int, n: int = 400) -> pd.DataFrame:
     rul = rng.choice([0.0, 0.0, 0.5, 1.0, 2.25, 3.0, 7.75], n)
     eul = np.maximum(rul + rng.choice([0.0, 0.25, 1.0, 4.4, 10.0], n), rng.choice([0.25, 1.0, 3.5, 12.0], n))
     return pd.DataFrame({
-        "measure_id": [f"m{i}" for i in range(n)], "PA": rng.choice(["PGE", "SCE"], n), "target_sector": rng.choice(["Res", "Com", "NoTable"], n),
-        "gas_sector": rng.choice(["Residential", "Commercial", "NoTable"], n),
-        "claim_year": rng.choice([2027, 2028, 2030], n), "claim_quarter": rng.choice([1, 2, 3, 4], n), "rul_years_exact": rul, "eul_years_exact": eul,
-        "ir_kwh": rng.uniform(0.8, 1.0, n), "rr_kwh": rng.uniform(0.8, 1.1, n),
-        "annual_net_kwh_1st": rng.normal(0, 5000, n), "annual_net_kwh_2nd": rng.normal(0, 3000, n),
-        "annual_net_therms_1st": rng.normal(0, 300, n), "annual_net_therms_2nd": rng.normal(0, 200, n), "is_fuel_sub": rng.random(n) < 0.5,
-        "num_units": rng.integers(1, 50, n).astype(float), "NTGRkWh": rng.uniform(0.5, 1.0, n), "ntgr_cost": rng.uniform(0.5, 1.0, n),
-        "unit_incentive_to_others": rng.uniform(0, 400, n), "unit_di_labor": rng.uniform(0, 100, n), "unit_di_material": rng.uniform(0, 100, n),
-        "unit_end_user_rebate": rng.uniform(0, 200, n), "unit_meas_cost_1st": rng.uniform(50, 900, n), "unit_meas_cost_2nd": rng.uniform(20, 600, n),
-        "meas_inflation": rng.choice([0.0, 0.02], n), "unit_gas_infra_bens": rng.uniform(0, 10, n), "unit_refrig_bens": rng.uniform(0, 10, n),
-        "unit_misc_bens": rng.uniform(0, 10, n), "unit_refrig_costs": rng.uniform(0, 10, n), "unit_misc_costs": rng.uniform(0, 10, n),
-        "unit_tax_credits": rng.uniform(0, 10, n),
+        "CEInputID": [f"m{i}" for i in range(n)], "IOU_AC_Territory": rng.choice(["PGE", "SCE"], n), "AC_Elec_Target_Sector": rng.choice(["Res", "Com", "NoTable"], n),
+        "AC_Gas_Target_Sector": rng.choice(["Residential", "Commercial", "NoTable"], n),
+        "Used_Year": rng.choice([2027, 2028, 2030], n), "Used_Quarter": rng.choice([1, 2, 3, 4], n), "RUL_Yrs": rul, "EUL_Yrs": eul,
+        "Billed_kWh_1st_Baseline": rng.normal(0, 5000, n), "Billed_kWh_2nd_Baseline": rng.normal(0, 3000, n),
+        "Billed_Therms_1st_Baseline": rng.normal(0, 300, n), "Billed_Therms_2nd_Baseline": rng.normal(0, 200, n), "Fuel_Sub_Flag": rng.random(n) < 0.5,
+        "NumUnits": rng.integers(1, 50, n).astype(float), "NTGRkWh": rng.uniform(0.5, 1.0, n), "NTGRCost": rng.uniform(0.5, 1.0, n),
+        "UnitIncentiveToOthers": rng.uniform(0, 400, n), "UnitDirectInstallLab": rng.uniform(0, 100, n), "UnitDirectInstallMat": rng.uniform(0, 100, n),
+        "UnitEndUserRebate": rng.uniform(0, 200, n), "UnitMeaCost1stBaseline": rng.uniform(50, 900, n), "UnitMeaCost2ndBaseline": rng.uniform(20, 600, n),
+        "MeasInflation": rng.choice([0.0, 0.02], n), "UnitGasInfraBens": rng.uniform(0, 10, n), "UnitRefrigBens": rng.uniform(0, 10, n),
+        "UnitMiscBens": rng.uniform(0, 10, n), "UnitRefrigCosts": rng.uniform(0, 10, n), "UnitMiscCosts": rng.uniform(0, 10, n),
+        "UnitTaxCredits": rng.uniform(0, 10, n),
     })
 
 
@@ -407,8 +398,8 @@ def test_array_bill_impact_participant_and_other_costs_equal_the_per_measure_ver
     m = _cost_inputs(seed)
     tables = {(pa, s): {y: 0.1 + 0.01 * (y - 2024) + (0.03 if pa == "SCE" else 0.0) for y in range(2024, 2041) if y != 2033}       # 2033 missing
               for pa in ("PGE", "SCE") for s in ("Res", "Com", "Residential", "Commercial")}
-    elec, gas = (lambda r: tables.get((r["PA"], r["target_sector"]))), (lambda r: tables.get((r["PA"], r["gas_sector"])))
-    rate = lambda r: 0.0766 if r["PA"] == "PGE" else 0.0765
+    elec, gas = (lambda r: tables.get((r["IOU_AC_Territory"], r["AC_Elec_Target_Sector"]))), (lambda r: tables.get((r["IOU_AC_Territory"], r["AC_Gas_Target_Sector"])))
+    rate = lambda r: 0.0766 if r["IOU_AC_Territory"] == "PGE" else 0.0765
     for got, ref in ((engine.price_bill_impact(m, elec, gas, rate, 2024), engine.price_bill_impact_per_measure(m, elec, gas, rate, 2024)),
                      (engine.price_participant_cost(m, lambda r: rate(r) / 4, 2028, 0.05), engine.price_participant_cost_per_measure(m, lambda r: rate(r) / 4, 2028, 0.05)),
                      (engine.price_other_ben_cost(m, 0.05, 0.05), engine.price_other_ben_cost_per_measure(m, 0.05, 0.05))):
