@@ -40,12 +40,12 @@ CEDARS.
 | Hourly valuation, load shifting (BR-06.6) | value savings in the hour they occur; a measure that only moves load has value | each measure's 8,760 profile is multiplied by that hour's avoided cost **before** summing (C5.1); kWh-per-unit profiles (C4.5) | met |
 | ACC per measure (BR-06.5) | price records on the ACC that applies to them; flag the ones that are not | optional `ACCVersion` column (C3.5); the "Priced for" check flags records whose ACC does not normally apply to their program year (`versions.expected_accs`) | met |
 | Version labels (BR-11.7) | name each ACC release unambiguously | versions keyed and shown by ACC year ("2026 ACC"); CET's Avoided Cost Version numbers mapped on read (`versions.py`) | met |
-| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks | `run_poc.participant_cost_test` | met |
+| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test`; every test is code in `pipeline/cost_tests.py` | partly met: the PCT is added, but tests and value streams are not configuration (needs D14) |
 | Filing checks (BR-06.3, BR-03.6, BR-03.3) | check a job against CEDARS' upload rules before upload | CEDARS' published claims and budget-filing rule files, shipped unchanged and versioned by effective date (`filing_rules.py`); failing records flagged, never blocked; the rule set used recorded in `run_settings.json` | met; multi-file batch upload dropped for ReCET |
 | Output templates and key metrics (BR-06.10) | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
 | Minimal input set (BR-06.15) | an exploratory run needs only the fields that change a result | descriptive columns may be left out (`templates.with_defaults`); a missing calculation column is still an error | met, except lifecycle savings as input (not built, by decision) |
 | Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); each run in its own process | partly met (section 11) |
-| Statewide allocation | split a statewide program across the IOUs | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15) | met |
+| Statewide allocation (BR-06.7) | split a statewide program across the IOUs; the allocated totals reconcile to the unallocated ones | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15); `statewide_reconciliation` table (`statewide_allocation.reconciliation`) | met; factors come from a file, not a Programs module |
 | Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
 | Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
 
@@ -308,6 +308,7 @@ prices it on another version within the same run (C3.5). Each ACC's hours follow
      key_metrics_acc<v>.<fmt>           headline results with definitions; top programs, sectors and end uses
      field_definitions_acc<v>.<fmt>     each column of the measure-level file with its definition and link
      filing_validation_acc<v>.<fmt>     with CEDARS filing checks on: each failing record and rule
+     statewide_reconciliation_acc<v>.<fmt>   with statewide allocation: each allocated field before allocation and by IOU
      preflight.txt / .json / preflight_findings.xlsx      the input check
      run_settings.json                  every setting, file, version and count needed to repeat the run
      log.txt                            the run's log

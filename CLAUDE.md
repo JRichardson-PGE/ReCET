@@ -90,6 +90,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.58 (2026-10-28, Jake; BRD review gap 1, BR-06.7): statewide allocation reconciles. `statewide_allocation._allocate`'s report carries
+  `reconciliation` (per Year, SW PrgID, allocated field: the total before allocation and over each IOU's produced rows; Measure fields as NumUnits x field),
+  `statewide_allocation.reconciliation(files, programcost)` adds them over a job's file or parts, and `jobs.write_reconciliation` writes
+  `statewide_reconciliation_<tag>` after preflight (OUTPUT_FIELDS 2.13) with a log note per field that does not reconcile (factors not summing to 1, usually
+  a fuel whose factors are all 0). tests/test_statewide_reconciliation.py prices a job both ways: benefits add up wherever the inputs do. ARCHITECTURE 1.3
+  marks BR-06.8 partly met (tests are code).
 - 0.1.57 (2026-10-28, Jake): an RUL_Yrs equal to EUL_Yrs is no RUL, as CalcCE's InputMeasurevw has it (`CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`):
   `engine.rul_in_use` in the electric / gas / water lifetime values, bill impacts and participant cost (grouped and per measure) and in
   `tests/reference_calc.py`. Before, a fractional life blended the 2nd baseline into its last part-quarter / year, and the participant cost took the

@@ -216,6 +216,7 @@ One folder `<out>/<run name>_acc<version>/`:
 * `portfolio_summary_*.csv`, `field_definitions_*.csv` (each column of the measure-level file with its definition), `key_metrics_*.csv` (the headline results and their
   main drivers), `preflight.txt`, `preflight_findings.xlsx` (the input check's findings and every flagged cell), `run_settings.json` (everything needed to reproduce the run).
 * With CEDARS filing checks: `filing_validation_*.csv` (each record CEDARS would reject or warn on).
+* With statewide allocation: `statewide_reconciliation_*.csv` (each allocated field of each statewide program, before allocation and by IOU, and whether it reconciles).
 * Optional: `components_summary_*.csv`, `portfolio_8760_*.csv` (+ `_unshaped`), `cet_comparison_*.csv`, and for a two-version run `comparison_acc<A>_vs_acc<B>.csv`.
 
 **Water energy** is priced like the electric benefit but on the `Gen` term alone (no T&D, no kW term) with the measure's own electric profile: `WaterEnergyBen` when
