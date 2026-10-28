@@ -90,6 +90,13 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.59 (2026-10-28, Jake; 0.1.58 is the statewide-allocation PR #45; scope: Claude Doc "OpenBCA module for ReCET: scope"): step 1 of the OpenBCA module.
+  `recet openbca run|compare` (`recet/openbca/run.py`) runs OpenBCA's own engine (its Integrated pathway: the SQLmesh projects on DuckDB, unchanged) on a
+  Program Input + Configuration workbook. ReCET never imports SQLmesh/DuckDB: RECET_OPENBCA_HOME names a pinned checkout (a release tag, `uv sync` done;
+  RECET_OPENBCA_PYTHON overrides its .venv), each run copies its config/core/excel_input_parsing into `<run>/openbca/` with the workbooks under OpenBCA's
+  fixed names, and `openbca/engine.py` runs in OpenBCA's interpreter, exporting OpenBCA's own outputs (results_summary_by_id, jst_ratio, the five
+  validation views) as they stand: nothing recomputed on them (Jake). C1 (v1.0.4 demo, 58 measures): every one of OpenBCA's tables equal to its own
+  `model_runners.py` run; 50.6 s, 1.81 GiB peak, already above the server container's 1.4 GB. Next: the California configuration from the ACC (C2).
 - 0.1.57 (2026-10-28, Jake): an RUL_Yrs equal to EUL_Yrs is no RUL, as CalcCE's InputMeasurevw has it (`CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`):
   `engine.rul_in_use` in the electric / gas / water lifetime values, bill impacts and participant cost (grouped and per measure) and in
   `tests/reference_calc.py`. Before, a fractional life blended the 2nd baseline into its last part-quarter / year, and the participant cost took the
