@@ -90,6 +90,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.57 (2026-10-28, Jake): an RUL_Yrs equal to EUL_Yrs is no RUL, as CalcCE's InputMeasurevw has it (`CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`):
+  `engine.rul_in_use` in the electric / gas / water lifetime values, bill impacts and participant cost (grouped and per measure) and in
+  `tests/reference_calc.py`. Before, a fractional life blended the 2nd baseline into its last part-quarter / year, and the participant cost took the
+  2nd-baseline cost plus the deferred difference; emissions, the combined 8,760 and the savings already treated it as single-baseline (the savings give the
+  same values either way). test_calcs' EX4 is such a measure. Same PR: the docs audit of PR #43 (stale names and formulas after 0.1.50-0.1.56).
 - 0.1.56 (2026-10-28; made 2026-10-27 for 0.1.52 but pushed after PR #38 merged): default `chunk_size` 50,000 (was 20,000), as the web server
   already ran; about 1 GiB peak at 1M on the server. Diagrams use SVG text labels (`htmlLabels: false` in each diagram's front matter, for GitHub,
   and in docs.js): HTML labels sit in a foreignObject that clips any text wider than Mermaid measured (e.g. a font that loads after measuring).
