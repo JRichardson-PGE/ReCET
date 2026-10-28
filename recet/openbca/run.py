@@ -67,7 +67,7 @@ def find_checkout(home: str | Path | None = None, python: str | Path | None = No
     py = Path(python or os.environ.get("RECET_OPENBCA_PYTHON") or home / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
     if not py.exists():
         raise FileNotFoundError(f"no OpenBCA interpreter at {py}: run `uv sync` in {home} or set RECET_OPENBCA_PYTHON")
-    return Checkout(home.resolve(), py)
+    return Checkout(home.resolve(), py.absolute())  # absolute, not resolved: resolving the venv's symlink would leave the venv
 
 
 def stage(checkout: Checkout, workspace: Path, program_input: Path, configuration: Path) -> Path:
