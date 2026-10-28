@@ -105,8 +105,8 @@ def derive(r: dict) -> dict:
     d["irr_kw"] = f("InstallationRatekW", 1.0) * f("RealizationRatekW", 1.0)
     d["irr_kwh"] = f("InstallationRatekWh", 1.0) * f("RealizationRatekWh", 1.0)
     d["irr_therm"] = f("InstallationRateTherm", 1.0) * f("RealizationRateTherm", 1.0)
-    d["eul"] = max(float(r["EUL_Yrs"]), 0.25)
-    d["rul"] = max(f("RUL_Yrs"), 0.0)
+    d["eul"] = float(r["EUL_Yrs"])
+    d["rul"] = f("RUL_Yrs") if f("RUL_Yrs") < d["eul"] else 0.0         # CalcCE's InputMeasurevw: an RUL not below the EUL is no RUL
     d["Used_Year"], d["Used_Quarter"] = int(str(r["ClaimYearQuarter"])[:4]), int(str(r["ClaimYearQuarter"])[-1])
     d["AC_Net_kWh_1st_Baseline"] = d["qty"] * d["kwh1"] * d["ntg_kwh"] * d["irr_kwh"]
     d["AC_Net_kWh_2nd_Baseline"] = d["qty"] * d["kwh2"] * d["ntg_kwh"] * d["irr_kwh"]

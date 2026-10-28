@@ -59,7 +59,7 @@ Symbols used in the formulas (input field in brackets). Every numeric field CET 
 | `NTGc` | cost net-to-gross | `NTGRCost` |
 | `IRe`, `RRe` | installation and realization rate, kWh | `InstallationRatekWh`, `RealizationRatekWh` |
 | `IRkw`, `RRkw`, `IRt`, `RRt` | the same for kW and therms | `InstallationRatekW`, `RealizationRatekW`, `InstallationRateTherm`, `RealizationRateTherm` |
-| `EUL`, `RUL` | effective and remaining useful life, years | `EUL_Yrs`, `RUL_Yrs` (neither may be negative, and `RUL_Yrs` may not exceed `EUL_Yrs`: preflight errors) |
+| `EUL`, `RUL` | effective and remaining useful life, years | `EUL_Yrs`, `RUL_Yrs` (neither may be negative, and `RUL_Yrs` may not exceed `EUL_Yrs`: preflight errors); `RUL` = 0 when `RUL_Yrs` equals `EUL_Yrs`, as CalcCE's InputMeasurevw does (`CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`) |
 | `Y0`, `q0` | claim year and claim quarter (1-4) | `ClaimYearQuarter` = `YYYYQn` |
 | `PA` | avoided-cost territory | `IOU_AC_Territory` |
 | `w(k)`, `DF(k)`, `phased(k; a, b)` | quarter weight, discount factor, baseline phasing | C2 |
@@ -149,7 +149,7 @@ phased(k; a, b) = a                                     if RQ <= 0  or  k + 1 <=
                   (RQ - k) * a + (1 - (RQ - k)) * b     otherwise                           (the one quarter that contains the RUL)
 ```
 
-`RUL = 0` (the normal case) means a single baseline: the 1st-baseline value applies for the whole life and the 2nd-baseline fields are ignored.
+`RUL = 0` (the normal case, and an `RUL_Yrs` equal to `EUL_Yrs`: C0) means a single baseline: the 1st-baseline value applies for the whole life and the 2nd-baseline fields are ignored.
 
 **C2.4 Discounting.** The discount rates come from the run parameters for the measure's `PA` and the ACC version (C3.3), or from a supplied
 run-parameters file for that PA. `DiscountRateQtr` is the nominal
@@ -910,7 +910,7 @@ The societal values follow C5.6: for example `ElecBen_SB` reprices the same quar
 
 ## C19 Savings quantities, discounted savings and levelized values
 
-CET's savings columns (CalcSavings) and the columns CalcCost builds on them. All use `EUL_Yrs` and `RUL_Yrs` **as filed**, as the pricing does. For each fuel,
+CET's savings columns (CalcSavings) and the columns CalcCost builds on them. All use `EUL_Yrs` and `RUL_Yrs` as filed, as the pricing does (an `RUL_Yrs` equal to `EUL_Yrs` gives the same values as `RUL` = 0 in every one of them). For each fuel,
 `a1` / `a2` are the per-unit 1st / 2nd-baseline amounts, `IR` / `RR` its installation and realization rates and `NTG` its net-to-gross ratio:
 
 | Suffix | `a1` / `a2` | `IR`, `RR`, `NTG` |

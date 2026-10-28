@@ -99,8 +99,8 @@ phased(k; a, b) = a                                    if RQ <= 0 or k + 1 <= RQ
 ```
 
 `RUL_Yrs` of 0 is a single baseline: `a` applies for the whole life and every 2nd-baseline field is ignored (a blank, negative or above-`EUL_Yrs` `RUL_Yrs` stops the run in
-preflight). An `RUL_Yrs` equal to `EUL_Yrs` (preflight warning `rul_not_below_eul`) is phased by the formula as written: with a fractional life its last, part-quarter
-contains `RQ` and is blended, while emissions (1.11) treat such a measure as single-baseline. *Example B*: `RUL_Yrs` 1.125, so `RQ` = 4.5; quarters 0-3 use
+preflight). An `RUL_Yrs` equal to `EUL_Yrs` (preflight warning `rul_not_below_eul`) is not an early replacement either: as in CalcCE (its InputMeasurevw sets an RUL
+that is not below the EUL to 0), every formula in this file then uses `RUL_Yrs` = 0, so the measure is single-baseline for its whole life. *Example B*: `RUL_Yrs` 1.125, so `RQ` = 4.5; quarters 0-3 use
 the 1st baseline, quarter 4 is a half-and-half blend (`RQ - k` = 0.5) and quarters 5-9 use the 2nd baseline.
 
 ### 0.5 The annual quantities that are priced

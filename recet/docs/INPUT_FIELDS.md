@@ -122,7 +122,7 @@ so they can be uploaded to the CET as they are.
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
 | `EUL_Yrs` | Years (fractional allowed) | required | error | Effective useful life of measure in years. **In ReCET:** Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). |
-| `RUL_Yrs` | Years | required | error | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
+| `RUL_Yrs` | Years | required | error | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value below `EUL_Yrs` makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). A value equal to `EUL_Yrs` is treated as 0, as CET does (a warning); above it is an error. |
 
 ### 1.6 Net-to-gross, realization and installation rates
 
