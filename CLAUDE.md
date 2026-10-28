@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.61 (2026-10-28, Jake; BRD review gap 4, BR-06.13): the combined 8,760 by climate zone. `profile8760.portfolio_profile` adds
+  `net_kwh_<Y>_CZ<zone>` (`zone_label`: the filed AC_Climate_Zone, CZ prepended to a bare number), `combine_profiles` adds them up over parts, and
+  `profile8760.peaks` writes `portfolio_8760_peaks_<tag>` (per year: portfolio, each PA, each zone; own peak, largest added load, kWh and share at the
+  portfolio's peak hour). The peak is the max net-savings hour, not a DEER peak-period definition. tests/test_profile_zones.py.
 - 0.1.60 (2026-10-28, Jake; BRD review gap 3, BR-04.1): results by program year. The portfolio summary has a `program year` group (Used_Year;
   `SummaryParts.GROUPS`, which summarize now shares). Results: group-sum key `_year` (CUBE_VERSION 2, so kept sums are rebuilt), a Program year level, and
   `years` (a list; empty = every year) on RunResults.table / count / measure_level_allowed and results_view.table / filter_pa; web `?years=2028&years=2029`

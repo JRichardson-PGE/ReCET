@@ -14,7 +14,8 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   key_metrics_<acc>              the headline results with their definitions, and the main drivers by program, sector and end use (key_metrics.py)
   statewide_reconciliation_<acc> (statewide allocation) each statewide program's allocated fields: total before allocation, each IOU's share, the difference
   components_summary_<acc>.csv   (components mode) portfolio value of each ACC component, with the sum-check against the totals
-  portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh; portfolio_8760_unshaped_<acc>.csv lists measures left out
+  portfolio_8760_<acc>.csv       (combined 8760 mode) the portfolio's hourly net kWh, by PA and climate zone; portfolio_8760_peaks_<acc> each one's peak hours;
+                                 portfolio_8760_unshaped_<acc>.csv lists measures left out
   cet_comparison_*.csv           (when a CET outputs file is given) POC vs CET, per measure and in total
   comparison_<A>_vs_<B>.csv      (compare mode) per-measure and portfolio differences between two ACC versions (see `run_compare`)
 
@@ -498,6 +499,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         log(f"\n== combined 8,760 electric profile, year(s) {years} ==")
         prof, unshaped, psum = profile8760.portfolio_profile(measures, years, log=log)
         result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format, excel)
+        result.files["portfolio_8760_peaks"] = outputs.write_table(profile8760.peaks(prof, years), run_dir / f"portfolio_8760_peaks_{tag}", cfg.output_format, excel)
         if len(unshaped):
             result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format, excel)
         for y, s in psum.items():

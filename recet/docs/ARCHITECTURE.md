@@ -310,6 +310,7 @@ prices it on another version within the same run (C3.5). Each ACC's hours follow
      field_definitions_acc<v>.<fmt>     each column of the measure-level file with its definition and link
      filing_validation_acc<v>.<fmt>     with CEDARS filing checks on: each failing record and rule
      statewide_reconciliation_acc<v>.<fmt>   with statewide allocation: each allocated field before allocation and by IOU
+     portfolio_8760_acc<v>.<fmt> / portfolio_8760_peaks_acc<v>.<fmt>   with the combined 8,760: hourly net kWh by PA and climate zone, and their peaks
      preflight.txt / .json / preflight_findings.xlsx      the input check
      run_settings.json                  every setting, file, version and count needed to repeat the run
      log.txt                            the run's log
