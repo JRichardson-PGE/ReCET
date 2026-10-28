@@ -21,7 +21,7 @@ takes them: ReCET does not take lifecycle savings to derive annual values from.
 *Carried* = read if present and copied to the output unchanged, never used in a calculation. Numeric columns must hold numbers or be blank; text in them is a blocking preflight error.
 Every numeric field CET marks NotEmpty cannot be blank, as in CET: `NumUnits`, the six `UnitkW` / `UnitkWh` / `UnitTherm` 1st/2nd-baseline fields, `UnitMeaCost1stBaseline`, `UnitMeaCost2ndBaseline`, the four `NTGR*`, `EUL_Yrs`, `RUL_Yrs`, the six installation and realization rates, `UnitGasInfraBens`, `UnitRefrigCosts`, `UnitRefrigBens`, `UnitMiscCosts` and `UnitMiscBens`; a blank is a blocking preflight error (enter 0 for none), and the pricing uses them as filed. `EUL_Yrs` and `RUL_Yrs` may not be negative, and `RUL_Yrs` may not exceed `EUL_Yrs` (blocking errors).
 The preflight also **warns** (the run still proceeds) when a value is outside the range CET's own QC allows: the four `NTGR*` in (0, 1.5], `EUL_Yrs` in [0, 40], `RUL_Yrs` in [0, 30], the three `RealizationRate*` in (0, 2],
-the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `UnitMeaCost*` at least 0, and `RUL_Yrs` not below `EUL_Yrs`.
+the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `UnitMeaCost*` at least 0, and an `RUL_Yrs` equal to `EUL_Yrs` (`rul_not_below_eul`).
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -121,7 +121,7 @@ so they can be uploaded to the CET as they are.
 
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
-| `EUL_Yrs` | Years (fractional allowed) | required | error | Effective useful life of measure in years. **In ReCET:** Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); a value below 0.25 is treated as 0.25. |
+| `EUL_Yrs` | Years (fractional allowed) | required | error | Effective useful life of measure in years. **In ReCET:** Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). |
 | `RUL_Yrs` | Years | required | error | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
 
 ### 1.6 Net-to-gross, realization and installation rates
@@ -255,6 +255,7 @@ Templates for each: GUI **Template...** buttons or `recet template ...`. Matchin
 | `hour_of_year` | integer 1-8760 | yes | The hour, exactly once per (profile, zone). Hour 1 is 00:00 on 1 January of `represents_year`. |
 | `impact` | fraction of the measure's annual net kWh | yes | The share of the year's savings that falls in the hour; each zone's 8,760 values should sum to 1 (a shape summing to about 0, i.e. pure load shifting, cannot be rescaled and is rejected). |
 | `represents_year` | calendar year | optional | The year whose weekdays the shape follows (same on every row of a profile); default 2009. The shape is rotated once onto the ACC's weekdays (2018 or 2020, C4.2). |
+| `profile_basis` | `share` or `kwh_per_unit` | optional | Same on every row of a profile. `share` (the default): `impact` is the share of annual savings, as above. `kwh_per_unit`: `impact` is already the kWh saved per unit in each hour (negative = added load), priced as given and not rescaled (C4.5, BRD BR-06.6). |
 
 ### 4.2 Gas monthly profiles (CSV or Parquet)
 
@@ -369,6 +370,8 @@ Kept in the *reference data folder* (GUI box, `--data-dir`, `RECET_DATA`, or `re
 
 | File in the folder | Size | Contents |
 |---|---|---|
+| `acc/2021/electric_hourly.parquet` | smaller | The 2021 ACC's hourly electric avoided costs (TRC only); optional: needed only to run on the 2021 ACC. |
+| `acc/2022/electric_hourly.parquet` | smaller | The 2022 ACC's (TRC only), same layout; optional: needed only to run on the 2022 ACC. |
 | `acc/2024/electric_hourly.parquet` | ~1 GB | The 2024 ACC's hourly electric avoided costs; the layout of section 4.3. |
 | `acc/2026/electric_hourly.parquet` | ~1 GB | The 2026 ACC's (final, v1b), same layout. |
 | `impact_profiles/catalog.parquet` | small | The CEDARS impact-profile catalog: one row per profile. Columns used: `id` (profile ID), `end_use_name` (= `AC_Elec_Impact_Profile`), `iou_ac_territory` (`PGE`...), `target_sector`, `year_represented` (the calendar year the shape follows; blank = 2009). Other columns (`pa` long name, `climate_zones`, `start_year`, `explicit_end_year`, `description`, `source_impact_type`, `ac_version`) are informational. |
@@ -382,14 +385,14 @@ ReCET's names drop the `E3` prefix of the CET tables they copy; the CET name is 
 
 | File (`recet/data/...`) | Columns used | Role |
 |---|---|---|
-| `run_parameters.csv` (RunParameters; CET `E3Settings`) | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2024), `CO2Gas` (metric tons CO2 per therm, 0.00531) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
-| `cet_tables/emissions.parquet` (Emissions; CET `E3Emissions`) | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is used only for the CET-table comparison option. |
+| `run_parameters.csv` (RunParameters; CET `E3Settings`) | `PA`, `Version`, `DiscountRateAnnual`, `DiscountRateQtr` (annual / 4), `DiscountRateAnnual_SCT`, `DiscountRateQtr_SCT`, `BaseYear` (2021, 2022, or 2024 for the 2024 and 2026 ACCs), `CO2Gas` (metric tons CO2 per therm: 0.00585 for the 2021 ACC, 0.00531 for the others) | The built-in **run parameters**: discount rates and the gas CO2 constant, by utility and CET `Version`, read by ACC version through the mapping in C3.3 (C2.4, C9, C14). `AvoidedCostVersion` is the publication date; `NOxGas` and the `Societal...` rate columns are not used. |
+| `cet_tables/emissions.parquet` (Emissions; CET `E3Emissions`) | `PA`, `Version`, `TS` (target sector), `EU` (end use), `CZ`, `NOx`, `PM10` | Electric NOx and PM10 factors per annual kWh; no matching row means 0 (C14.3). Its `CO2` column is not used (electric CO2 comes from the ACC's hourly emission rate). |
 | `cet_tables/combustion_type.parquet` (CombustionType; CET `E3CombustionType`) | `LookupCode` (= `CombustionType`), `NOx` (per therm) | Gas NOx factor (C14.3). |
 | `cet_tables/rate_schedule_elec.parquet` (RateScheduleElec; CET `E3RateScheduleElec`) | `PA`, `Version`, `Year`, `Schedule`, `RateE` ($/kWh) | Retail electric rates by year (C9). |
 | `cet_tables/rate_schedule_elec_mapping.parquet` (RateScheduleElecMapping; CET `E3RateScheduleElecMapping`) | `PA`, `Version`, `TargetSector`, `Schedule` | Maps a target sector to its schedule. |
 | `cet_tables/rate_schedule_gas.parquet`, `rate_schedule_gas_mapping.parquet` (RateScheduleGas, RateScheduleGasMapping; CET `E3RateScheduleGas`, `E3RateScheduleGasMapping`) | `PA`, `Version`, `Year`, `Schedule`, `RateG` ($/therm); `GasSector`, `GasRateSchedule` | The same for gas. |
 | `gas_savings_profiles.csv` | `Profile`, `Month`, `Impact` | The library of gas monthly profiles (C4.3). |
-| `acc/2024/gas_components.parquet`, `acc/2026/gas_components.parquet` | the gas ACC layout of section 4.4 | The two gas ACCs, extracted from E3's workbooks. |
+| `acc/2021/gas_components.parquet`, `acc/2022/gas_components.parquet`, `acc/2024/gas_components.parquet`, `acc/2026/gas_components.parquet` | the gas ACC layout of section 4.4 | The four gas ACCs, extracted from E3's workbooks (2021 and 2022: TRC only). |
 | `statewide_allocation/statewide_factors_20260918.csv` | `Year`, `ProgramID`, `PercentElectric`, `<IOU>GasFactor`, `<IOU>ElectricFactor`, `<IOU>WeightedFactor` for PGE, SDGE, SCE, SCG | The IOU shares of each statewide program (C15). |
 | `programs/cedars_programs_20261003.csv` | the columns of section 4.8 | The built-in program metadata: CEDARS' Programs list of 2026-10-03 (1,416 programs), without its `ProgramManager` column. |
 | `statewide_allocation/field_rules.csv` | `table`, `field`, `rule` | Which factor (or pass-through) applies to each field of `Measure.csv`, `ProgramCost.csv` and the CET output (C15). |

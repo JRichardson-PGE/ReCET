@@ -39,7 +39,7 @@ Optional but used when present: `FuelID`, `MeasImpactType` (fuel-substitution me
 `UnitkWhIOUWater1stBaseline` / `UnitkWhIOUWater2ndBaseline` (water energy: the IOU-supplied kWh embedded in the water a measure saves, or uses if negative). All other CET
 columns are carried into the output unchanged.
 
-Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBaseline` not blank (and `UnitkWh2ndBaseline` not blank when `RUL_Yrs > 0`); values outside the ranges CET's own QC allows are warned about (see INPUT_FIELDS.md); `CEInputID` unique; `ClaimYearQuarter` like `2028Q1`; `IOU_AC_Territory` one of `PGE SCE SDGE SCG`; numeric columns numeric or blank;
+Rules the preflight enforces: every numeric field CET requires not blank (`NumUnits`, the kWh / kW / therm savings of both baselines, the measure costs, the four `NTGR*`, `EUL_Yrs`, `RUL_Yrs`, the installation and realization rates, and the gas-infrastructure, refrigerant and miscellaneous benefits and costs; enter 0 for none); `EUL_Yrs` and `RUL_Yrs` not negative and `RUL_Yrs` not above `EUL_Yrs` (`RUL_Yrs` equal to `EUL_Yrs` is a warning); values outside the ranges CET's own QC allows are warned about (see INPUT_FIELDS.md); `CEInputID` unique; `ClaimYearQuarter` like `2028Q1`; `IOU_AC_Territory` one of `PGE SCE SDGE SCG`; numeric columns numeric or blank;
 `AC_Gas_Target_Sector` one of `Residential Commercial Core` for measures with gas savings; every `PrgID` in `Measure.csv` present in `ProgramCost.csv` and vice versa.
 
 ### Things about the CET format that need attention (found on the real 2028-2031 PG&E files)
@@ -53,15 +53,15 @@ Rules the preflight enforces: `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBa
 4. **TOU (H-factor) end uses are priced from 8,760s.** CEDARS has no hourly data for them; the library holds Gen-based 8,760s built from their H-factors on the ACC's
    2018-calendar TOU map (2026 ACC v1b, re-issued 2026-10-20), for every PG&E, SCE, SCG and SDG&E TOU profile and zone, and they are priced like any other profile. A supplied 8,760 with the same name
    replaces the library's.
-5. **A brand-new ACC has no E3 tables.** Discount rates, emission factors and rate schedules are picked by ACC version (C3.3); a new ACC label borrows the tables of an
+5. **A brand-new ACC has no run parameters or CET tables of its own.** Discount rates, emission factors and rate schedules are picked by ACC version (C3.3); a new ACC label borrows the tables of an
    ACC version you choose (default: the newest built-in).
 6. **Years covered:** 2021 ACC 2020-2050, 2022 ACC 2022-2052, 2024 ACC 2024-2054, 2026 ACC 2026-2055 (gas: 2020-2050, 2022-2052, 2024-2054, 2026-2055). The 2021 and
    2022 ACCs are TRC only (C3.4) and use the 2020 hourly calendar (C4.2). Years outside an ACC's range are priced with its nearest year; the preflight counts the measures affected.
 7. **SCG electric** has no ACC of its own. In each zone SCG is priced entirely by one utility: SCE where the ACC has SCE data for the zone, otherwise PG&E (on the
    built-in ACCs, PG&E in CZ 1, 2, 3A, 3B, 4, 5, 11, 12). Generation, T&D and emission rate always come from the same utility. CET's quarterly SCG table is not used.
-8. **Bill impacts / RIM** use the E3 rate schedules chosen by (PA, `AC_Elec_Target_Sector`); the 2026 ACC uses the same rate tables as the 2024 ACC.
-9. **Market Effects** is one option: 5% on benefits (`NTGR + 0.05`) and on costs (CET's `MECost`) together. It has not been checked against a CET run made
-   with a non-zero setting.
+8. **Bill impacts / RIM** use CET's rate schedules chosen by (PA, `AC_Elec_Target_Sector`); the 2026 ACC uses the same rate tables as the 2024 ACC.
+9. **Market Effects** is one option: 5% on benefits (`NTGR + 0.05`) and on costs (CET's `MECost`) together. Checked against CET runs made with 0% and 5%
+   (jobs 121842 / 121841, CALCULATIONS C13).
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ Parquet (recommended: the built-in files have ~17 million rows) or CSV, **one ro
 | component columns | for "components" mode | `energy generation_capacity avoided_as_procurement losses methane_leakage ghg_adder air_quality_adder` plus `ghg_cap_and_trade ghg_portfolio_rebalancing` (2024 ACC) or `ghg_cap_and_invest` (2026 ACC); their sum should equal `total_avoided_cost` |
 | `price_zone`, `datetime`, `month`, `day`, `hour` | no | ignored |
 
-**Which version it replaces:** you choose the ACC version label in the GUI (or `--acc`). If the label is one the package ships (`2024`, `2026`) the supplied file replaces that
+**Which version it replaces:** you choose the ACC version label in the GUI (or `--acc`). If the label is one the package ships (`2021`, `2022`, `2024`, `2026`) the supplied file replaces that
 version's electric ACC; a new label defines a new version made of the supplied files (an unsupplied fuel falls back to the newest built-in, with a note).
 
 The file is checked before the run: required columns, 8,760 rows per block, consecutive years, all three IOUs, `TRC` present, and the sum-of-components test.
@@ -213,12 +213,15 @@ One folder `<out>/<run name>_acc<version>/`:
   `GasProfileSource`, then every output (benefits, supply costs, participant and bill-impact PVs, Gross / NoAdmin variants, TRC / PAC / RIM / SCB / SCH costs and ratios,
   program-cost weighting, CO2 / NOx / PM10), `ElecValue_*` / `GasValue_*` in components mode, `CreditedPA` (the `PA` of the measure's program in `ProgramCost.csv`; with statewide
   allocation, the IOU each statewide share went to), and the program metadata (`Prg_MatchedOn`, `Prg_<column>`).
-* `portfolio_summary_*.csv`, `preflight.txt`, `run_settings.json` (everything needed to reproduce the run).
+* `portfolio_summary_*.csv`, `field_definitions_*.csv` (each column of the measure-level file with its definition), `key_metrics_*.csv` (the headline results and their
+  main drivers), `preflight.txt`, `preflight_findings.xlsx` (the input check's findings and every flagged cell), `run_settings.json` (everything needed to reproduce the run).
+* With CEDARS filing checks: `filing_validation_*.csv` (each record CEDARS would reject or warn on).
 * Optional: `components_summary_*.csv`, `portfolio_8760_*.csv` (+ `_unshaped`), `cet_comparison_*.csv`, and for a two-version run `comparison_acc<A>_vs_acc<B>.csv`.
 
 **Water energy** is priced like the electric benefit but on the `Gen` term alone (no T&D, no kW term) with the measure's own electric profile: `WaterEnergyBen` when
 `UnitkWhIOUWater1stBaseline > 0`, `WaterEnergyCost` when it is `< 0` (plus `_SB`/`_SH` and `Gross` variants). Both go into TSB; the cost goes into TRC/PAC/RIM/SCB/SCH costs, the
 benefit into every ratio and into the program-cost weighting. `WaterPricingStatus` says `no water energy`, `priced`, or `UNPRICED` (the measure has no electric profile).
 
-`ElecPricingStatus` is `no electric savings`, `priced: hourly profile` or `UNPRICED: ...`: a benefit of 0 alone cannot tell "no
+`ElecPricingStatus` is `no electric savings`, `priced: hourly profile`, `PARTLY PRICED: ...` (a separate 2nd-baseline shape of which only one of the two shapes was found)
+or `UNPRICED: ...`: a benefit of 0 alone cannot tell "no
 savings" from "could not price".
