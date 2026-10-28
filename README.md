@@ -107,7 +107,7 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
 The replacement BRD's target (NFR Performance) is at least 1,000,000 records priced on 8,760 profiles in 15 minutes or less. Measured with
 `poc/benchmark_recet_scale.py` in the CEDARS review research repository: the four real PG&E 2028-2031 jobs repeated to 1,000,000 records, the 2024 ACC,
 societal tests and emissions on, one process on a 16-thread laptop with 11.6 GB of memory (version 0.1.34, 2026-10-23). The job is run in 50 parts of
-20,000 measures (the default `chunk_size` until 0.1.52; it is now 50,000, as the web server runs; see the user guide's "What a run does"):
+20,000 measures (the default `chunk_size` until 0.1.56; it is now 50,000, as the web server runs; see the user guide's "What a run does"):
 
 | Stage | Seconds |
 |---|---|
@@ -130,7 +130,7 @@ How it came down, all on the same job:
 0.1.37 prices each measure's lifetime value per route instead of building a row per quarter of its life (CALCULATIONS.md C5.1), reads profile metadata from a
 cached index, reads each route's first measure in one lookup for all routes and shifts each route's profile once. Measured against 0.1.36 in the same sitting:
 pricing 173 -> 105 s, the whole run 298 -> 229 s (3.8 minutes), peak memory unchanged; every output equal to 2.2e-12. With 100,000-row parts pricing's own
-peak falls from 2.11 to 1.20 GB, but writing then peaks at 2.29 GB, so 20,000 stayed the default until 0.1.52 (50,000 since, as the web server ran). Since 0.1.36 the 1M run peaks at 1.65 GB
+peak falls from 2.11 to 1.20 GB, but writing then peaks at 2.29 GB, so 20,000 stayed the default until 0.1.56 (50,000 since, as the web server ran). Since 0.1.36 the 1M run peaks at 1.65 GB
 because the measure-level parquet is joined into 200,000-row groups (`parquet_row_group`). On the web server (a t4g.small, 2 ARM vCPUs, 0.1.36, 50,000-row
 groups, zipped CSV) the same job took 13.1 minutes and peaked at 1.05 GiB in its container.
 
