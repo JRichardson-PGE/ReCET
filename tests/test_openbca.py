@@ -72,3 +72,14 @@ def test_c1_hosted_run_of_the_demo_matches_a_second_run(tmp_path):
     b = run.run_openbca(demo / run.PROGRAM_INPUT, demo / run.CONFIGURATION, tmp_path, "b", checkout=co)
     assert "openbca_results_summary_by_id" in a.files and "openbca_jst_ratio" in a.files
     assert run.compare_dbs(a.run_dir / "openbca" / "openbca.db", b.run_dir / "openbca" / "openbca.db", co)
+
+
+def test_a_relative_checkout_gives_an_absolute_interpreter(tmp_path, monkeypatch):
+    """The engine runs with cwd = the run's workspace, so a relative interpreter path would point nowhere."""
+    _fake_checkout(tmp_path / "ob")
+    py = tmp_path / "ob" / ".venv" / "bin" / "python"
+    py.parent.mkdir(parents=True)
+    py.write_text("")
+    monkeypatch.chdir(tmp_path)
+    got = run.find_checkout("ob", python="ob/.venv/bin/python")
+    assert got.python.is_absolute() and got.python == py
