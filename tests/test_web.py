@@ -324,7 +324,10 @@ def test_the_results_page_tiles_chart_sorting_and_column_groups(web, tmp_path):
     assert 'class="tile-label">Total system benefit<' in page and 'id="results-table"' in page and "data sortable" in page
     assert '<legend>Ratios</legend>' in page and "Columns…" in page and 'data-filter="results-table"' in page
     levels = re.findall(r'href="\?level=(\w+)', page)
-    assert levels[0] == "portfolio" and levels[-1] == "measure"                                                   # summary first
+    assert levels[0] == "portfolio" and levels[-1] == "measure" and "year" in levels                               # summary first
+    by_year = c.get(f"{P}/runs/{run_id}/results?level=year&years=2028&years=1999").text                           # BR-04.1; an unknown year is ignored
+    assert ">Program year<" in by_year and ">2028<" in by_year
+    assert "Program year" in c.get(f"{P}/runs/{run_id}/results.csv?level=year&years=2028").text
 
 
 def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_path):

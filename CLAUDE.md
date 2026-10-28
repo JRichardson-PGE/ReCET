@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.60 (2026-10-28, Jake; BRD review gap 3, BR-04.1): results by program year. The portfolio summary has a `program year` group (Used_Year;
+  `SummaryParts.GROUPS`, which summarize now shares). Results: group-sum key `_year` (CUBE_VERSION 2, so kept sums are rebuilt), a Program year level, and
+  `years` (a list; empty = every year) on RunResults.table / count / measure_level_allowed and results_view.table / filter_pa; web `?years=2028&years=2029`
+  (checkboxes under Program years, also on results.csv), window: a Program years menu. `year_of` falls back to ClaimYearQuarter for old runs.
 - 0.1.59 (2026-10-28, Jake; BRD review gap 2, BR-06.16): PrgIDs that do not line up between Measure.csv and ProgramCost.csv no longer stop the run (CET stops
   it; C17 item 11). `run_poc.load_job` no longer raises; `preflight._program_alignment` warns `measures_without_program_costs` (priced with no program costs,
   CreditedPA blank) and `program_costs_without_measures` (with the nominal dollars no cost test includes), in one piece and in parts. A load ValueError is now

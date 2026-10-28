@@ -1819,7 +1819,8 @@ Results views that use an old name still work (the new name is used). CET's own 
 ### 2.2 `portfolio_summary_acc<version>`
 
 One row for the whole job (`group` = `portfolio`), then one row per `IOU_AC_Territory` (`group` = `IOU territory (PA)`), then one per credited PA (`group` = `credited PA`, from `CreditedPA`; left out when there is no `ProgramCost.csv`),
-then one per program segment (`group` = `program segment`, from `Prg_ProgramSegment`; `(blank)` for programs with no segment or not in the program metadata).
+then one per program segment (`group` = `program segment`, from `Prg_ProgramSegment`; `(blank)` for programs with no segment or not in the program metadata),
+then one per program year (`group` = `program year`, from `Used_Year`, the claim year; BRD BR-04.1, so a multi-year filing's tests and TSB are given year by year).
 Every number is computed over the measures of the row's group.
 
 With **Leave Exclude_From_CE programs out of the portfolio summary** (`apply_exclude_from_ce`), the measures whose `Prg_Exclude_From_CE` is `True` are left out of every one
@@ -1828,8 +1829,8 @@ it they are counted like every other measure.
 
 | Field | Meaning and unit | Formula |
 |---|---|---|
-| `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited PA`, `program segment` or `excluded` |
-| `value` | The group's value. Text. | `all measures`, the IOU territory (`PGE`, `SCE`, `SDGE`, `SCG`) or the credited PA (any PA of `ProgramCost.csv`, such as a REN or CCA; `SW` for unallocated statewide programs), the segment (for example `resource_acquisition`, `(blank)`), or the excluded row's label |
+| `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited PA`, `program segment`, `program year` or `excluded` |
+| `value` | The group's value. Text. | `all measures`, the IOU territory (`PGE`, `SCE`, `SDGE`, `SCG`) or the credited PA (any PA of `ProgramCost.csv`, such as a REN or CCA; `SW` for unallocated statewide programs), the segment (for example `resource_acquisition`, `(blank)`), the program year (for example `2028`), or the excluded row's label |
 | `measures` | Number of measures in the group. Count. | `COUNT of the measure-level rows in the group` |
 | `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
 | `FirstYearNetElecCO2`, `FirstYearNetGasCO2` | The group's First Year Net Electric CO2 emissions avoided and First Year Net Gas CO2 emissions avoided. Metric Tons. | `SUM over the group of FirstYearNetElecCO2` (and of `FirstYearNetGasCO2`) |
@@ -1951,7 +1952,7 @@ When the output format is `csv` or `csv.zip`, or the run has an output template 
 folder's `_results` folder, and the Results tables (window and web app) read it rather than the CSV. Same columns and values as the measure-level file. The web
 app does not list it for download.
 
-The same folder holds `group_sums1_<results file>.parquet`: for each distinct (PA, `PrgID`, program name, program sector, program segment), the number of
+The same folder holds `group_sums2_<results file>.parquet`: for each distinct (PA, `PrgID`, program name, program sector, program segment, program year), the number of
 measures and the sum of every additive numeric output. The Results tables build every level above the measure from it (ratios recomputed from the sums). The
 run writes it at the end (a run in parts adds it up part by part as it writes them, so the file is not read back); the Results tables rebuild it if it is missing or older than the results file. Not listed for download.
 
