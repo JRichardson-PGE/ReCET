@@ -915,7 +915,8 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     factors (kWh by the electric factor, therms by the gas factor, ...) and its ProgramCost rows by the per-field rules, with `<IOU>_`
     prepended to CEInputID and PrgID and PA set to the IOU on program-cost rows. Program costs then discount at each IOU's own rate
     and are shared only among that IOU's own measures. Allocating only one of the two files would leave the PrgIDs unmatched, so this
-    is the single entry point; misalignment is reported by cost_tests.check_program_alignment and raised here.
+    is the single entry point. PrgIDs that do not line up between the two files are not an error (BRD BR-06.16; preflight warns, with the costs left out):
+    a measure with no ProgramCost row gets no program costs, and a ProgramCost row with no measures is charged to none.
 
     dtypes: the Measure.csv column types to read with (a part of a larger file: see data_loading.load_measures_from_csv).
 
@@ -923,8 +924,4 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes),
                                      allocated=allocate_statewide)
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
-    if program is not None:
-        gap = cost_tests.check_program_alignment(measures, program)
-        if gap["measure_programs_without_costs"] or gap["program_costs_without_measures"]:
-            raise ValueError(f"PrgIDs do not line up between the measure and program-cost files: {gap}")
     return measures, program

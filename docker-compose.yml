@@ -27,6 +27,14 @@ services:
       RECET_WEB_WORKERS: "1"
       OPENBLAS_NUM_THREADS: "1"               # recet sets this too; here it also covers anything that imports numpy first
       RECET_WEB_ACC_VERSIONS: "2021,2022,2024,2026"
+      # run emails (recet/web/notify.py): set these in the server's .env (never in git); with no SMTP host no email is sent
+      RECET_WEB_BASE_URL: ${RECET_WEB_BASE_URL:-}
+      RECET_WEB_SMTP_HOST: ${RECET_WEB_SMTP_HOST:-}
+      RECET_WEB_SMTP_PORT: ${RECET_WEB_SMTP_PORT:-587}
+      RECET_WEB_SMTP_SECURITY: ${RECET_WEB_SMTP_SECURITY:-starttls}
+      RECET_WEB_SMTP_USER: ${RECET_WEB_SMTP_USER:-}
+      RECET_WEB_SMTP_PASSWORD: ${RECET_WEB_SMTP_PASSWORD:-}
+      RECET_WEB_SMTP_FROM: ${RECET_WEB_SMTP_FROM:-}
     volumes:
       - ${RECET_DATA_DIR:-~/recet-data}:/data:ro
       - recet_state:/var/lib/recet            # accounts, runs, drafts and the ACC cache

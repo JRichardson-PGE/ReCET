@@ -203,3 +203,28 @@ def test_a_run_keeps_its_group_sums(tmp_path):
     rv.keep_group_sums(run, f)
     kept = run / outputs.RESULTS_DIR / f"group_sums{rv.CUBE_VERSION}_measure_level_x.parquet.parquet"
     pd.testing.assert_frame_equal(pd.read_parquet(kept), rv.build_group_sums(run / "measure_level_x.parquet"), check_dtype=False)
+
+
+def test_program_years_level_and_filter():
+    """BRD BR-04.1: a program-year level, and every level totalled over the years picked (the summary file has a program year group too)."""
+    f = _frame()
+    f["Used_Year"] = [2028, 2029, 2029, 2030]
+    res = rv.RunResults.from_frame(f)
+    assert res.years() == ["2028", "2029", "2030"]
+    by_year = res.table("year", rv.ALL_PAS, ["TotalExpenditures", "TRC_ratio"]).set_index("Program year")
+    assert by_year["TotalExpenditures"].to_dict() == {"2028": 40.0, "2029": 75.0, "2030": 5.0}
+    assert by_year.loc["2029", "TRC_ratio"] == pytest.approx(50 / 120)
+    two = res.table("portfolio", rv.ALL_PAS, ["TotalExpenditures", "TRC_ratio"], years=["2029", "2030"]).iloc[0]
+    assert two["Measures"] == 3 and two["TotalExpenditures"] == 80.0 and two["Program years"] == "2029, 2030"
+    assert two["TRC_ratio"] == pytest.approx((10 + 40 + 10) / (100 + 20 + 10))
+    prog = res.table("program", "PGE", ["TotalExpenditures"], years=["2029"]).set_index("PrgID")
+    assert prog["TotalExpenditures"].to_dict() == {"P1": 60.0}                  # P2 (2029) is BAY's
+    assert res.table("measure", rv.ALL_PAS, ["TotalExpenditures"], years=["2028"])["CEInputID"].tolist() == ["M1"]
+    assert res.count(rv.ALL_PAS, ["2030"]) == 1 and rv.parse_years(["2029,2028", "x", "2028"]) == ["2028", "2029"]
+    summ = outputs.summarize(f)
+    years = summ[summ["group"] == "program year"].set_index("value")
+    assert years["measures"].to_dict() == {"2028": 1, "2029": 2, "2030": 1} and years.loc["2029", "TRC_ratio"] == pytest.approx(50 / 120)
+    parts = outputs.SummaryParts()
+    parts.add(f.iloc[:2])
+    parts.add(f.iloc[2:])
+    pd.testing.assert_frame_equal(parts.result(), summ, check_dtype=False)

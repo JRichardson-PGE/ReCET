@@ -189,7 +189,8 @@ def row_ratios(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.DataFrame:
-    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA and by program segment. With `apply_exclude_from_ce`, measures of programs
+    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA, by program segment and by program year (the claim year, BRD BR-04.1).
+    With `apply_exclude_from_ce`, measures of programs
     whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`)."""
     def block(g: pd.DataFrame, label: str, group: str) -> dict:
         return _summary_row(g, label, group, len(g))
@@ -199,7 +200,7 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
         flag = programs.is_true(frame[EXCLUDE_FLAG]).to_numpy()
         excluded, frame = frame[flag], frame[~flag]
     rows = [block(frame, "all measures", "portfolio")]
-    for col, group in (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment")):
+    for col, group in SummaryParts.GROUPS:
         if col in frame and not (col != "IOU_AC_Territory" and (frame[col].astype(str) == "").all()):
             for key, g in frame.groupby(frame[col].astype(str).replace("", "(blank)"), sort=True):
                 rows.append(block(g, str(key), group))
@@ -211,7 +212,7 @@ def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.Da
 class SummaryParts:
     """summarize() over a table that arrives in parts (a chunked run): each part is reduced to per-group sums as it comes, so the whole table is never held.
     `result()` gives the rows summarize(whole table) gives, to rounding (the sums are taken in a different order)."""
-    GROUPS = (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment"))
+    GROUPS = (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment"), ("Used_Year", "program year"))
     EXCLUDED = ("excluded", "Exclude_From_CE programs (left out of the rows above)")
 
     def __init__(self, apply_exclude_from_ce: bool = False):

@@ -1819,7 +1819,8 @@ Results views that use an old name still work (the new name is used). CET's own 
 ### 2.2 `portfolio_summary_acc<version>`
 
 One row for the whole job (`group` = `portfolio`), then one row per `IOU_AC_Territory` (`group` = `IOU territory (PA)`), then one per credited PA (`group` = `credited PA`, from `CreditedPA`; left out when there is no `ProgramCost.csv`),
-then one per program segment (`group` = `program segment`, from `Prg_ProgramSegment`; `(blank)` for programs with no segment or not in the program metadata).
+then one per program segment (`group` = `program segment`, from `Prg_ProgramSegment`; `(blank)` for programs with no segment or not in the program metadata),
+then one per program year (`group` = `program year`, from `Used_Year`, the claim year; BRD BR-04.1, so a multi-year filing's tests and TSB are given year by year).
 Every number is computed over the measures of the row's group.
 
 With **Leave Exclude_From_CE programs out of the portfolio summary** (`apply_exclude_from_ce`), the measures whose `Prg_Exclude_From_CE` is `True` are left out of every one
@@ -1828,8 +1829,8 @@ it they are counted like every other measure.
 
 | Field | Meaning and unit | Formula |
 |---|---|---|
-| `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited PA`, `program segment` or `excluded` |
-| `value` | The group's value. Text. | `all measures`, the IOU territory (`PGE`, `SCE`, `SDGE`, `SCG`) or the credited PA (any PA of `ProgramCost.csv`, such as a REN or CCA; `SW` for unallocated statewide programs), the segment (for example `resource_acquisition`, `(blank)`), or the excluded row's label |
+| `group` | The kind of row. Text. | `portfolio`, `IOU territory (PA)`, `credited PA`, `program segment`, `program year` or `excluded` |
+| `value` | The group's value. Text. | `all measures`, the IOU territory (`PGE`, `SCE`, `SDGE`, `SCG`) or the credited PA (any PA of `ProgramCost.csv`, such as a REN or CCA; `SW` for unallocated statewide programs), the segment (for example `resource_acquisition`, `(blank)`), the program year (for example `2028`), or the excluded row's label |
 | `measures` | Number of measures in the group. Count. | `COUNT of the measure-level rows in the group` |
 | `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`, `WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost` | The group's total of the measure-level column of the same name (a column with no values, for example `SCBCost` when SCB/SCH are off, is omitted). $ (`WeightedProgramCost` nominal, the rest PV). | `SUM over the measures of the group of the measure-level column of the same name` |
 | `FirstYearNetElecCO2`, `FirstYearNetGasCO2` | The group's First Year Net Electric CO2 emissions avoided and First Year Net Gas CO2 emissions avoided. Metric Tons. | `SUM over the group of FirstYearNetElecCO2` (and of `FirstYearNetGasCO2`) |
@@ -1880,6 +1881,7 @@ The portfolio's net electric savings hour by hour, for each requested calendar y
 | `datetime` | That index laid on the ACC's calendar `A`: 2018 for the 2024/2026 ACCs, 2020 for the 2021/2022 ACCs (every forecast year of an ACC follows one calendar's weekdays, and the shapes are aligned to it; a 2020 calendar includes 29 February and ends on 30 December). Timestamp. | `A-01-01 00:00 plus (hour_of_year - 1) hours` |
 | `net_kwh_<Y>` | The portfolio's net kWh in that hour of calendar year `Y`, all IOUs. Positive = savings, negative = added load. kWh. | `SUM over measures m of weight_m(Y) * shape_m,Y(i)`, `i` = `hour_of_year` |
 | `net_kwh_<Y>_<PA>` | The same for the measures of one IOU territory `PA`. kWh. | the same sum over the measures with `IOU_AC_Territory` = `PA` |
+| `net_kwh_<Y>_CZ<zone>` | The same for the measures of one climate zone (BRD BR-06.13): the measure's `AC_Climate_Zone` as filed, `CZ` prepended when it is a bare number (`13` -> `CZ13`; `System` -> `CZSystem`). The zones add up to `net_kwh_<Y>`. kWh. | the same sum over the measures with that `AC_Climate_Zone` |
 
 **Where**
 
@@ -1905,6 +1907,23 @@ the electric-profile fields of `ElecBen`; the "Year(s)" setting.
 - Example A, `net_kwh_2028`: overlap([2028, 2029), [2028.5, 2030.9)) = 0.5, so 0.5 * 34200 / 8760 = **1.9521** kWh in every hour (a flat shape)
 - Example A, `net_kwh_2029`: overlap([2029, 2030), [2028.5, 2030.9)) = 1, so 1 * 34200 / 8760 = **3.9041** kWh in every hour
 - Example A, `net_kwh_2030`: overlap([2030, 2031), [2028.5, 2030.9)) = 0.9, so 0.9 * 34200 / 8760 = **3.5137** kWh in every hour
+
+### 2.4b `portfolio_8760_peaks_acc<version>` (combined 8760 mode)
+
+The peaks of the combined profile (BRD BR-06.13): one row per year `Y` and group, the portfolio first, then each IOU territory, then each climate zone.
+
+| Field | Meaning and unit | Formula |
+|---|---|---|
+| `year` | The calendar year `Y`. | the "Year(s)" setting |
+| `group`, `value` | `portfolio` / `all measures`, `IOU territory (PA)` / the PA, or `climate zone` / the zone (`CZ13` ...). Text. | |
+| `net_kwh` | The group's net kWh over the year. kWh. | `SUM over hours of the group's column of 2.4` |
+| `peak_hour_of_year`, `peak_datetime`, `peak_kwh` | The hour of the group's largest net savings, on the ACC calendar, and its kWh (its own, non-coincident peak). | `argmax` and `max` of the group's column |
+| `max_added_load_hour_of_year`, `max_added_load_kwh` | The hour of the group's largest added load (most negative hour, from fuel substitution) and its kWh; blank and 0 when no hour is negative. | `argmin` and `min` of the column, when below 0 |
+| `kwh_at_portfolio_peak` | The group's kWh in the portfolio's peak hour (coincident with the portfolio peak). kWh. | the group's column at the portfolio's `peak_hour_of_year` |
+| `share_of_portfolio_peak` | That as a share of the portfolio's peak kWh; the PAs (and the zones) add up to 1. | `kwh_at_portfolio_peak / portfolio peak_kwh` |
+
+The peak is the hour of the largest net savings in the combined profile, not a system-peak definition such as the DEER peak period: use the hourly columns of 2.4 for any
+other definition.
 
 ### 2.5 `portfolio_8760_unshaped_acc<version>` (only when some measures have no shape)
 
@@ -1951,7 +1970,7 @@ When the output format is `csv` or `csv.zip`, or the run has an output template 
 folder's `_results` folder, and the Results tables (window and web app) read it rather than the CSV. Same columns and values as the measure-level file. The web
 app does not list it for download.
 
-The same folder holds `group_sums1_<results file>.parquet`: for each distinct (PA, `PrgID`, program name, program sector, program segment), the number of
+The same folder holds `group_sums2_<results file>.parquet`: for each distinct (PA, `PrgID`, program name, program sector, program segment, program year), the number of
 measures and the sum of every additive numeric output. The Results tables build every level above the measure from it (ratios recomputed from the sums). The
 run writes it at the end (a run in parts adds it up part by part as it writes them, so the file is not read back); the Results tables rebuild it if it is missing or older than the results file. Not listed for download.
 
@@ -1960,7 +1979,7 @@ run writes it at the end (a run in parts adds it up part by part as it writes th
 The input check that ran before pricing: a header (`PREFLIGHT: no blocking problems` or the number of blocking problems), the job's statistics (measure counts, claim years, First Year, how many measures use each electric shape
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count, the first-year net kWh or therms its records carry (`no_electric_profile`, `loose_profile_match`,
 `no_gas_profile`) and examples (for `loose_profile_match`: end use | IOU | the AC_Elec_Target_Sector given). Finding codes: `file_missing`, `no_delimiter`, `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`, `missing_descriptive_column` (warning: `MeasDescription` or `Sector` left out, read as blank),
-`missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value` (a numeric field CET requires is blank), `negative_life` (`EUL_Yrs` or `RUL_Yrs` below 0), `rul_above_eul` (`RUL_Yrs` greater than `EUL_Yrs`), `outside_cet_range`, `rul_not_below_eul` (warning: `RUL_Yrs` equals `EUL_Yrs`), `program_alignment`,
+`missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value` (a numeric field CET requires is blank), `negative_life` (`EUL_Yrs` or `RUL_Yrs` below 0), `rul_above_eul` (`RUL_Yrs` greater than `EUL_Yrs`), `outside_cet_range`, `rul_not_below_eul` (warning: `RUL_Yrs` equals `EUL_Yrs`), `measures_without_program_costs` (warning: measures whose `PrgID` has no `ProgramCost.csv` row, priced with no program costs), `program_costs_without_measures` (warning: `ProgramCost.csv` rows whose `PrgID` has no measures, with the nominal dollars no cost test includes; C17 item 11), `inputs_unreadable`,
 `no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, `program_costs_unreadable` (a job checked in parts could not read `ProgramCost.csv`), and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`),
@@ -2048,6 +2067,17 @@ input column, from INPUT_FIELDS.md. With an output template it lists exactly the
 | `column` | The column's name. |
 | `definition` | The first paragraph of its entry (or its table row), as plain text. |
 | `documentation` | The entry: the document and the heading id, e.g. `OUTPUT_FIELDS.md#elecben` (on the web app, `/docs/OUTPUT_FIELDS.md#elecben`). |
+| `unit` | The unit its entry gives ("Dollars (PV)", "kWh", "Metric Tons"); blank when the entry names none (inputs, labels). |
+| `source` | Where the value comes from: `input: Measure.csv`, the CEDARS Programs list (`Prg_` columns), or a ReCET calculation and what it works on (ACC avoided costs, emission factors, retail rates, `ProgramCost.csv` totals). |
+| `version` | `as filed (CET input field)` for an input; else the ReCET version, plus the run's ACC ("2026 ACC") for a value priced on it. A record with its own `ACCVersion` is priced on that ACC. |
+| `cost_tests` | How the cost tests use it (section 1.9): `benefit in TRC, PAC, RIM`, `cost in RIM`, a test's numerator, denominator or result, or `not used in a cost test`. The benefits and costs listed for a test add up to its `<test>Ben` and `<test>CostNoAdmin`. |
+| `time_basis` | First year, average year, lifecycle undiscounted, lifecycle present value to the run's First Year, nominal dollars, a ratio of present values, or levelized. |
+| `aggregation` | How a group total (portfolio summary, Results levels) combines it: summed; recomputed from the summed numerator and denominator (ratios and levelized values); or not combined (inputs, labels, per-measure shares). |
+| `rounding` | Always "not rounded": ReCET writes full precision; the Results pages and Excel formats only change how numbers are shown. |
+| `years_in_use` | Which ACCs fill it ("2024 ACC on" for the SCT columns, blank on the TRC-only 2021 and 2022 ACCs; otherwise every ACC) and any earlier name of the column (renamed in 0.1.50 or from CET's E3 names). |
+
+These attributes (BRD BR-08.1) follow rules on the column's name and its documented unit (`field_attributes.py`), so a column added later gets them
+without an entry of its own; `tests/test_field_attributes.py` checks the cost-test treatment against the cost tests' arithmetic.
 
 ### 2.12 `key_metrics_acc<version>`
 
@@ -2063,6 +2093,31 @@ The key-metrics summary (BRD BR-06.10): the headline results and the main driver
 | `TRCCost`, `share_of_TRC_cost` | Driver rows: the item's TRC cost and its share of the portfolio's. |
 | `TRC_ratio`, `PAC_ratio` | Driver rows: the item's ratios, recomputed from its sums. |
 | `definition`, `documentation` | Portfolio rows: the metric's definition and its entry in this document, as in 2.11. |
+
+### 2.13 `statewide_reconciliation_acc<version>` (with statewide allocation)
+
+With **Allocate statewide programs** on (C15), the check that the allocation reconciles (BRD BR-06.7): for each statewide program and year, every field the
+allocation scales, added up before allocation and over each IOU's allocated rows, from the rows the run actually priced. One row per (table, year, program, field).
+
+| Column | Meaning |
+|---|---|
+| `table` | `Measure` or `ProgramCost`. |
+| `Year` | The year the factors are looked up by: the claim year (`ClaimYearQuarter`), or `PrgYear` for a `ProgramCost` row without one. |
+| `PrgID` | The statewide program as filed (`SW_...`). |
+| `field` | The allocated field, e.g. `UnitkWh1stBaseline` or `AdminCostsOther`. |
+| `factor` | Its rule: `Electric Factor`, `Gas Factor` or `Weighted Factor`. |
+| `factor_sum` | That factor summed over PGE, SDGE, SCE and SCG for the program and year (1 when the table is complete). |
+| `unallocated_total` | The field's total over the program's rows before allocation: `NumUnits` x the per-unit field for `Measure` (`NumUnits` is passed through), the field itself for `ProgramCost`. |
+| `PGE`, `SDGE`, `SCE`, `SCG` | The same total over each IOU's allocated rows (`<IOU>_SW_...`); 0 for an IOU with no share. |
+| `allocated_total` | The sum of the four IOU columns. |
+| `difference` | `allocated_total - unallocated_total`. |
+| `reconciles` | `True` when the difference is within 1e-9 of the unallocated total (relative; absolute below 1). |
+| `note` | Why a field does not reconcile: every IOU's factor for that fuel is 0 for the program and year (the quantity is in no IOU's share; for example therms of a program whose gas factors are all 0), or the factors sum to something other than 1. |
+
+The check is on the inputs because that is where allocation happens. Each IOU's share is then priced like any measure, and every benefit, cost and saving is
+linear in the allocated quantities, so where a program's inputs reconcile its IOU shares' benefits add up to the unallocated program's (tested by pricing a
+job both ways). Program costs reconcile in nominal dollars; their present values can differ because each IOU's share is discounted at that IOU's rate (C15).
+A field that does not reconcile is also a note in the run log and in `run_settings.json` (the first 20). Nothing is stopped.
 
 Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of any supplied ACC that was not already Parquet) and, from the GUI, `_gui_job.json` in the output folder (the settings the GUI launched the run with).
 

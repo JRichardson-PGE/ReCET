@@ -12,6 +12,13 @@ RECET_WEB_MAX_UPLOAD_MB  largest accepted upload, per file (default 150)
 RECET_WEB_MAX_UNZIPPED_MB largest a job zip may unzip to: Measure.csv plus ProgramCost.csv (default 1024; a 1,000,000-row Measure.csv is about 600 MB)
 RECET_WEB_RUN_TIMEOUT    seconds before a run is stopped (default 7200)
 RECET_WEB_RUN_DEFAULTS   JSON merged into every run's RunConfig (tests use it to supply a synthetic ACC; not needed in production)
+RECET_WEB_BASE_URL       the site's address, e.g. https://jakemoto.com, for the links in run emails (default none: the email gives the page's path)
+RECET_WEB_SMTP_HOST      the SMTP server that sends run emails (notify.py); none (the default) = no emails
+RECET_WEB_SMTP_PORT      its port (default 587)
+RECET_WEB_SMTP_SECURITY  starttls (default), ssl (port 465) or none (a local relay)
+RECET_WEB_SMTP_USER      the sign-in name, if the server needs one
+RECET_WEB_SMTP_PASSWORD  its password (keep it in the server's .env, never in git)
+RECET_WEB_SMTP_FROM      the From address (default RECET_WEB_SMTP_USER)
 """
 from __future__ import annotations
 
@@ -48,6 +55,13 @@ class Settings:
     start_workers: bool = True          # tests turn the background threads off and drive the queue by hand
     session_days: int = 14
     setup_link_hours: int = 72
+    base_url: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_security: str = "starttls"
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -69,6 +83,15 @@ class Settings:
         s.run_timeout = _int("RECET_WEB_RUN_TIMEOUT", 7200)
         if os.environ.get("RECET_WEB_RUN_DEFAULTS", "").strip():
             s.run_defaults = json.loads(os.environ["RECET_WEB_RUN_DEFAULTS"])
+        s.base_url = os.environ.get("RECET_WEB_BASE_URL", "").strip().rstrip("/")
+        s.smtp_host = os.environ.get("RECET_WEB_SMTP_HOST", "").strip()
+        s.smtp_port = _int("RECET_WEB_SMTP_PORT", 587)
+        s.smtp_security = os.environ.get("RECET_WEB_SMTP_SECURITY", "starttls").strip().lower() or "starttls"
+        if s.smtp_security not in ("starttls", "ssl", "none"):
+            raise ValueError(f"RECET_WEB_SMTP_SECURITY must be starttls, ssl or none, not {s.smtp_security!r}")
+        s.smtp_user = os.environ.get("RECET_WEB_SMTP_USER", "").strip()
+        s.smtp_password = os.environ.get("RECET_WEB_SMTP_PASSWORD", "")
+        s.smtp_from = os.environ.get("RECET_WEB_SMTP_FROM", "").strip()
         return s
 
     @property
