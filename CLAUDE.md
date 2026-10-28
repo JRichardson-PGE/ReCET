@@ -103,7 +103,17 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   inflation 0, quarterly discounting, line losses 0) and `run --jurisdiction <folder>` stages replacement parser models that read them (a stub
   Configuration supplies the CUSTOM 1-5 names); `openbca/workbook.py` writes a Program Input. OpenBCA rounds every avoided cost to $0.001/kWh (its
   `::NUMERIC` cast is DECIMAL(18,3); up to 0.03% on annual sums), left as is; C2 on the 2024 ACC equals the ACC rounded that way within one rounding step.
-  Next: the CET-to-OpenBCA translator and like-for-like records (C3).
+  Step 3: `openbca/translate.py` sends a CET job to OpenBCA on ReCET's own pricing inputs (the route's resolved, ACC-aligned 8,760 per load shape; the
+  route's get_acc_series per subset "PGE CZ13", nearest ACC year beyond the file; Unit Quantity x NTG x savings = AC_Net_kWh_ScaledProfile_1st_Baseline;
+  rate = 4 x DiscountRateQtr; incentives = rebate + to-others + DI; measure cost = CET's nominal one; ProgramCost's ten fields -> Program Admin Costs), set
+  up from the run's RunConfig (`jobs.prepare`), and flags each measure's known differences (`VALUE_DIFFERENCES`: fractional_eul, ntg_cost, dual_baseline,
+  excess_incentive, unpriced; plus start_quarter, fractional_units, gas, other). `recet openbca compare-recet` (compare_job) runs ReCET and OpenBCA (TRC
+  as "CA TRC", PAC as "USI") and writes compare_<test>.csv and summary.csv. OpenBCA discounts from each measure's own start quarter (CalcCE from Q1 of
+  the First Year) and leaves upfront costs undiscounted, so a measure's benefits and costs are both higher by (1 + r/4)^quarters; compare after that
+  factor. Results 2026-10-28 (2024 ACC, records from the 2028 consolidated job): C3, 20 matched records: electric within 1.7e-4 (the $0.001/kWh
+  rounding), costs equal, jst_ratio 0.119238 / 0.147843 vs ReCET on the same terms 0.119238 / 0.147844; C4, a 50-measure sample: 47 within 5e-5
+  after the start-quarter factor, the other 3 are a fractional EUL (+9.4%), a dual baseline (x2.29) and an excess incentive (TRC cost x0.15).
+  Same PR: run_poc.run_gas_benefit crashed under pandas 3 on a job whose gas profiles are named but none has gas savings (an empty str Series sums to "").
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
   (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow

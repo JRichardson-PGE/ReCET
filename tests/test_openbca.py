@@ -153,3 +153,57 @@ def test_program_input_workbook_has_openbcas_layout(tmp_path):
         workbook.write_program_input(tmp_path / "x.xlsx", m.assign(Bogus=1), None, {"Flat": np.zeros(8760)})
     with pytest.raises(ValueError, match="8,760"):
         workbook.write_program_input(tmp_path / "y.xlsx", m, None, {"Flat": np.zeros(10)})
+
+
+def _job_cfg(tmp_path, **measure):
+    from conftest import make_electric_acc, make_flat_profile_csv, make_measure_csv
+    from recet.jobs import RunConfig
+    return RunConfig(measures=str(make_measure_csv(tmp_path / "Measure.csv", **measure)), out_dir=str(tmp_path / "out"), run_name="t", acc_version="2026",
+                     acc_electric_file=str(make_electric_acc(tmp_path / "acc.parquet")), profiles_8760_file=str(make_flat_profile_csv(tmp_path / "p.csv")),
+                     emissions=False, include_societal=False)
+
+
+def test_translation_sends_recets_quantity_shape_and_avoided_costs(tmp_path):
+    import numpy as np
+    import pandas as pd
+    from openpyxl import load_workbook
+    from recet.openbca import translate
+    cfg = _job_cfg(tmp_path, NumUnits="4", NTGRkWh="0.8", NTGRCost="0.8", EUL_Yrs="3", UnitEndUserRebate="5", UnitMeaCost1stBaseline="20")
+    t = translate.translate(cfg, tmp_path / "ob", test="TRC")
+    rec = dict(zip(*list(load_workbook(t.program_input, read_only=True)["Measure Inputs"].iter_rows(min_row=4, max_row=5, values_only=True))))
+    assert rec["Unit Quantity"] == 4 and rec["Net-to-gross Ratio"] == 0.8 and rec["Estimated Useful Life (Years)"] == 3
+    assert rec["Adj. Gross Annual Electric Savings (kWh)"] == pytest.approx(1000.0)      # x 4 x 0.8 = ReCET's priced 3,200 kWh
+    assert rec["Utility Incentive Upfront  ($)"] == 5 and rec["Incremental Cost Upfront  ($)"] == 20
+    assert rec["Avoided Cost Subset "] == "PGE CZ13" and rec["Start Year"] == 2028 and rec["Start Quarter"] == 1
+    avoided = pd.read_parquet(t.jurisdiction / "avoided_costs_ts.parquet")
+    assert set(avoided["year"]) >= {2028, 2029, 2030, 2031}                               # beyond the ACC's 2029: the nearest year, as ReCET
+    assert np.allclose(avoided["avoided_cost_value"], 0.100)                              # $100/MWh
+    assert t.table["differences"].iloc[0] == ""
+
+
+def test_translation_flags_every_known_difference(tmp_path):
+    from recet.openbca import translate
+    cfg = _job_cfg(tmp_path, ClaimYearQuarter="2028Q3", EUL_Yrs="2.5", NumUnits="1.5", NTGRCost="0.9", UnitDirectInstallMat="50",
+                   UnitTherm1stBaseline="3", UnitMiscCosts="1")
+    flags = set(translate.translate(cfg, tmp_path / "ob").table["differences"].iloc[0].split(", "))
+    assert flags == {"start_quarter", "fractional_eul", "fractional_units", "ntg_cost", "excess_incentive", "gas", "other"}
+
+
+def test_comparison_allows_for_the_start_quarter(tmp_path):
+    import pandas as pd
+    from recet.openbca import translate
+    table = pd.DataFrame({"CEInputID": ["A"], "differences": ["start_quarter"], "quarters_after_first_year_q1": [2], "discount_rate": [0.08]})
+    recet = pd.DataFrame({"CEInputID": ["A"], "PrgID": ["P"], "ElecBen": [100.0], "ElecSupplyCost": [0.0], "GasSupplyCost": [0.0], "TRCCostNoAdmin": [50.0]})
+    ob = pd.DataFrame({"type": ["Measure"], "id": ["A"], "ELECTRIC Total ($)": [100.0 * 1.02 ** 2], "total_costs": [-50.0 * 1.02 ** 2]})
+    c = translate.compare_with_recet(recet, ob, "TRC", table)
+    assert c["electric_ratio_after_start_quarter"].iloc[0] == pytest.approx(1.0) and c["cost_ratio_after_start_quarter"].iloc[0] == pytest.approx(1.0)
+
+
+@pytest.mark.skipif(not os.environ.get("RECET_OPENBCA_HOME"), reason="needs RECET_OPENBCA_HOME (a synced OpenBCA checkout)")
+def test_c3_openbca_prices_a_matched_measure_as_recet(tmp_path):
+    """C3 in small: a measure with no known difference gives the same electric value, costs and ratio in both tools."""
+    from recet.openbca import translate
+    cfg = _job_cfg(tmp_path, NumUnits="2", NTGRkWh="0.85", NTGRCost="0.85", EUL_Yrs="4", UnitEndUserRebate="30", UnitMeaCost1stBaseline="120")
+    s = translate.compare_job(cfg, tmp_path / "cmp", log=lambda s: None).set_index("test")
+    assert (s["max_electric_deviation_after_start_quarter"] < 1e-5).all() and (s["max_cost_deviation_after_start_quarter"] < 1e-6).all()
+    assert s.loc["TRC", "openbca_jst_ratio"] == pytest.approx(s.loc["TRC", "recet_ratio_on_openbca_terms"], rel=1e-5)

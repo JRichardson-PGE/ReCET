@@ -184,7 +184,7 @@ def compare_dbs(db_a: str | Path, db_b: str | Path, checkout: Checkout | None = 
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`recet openbca run|compare` (see cli.py)."""
+    """`recet openbca run|compare|compare-recet` (see cli.py)."""
     import argparse
     ap = argparse.ArgumentParser(prog="recet openbca")
     sub = ap.add_subparsers(dest="action", required=True)
@@ -195,6 +195,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--name", default="")
     p.add_argument("--format", default="csv", choices=outputs.FORMATS)
+    p = sub.add_parser("compare-recet", help="price a CET job in ReCET and in OpenBCA (TRC and PAC) and compare them measure by measure (C3 / C4)")
+    p.add_argument("--measures", required=True)
+    p.add_argument("--programcost")
+    p.add_argument("--acc", default="2024")
+    p.add_argument("--data-dir", help="ReCET's reference data folder (default: as `recet run`)")
+    p.add_argument("--base-year", type=int)
+    p.add_argument("--out", required=True)
     p = sub.add_parser("compare", help="compare every OpenBCA table of two runs' openbca.db files (C1)")
     p.add_argument("db_a")
     p.add_argument("db_b")
@@ -206,6 +213,12 @@ def main(argv: list[str] | None = None) -> int:
         if not (a.configuration or a.jurisdiction):
             ap.error("give --configuration or --jurisdiction")
         run_openbca(a.program_input, a.configuration, a.out, a.name, a.format, checkout, jurisdiction=a.jurisdiction)
+        return 0
+    if a.action == "compare-recet":
+        from ..jobs import RunConfig
+        from .translate import compare_job
+        cfg = RunConfig(measures=a.measures, programcost=a.programcost, acc_version=a.acc, reference_dir=a.data_dir, base_year=a.base_year)
+        print(compare_job(cfg, a.out, checkout).T.to_string(header=False))
         return 0
     return 0 if compare_dbs(a.db_a, a.db_b, checkout) else 1
 
