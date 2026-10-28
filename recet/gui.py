@@ -22,7 +22,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 
-from . import __version__, gui_editor, gui_results, output_templates, paths, templates, versions
+from . import __version__, gui_editor, gui_results, gui_templates, output_templates, paths, templates, versions
 from .jobs import RunConfig
 
 STATE_KEY = "gui"
@@ -115,6 +115,8 @@ class App:
         self.file_detail: dict[str, str] = {}
         self._build()
         self.apply_config(RunConfig.from_dict(paths.read_config().get(STATE_KEY, {})))
+        if paths.read_config().get(output_templates.DEFAULT_KEY):         # a saved default template replaces the last run's
+            self.v["output_template"].set(output_templates.default_name())
         self._restore_job_inputs()
         if not self.v["reference_dir"].get():
             self.v["reference_dir"].set(str(paths.reference_dir() or ""))
@@ -453,63 +455,12 @@ class App:
 
     # ------------------------------------------------------------------------------------------------------------------ input type
     def _edit_templates(self) -> None:
-        """A small editor for the saved output templates (output_templates.py): pick one, edit its columns (one per line, in order), check, save or delete."""
-        top = tk.Toplevel(self.root)
-        top.title("Output templates")
-        saved = output_templates.load_saved()
-        name = tk.StringVar(value=self.v["output_template"].get() if self.v["output_template"].get() in saved else "")
-        row = ttk.Frame(top)
-        row.pack(fill="x", padx=12, pady=(12, 4))
-        ttk.Label(row, text="Template name:").pack(side="left")
-        box = ttk.Combobox(row, textvariable=name, values=list(saved), width=30)
-        box.pack(side="left", padx=6)
-        hint = ("Columns, one per line, in the order the file should have them. Their definitions are in OUTPUT_FIELDS.md (section 1) and INPUT_FIELDS.md; "
-                "each run also writes a field_definitions file.")
-        ttk.Label(top, text=hint, style="Hint.TLabel", wraplength=520, justify="left").pack(fill="x", padx=12)
-        text = scrolledtext.ScrolledText(top, width=60, height=22)
-        text.pack(fill="both", expand=True, padx=12, pady=6)
-
-        def show(*_):
-            text.delete("1.0", "end")
-            text.insert("1.0", "\n".join(output_templates.load_saved().get(name.get(), [])))
-        box.bind("<<ComboboxSelected>>", show)
-        show()
-
-        def refresh(keep: str) -> None:
+        """The output-template editor (gui_templates.py): a two-list field picker, saved templates and the default for new runs."""
+        def changed(keep: str) -> None:
             names = list(output_templates.load_saved())
-            box.configure(values=names)
             self.template_box.configure(values=[output_templates.ALL, *names])
             self.v["output_template"].set(keep if keep in names else output_templates.ALL)
-
-        def save() -> None:
-            cols, bad = output_templates.check(output_templates.parse(text.get("1.0", "end")))
-            n = name.get().strip()
-            if bad:
-                messagebox.showerror("Output templates", f"Not columns ReCET writes: {', '.join(bad)}", parent=top)
-            elif not n or not cols:
-                messagebox.showerror("Output templates", "Give the template a name and at least one column.", parent=top)
-            else:
-                try:
-                    output_templates.save(n, cols)
-                except ValueError as exc:
-                    messagebox.showerror("Output templates", f"{exc}: save it under another name.", parent=top)
-                    return
-                refresh(n)
-
-        def delete() -> None:
-            try:
-                output_templates.save(name.get().strip(), None)
-            except ValueError as exc:
-                messagebox.showerror("Output templates", str(exc), parent=top)
-                return
-            refresh(output_templates.ALL)
-            name.set("")
-            show()
-        row = ttk.Frame(top)
-        row.pack(fill="x", padx=12, pady=(0, 12))
-        ttk.Button(row, text="Save template", command=save).pack(side="left")
-        ttk.Button(row, text="Delete template", command=delete).pack(side="left", padx=6)
-        ttk.Button(row, text="Close", command=top.destroy).pack(side="right")
+        gui_templates.TemplateEditor(self, changed)
 
     def _set_input_mode(self, mode: str) -> None:
         self.input_mode.set(mode)
