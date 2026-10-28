@@ -293,15 +293,123 @@
     apply();
   }
 
-  // Output templates page: "Add" puts a column at the end of the template's list
+  // Output templates page: a two-list field picker. The left list shows the fields of the chosen category not yet in the template, filtered by the search
+  // box; the right list is the template in file order. The textarea (sent with the form) always holds the right list, one column per line, and typing or
+  // pasting there rebuilds the right list.
   var tmplCols = document.getElementById("template-columns");
-  if (tmplCols) {
-    document.querySelectorAll("[data-add-column]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var v = tmplCols.value.replace(/\s+$/, "");
-        tmplCols.value = (v ? v + "\n" : "") + b.getAttribute("data-add-column") + "\n";
-        tmplCols.focus();
+  var picker = document.getElementById("field-picker");
+  var catalogEl = document.getElementById("field-catalog");
+  if (tmplCols && picker && catalogEl) {
+    var fields = JSON.parse(catalogEl.textContent), byName = {};
+    fields.forEach(function (f) { byName[f.c] = f; });
+    var avail = document.getElementById("pick-available"), sel = document.getElementById("pick-selected");
+    var kindBox = document.getElementById("pick-kind"), find = document.getElementById("pick-find"), findSel = document.getElementById("pick-find-sel");
+    var defBox = document.getElementById("pick-def");
+    var chosen = [];
+    var parse = function (text) {
+      var out = [];
+      text.split(/\r?\n/).forEach(function (line) {
+        line.split("#")[0].split(",").forEach(function (c) { c = c.trim(); if (c && out.indexOf(c) < 0) out.push(c); });
       });
+      return out;
+    };
+    var matches = function (f, q) { return !q || f.c.toLowerCase().indexOf(q) >= 0 || (f.d || "").toLowerCase().indexOf(q) >= 0; };
+    var option = function (name) {
+      var f = byName[name], o = document.createElement("option");
+      o.value = name; o.textContent = name;
+      o.title = f ? (f.g + (f.d ? ": " + f.d : "")) : "Not in the field list (a per-component column, or a name ReCET does not write)";
+      if (!f && !/^(Elec|Gas)Value_/.test(name)) o.className = "unknown";
+      return o;
+    };
+    var renderAvail = function () {
+      var k = kindBox.value, q = find.value.trim().toLowerCase(), taken = {}, groups = {}, order = [], shown = 0;
+      chosen.forEach(function (c) { taken[c] = 1; });
+      avail.innerHTML = "";
+      fields.forEach(function (f) {
+        if (taken[f.c] || !matches(f, q)) return;
+        if (k.slice(0, 2) === "k:" && f.k !== k.slice(2)) return;
+        if (k.slice(0, 2) === "g:" && f.g !== k.slice(2)) return;
+        if (!groups[f.g]) { groups[f.g] = []; order.push(f.g); }
+        groups[f.g].push(f.c);
+        shown += 1;
+      });
+      order.forEach(function (g) {
+        var og = document.createElement("optgroup");
+        og.label = g;
+        groups[g].forEach(function (c) { og.appendChild(option(c)); });
+        avail.appendChild(og);
+      });
+      document.getElementById("pick-count").textContent = shown + " field" + (shown === 1 ? "" : "s") + " shown";
+    };
+    var renderSel = function (keep, keepText) {
+      var q = findSel.value.trim().toLowerCase();
+      sel.innerHTML = "";
+      chosen.forEach(function (c) {
+        var o = option(c);
+        if (keep && keep.indexOf(c) >= 0) o.selected = true;
+        if (q && c.toLowerCase().indexOf(q) < 0) o.hidden = true;
+        sel.appendChild(o);
+      });
+      document.getElementById("pick-sel-count").textContent = chosen.length + " column" + (chosen.length === 1 ? "" : "s");
+      tmplCols.value = chosen.join("\n") + (chosen.length ? "\n" : "");
+    };
+    var picked = function (list) { return Array.prototype.filter.call(list.options, function (o) { return o.selected && !o.hidden; }).map(function (o) { return o.value; }); };
+    var showDef = function (name) {
+      var f = byName[name];
+      defBox.innerHTML = "";
+      var code = document.createElement(f && f.l ? "a" : "strong");
+      if (f && f.l) code.href = f.l;
+      code.textContent = name;
+      defBox.appendChild(code);
+      defBox.appendChild(document.createTextNode(f ? " (" + f.g + ") " + (f.d || "") : " is not in the field list."));
+    };
+    var add = function (names) { names.forEach(function (c) { if (chosen.indexOf(c) < 0) chosen.push(c); }); renderSel(names); renderAvail(); };
+    var remove = function (names) { chosen = chosen.filter(function (c) { return names.indexOf(c) < 0; }); renderSel(); renderAvail(); };
+    var move = function (how) {
+      var names = picked(sel);
+      if (!names.length) return;
+      var rest = chosen.filter(function (c) { return names.indexOf(c) < 0; });
+      if (how === "top") chosen = names.concat(rest);
+      else if (how === "bottom") chosen = rest.concat(names);
+      else {
+        var step = how === "up" ? -1 : 1, idx = names.map(function (c) { return chosen.indexOf(c); });
+        if (step > 0) idx.reverse();
+        idx.forEach(function (i) {
+          var j = i + step;
+          if (j < 0 || j >= chosen.length || names.indexOf(chosen[j]) >= 0) return;
+          var tmp = chosen[j]; chosen[j] = chosen[i]; chosen[i] = tmp;
+        });
+      }
+      renderSel(names);
+      var first = sel.querySelector("option:checked");
+      if (first) first.scrollIntoView({ block: "nearest" });
+    };
+    document.getElementById("pick-add").addEventListener("click", function () { add(picked(avail)); });
+    document.getElementById("pick-add-all").addEventListener("click", function () {
+      add(Array.prototype.map.call(avail.options, function (o) { return o.value; }));
     });
+    document.getElementById("pick-remove").addEventListener("click", function () { remove(picked(sel)); });
+    document.getElementById("pick-clear").addEventListener("click", function () { if (!chosen.length || confirm("Remove every column from the template?")) remove(chosen.slice()); });
+    ["top", "up", "down", "bottom"].forEach(function (h) { document.getElementById("pick-" + h).addEventListener("click", function () { move(h); }); });
+    avail.addEventListener("dblclick", function (e) { if (e.target.tagName === "OPTION") add([e.target.value]); });
+    sel.addEventListener("dblclick", function (e) { if (e.target.tagName === "OPTION") remove([e.target.value]); });
+    avail.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); add(picked(avail)); } });
+    sel.addEventListener("keydown", function (e) {
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); remove(picked(sel)); }
+      else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); move(e.key === "ArrowUp" ? "up" : "down"); }
+    });
+    [avail, sel].forEach(function (list) {
+      list.addEventListener("change", function () { var n = picked(list); if (n.length) showDef(n[n.length - 1]); });
+    });
+    kindBox.addEventListener("change", renderAvail);
+    find.addEventListener("input", renderAvail);
+    findSel.addEventListener("input", function () { renderSel(picked(sel)); });
+    tmplCols.addEventListener("input", function () { chosen = parse(tmplCols.value); renderSel(null, true); renderAvail(); });   // typing: leave the text as typed
+    tmplCols.addEventListener("change", function () { renderSel(); });
+    chosen = parse(tmplCols.value);
+    picker.hidden = false;
+    document.getElementById("pick-text-box").open = false;
+    renderSel();
+    renderAvail();
   }
 })();

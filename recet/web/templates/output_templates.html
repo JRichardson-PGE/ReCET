@@ -7,41 +7,73 @@
   <code>field_definitions</code>, the definition and documentation link of each column in its file.</p>
 {% if error %}<p class="alert">{{ error }}</p>{% endif %}
 {% if saved_ok %}<p class="ok">Saved "{{ saved_ok }}".</p>{% endif %}
+{% if default_ok %}<p class="ok">New runs now start with "{{ default }}".</p>{% endif %}
 <section class="card">
   <h2>Templates</h2>
   <table class="list compact">
     <thead><tr><th>Name</th><th>Columns</th><th></th></tr></thead>
     <tbody>
     {% for name, cols in all_templates.items() %}
-      <tr><td>{{ name }}{% if name in builtin %} <span class="muted">(built-in)</span>{% endif %}</td><td>{{ cols|length }}: {{ cols[:6]|join(', ') }}{% if cols|length > 6 %} ...{% endif %}</td>
+      <tr><td>{{ name }}{% if name in builtin %} <span class="muted">(built-in)</span>{% endif %}{% if name == default %} <span class="tag">default</span>{% endif %}</td>
+        <td>{{ cols|length }}: {{ cols[:6]|join(', ') }}{% if cols|length > 6 %} ...{% endif %}</td>
         <td><a href="{{ u('/output-templates') }}?edit={{ name|urlencode }}">{% if name in builtin %}Copy{% else %}Edit{% endif %}</a></td></tr>
     {% endfor %}
     </tbody>
   </table>
-</section>
-<section class="card">
-  <h2>{% if editing and editing not in builtin %}Edit "{{ editing }}"{% else %}New template{% endif %}</h2>
-  <form method="post" action="{{ u('/output-templates') }}" class="stack">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Name <input type="text" name="name" maxlength="60" required value="{{ editing if editing and editing not in builtin else '' }}"></label>
-    <label>Columns, one per line, in the order the file should have them
-      <textarea name="columns" id="template-columns" rows="16" required>{{ columns|join('\n') }}</textarea></label>
-    <div class="actions"><button class="primary">Save template</button>
-      {% if editing and editing not in builtin %}<button name="delete" value="1" class="danger">Delete template</button>{% endif %}</div>
+  <form method="post" action="{{ u('/output-templates') }}" class="default-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="set_default" value="1">
+    <label>Default for new runs
+      <select name="name"><option value="{{ all_name }}" {% if default == all_name %}selected{% endif %}>{{ all_name }}</option>
+        {% for name in all_templates %}<option value="{{ name }}" {% if name == default %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+    <button>Save default</button>
+    <span class="muted">New run starts with this template; you can still pick another for each run.</span>
   </form>
 </section>
 <section class="card">
-  <h2>Columns you can use</h2>
-  <p class="muted">Add puts a column at the end of the list above. Each name links to its definition.</p>
-  {% for group, items in catalog %}
-  <details class="info-box"><summary>{{ group }} ({{ items|length }})</summary>
-    <table class="list compact">
-      <tbody>{% for col, text, link in items %}
-        <tr><td><button type="button" class="small" data-add-column="{{ col }}">Add</button></td><td><a href="{{ u('/docs/' ~ link) }}"><code>{{ col }}</code></a></td><td>{{ text }}</td></tr>
-      {% endfor %}</tbody>
-    </table>
-  </details>
-  {% endfor %}
+  <h2>{% if editing and editing not in builtin %}Edit "{{ editing }}"{% elif editing %}Copy of "{{ editing }}"{% else %}New template{% endif %}</h2>
+  <form method="post" action="{{ u('/output-templates') }}" class="stack" id="template-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Name <input type="text" name="name" maxlength="60" required value="{{ editing if editing and editing not in builtin else '' }}"></label>
+    <div class="picker" id="field-picker" hidden>
+      <div class="picker-side">
+        <div class="picker-head">
+          <label>Show <select id="pick-kind">
+            <option value="">All fields</option>
+            {% for k in kinds %}<option value="k:{{ k }}">{{ k }}</option>{% endfor %}
+            <optgroup label="Output field groups">{% for g in output_groups %}<option value="g:{{ g }}">{{ g }}</option>{% endfor %}</optgroup>
+          </select></label>
+          <input type="search" id="pick-find" placeholder="Search names and definitions" aria-label="Search fields">
+        </div>
+        <select id="pick-available" multiple size="18" aria-label="Fields you can add"></select>
+        <div class="picker-foot muted" id="pick-count"></div>
+      </div>
+      <div class="picker-moves">
+        <button type="button" id="pick-add" title="Add the selected fields (or double-click a field)">Add &rarr;</button>
+        <button type="button" id="pick-add-all" title="Add every field shown on the left">Add shown &raquo;</button>
+        <button type="button" id="pick-remove" title="Remove the selected fields (or double-click a field)">&larr; Remove</button>
+        <button type="button" id="pick-clear" title="Remove every field">&laquo; Remove all</button>
+      </div>
+      <div class="picker-side">
+        <div class="picker-head"><strong>Template columns, in file order</strong>
+          <input type="search" id="pick-find-sel" placeholder="Find in template" aria-label="Find in template"></div>
+        <select id="pick-selected" multiple size="18" aria-label="Template columns"></select>
+        <div class="picker-foot muted" id="pick-sel-count"></div>
+      </div>
+      <div class="picker-moves">
+        <button type="button" id="pick-top" title="Move to the top">Top</button>
+        <button type="button" id="pick-up" title="Move up (Alt+Up)">Up</button>
+        <button type="button" id="pick-down" title="Move down (Alt+Down)">Down</button>
+        <button type="button" id="pick-bottom" title="Move to the bottom">Bottom</button>
+      </div>
+      <div class="picker-def" id="pick-def"><span class="muted">Click a field to see its definition.</span></div>
+    </div>
+    <details id="pick-text-box" open><summary>Columns as text (one per line; paste a list here)</summary>
+      <textarea name="columns" id="template-columns" rows="12">{{ columns|join('\n') }}</textarea></details>
+    <label class="check"><input type="checkbox" name="make_default" value="1" {% if editing and editing == default and editing not in builtin %}checked{% endif %}> Use for new runs (default)</label>
+    <div class="actions"><button class="primary">Save template</button>
+      {% if editing and editing not in builtin %}<button name="delete" value="1" class="danger" formnovalidate>Delete template</button>{% endif %}</div>
+  </form>
 </section>
+<script type="application/json" id="field-catalog">{{ fields|tojson }}</script>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}
