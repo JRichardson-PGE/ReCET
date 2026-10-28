@@ -605,14 +605,15 @@ SCBCostGross    = share_SB_gross * SumCostsNPV_SCT + RebatesandIncentsPV_sct + G
 SCHCost..., SCHCostNoAdmin, SCHCostGross: the same with _SH
 ```
 
-**Ratios** (`ratio(n, d)`, so a zero cost gives 0):
+**Ratios** (`ratio(n, d)`, so a zero cost gives 0). Each test's numerator is written as its own column (`TRCBen` ... `SCHBen`, beside its ratios), so every ratio
+is its `...Ben` column over its cost column in the same file:
 
 ```text
-TRCRatio = (B + TaxCredits) / TRCCost               TRCRatioNoAdmin = (B + TaxCredits) / TRCCostNoAdmin
-PACRatio =  B / PACCost                             PACRatioNoAdmin =  B / PACCostNoAdmin
-RIMRatio = (B + LifecycleBillIncrElec + LifecycleBillIncrGas) / RIMCost     RIMRatioNoAdmin = (B + LifecycleBillIncrElec + LifecycleBillIncrGas) / RIMCostNoAdmin
-SCBRatio = (ElecBen_SB + GasBen_SB + WaterEnergyBen_SB + OtherBen) / SCBCost                      SCBRatioNoAdmin = the same over SCBCostNoAdmin
-SCHRatio = (ElecBen_SH + GasBen_SH + WaterEnergyBen_SH + OtherBen) / SCHCost                      SCHRatioNoAdmin = the same over SCHCostNoAdmin
+TRCBen = B + TaxCredits                                       TRCRatio = TRCBen / TRCCost       TRCRatioNoAdmin = TRCBen / TRCCostNoAdmin
+PACBen = B                                                    PACRatio = PACBen / PACCost       PACRatioNoAdmin = PACBen / PACCostNoAdmin
+RIMBen = B + LifecycleBillIncrElec + LifecycleBillIncrGas     RIMRatio = RIMBen / RIMCost       RIMRatioNoAdmin = RIMBen / RIMCostNoAdmin
+SCBBen = ElecBen_SB + GasBen_SB + WaterEnergyBen_SB + OtherBen     SCBRatio = SCBBen / SCBCost       SCBRatioNoAdmin = SCBBen / SCBCostNoAdmin
+SCHBen = ElecBen_SH + GasBen_SH + WaterEnergyBen_SH + OtherBen     SCHRatio = SCHBen / SCHCost       SCHRatioNoAdmin = SCHBen / SCHCostNoAdmin
 ```
 
 Water-energy benefits are in every numerator and TSB; water-energy costs are in every cost. Supply costs are in the *cost*, not netted from the ratio's numerator.
@@ -742,13 +743,15 @@ weight_m(Y) = overlap( [Y, Y+1), 1st-baseline period ) * S1e + overlap( [Y, Y+1)
 territory.
 
 **C16.3 Portfolio summary.** `portfolio_summary_*` has one row for all measures, one per `IOU_AC_Territory`, one per `CreditedPA` and one per program segment (`Prg_ProgramSegment`, from the program metadata), with the sum of each of: `ElecBen`, `GasBen`, `WaterEnergyBen`, `OtherBen`, `ElecSupplyCost`, `GasSupplyCost`,
-`WaterEnergyCost`, `TotalSystemBenefit`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost`, `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, and portfolio ratios on CET's receipt definition (plus `PCT_ratio = sum(PCTBen) / sum(PCTCost)`):
+`WaterEnergyCost`, `TotalSystemBenefit`, `TRCBen`, `PACBen`, `RIMBen`, `SCBBen`, `SCHBen`, `TRCCost`, `PACCost`, `RIMCost`, `SCBCost`, `SCHCost`, `TRCCostNoAdmin`, `PACCostNoAdmin`, `WeightedProgramCost`, `LifecycleBillReducElec`, `LifecycleBillReducGas`, `PCTBen`, `PCTCost`, `FirstYearNetElecCO2`, `FirstYearNetGasCO2`, and portfolio ratios on CET's receipt definition (plus `PCT_ratio = sum(PCTBen) / sum(PCTCost)`):
 
 ```text
 B      = sum(ElecBen) + sum(GasBen) + sum(WaterEnergyBen) + sum(OtherBen)            B_SB, B_SH: the same with the _SB / _SH benefits
 TRC_ratio = (B + sum(TaxCredits)) / sum(TRCCost)         PAC_ratio = B / sum(PACCost)         RIM_ratio = (B + sum(LifecycleBillIncrElec) + sum(LifecycleBillIncrGas)) / sum(RIMCost)
 SCB_ratio = B_SB / sum(SCBCost)                          SCH_ratio = B_SH / sum(SCHCost)      TRC_NoAdmin_ratio, PAC_NoAdmin_ratio: over the NoAdmin costs
 ```
+
+The numerators are the sums of the measure-level `...Ben` columns (`B + sum(TaxCredits) = sum(TRCBen)`, ...), so each ratio is that row's `...Ben` over its cost column.
 
 A ratio is omitted when its inputs are blank (for example the societal ratios when SCB/SCH are off).
 

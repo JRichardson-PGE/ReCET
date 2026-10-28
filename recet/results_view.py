@@ -78,6 +78,8 @@ LABELS = {
     "RebatesandIncents": ("Rebates and incentives ($)", "usd"), "WeightedProgramCost": ("Program costs ($)", "usd"),
     "ElecBen": ("Electric benefits ($)", "usd"), "GasBen": ("Gas benefits ($)", "usd"), "TRCCost": ("TRC cost ($)", "usd"), "PACCost": ("PAC cost ($)", "usd"),
     "RIMCost": ("RIM cost ($)", "usd"), "SCBCost": ("SCT Base cost ($)", "usd"), "SCHCost": ("SCT High cost ($)", "usd"),
+    "TRCBen": ("TRC benefits ($)", "usd"), "PACBen": ("PAC benefits ($)", "usd"), "RIMBen": ("RIM benefits ($)", "usd"),
+    "SCBBen": ("SCT Base benefits ($)", "usd"), "SCHBen": ("SCT High benefits ($)", "usd"),
     "PCTBen": ("PCT benefits ($)", "usd"), "PCTCost": ("PCT cost ($)", "usd"),
 }
 NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}     # WeightedSavings: a run written before 0.1.50
@@ -344,7 +346,8 @@ def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None, sums: pd.D
 
 RATIO_INPUTS = {"ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
                 "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin",
-                "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin", "PCTBen", "PCTCost"}     # every column outputs._ratio_parts reads
+                "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin", "PCTBen", "PCTCost",
+                "TRCBen", "PACBen", "RIMBen", "SCBBen", "SCHBen"}     # every column outputs._ratio_parts reads
 
 
 # ----------------------------------------------------------------------------------------------------------------------------- a run's results
