@@ -534,3 +534,35 @@ def current_keys(keys) -> list[str]:
 
 def save_views(views: dict[str, list[str]], current: str) -> None:
     paths.save_config(**{VIEWS_KEY: {"views": {k: v for k, v in views.items() if k != DEFAULT_VIEW_NAME}, "current": current}})
+
+
+# ----------------------------------------------------------------------------------------------------------------------------- two runs side by side
+COMPARE_LEVELS = [("portfolio", "Portfolio"), ("year", "Program year"), ("segment", "Program segment"), ("sector", "Program sector"), ("program", "Program")]
+SIDES = ("a", "b", "diff", "pct")
+
+
+def compare(a: RunResults, b: RunResults, level: str, keys: list[str], pa: str = ALL_PAS, years=None) -> pd.DataFrame:
+    """Two runs side by side at one level (BRD BR-06.11, any two runs, not only two ACCs of one job): one row per group present in either run, matched
+    on the group (the PrgID, program year, sector or segment; the portfolio is one row), and for each key `<key>__a`, `<key>__b`, `<key>__diff` (b - a) and
+    `<key>__pct` (diff / |a|, blank when a is 0; ratios are recomputed in each run from its own sums, as everywhere). Measures counts as a key too.
+    Keys only one run has are blank for the other."""
+    ta, tb = a.table(level, pa, keys, years), b.table(level, pa, keys, years)
+    idcol = {"portfolio": "Portfolio", "program": "PrgID", "year": "Program year", "sector": "Program sector", "segment": "Program segment"}[level]
+    for t in (ta, tb):
+        if level == "portfolio" and len(t):
+            t[idcol] = "All PAs" if pa in (None, "", ALL_PAS) else pa
+    extra = [c for c in ("Program name", "PA") if c in ta or c in tb]
+    values = ["Measures"] + [k for k in keys if k in ta.columns or k in tb.columns]
+    ja = ta.set_index(idcol) if len(ta) else pd.DataFrame(columns=values + extra).rename_axis(idcol)
+    jb = tb.set_index(idcol) if len(tb) else pd.DataFrame(columns=values + extra).rename_axis(idcol)
+    index = list(dict.fromkeys(list(ja.index) + list(jb.index)))
+    out = pd.DataFrame(index=pd.Index(index, name=idcol))
+    for c in extra:
+        out[c] = ja[c].reindex(index).fillna(jb[c].reindex(index)) if c in ja else jb[c].reindex(index)
+    for k in values:
+        va = pd.to_numeric(ja[k], errors="coerce").reindex(index) if k in ja else pd.Series(float("nan"), index=index)
+        vb = pd.to_numeric(jb[k], errors="coerce").reindex(index) if k in jb else pd.Series(float("nan"), index=index)
+        out[f"{k}__a"], out[f"{k}__b"] = va.to_numpy(), vb.to_numpy()
+        out[f"{k}__diff"] = (vb - va).to_numpy()
+        out[f"{k}__pct"] = ((vb - va) / va.abs()).where(va != 0).to_numpy()
+    return out.reset_index()

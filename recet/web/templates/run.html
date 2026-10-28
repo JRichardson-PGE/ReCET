@@ -26,7 +26,7 @@
 {% endfor %}
 
 <div class="actions">
-  {% if run.status in ('queued', 'running') %}
+  {% if owner and run.status in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/cancel') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Stop</button></form>
   {% endif %}
   {% if not run.preflight_only %}<a id="results-link" class="button primary {% if not run.result_dir %}hidden{% endif %}" href="{{ u('/runs/' + run.id + '/results') }}">Results</a>{% endif %}
@@ -40,7 +40,7 @@
   <span class="small muted">The editor takes up to {{ '{:,}'.format(max_edit_rows) }} measures.</span>
   {% endif %}
   {% endif %}
-  {% if run.status not in ('queued', 'running') %}
+  {% if owner and run.status not in ('queued', 'running') %}
   <form method="post" action="{{ u('/runs/' + run.id + '/delete') }}" class="confirm" data-confirm="Delete this run and its files?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Delete</button></form>
   {% endif %}
 </div>
@@ -75,6 +75,35 @@
   </ul>
   {% endif %}
   <p class="small muted">Every finding, with the rows and cells it names, is in preflight_findings.xlsx in the files below.</p>
+</details>
+{% endif %}
+
+{% if candidates %}
+<details class="card">
+  <summary>Compare with another run</summary>
+  <form method="get" action="{{ u('/runs/' + run.id + '/compare') }}" class="inline-form">
+    <label>This run against <select name="with">
+      {% for c in candidates %}<option value="{{ c.id }}">{{ c.label or c.id }} · {{ acc_label(c.acc_version) }} · {{ fmt_time(c.created_at) }}{% if c.owner_email != user.email %} · {{ c.owner_email }}{% endif %}</option>{% endfor %}
+    </select></label>
+    <button>Compare</button>
+  </form>
+  <p class="small muted">Any finished run of yours, or one shared with you: the two side by side at the portfolio, program year, segment, sector or program level, with the difference and the % change.</p>
+</details>
+{% endif %}
+
+{% if owner %}
+<details class="card" {% if shared_with %}open{% endif %}>
+  <summary>Sharing{% if shared_with %}: {{ shared_with|length }} user{{ 's' if shared_with|length != 1 }}{% endif %}</summary>
+  {% if shared_with %}
+  <ul class="files">{% for p in shared_with %}<li>{{ p.email }}
+    <form method="post" action="{{ u('/runs/' + run.id + '/unshare') }}" class="inline-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.id }}"><button class="small">Stop sharing</button></form></li>{% endfor %}</ul>
+  {% endif %}
+  <form method="post" action="{{ u('/runs/' + run.id + '/share') }}" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Share with <input type="email" name="email" placeholder="their sign-in email" required></label>
+    <button>Share</button>
+  </form>
+  <p class="small muted">They can open this run, its results and files, compare it and rerun its inputs as a run of their own; they cannot stop, delete or share it.</p>
 </details>
 {% endif %}
 

@@ -39,5 +39,20 @@
 {% else %}
 <p>No runs {{ 'to show' if n_expired else 'yet' }}. <a href="{{ u('/runs/new') }}">Start one</a>, or build a small job on the <a href="{{ u('/edit') }}">Edit inputs</a> page.</p>
 {% endif %}
+{% if shared %}
+<h2>Shared with you</h2>
+<div class="hscroll">
+<table class="list">
+  <thead><tr><th>Started</th><th>Run</th><th>ACC</th><th>Owner</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in shared %}
+  <tr><td class="nowrap">{{ fmt_time(r.created_at) }}</td><td><a href="{{ u('/runs/' + r.id) }}">{{ r.label or r.id }}</a>{% if r.preflight_only %} <span class="tag">input check</span>{% endif %}</td>
+    <td class="nowrap">{{ r.acc_version }}{% if r.compare_with %} vs {{ r.compare_with }}{% endif %}</td><td class="small">{{ r.owner_email }}</td>
+    <td><span class="status s-{{ r.status }}">{{ status_text.get(r.status, r.status) }}</span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

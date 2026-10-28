@@ -90,6 +90,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.63 (2026-10-28, Jake; BRD review gap 6, BR-06.11): compare any two runs and share a run. `results_view.compare(a, b, level, keys, pa, years)`
+  (`<key>__a/__b/__diff/__pct`, groups matched on their id, a group in one run only blank for the other; `COMPARE_LEVELS` has no measure level); web
+  `/runs/{id}/compare?with=<id>` and `compare.csv`, offered on a finished run's page for the user's own and shared finished runs. Sharing: table
+  `run_shares`; `Ctx.run_for` lets a user a run is shared with read it (pages, results, files, compare, rerun as their own run), and `owner=True` (Stop,
+  Delete, share / unshare) keeps the rest with the owner or an admin. Runs list: "Shared with you". Audit `run shared` / `run unshared`. tests/test_share_compare.py.
 - 0.1.62 (2026-10-28, Jake; BRD review gap 5, BR-06.2): run emails. `recet/web/notify.py`: when a run ends, `Runner._finish` starts a thread that
   emails the owner (finished or failed; not a stopped run or a passing input check) through RECET_WEB_SMTP_* (none set = no email; docker-compose passes
   them from the server's .env), with headline totals from run_settings.json and the RECET_WEB_BASE_URL link. Account page: "Email me when a run finishes
