@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.59 (2026-10-28, Jake; BRD review gap 2, BR-06.16): PrgIDs that do not line up between Measure.csv and ProgramCost.csv no longer stop the run (CET stops
+  it; C17 item 11). `run_poc.load_job` no longer raises; `preflight._program_alignment` warns `measures_without_program_costs` (priced with no program costs,
+  CreditedPA blank) and `program_costs_without_measures` (with the nominal dollars no cost test includes), in one piece and in parts. A load ValueError is now
+  `inputs_unreadable` (it was mislabelled program_alignment). tests/test_program_alignment.py: the result equals the aligned job with those costs at 0.
 - 0.1.58 (2026-10-28, Jake; BRD review gap 1, BR-06.7): statewide allocation reconciles. `statewide_allocation._allocate`'s report carries
   `reconciliation` (per Year, SW PrgID, allocated field: the total before allocation and over each IOU's produced rows; Measure fields as NumUnits x field),
   `statewide_allocation.reconciliation(files, programcost)` adds them over a job's file or parts, and `jobs.write_reconciliation` writes
