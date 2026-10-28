@@ -43,7 +43,7 @@ DROP_FROM_RESULT = {"measure_id", "prg_id", "NTGRkWh", "ntgr_therm"}   # restate
 
 # the columns compared between two runs / against CET, and the totals in the summary
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-               "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "FirstYearNetElecCO2", "FirstYearNetGasCO2", "LifecycleBillReducElec", "LifecycleBillReducGas"]
+               "TRCBen", "PACBen", "RIMBen", "SCBBen", "SCHBen", "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "FirstYearNetElecCO2", "FirstYearNetGasCO2", "LifecycleBillReducElec", "LifecycleBillReducGas"]
 SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TotalSystemBenefit", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
                   "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "LifecycleBillReducElec", "LifecycleBillReducGas", "PCTBen", "PCTCost", "FirstYearNetElecCO2", "FirstYearNetGasCO2"]
 
@@ -141,8 +141,12 @@ EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "PCT_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
 
 
-def _ratio_parts(get) -> list[tuple[str, object, object]]:
-    """(ratio name, numerator, denominator) for the cost-test ratios, with `get(column)` returning a total (a number, or a Series for per-row ratios) or None."""
+RATIO_TESTS = ("TRC", "PAC", "RIM", "SCB", "SCH")     # each writes its ratios' numerator as <test>Ben (PCT's is PCTBen, an output of its own)
+
+
+def _numerators(get) -> dict[str, object]:
+    """{test: the numerator of its ratios} for RATIO_TESTS: the total of the measure-level <test>Ben column, or (a table written before 0.1.53, which has no
+    such column) the same sum of benefits built from its parts."""
     z = lambda x: 0.0 if x is None else x
 
     def benefits(suffix: str = ""):
@@ -152,11 +156,19 @@ def _ratio_parts(get) -> list[tuple[str, object, object]]:
     b, b_sb, b_sh = benefits(), benefits("_SB"), benefits("_SH")
     tax, incr = z(get("TaxCredits")), z(get("LifecycleBillIncrElec")) + z(get("LifecycleBillIncrGas"))
     plus = lambda x, y: None if x is None else x + y
-    return [("TRC", plus(b, tax), get("TRCCost")), ("PAC", b, get("PACCost")), ("RIM", plus(b, incr), get("RIMCost")),
-            ("SCB", b_sb, get("SCBCost")), ("SCH", b_sh, get("SCHCost")),
-            ("TRC_NoAdmin", plus(b, tax), get("TRCCostNoAdmin")), ("PAC_NoAdmin", b, get("PACCostNoAdmin")),
-            ("RIM_NoAdmin", plus(b, incr), get("RIMCostNoAdmin")), ("SCB_NoAdmin", b_sb, get("SCBCostNoAdmin")),
-            ("SCH_NoAdmin", b_sh, get("SCHCostNoAdmin")), ("PCT", get("PCTBen"), get("PCTCost"))]
+    built = {"TRC": plus(b, tax), "PAC": b, "RIM": plus(b, incr), "SCB": b_sb, "SCH": b_sh}
+    out = {}
+    for t in RATIO_TESTS:
+        v = get(f"{t}Ben")
+        out[t] = built[t] if v is None else v
+    return out
+
+
+def _ratio_parts(get) -> list[tuple[str, object, object]]:
+    """(ratio name, numerator, denominator) for the cost-test ratios, with `get(column)` returning a total (a number, or a Series for per-row ratios) or None."""
+    n = _numerators(get)
+    return [*((t, n[t], get(f"{t}Cost")) for t in RATIO_TESTS), *((f"{t}_NoAdmin", n[t], get(f"{t}CostNoAdmin")) for t in RATIO_TESTS),
+            ("PCT", get("PCTBen"), get("PCTCost"))]
 
 
 def group_ratios(g: pd.DataFrame) -> dict[str, float]:
@@ -166,6 +178,13 @@ def group_ratios(g: pd.DataFrame) -> dict[str, float]:
     Used by the portfolio summary and the Results tab's views, so both give the same ratios."""
     get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
     return {f"{name}_ratio": num / den for name, num, den in _ratio_parts(get) if num is not None and den}
+
+
+def group_numerators(g: pd.DataFrame) -> dict[str, float]:
+    """The numerators of a group's ratios (group_ratios), under the measure-level names TRCBen ... SCHBen; one whose inputs are missing is left out. So each
+    <test>_ratio of a summary row is its <test>Ben over its <test>Cost (or <test>CostNoAdmin)."""
+    get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
+    return {f"{t}Ben": v for t, v in _numerators(get).items() if v is not None}
 
 
 def row_ratios(df: pd.DataFrame) -> pd.DataFrame:
@@ -272,6 +291,7 @@ def _summary_row(g: pd.DataFrame, label: str, group: str, n: int) -> dict:
     for c in SUMMARY_TOTALS:
         if c in g and g[c].notna().any():
             row[c] = float(g[c].sum())
+    row.update(group_numerators(g))
     for name, value in group_ratios(g).items():
         if name in SUMMARY_RATIOS:
             row[name] = value

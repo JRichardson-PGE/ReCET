@@ -254,20 +254,23 @@ def compute_cost_tests(d: pd.DataFrame, prog: pd.DataFrame, totals: dict[str, pd
     def ratio(num, den):
         return (num / den.replace(0, np.nan)).fillna(0.0) + 0.0          # + 0.0: a zero over a negative denominator is 0, not -0
 
+    # each test's numerator is written beside its ratios (<test>Ben), so ratio = <test>Ben / <test>Cost(NoAdmin) can be checked from the file
     b = d.ElecBen + d.GasBen + d.WaterEnergyBen + d.OtherBen
-    d["TRCRatio"] = ratio(b + d.TaxCredits, d.TRCCost)
-    d["TRCRatioNoAdmin"] = ratio(b + d.TaxCredits, d.TRCCostNoAdmin)
-    d["PACRatio"] = ratio(b, d.PACCost)
-    d["PACRatioNoAdmin"] = ratio(b, d.PACCostNoAdmin)
-    rim_b = b + d.LifecycleBillIncrElec + d.LifecycleBillIncrGas
-    d["RIMRatio"] = ratio(rim_b, d.RIMCost)
-    d["RIMRatioNoAdmin"] = ratio(rim_b, d.RIMCostNoAdmin)
-    b_sb = d.ElecBen_SB + d.GasBen_SB + d.WaterEnergyBen_SB + d.OtherBen
-    b_sh = d.ElecBen_SH + d.GasBen_SH + d.WaterEnergyBen_SH + d.OtherBen
-    d["SCBRatio"] = ratio(b_sb, d.SCBCost)
-    d["SCHRatio"] = ratio(b_sh, d.SCHCost)
-    d["SCBRatioNoAdmin"] = ratio(b_sb, d.SCBCostNoAdmin)
-    d["SCHRatioNoAdmin"] = ratio(b_sh, d.SCHCostNoAdmin)
+    d["TRCBen"] = b + d.TaxCredits
+    d["TRCRatio"] = ratio(d.TRCBen, d.TRCCost)
+    d["TRCRatioNoAdmin"] = ratio(d.TRCBen, d.TRCCostNoAdmin)
+    d["PACBen"] = b
+    d["PACRatio"] = ratio(d.PACBen, d.PACCost)
+    d["PACRatioNoAdmin"] = ratio(d.PACBen, d.PACCostNoAdmin)
+    d["RIMBen"] = b + d.LifecycleBillIncrElec + d.LifecycleBillIncrGas
+    d["RIMRatio"] = ratio(d.RIMBen, d.RIMCost)
+    d["RIMRatioNoAdmin"] = ratio(d.RIMBen, d.RIMCostNoAdmin)
+    d["SCBBen"] = d.ElecBen_SB + d.GasBen_SB + d.WaterEnergyBen_SB + d.OtherBen
+    d["SCBRatio"] = ratio(d.SCBBen, d.SCBCost)
+    d["SCBRatioNoAdmin"] = ratio(d.SCBBen, d.SCBCostNoAdmin)
+    d["SCHBen"] = d.ElecBen_SH + d.GasBen_SH + d.WaterEnergyBen_SH + d.OtherBen
+    d["SCHRatio"] = ratio(d.SCHBen, d.SCHCost)
+    d["SCHRatioNoAdmin"] = ratio(d.SCHBen, d.SCHCostNoAdmin)
 
     # CalcCost's lifecycle net benefits and levelized columns (see the module docstring); the benefits are ElecBen + GasBen only, as CET has them
     d["TRCLifecycleNetBen"] = d.ElecBen + d.GasBen - d.TRCCost

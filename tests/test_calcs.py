@@ -262,6 +262,27 @@ def test_every_documented_output_matches_the_reference_formulas(tmp_path, meb, m
     assert summ["PCT_ratio"] == pytest.approx(tot("PCTBen") / tot("PCTCost"), rel=1e-9)
 
 
+def test_every_ratio_is_its_numerator_column_over_its_cost_column(tmp_path):
+    """Each ratio the tool writes can be reproduced from two columns of the same file: <test>Ben / <test>Cost (and / <test>CostNoAdmin), 0 when the cost is 0;
+    and each ratio of the portfolio summary from the summary's own <test>Ben and cost totals."""
+    result = _job(tmp_path, 0.05, 0.05)
+    frame = result.frame
+    ratios = [c for c in frame.columns if c.endswith(("Ratio", "RatioNoAdmin"))]
+    assert {"TRCRatio", "TRCRatioNoAdmin", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatioNoAdmin", "PCTRatio"} <= set(ratios)
+    for col in ratios:
+        test, suffix = col.split("Ratio")
+        num, cost = frame[f"{test}Ben"], frame[f"{test}Cost{suffix}"]
+        assert frame.columns.get_loc(f"{test}Ben") < frame.columns.get_loc(col), f"{test}Ben should come before {col}"
+        want = (num / cost.where(cost != 0)).fillna(0.0)
+        np.testing.assert_allclose(frame[col].to_numpy(float), want.to_numpy(float), rtol=1e-12, atol=0, err_msg=col)
+        assert (cost != 0).any() and (num != 0).any(), f"{col}: the example should exercise a non-zero numerator and cost"
+    summ = pd.read_csv(result.files["portfolio_summary"]).iloc[0]
+    for name in [c for c in summ.index if c.endswith("_ratio")]:
+        test, _, rest = name.partition("_")
+        suffix = "NoAdmin" if rest == "NoAdmin_ratio" else ""
+        assert summ[name] == pytest.approx(summ[f"{test}Ben"] / summ[f"{test}Cost{suffix}"], rel=1e-12), name
+
+
 # ---------------------------------------------------------------------------------------------------------------------------------------------- regressions found while documenting
 def _bill_measure(eul, rul, s1=1000.0, s2=0.0):
     return pd.DataFrame([{"measure_id": "m", "claim_year": 2028, "rul_years_exact": rul, "eul_years_exact": eul, "ir_kwh": 1.0, "rr_kwh": 1.0, "annual_net_kwh_1st": s1,
