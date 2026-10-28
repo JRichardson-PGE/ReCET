@@ -2067,6 +2067,17 @@ input column, from INPUT_FIELDS.md. With an output template it lists exactly the
 | `column` | The column's name. |
 | `definition` | The first paragraph of its entry (or its table row), as plain text. |
 | `documentation` | The entry: the document and the heading id, e.g. `OUTPUT_FIELDS.md#elecben` (on the web app, `/docs/OUTPUT_FIELDS.md#elecben`). |
+| `unit` | The unit its entry gives ("Dollars (PV)", "kWh", "Metric Tons"); blank when the entry names none (inputs, labels). |
+| `source` | Where the value comes from: `input: Measure.csv`, the CEDARS Programs list (`Prg_` columns), or a ReCET calculation and what it works on (ACC avoided costs, emission factors, retail rates, `ProgramCost.csv` totals). |
+| `version` | `as filed (CET input field)` for an input; else the ReCET version, plus the run's ACC ("2026 ACC") for a value priced on it. A record with its own `ACCVersion` is priced on that ACC. |
+| `cost_tests` | How the cost tests use it (section 1.9): `benefit in TRC, PAC, RIM`, `cost in RIM`, a test's numerator, denominator or result, or `not used in a cost test`. The benefits and costs listed for a test add up to its `<test>Ben` and `<test>CostNoAdmin`. |
+| `time_basis` | First year, average year, lifecycle undiscounted, lifecycle present value to the run's First Year, nominal dollars, a ratio of present values, or levelized. |
+| `aggregation` | How a group total (portfolio summary, Results levels) combines it: summed; recomputed from the summed numerator and denominator (ratios and levelized values); or not combined (inputs, labels, per-measure shares). |
+| `rounding` | Always "not rounded": ReCET writes full precision; the Results pages and Excel formats only change how numbers are shown. |
+| `years_in_use` | Which ACCs fill it ("2024 ACC on" for the SCT columns, blank on the TRC-only 2021 and 2022 ACCs; otherwise every ACC) and any earlier name of the column (renamed in 0.1.50 or from CET's E3 names). |
+
+These attributes (BRD BR-08.1) follow rules on the column's name and its documented unit (`field_attributes.py`), so a column added later gets them
+without an entry of its own; `tests/test_field_attributes.py` checks the cost-test treatment against the cost tests' arithmetic.
 
 ### 2.12 `key_metrics_acc<version>`
 

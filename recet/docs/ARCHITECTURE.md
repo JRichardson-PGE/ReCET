@@ -48,6 +48,7 @@ CEDARS.
 | Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); an email to the owner when a run finishes or fails (`web/notify.py`); each run in its own process | partly met: scaling and isolation are not built (section 11) |
 | Compare and share runs (BR-06.11) | compare any two runs; share a run with another user | the web Compare page and CSV (`results_view.compare`: each run's value, the difference and the % change at the portfolio, program year, segment, sector or program level); a run shared read-only by email (`run_shares`) | met for the web app; the desktop window still compares two ACCs of one job only |
 | Statewide allocation (BR-06.7) | split a statewide program across the IOUs; the allocated totals reconcile to the unallocated ones | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15); `statewide_reconciliation` table (`statewide_allocation.reconciliation`) | met; factors come from a file, not a Programs module |
+| Data dictionary (BR-08.1) | every field with its definition, source and version, cost-test treatment, time basis, aggregation, rounding and years in use | INPUT_FIELDS.md and OUTPUT_FIELDS.md (definitions, units, formulas); every run's `field_definitions` table adds the attributes per column (`field_attributes.py`, rules on the name and the documented unit, checked against the cost tests by `tests/test_field_attributes.py`) | met for the measure-level file; the attributes are rules, not a maintained registry |
 | Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
 | Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
 
@@ -178,6 +179,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
 | `field_docs.py` | outputs | each output column's definition and documentation link, read from these documents |
+| `field_attributes.py` | outputs | each column's data-dictionary attributes: unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use (BR-08.1) |
 | `output_templates.py` | outputs | named, ordered column lists for the measure-level file |
 
 ## 5. A run, end to end
