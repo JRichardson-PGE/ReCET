@@ -807,6 +807,9 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 10. `DiscountedSavingsGross...` on early-replacement measures (`RUL_Yrs` > 0): ReCET's is the net formula without NTG (C19.5). CET's gross kWh counts one 2nd-baseline year too many
    (`Raf ^ -(EUL - RUL)` where its net version has `- 1`) and its gross therms leave the 2nd baseline undiscounted (a misplaced bracket), so CET's gross and net disagree even at NTG = 1.
    Single-baseline measures match CET.
+11. **PrgIDs that do not line up between `Measure.csv` and `ProgramCost.csv`** do not stop the run (BRD BR-06.16, 0.1.59). CET stops the job on either kind. A measure whose program
+   has no `ProgramCost.csv` row is priced with no program costs (C11: its share is of a program total of 0), and a `ProgramCost.csv` row whose program has no measures is charged to
+   none; preflight warns about both (`measures_without_program_costs`, `program_costs_without_measures`, with the costs left out). A job whose PrgIDs all line up gives CET's results.
 
 **Limitations.**
 

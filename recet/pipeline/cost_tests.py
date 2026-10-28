@@ -95,9 +95,9 @@ def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataF
 
 
 def check_program_alignment(measures: pd.DataFrame, program: pd.DataFrame | None) -> dict:
-    """PrgIDs must line up between the measures and the program costs, or costs silently drop out of the cost tests (a program
-    cost row with no measures is never charged; a measure whose program has no cost row gets none). After statewide allocation both
-    sides carry the same `<IOU>_` prefix; a mismatch means only one of the two files was allocated. Returns the two difference sets."""
+    """The PrgIDs that do not line up between the measures and the program costs: a program cost row with no measures is never charged, and a
+    measure whose program has no cost row gets none (preflight warns about both, BRD BR-06.16). After statewide allocation both sides carry the
+    same `<IOU>_` prefix. Returns the two difference sets."""
     m_ids = set(measures["PrgID"].astype(str).str.strip())
     p_ids = set() if program is None else set(program["PrgID"])
     return {"program_costs_without_measures": sorted(p_ids - m_ids), "measure_programs_without_costs": sorted(m_ids - p_ids)}
