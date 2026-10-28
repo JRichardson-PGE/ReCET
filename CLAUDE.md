@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.62 (2026-10-28, Jake; BRD review gap 5, BR-06.2): run emails. `recet/web/notify.py`: when a run ends, `Runner._finish` starts a thread that
+  emails the owner (finished or failed; not a stopped run or a passing input check) through RECET_WEB_SMTP_* (none set = no email; docker-compose passes
+  them from the server's .env), with headline totals from run_settings.json and the RECET_WEB_BASE_URL link. Account page: "Email me when a run finishes
+  or fails" (user_settings `notify_runs`, on by default). Audit `run email sent` / `run email failed`. ARCHITECTURE 8.6; tests/test_notify.py.
 - 0.1.61 (2026-10-28, Jake; BRD review gap 4, BR-06.13): the combined 8,760 by climate zone. `profile8760.portfolio_profile` adds
   `net_kwh_<Y>_CZ<zone>` (`zone_label`: the filed AC_Climate_Zone, CZ prepended to a bare number), `combine_profiles` adds them up over parts, and
   `profile8760.peaks` writes `portfolio_8760_peaks_<tag>` (per year: portfolio, each PA, each zone; own peak, largest added load, kWh and share at the

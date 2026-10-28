@@ -599,10 +599,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from urllib.parse import quote
         return ctx.redirect(f"/output-templates?edit={quote(name)}&saved={quote(name)}")
 
+    def account_kw(u) -> dict:
+        from . import notify
+        return dict(email_on=notify.enabled(s), notify_runs=notify.wants(ctx.db, u["id"]))
+
     @app.get("/account", response_class=HTMLResponse)
     async def account_page(request: Request, done: str = ""):
-        ctx.need_user(request)
-        return ctx.render(request, "account.html", error="", done=done)
+        u = ctx.need_user(request)
+        return ctx.render(request, "account.html", error="", done=done, **account_kw(u))
+
+    @app.post("/account/notifications")
+    async def account_notifications(request: Request):
+        """The Account page's "Email me when a run finishes or fails" (notify.py)."""
+        from . import notify
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        on = bool(form.get("notify_runs"))
+        notify.set_wants(ctx.db, u["id"], on)
+        ctx.db.audit("run emails " + ("on" if on else "off"), u, ip=ctx.ip(request))
+        return ctx.redirect("/account?done=email")
 
     @app.post("/account")
     async def account(request: Request):
@@ -610,11 +626,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         form = await request.form()
         ctx.check_csrf(request, str(form.get("csrf", "")))
         if auth.check_login(ctx.db, u["email"], str(form.get("current", "")), ctx.ip(request)) is None:
-            return ctx.render(request, "account.html", status_code=400, error="Your current password is not right.", done="")
+            return ctx.render(request, "account.html", status_code=400, error="Your current password is not right.", done="", **account_kw(u))
         pw, again = str(form.get("password", "")), str(form.get("password2", ""))
         problem = auth.password_problem(pw, again)
         if problem:
-            return ctx.render(request, "account.html", status_code=400, error=problem, done="")
+            return ctx.render(request, "account.html", status_code=400, error=problem, done="", **account_kw(u))
         auth.set_password(ctx.db, u["id"], pw)          # ends every session, this one too: sign in again with a fresh one
         ctx.db.audit("password changed", u, ip=ctx.ip(request))
         resp = ctx.redirect("/account?done=1")

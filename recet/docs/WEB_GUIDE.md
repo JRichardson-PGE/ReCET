@@ -86,6 +86,9 @@ until you show them. Queued and running runs update in place.
 
 Every output column, with its formula, is described in [Output fields](OUTPUT_FIELDS.md).
 
+**Email.** When the server has a mail server set up, you get an email when each of your runs finishes or fails, with its headline results and a link
+to its page (not for stopped runs or input checks that pass). Turn it off or on under **Account**.
+
 ## 5. Edit inputs
 
 **Edit inputs** builds or changes a small job (up to 500 measures) cell by cell. Larger jobs are edited offline, in Excel, and run from New run. Drafts
