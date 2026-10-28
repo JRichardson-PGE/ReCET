@@ -90,6 +90,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.53 (2026-10-27, Jake): every ratio has its numerator as its own column, just before its ratios: `TRCBen` (B + TaxCredits), `PACBen` (B), `RIMBen`
+  (B + bill increases), `SCBBen` / `SCHBen` (the _SB / _SH benefits + OtherBen); PCT already had `PCTBen`. So `<test>Ratio = <test>Ben / <test>Cost` and
+  `<test>RatioNoAdmin = <test>Ben / <test>CostNoAdmin` from two columns of one file (0 when the cost is 0). The portfolio summary, Results group sums and
+  two-version comparison carry them too; `outputs._numerators` reads the `<test>Ben` totals, falling back to their parts for files written before 0.1.53.
+  Statewide allocation: Weighted Factor, like the costs. Column order changed: SCBBen, SCBRatio, SCBRatioNoAdmin, SCHBen, SCHRatio, SCHRatioNoAdmin.
 - 0.1.52 (2026-10-27, Jake): `docs/ARCHITECTURE.md` (requirements, layers, every module, run flow, data, web deployment and security, performance
   design; its module map and web settings table are checked by tests). The web Docs pages draw ```mermaid blocks: Mermaid 11.4.1 is vendored in
   `web/static/vendor/mermaid/` (npm tarball, integrity checked; the CSP allows only same-origin scripts, so never load it from a CDN) and `static/docs.js`
