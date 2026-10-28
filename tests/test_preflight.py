@@ -18,29 +18,34 @@ def test_a_blank_the_arithmetic_cannot_do_without_is_a_blocking_error(tmp_path, 
     assert "blank_required_value" in _codes(p, "error")
 
 
-def test_a_second_baseline_is_needed_on_early_replacement_measures(tmp_path):
-    p = make_measure_csv(tmp_path / "m.csv", RUL_Yrs="1", EUL_Yrs="3", UnitkWh2ndBaseline="")
-    assert "blank_second_baseline" in _codes(p, "error")
-    ok = make_measure_csv(tmp_path / "m2.csv", RUL_Yrs="0", EUL_Yrs="3", UnitkWh2ndBaseline="")     # single baseline: the 2nd baseline is never used
-    assert "blank_second_baseline" not in _codes(ok, "error")
+def test_every_field_cet_requires_must_have_a_value(tmp_path):
+    """CET marks the numeric Measure fields NotEmpty: a blank one is an error (the pricing uses them as filed), single baseline or not. The fields CET does not
+    require may be blank."""
+    for col in preflight.NEEDED_VALUES:
+        assert "blank_required_value" in _codes(make_measure_csv(tmp_path / f"{col}.csv", **{col: ""}), "error"), col
+    ok = make_measure_csv(tmp_path / "ok.csv", UnitkWhIOUWater1stBaseline="", UnitDirectInstallLab="", UnitTaxCredits="", MeasInflation="")
+    assert "blank_required_value" not in _codes(ok, "error")
 
 
 @pytest.mark.parametrize("column,value", [("NTGRkWh", "1.6"), ("NTGRkWh", "0"), ("EUL_Yrs", "41"), ("RUL_Yrs", "31"), ("InstallationRatekWh", "1.2"),
                                           ("RealizationRatekWh", "2.5"), ("MeasInflation", "1.5"), ("UnitMeaCost1stBaseline", "-5")])
 def test_values_outside_cets_ranges_are_warnings_not_errors(tmp_path, column, value):
-    p = make_measure_csv(tmp_path / "m.csv", **{column: value})
+    p = make_measure_csv(tmp_path / "m.csv", **{column: value, **({"EUL_Yrs": "35"} if column == "RUL_Yrs" else {})})   # an RUL above the EUL is an error
     rep = preflight.check_inputs(p)
     assert "outside_cet_range" in {i.code for i in rep.issues if i.severity == "warning"}
     assert rep.ok                                                  # the tool still prices it
 
 
-def test_an_rul_that_is_not_below_the_eul_is_flagged(tmp_path):
-    assert "rul_not_below_eul" in _codes(make_measure_csv(tmp_path / "m.csv", RUL_Yrs="5", EUL_Yrs="4"), "warning")
+def test_an_rul_above_the_eul_or_a_negative_life_is_an_error(tmp_path):
+    assert "rul_above_eul" in _codes(make_measure_csv(tmp_path / "m.csv", RUL_Yrs="5", EUL_Yrs="4"), "error")
+    assert "rul_not_below_eul" in _codes(make_measure_csv(tmp_path / "eq.csv", RUL_Yrs="4", EUL_Yrs="4"), "warning")     # equal: a warning, priced single-baseline
+    assert "negative_life" in _codes(make_measure_csv(tmp_path / "n1.csv", EUL_Yrs="-1"), "error")
+    assert "negative_life" in _codes(make_measure_csv(tmp_path / "n2.csv", RUL_Yrs="-0.5"), "error")
 
 
 def test_a_clean_row_raises_none_of_them(tmp_path):
     codes = _codes(make_measure_csv(tmp_path / "m.csv"), "warning") | _codes(tmp_path / "m.csv", "error")
-    assert not codes & {"blank_required_value", "blank_second_baseline", "outside_cet_range", "rul_not_below_eul"}
+    assert not codes & {"blank_required_value", "negative_life", "rul_above_eul", "outside_cet_range", "rul_not_below_eul"}
 
 
 def _rows(path, rows):

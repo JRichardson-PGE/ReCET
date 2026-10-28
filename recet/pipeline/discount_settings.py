@@ -77,8 +77,7 @@ def known_versions() -> list[int]:
 
 def get_settings(pa: str, acc_version: int = 2024) -> dict:
     """Returns the RunParameters row for (pa, acc_version) as a dict:
-    discount_rate_annual, discount_rate_qtr (and the _sct variants, unused
-    here but kept for completeness -- Jake confirmed SCT uses a DIFFERENT,
+    DiscountRateAnnual, DiscountRateQtr, DiscountRateAnnual_SCT, DiscountRateQtr_SCT, BaseYear (its fields' own names) -- Jake confirmed SCT uses a DIFFERENT,
     lower discount rate than the primary TRC-style calculations this POC
     compares against, so never substitute one for the other)."""
     pa_key = PA_ALIASES.get(pa.upper().replace("&", ""), pa.upper())
@@ -119,21 +118,21 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
             else:
                 raise KeyError(f"run parameters for PA={pa_key!r} give no BaseYear and the {acc_version} ACC has no built-in rows to take it from")
         return ({
-            "discount_rate_annual": float(u["DiscountRateAnnual"]),
-            "discount_rate_qtr": float(u["DiscountRateQtr"]),
-            "discount_rate_annual_sct": float(u["DiscountRateAnnual_SCT"]),
-            "discount_rate_qtr_sct": float(u["DiscountRateQtr_SCT"]),
-            "settings_base_year": int(base),
+            "DiscountRateAnnual": float(u["DiscountRateAnnual"]),
+            "DiscountRateQtr": float(u["DiscountRateQtr"]),
+            "DiscountRateAnnual_SCT": float(u["DiscountRateAnnual_SCT"]),
+            "DiscountRateQtr_SCT": float(u["DiscountRateQtr_SCT"]),
+            "BaseYear": int(base),
         }, float(u["CO2Gas"]))
     if row.empty:
         raise KeyError(f"No run parameters for PA={pa_key!r}, ACC version {acc_version!r}: supply them in a run-parameters file")
     row = row.iloc[0]
     return ({
-        "discount_rate_annual": float(row["DiscountRateAnnual"]),
-        "discount_rate_qtr": float(row["DiscountRateQtr"]),
-        "discount_rate_annual_sct": float(row["DiscountRateAnnual_SCT"]),
-        "discount_rate_qtr_sct": float(row["DiscountRateQtr_SCT"]),
-        "settings_base_year": int(row["BaseYear"]),
+        "DiscountRateAnnual": float(row["DiscountRateAnnual"]),
+        "DiscountRateQtr": float(row["DiscountRateQtr"]),
+        "DiscountRateAnnual_SCT": float(row["DiscountRateAnnual_SCT"]),
+        "DiscountRateQtr_SCT": float(row["DiscountRateQtr_SCT"]),
+        "BaseYear": int(row["BaseYear"]),
     }, float(row["CO2Gas"]))
 
 
@@ -144,7 +143,7 @@ def get_discount_rate_qtr(pa: str, acc_version: int = 2024) -> float:
     SCG's own rate, since discounting is a PA property, not an ACC-source
     property. Callers should pass the measure's own real PA, not whatever
     ACC fallback IOU real_avoided_cost_v2 used for the dollar values."""
-    return get_settings(pa, acc_version)["discount_rate_qtr"]
+    return get_settings(pa, acc_version)["DiscountRateQtr"]
 
 
 def get_discount_rate_annual(pa: str, acc_version: int = 2024) -> float:
@@ -153,7 +152,7 @@ def get_discount_rate_annual(pa: str, acc_version: int = 2024) -> float:
     test's bill-impact PV sum (engine.price_bill_impact; real retail rate
     schedules are themselves annual-granularity, see
     pipeline/rate_schedules.py)."""
-    return get_settings(pa, acc_version)["discount_rate_annual"]
+    return get_settings(pa, acc_version)["DiscountRateAnnual"]
 
 
 def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2024) -> float:
@@ -164,7 +163,7 @@ def get_discount_rate_qtr_sct(pa: str, acc_version: int = 2024) -> float:
     `ace_1.Gen_SB`/`Gen_SH`, the SCB/SCH avoided-cost PV terms, discount
     with `Rqf_SCT` specifically, not the regular `Rqf` every other cost
     test uses)."""
-    return get_settings(pa, acc_version)["discount_rate_qtr_sct"]
+    return get_settings(pa, acc_version)["DiscountRateQtr_SCT"]
 
 
 def get_co2_gas(pa: str, acc_version: int = 2024) -> float:

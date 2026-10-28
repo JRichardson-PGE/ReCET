@@ -19,7 +19,7 @@ takes them: ReCET does not take lifecycle savings to derive annual values from.
 
 **Reading the tables.** *Required* = the column must exist in the file (a missing one stops the run and the preflight names it; a *blank cell* in a numeric column is read as the default stated in "Blank means").
 *Carried* = read if present and copied to the output unchanged, never used in a calculation. Numeric columns must hold numbers or be blank; text in them is a blocking preflight error.
-Four values cannot be blank because the arithmetic has no default for them - `NumUnits`, `EUL_Yrs`, `NTGRkWh` and `UnitkWh1stBaseline` (plus `UnitkWh2ndBaseline` when `RUL_Yrs > 0`); a blank is a blocking preflight error.
+Every numeric field CET marks NotEmpty cannot be blank, as in CET: `NumUnits`, the six `UnitkW` / `UnitkWh` / `UnitTherm` 1st/2nd-baseline fields, `UnitMeaCost1stBaseline`, `UnitMeaCost2ndBaseline`, the four `NTGR*`, `EUL_Yrs`, `RUL_Yrs`, the six installation and realization rates, `UnitGasInfraBens`, `UnitRefrigCosts`, `UnitRefrigBens`, `UnitMiscCosts` and `UnitMiscBens`; a blank is a blocking preflight error (enter 0 for none), and the pricing uses them as filed. `EUL_Yrs` and `RUL_Yrs` may not be negative, and `RUL_Yrs` may not exceed `EUL_Yrs` (blocking errors).
 The preflight also **warns** (the run still proceeds) when a value is outside the range CET's own QC allows: the four `NTGR*` in (0, 1.5], `EUL_Yrs` in [0, 40], `RUL_Yrs` in [0, 30], the three `RealizationRate*` in (0, 2],
 the three `InstallationRate*` in (0, 1], `MeasInflation` in [0, 1], the two `UnitMeaCost*` at least 0, and `RUL_Yrs` not below `EUL_Yrs`.
 
@@ -107,13 +107,13 @@ so they can be uploaded to the CET as they are.
 
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
-| `NumUnits` | Decimal number (units of `NormUnit`) | required | error | Number of units or quantity. `NumUnits` must work in conjunction with the `NormUnit` value for the claim. Cross reference `NormUnit` and `NumUnits` before interpreting quantities of measures installed. |
+| `NumUnits` | Decimal number (units of `NormUnit`) | required | error (enter 0 for none) | Number of units or quantity. `NumUnits` must work in conjunction with the `NormUnit` value for the claim. Cross reference `NormUnit` and `NumUnits` before interpreting quantities of measures installed. |
 | `UnitkWh1stBaseline` | kWh (per unit per year) | required | error (enter 0 for none) | The first baseline kWh Impact per Unit. |
-| `UnitkWh2ndBaseline` | kWh (per unit per year) | required | 0 (error when `RUL_Yrs > 0`) | The second baseline kWh Impact per Unit. Only used for accelerated replacement situations. |
-| `UnitkW1stBaseline` | kW (per unit) | required | 0 | The first baseline kW Impact per Unit. **In ReCET:** Reported in the kW savings columns (`FirstYearNetKW` ...) only: pricing is on kWh through the 8,760 shape, which carries the T&D value. |
-| `UnitkW2ndBaseline` | kW (per unit) | required | 0 | The second baseline kW Impact per Unit. Only used for accelerated replacement situations. **In ReCET:** Reported in the kW savings columns only, as `UnitkW1stBaseline`. |
-| `UnitTherm1stBaseline` | Therms (per unit per year) | required | 0 | The first baseline therm Impact per Unit. |
-| `UnitTherm2ndBaseline` | Therms (per unit per year) | required | 0 | The second baseline therm Impact per Unit. Only used for accelerated replacement situations. |
+| `UnitkWh2ndBaseline` | kWh (per unit per year) | required | error (enter 0 for none) | The second baseline kWh Impact per Unit. Only used for accelerated replacement situations. |
+| `UnitkW1stBaseline` | kW (per unit) | required | error (enter 0 for none) | The first baseline kW Impact per Unit. **In ReCET:** Reported in the kW savings columns (`FirstYearNetKW` ...) only: pricing is on kWh through the 8,760 shape, which carries the T&D value. |
+| `UnitkW2ndBaseline` | kW (per unit) | required | error (enter 0 for none) | The second baseline kW Impact per Unit. Only used for accelerated replacement situations. **In ReCET:** Reported in the kW savings columns only, as `UnitkW1stBaseline`. |
+| `UnitTherm1stBaseline` | Therms (per unit per year) | required | error (enter 0 for none) | The first baseline therm Impact per Unit. |
+| `UnitTherm2ndBaseline` | Therms (per unit per year) | required | error (enter 0 for none) | The second baseline therm Impact per Unit. Only used for accelerated replacement situations. |
 | `UnitkWhIOUWater1stBaseline` | kWh (per unit per year) | optional | 0 | The first baseline kWh impact per unit due to water savings. |
 | `UnitkWhIOUWater2ndBaseline` | kWh (per unit per year) | optional | 0 | The second baseline kWh impact per unit due to water savings. Only used for accelerated replacement situations. |
 
@@ -122,26 +122,26 @@ so they can be uploaded to the CET as they are.
 | Field | Type / unit | Column | Blank means | Description and use |
 |---|---|---|---|---|
 | `EUL_Yrs` | Years (fractional allowed) | required | error | Effective useful life of measure in years. **In ReCET:** Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); a value below 0.25 is treated as 0.25. |
-| `RUL_Yrs` | Years | required | 0 | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
+| `RUL_Yrs` | Years | required | error | For dual baseline measures, specifies the remaining useful life of pre-existing measure in years. **In ReCET:** 0 means a single baseline for the whole EUL; a positive value makes the measure an early replacement: 1st-baseline savings until the RUL, 2nd-baseline after (C2.3). |
 
 ### 1.6 Net-to-gross, realization and installation rates
 
 | Field | Type | Column | Blank means | Description and use |
 |---|---|---|---|---|
 | `NTGRkWh` | Decimal number | required | error | kWh-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
-| `NTGRkW` | Decimal number | required | `NTGRkWh` | kW-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. **In ReCET:** Used only in the kW savings columns. |
-| `NTGRTherm` | Decimal number | required | `NTGRkWh`, then 1 | Therm-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
-| `NTGRCost` | Decimal number | required | `NTGRkWh`, then 1 | Cost-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
-| `RealizationRatekWh` | Decimal number | required | 1 | Ex ante adjustment factor: kWh weighted Realization rate for all measures included in this claim record. |
-| `RealizationRatekW` | Decimal number | required | 1 | Ex ante adjustment factor: kW weighted Realization rate for all measures included in this claim record. |
-| `RealizationRateTherm` | Decimal number | required | 1 | Ex ante adjustment factor: Therm weighted Realization rate for all measures included in this claim record. |
-| `InstallationRatekWh` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kWh weighted installation rate for all measures included in the associated claim. |
-| `InstallationRatekW` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kW weighted installation rate for all measures included in the associated claim. |
-| `InstallationRateTherm` | Decimal number | required | 1 | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. Therm weighted installation rate for all measures included in the associated claim. |
+| `NTGRkW` | Decimal number | required | error | kW-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. **In ReCET:** Used only in the kW savings columns. |
+| `NTGRTherm` | Decimal number | required | error | Therm-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
+| `NTGRCost` | Decimal number | required | error | Cost-specific NTG value. Usually, there is one NTG value entered for all NTGR fields. Developed through evaluation studies. NTG describes the free-ridership that may be occurring within energy efficiency programs. |
+| `RealizationRatekWh` | Decimal number | required | error | Ex ante adjustment factor: kWh weighted Realization rate for all measures included in this claim record. |
+| `RealizationRatekW` | Decimal number | required | error | Ex ante adjustment factor: kW weighted Realization rate for all measures included in this claim record. |
+| `RealizationRateTherm` | Decimal number | required | error | Ex ante adjustment factor: Therm weighted Realization rate for all measures included in this claim record. |
+| `InstallationRatekWh` | Decimal number | required | error | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kWh weighted installation rate for all measures included in the associated claim. |
+| `InstallationRatekW` | Decimal number | required | error | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. kW weighted installation rate for all measures included in the associated claim. |
+| `InstallationRateTherm` | Decimal number | required | error | Ex ante adjustment factor, generally developed by evaluation studies of prior year programs. Therm weighted installation rate for all measures included in the associated claim. |
 
 ### 1.7 Costs, incentives and inflation
 
-All are dollars **per unit** (multiplied by `NumUnits`), blank = 0.
+All are dollars **per unit** (multiplied by `NumUnits`). `UnitMeaCost1stBaseline` and `UnitMeaCost2ndBaseline` are required (blank is an error); the others read blank as 0.
 
 | Field | Unit | Column | Description and use |
 |---|---|---|---|
@@ -155,7 +155,7 @@ All are dollars **per unit** (multiplied by `NumUnits`), blank = 0.
 
 ### 1.8 Other benefits, other costs, tax credits
 
-Dollars per unit, undiscounted, blank = 0 (C7).
+Dollars per unit, undiscounted (C7). All but `UnitTaxCredits` are required (blank is an error); a blank `UnitTaxCredits` is 0.
 
 | Field | Unit | Column | Description and use |
 |---|---|---|---|

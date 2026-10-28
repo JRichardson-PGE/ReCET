@@ -37,30 +37,30 @@ def _overlap(a0: float, a1: float, b0: float, b1: float) -> float:
 
 def weights_for_year(m, year: int) -> float:
     """Annual-equivalent net kWh that measure `m` (a row/itertuples record) delivers in calendar `year`."""
-    start = float(m.claim_year) + (float(m.claim_quarter) - 1.0) / 4.0
-    eul = float(m.eul_years_exact)
-    end = start + eul
-    rul = float(m.rul_years_exact)
+    start = float(m.Used_Year) + (float(m.Used_Quarter) - 1.0) / 4.0
+    EUL_Yrs = float(m.EUL_Yrs)
+    end = start + EUL_Yrs
+    RUL_Yrs = float(m.RUL_Yrs)
     y0, y1 = float(year), float(year) + 1.0
-    if rul > 0 and rul < eul:
-        w1 = _overlap(y0, y1, start, start + rul)
-        w2 = _overlap(y0, y1, start + rul, end)
+    if RUL_Yrs > 0 and RUL_Yrs < EUL_Yrs:
+        share_1st = _overlap(y0, y1, start, start + RUL_Yrs)
+        share_2nd = _overlap(y0, y1, start + RUL_Yrs, end)
     else:
-        w1, w2 = _overlap(y0, y1, start, end), 0.0
-    return w1 * float(m.shape_scale) + w2 * float(m.shape_scale_2nd)
+        share_1st, share_2nd = _overlap(y0, y1, start, end), 0.0
+    return share_1st * float(m.AC_Net_kWh_ScaledProfile_1st_Baseline) + share_2nd * float(m.AC_Net_kWh_ScaledProfile_2nd_Baseline)
 
 
 def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[str], None] = print) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """(profile frame, unshaped-measures table, summary dict). See the module docstring."""
     years = sorted(int(y) for y in years)
-    pas = sorted(measures["PA"].astype(str).unique())
+    pas = sorted(measures["IOU_AC_Territory"].astype(str).unique())
     shape_cache: dict[tuple, tuple | None] = {}
 
     def shape_for(m):
-        key = (m.shape_key, m.PA, m.target_sector, str(m.climate_zone))
+        key = (m.Used_AC_Elec_Impact_Profile, m.IOU_AC_Territory, m.AC_Elec_Target_Sector, str(m.AC_Climate_Zone))
         if key not in shape_cache:
-            zone = system_zones.priced_zone(m.shape_key, m.PA, m.target_sector, str(m.climate_zone))   # System -> the profile's System zone
-            hit = real_impact_profiles.resolve_shape(m.shape_key, m.PA, m.target_sector, zone)
+            zone = system_zones.priced_zone(*key)                                   # System -> the profile's System zone
+            hit = real_impact_profiles.resolve_shape(*key[:3], zone)
             shape_cache[key] = None if hit is None else real_impact_profiles.shift_for_year(hit[0], 0, int(hit[1]))   # aligned to the ACC calendar once
         return shape_cache[key]
 
@@ -72,7 +72,7 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
     groups: dict[tuple, dict[int, float]] = {}
     from . import run_poc
     for m in run_poc.split_by_baseline_shape(measures).itertuples(index=False):     # a separate 2nd-baseline shape adds its own part
-        if float(m.shape_scale) == 0 and float(m.shape_scale_2nd) == 0:
+        if float(m.AC_Net_kWh_ScaledProfile_1st_Baseline) == 0 and float(m.AC_Net_kWh_ScaledProfile_2nd_Baseline) == 0:
             continue
         ws = {y: weights_for_year(m, y) for y in years}
         if not any(ws.values()):
@@ -81,12 +81,12 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
         for y in years:
             kwh_total[y] += ws[y]
         if hit is None:
-            unshaped.append({"measure_id": m.measure_id, "PA": m.PA, "shape_key": m.shape_key, "target_sector": m.target_sector,
-                             "climate_zone": m.climate_zone, **{f"kwh_{y}": ws[y] for y in years}})
+            unshaped.append({"CEInputID": m.CEInputID, "IOU_AC_Territory": m.IOU_AC_Territory, "AC_Elec_Impact_Profile": m.Used_AC_Elec_Impact_Profile,
+                             "AC_Elec_Target_Sector": m.AC_Elec_Target_Sector, "AC_Climate_Zone": m.AC_Climate_Zone, **{f"kwh_{y}": ws[y] for y in years}})
             for y in years:
                 kwh_unshaped[y] += ws[y]
             continue
-        g = groups.setdefault((m.shape_key, m.PA, m.target_sector, str(m.climate_zone)), {y: 0.0 for y in years})
+        g = groups.setdefault((m.Used_AC_Elec_Impact_Profile, m.IOU_AC_Territory, m.AC_Elec_Target_Sector, str(m.AC_Climate_Zone)), {y: 0.0 for y in years})
         for y in years:
             g[y] += ws[y]
     for key, wy in groups.items():
