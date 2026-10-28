@@ -1121,7 +1121,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return views
 
     @app.get("/runs/{run_id}/results", response_class=HTMLResponse)
-    async def run_results(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = ""):
+    async def run_results(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                          years: list[str] = Query(default=[])):
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         u = request.state.user
@@ -1148,6 +1149,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         res = ctx.results(source)
         pas = res.pas()
         pa = pa if pa in pas else rv.ALL_PAS
+        all_years = res.years()
+        years = [y for y in rv.parse_years(years) if y in all_years]            # program years to total (BR-04.1); none = every year
+        if set(years) == set(all_years):
+            years = []
         views = user_views(u["id"])
         cat = res.catalog()
         if columns:                                          # an unsaved choice from the column picker
@@ -1164,34 +1169,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if level == "measure" and not measure_ok:
             note = (f"This run has {res.n:,} measures: the measure level is shown only for runs of up to {rv.MAX_RUN_MEASURE_ROWS:,}. "
                     "Its measure-level table is in the downloads on the run page.")
-        elif level == "measure" and not res.measure_level_allowed(pa):
-            note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA."
+        elif level == "measure" and not res.measure_level_allowed(pa, years):
+            note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA or fewer years."
         else:
-            table = res.table(level, pa, keys)
+            table = res.table(level, pa, keys, years)
         shown = [cat[k] for k in keys if k in cat]
         kw.update(level=level, pa=pa, pas=pas, views=views, view=view, keys=keys, catalog=cat, shown=shown, file_name=measure_files[0].name,
-                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS,
-                  tiles=results_tiles(res, cat, pa), chart=sector_chart(res, cat, pa), groups=picker_groups(cat), labels={k: rv.display_label(c) for k, c in cat.items()})
+                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS, all_years=all_years, years=years,
+                  years_param=",".join(years),
+                  tiles=results_tiles(res, cat, pa, years), chart=sector_chart(res, cat, pa, years=years), groups=picker_groups(cat),
+                  labels={k: rv.display_label(c) for k, c in cat.items()})
         return ctx.render(request, "results.html", **kw, note=note, table=table, rv=rv)
 
-    def results_tiles(res, cat, pa) -> list[dict]:
-        """The Results page's headline numbers for the chosen PA: measures, then Ctx.HEADLINE's columns that this run has."""
+    def results_tiles(res, cat, pa, years=None) -> list[dict]:
+        """The Results page's headline numbers for the chosen PA and program years: measures, then Ctx.HEADLINE's columns that this run has."""
         from .. import results_view as rv
         keys = [k for k, _ in Ctx.HEADLINE if k in cat]
-        t = res.table("portfolio", pa, keys)
+        t = res.table("portfolio", pa, keys, years)
         if not len(t):
             return []
         row, labels = t.iloc[0], dict(Ctx.HEADLINE)
         return ([{"label": "Measures", "value": f"{int(row['Measures']):,}", "help": "measures in the table below"}]
                 + [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys])
 
-    def sector_chart(res, cat, pa, limit: int = 12) -> dict | None:
+    def sector_chart(res, cat, pa, limit: int = 12, years=None) -> dict | None:
         """Total system benefit by program sector, as bars for the Results page (widths in percent of the largest value; negative bars marked)."""
         from .. import results_view as rv
         key = "TotalSystemBenefit"
         if key not in cat:
             return None
-        t = res.table("sector", pa, [key])
+        t = res.table("sector", pa, [key], years)
         if len(t) < 2 or key not in t:
             return None
         t = t.sort_values(key, ascending=False).head(limit)
@@ -1209,7 +1216,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [(g, items) for g, items in out.items() if items]
 
     @app.get("/runs/{run_id}/results.csv")
-    async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = ""):
+    async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                              years: list[str] = Query(default=[])):
         from .. import results_view as rv
         run = ctx.run_for(request, run_id)
         base = ctx.result_path(run, sub) if sub else ctx.result_path(run)
@@ -1221,10 +1229,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         views = user_views(request.state.user["id"])
         keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
         pa = pa if pa in res.pas() else rv.ALL_PAS
+        years = [y for y in rv.parse_years(years) if y in res.years()]
         level = level if level in {k for k, _ in rv.LEVELS} else "portfolio"
-        if level == "measure" and not res.measure_level_allowed(pa):
+        if level == "measure" and not res.measure_level_allowed(pa, years):
             raise HTTPException(400, "The measure level is too large to show: download the measure-level file instead.")
-        t = res.table(level, pa, keys).rename(columns={k: c.label for k, c in cat.items()})
+        t = res.table(level, pa, keys, years).rename(columns={k: c.label for k, c in cat.items()})
         name = f"recet_{run_id}_{level}.csv"
         return Response(t.to_csv(index=False), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

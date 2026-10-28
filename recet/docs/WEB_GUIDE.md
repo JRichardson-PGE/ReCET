@@ -73,7 +73,9 @@ until you show them. Queued and running runs update in place.
 **Results** (on the run page) shows the run's outputs as tables.
 
 - **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
-- **Levels:** portfolio, program segment, program sector, program, and measure. Every level above the measure is a sum of its measures; ratios are
+- **Program years** (a run with more than one claim year) totals every table, the headline numbers and the chart over the years ticked; none ticked, or
+  **all years**, is every year (BRD BR-04.1).
+- **Levels:** portfolio, program segment, program sector, program year, program, and measure. Every level above the measure is a sum of its measures; ratios are
   recomputed from the summed benefits and costs. The measure level is shown for runs of up to 50,000 measures, and for up to 5,000 measures of the chosen
   PA; a larger run's measure-level table is in its files.
 - The **headline numbers** and a **total system benefit by program sector** chart sit above the table.
