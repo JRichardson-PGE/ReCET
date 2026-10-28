@@ -10,7 +10,7 @@ Files written to the run folder (`<out_dir>/<run name>_<acc>/`):
   preflight.txt                  the input check that ran first
   preflight.json                 the same check as JSON (ok, stats, issues), read by the web app's Validate inputs panel
   run_settings.json              everything needed to reproduce the run (options, resolved ACC files, supplied files with sizes, package version, timings)
-  field_definitions_<acc>        one row per column of the measure-level file, in order: its definition and documentation link (field_docs.py)
+  field_definitions_<acc>        one row per column of the measure-level file, in order: its definition, documentation link and data-dictionary attributes (field_docs.py, field_attributes.py)
   key_metrics_<acc>              the headline results with their definitions, and the main drivers by program, sector and end use (key_metrics.py)
   statewide_reconciliation_<acc> (statewide allocation) each statewide program's allocated fields: total before allocation, each IOU's share, the difference
   components_summary_<acc>.csv   (components mode) portfolio value of each ACC component, with the sum-check against the totals
@@ -275,6 +275,12 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     result.files["run_settings"] = run_dir / "run_settings.json"
 
 
+def _acc_text(cfg: RunConfig) -> str:
+    """The run's ACC for field_definitions' version column ("2026 ACC"; a record with its own ACCVersion is priced on that one)."""
+    from . import versions
+    return versions.acc_short(cfg.acc_version)
+
+
 def write_template_files(cfg: RunConfig, writer, km_totals, run_dir: Path, tag: str, excel, result: RunResult, log: Log) -> None:
     """After the measure-level file: a note for any template column the run did not produce, the field_definitions table (one row per column of the file,
     its definition and documentation link) and the key_metrics table (BR-06.10)."""
@@ -284,7 +290,7 @@ def write_template_files(cfg: RunConfig, writer, km_totals, run_dir: Path, tag: 
                 f"{', '.join(writer.left_out)}, so the measure-level file leaves them out")
         result.notes.append(note)
         log(f"note: {note}")
-    result.files["field_definitions"] = outputs.write_table(field_docs.table(writer.output_columns), run_dir / f"field_definitions_{tag}", cfg.output_format, excel)
+    result.files["field_definitions"] = outputs.write_table(field_docs.table(writer.output_columns, acc=_acc_text(cfg)), run_dir / f"field_definitions_{tag}", cfg.output_format, excel)
     result.files["key_metrics"] = outputs.write_table(key_metrics.build(km_totals), run_dir / f"key_metrics_{tag}", cfg.output_format, excel)
 
 

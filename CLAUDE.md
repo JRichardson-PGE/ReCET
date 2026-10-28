@@ -90,6 +90,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
+  `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
+  (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow
+  `cost_tests.compute_cost_tests` (tests/test_field_attributes.py adds them up to each test's Ben / CostNoAdmin). The research repo's field dictionary
+  workbook does not carry them yet.
 - 0.1.63 (2026-10-28, Jake; BRD review gap 6, BR-06.11): compare any two runs and share a run. `results_view.compare(a, b, level, keys, pa, years)`
   (`<key>__a/__b/__diff/__pct`, groups matched on their id, a group in one run only blank for the other; `COMPARE_LEVELS` has no measure level); web
   `/runs/{id}/compare?with=<id>` and `compare.csv`, offered on a finished run's page for the user's own and shared finished runs. Sharing: table
