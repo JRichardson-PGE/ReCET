@@ -42,6 +42,13 @@ class HourlyPricingResult:
 QUARTER_BOUNDS = [(0, 2160), (2160, 4344), (4344, 6552), (6552, 8760)]
 
 
+def rul_in_use(RUL_Yrs, EUL_Yrs):
+    """The RUL CalcCE prices with (InputMeasurevw: `CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`): an RUL that is not below the EUL is not an early
+    replacement, so the measure is single-baseline for its whole life. Scalars or arrays; RUL_Yrs and EUL_Yrs stay as filed in the measure table."""
+    RUL_Yrs, EUL_Yrs = np.asarray(RUL_Yrs, dtype=float), np.asarray(EUL_Yrs, dtype=float)
+    return np.where(RUL_Yrs < EUL_Yrs, RUL_Yrs, 0.0)
+
+
 def _baseline_quantity_in_quarter(k: int, rul_quarters: float, quantity_1st: float, quantity_2nd: float) -> float:
     """RUL-based dual-baseline blend for the k-th (0-based) quarter since a
     measure's claim date (2026-09-16 fix -- found comparing this POC
@@ -161,7 +168,7 @@ def price_real_hourly_per_measure(
         whole_quarters = int(eul_quarters)
         last_quarter_fraction = eul_quarters - whole_quarters  # prorates the final quarter, per real CalcCE
         n_priced_quarters = whole_quarters + (1 if last_quarter_fraction > 1e-9 else 0)
-        rul_quarters = float(m["RUL_Yrs"]) * 4.0                            # CalcCE's rulq
+        rul_quarters = float(rul_in_use(m["RUL_Yrs"], m["EUL_Yrs"])) * 4.0   # CalcCE's rulq
         quantity_1st = float(m["Priced_Quantity_1st_Baseline"])
         quantity_2nd = float(m["Priced_Quantity_2nd_Baseline"])
 
@@ -341,7 +348,7 @@ def price_real_hourly(
     m = measures
     value, has_life = _lifetime_values(
         route_code[has_profile], m["Used_Year"].to_numpy()[has_profile].astype(np.int64), m["Used_Quarter"].to_numpy()[has_profile].astype(np.int64),
-        m["EUL_Yrs"].to_numpy(dtype=np.float64)[has_profile], m["RUL_Yrs"].to_numpy(dtype=np.float64)[has_profile],
+        m["EUL_Yrs"].to_numpy(dtype=np.float64)[has_profile], rul_in_use(m["RUL_Yrs"], m["EUL_Yrs"])[has_profile],
         m["Priced_Quantity_1st_Baseline"].to_numpy(dtype=np.float64)[has_profile], m["Priced_Quantity_2nd_Baseline"].to_numpy(dtype=np.float64)[has_profile],
         quarterly_discount_factor_by_route, base_year, fill_value_per_unit_quantity)
     return HourlyPricingResult(values=pd.DataFrame({"CEInputID": ids[has_profile][has_life], "LifetimeValuePV": value[has_life]}), unpriced_ids=unpriced_ids)
@@ -412,7 +419,7 @@ def price_gas_benefit_per_measure(
             continue
 
         acc_years = get_gas_acc_years(m)
-        rul_quarters = float(m["RUL_Yrs"]) * 4.0                            # CalcCE's rulq
+        rul_quarters = float(rul_in_use(m["RUL_Yrs"], m["EUL_Yrs"])) * 4.0   # CalcCE's rulq
 
         claim_year = int(m["Used_Year"])
         claim_quarter = int(m["Used_Quarter"])
@@ -505,7 +512,7 @@ def price_gas_benefit(
     m = measures
     value, has_life = _lifetime_values(
         route_code[priced], m["Used_Year"].to_numpy()[priced].astype(np.int64), m["Used_Quarter"].to_numpy()[priced].astype(np.int64),
-        m["EUL_Yrs"].to_numpy(dtype=np.float64)[priced], m["RUL_Yrs"].to_numpy(dtype=np.float64)[priced],
+        m["EUL_Yrs"].to_numpy(dtype=np.float64)[priced], rul_in_use(m["RUL_Yrs"], m["EUL_Yrs"])[priced],
         therms_1st[priced], therms_2nd[priced], quarterly_discount_factor_by_route, base_year, fill_value_per_unit_quantity)
     return pd.DataFrame({"CEInputID": m["CEInputID"].to_numpy()[priced][has_life], "LifetimeValuePV": value[has_life]})
 
@@ -582,13 +589,13 @@ def price_bill_impact_per_measure(
         claim_year = int(m["Used_Year"])
         years_from_base_year = claim_year - run_parameters_base_year  # CalcCE's own Yr1 (RunParameters BaseYear: 2024 for Versions 2026 and 2027) -- see docstring
         annual_discount_factor = 1.0 + get_discount_rate_annual(m)               # CalcCE's Raf
-        RUL_Yrs = float(m["RUL_Yrs"])
         EUL_Yrs = float(m["EUL_Yrs"])
+        RUL_Yrs = float(rul_in_use(m["RUL_Yrs"], EUL_Yrs))
         whole_years = int(EUL_Yrs)
         last_year_fraction = EUL_Yrs - whole_years
         n_billed_years = whole_years + (1 if last_year_fraction > 1e-9 else 0)
         # eul1 (real CalcCE field, InputMeasurevw): RUL if 0 < RUL < EUL, else
-        # the WHOLE EUL -- i.e. RUL_Yrs==0 means "1st baseline for 100% of the
+        # the WHOLE EUL -- i.e. RUL_Yrs==0 (or RUL >= EUL, which rul_in_use makes 0) means "1st baseline for 100% of the
         # EUL", same convention as _baseline_quantity_in_quarter() elsewhere in this file.
         years_on_1st_baseline = int(RUL_Yrs) if RUL_Yrs > 0 else whole_years
         # Share of the boundary year that is still 1st baseline: the fractional part of RUL, 0 when RUL is a whole number, and 1 when RUL <= 0 (a single-baseline
@@ -722,7 +729,7 @@ def price_participant_cost_per_measure(
 
         UnitMeaCost1stBaseline = float(m["UnitMeaCost1stBaseline"])
         UnitMeaCost2ndBaseline = float(m["UnitMeaCost2ndBaseline"])
-        RUL_Yrs = float(m["RUL_Yrs"])
+        RUL_Yrs = float(rul_in_use(m["RUL_Yrs"], m["EUL_Yrs"]))
         GrossMeasureCost = NumUnits * (UnitMeaCost2ndBaseline if RUL_Yrs > 0 else UnitMeaCost1stBaseline)
         if RUL_Yrs > 0:
             # the 1st-minus-2nd-baseline cost difference carried to the end of the RUL (at MeasInflation) and discounted back to the claim quarter
@@ -867,8 +874,8 @@ def price_bill_impact(
     claim_year = m["Used_Year"].astype(int).to_numpy()
     years_from_base_year = claim_year - run_parameters_base_year                                        # CalcCE's Yr1
     annual_discount_factor = 1.0 + np.asarray(_by_key(m, ["IOU_AC_Territory"], get_discount_rate_annual), dtype=float)   # CalcCE's Raf
-    RUL_Yrs = _column_or_default(m, "RUL_Yrs")
     EUL_Yrs = _column_or_default(m, "EUL_Yrs")
+    RUL_Yrs = rul_in_use(_column_or_default(m, "RUL_Yrs"), EUL_Yrs)
     whole_years = np.floor(EUL_Yrs).astype(int)
     last_year_fraction = EUL_Yrs - whole_years
     n_billed_years = whole_years + (last_year_fraction > 1e-9).astype(int)
@@ -938,7 +945,7 @@ def price_participant_cost(
         NumUnits * _column_or_default(m, c) for c in ("UnitIncentiveToOthers", "UnitDirectInstallLab", "UnitDirectInstallMat", "UnitEndUserRebate"))
     incentives_and_di = IncentiveToOthers + DILaborCost + DIMaterialCost                                 # the incentives other than end-user rebates
     UnitMeaCost1stBaseline, UnitMeaCost2ndBaseline = _column_or_default(m, "UnitMeaCost1stBaseline"), _column_or_default(m, "UnitMeaCost2ndBaseline")
-    RUL_Yrs = _column_or_default(m, "RUL_Yrs")
+    RUL_Yrs = rul_in_use(_column_or_default(m, "RUL_Yrs"), _column_or_default(m, "EUL_Yrs"))
     GrossMeasureCost = NumUnits * np.where(RUL_Yrs > 0, UnitMeaCost2ndBaseline, UnitMeaCost1stBaseline)
     # early replacement: the 1st-minus-2nd-baseline cost difference carried to the end of the RUL (at MeasInflation) and discounted back to the claim quarter
     deferred_cost_difference_pv = np.where(RUL_Yrs > 0, (UnitMeaCost1stBaseline - UnitMeaCost2ndBaseline)
