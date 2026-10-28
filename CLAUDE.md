@@ -96,7 +96,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   RECET_OPENBCA_PYTHON overrides its .venv), each run copies its config/core/excel_input_parsing into `<run>/openbca/` with the workbooks under OpenBCA's
   fixed names, and `openbca/engine.py` runs in OpenBCA's interpreter, exporting OpenBCA's own outputs (results_summary_by_id, jst_ratio, the five
   validation views) as they stand: nothing recomputed on them (Jake). C1 (v1.0.4 demo, 58 measures): every one of OpenBCA's tables equal to its own
-  `model_runners.py` run; 50.6 s, 1.81 GiB peak, already above the server container's 1.4 GB. Next: the California configuration from the ACC (C2).
+  `model_runners.py` run; 50.6 s, 1.81 GiB peak. Scale (demo measures copied, 4 cores): 580 measures 207 s, 6.2 GiB, 16 GB of DuckDB spill
+  (final_value_calculations_ts); 1,160+ ran out of ~28 GB disk. So (Jake, 2026-10-28) OpenBCA is tested on the laptop from the command line only: no web
+  page, no server, no performance comparisons (C5 cut); results comparisons only, on a sample (C4 = ~50 measures of the 2028 PG&E job). Step 2 (C2): `openbca/ca_config.py` builds California's
+  jurisdiction tables from an ACC file (hourly total_avoided_cost / 1000 per IOU + climate zone, subset "PG&E CZ12"; TRC = "CA TRC", PAC = "USI";
+  inflation 0, quarterly discounting, line losses 0) and `run --jurisdiction <folder>` stages replacement parser models that read them (a stub
+  Configuration supplies the CUSTOM 1-5 names); `openbca/workbook.py` writes a Program Input. OpenBCA rounds every avoided cost to $0.001/kWh (its
+  `::NUMERIC` cast is DECIMAL(18,3); up to 0.03% on annual sums), left as is; C2 on the 2024 ACC equals the ACC rounded that way within one rounding step.
+  Next: the CET-to-OpenBCA translator and like-for-like records (C3).
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
   (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow
