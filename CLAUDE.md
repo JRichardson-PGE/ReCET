@@ -97,6 +97,38 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   fixed names, and `openbca/engine.py` runs in OpenBCA's interpreter, exporting OpenBCA's own outputs (results_summary_by_id, jst_ratio, the five
   validation views) as they stand: nothing recomputed on them (Jake). C1 (v1.0.4 demo, 58 measures): every one of OpenBCA's tables equal to its own
   `model_runners.py` run; 50.6 s, 1.81 GiB peak, already above the server container's 1.4 GB. Next: the California configuration from the ACC (C2).
+- 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
+  `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
+  (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow
+  `cost_tests.compute_cost_tests` (tests/test_field_attributes.py adds them up to each test's Ben / CostNoAdmin). The research repo's field dictionary
+  workbook does not carry them yet.
+- 0.1.63 (2026-10-28, Jake; BRD review gap 6, BR-06.11): compare any two runs and share a run. `results_view.compare(a, b, level, keys, pa, years)`
+  (`<key>__a/__b/__diff/__pct`, groups matched on their id, a group in one run only blank for the other; `COMPARE_LEVELS` has no measure level); web
+  `/runs/{id}/compare?with=<id>` and `compare.csv`, offered on a finished run's page for the user's own and shared finished runs. Sharing: table
+  `run_shares`; `Ctx.run_for` lets a user a run is shared with read it (pages, results, files, compare, rerun as their own run), and `owner=True` (Stop,
+  Delete, share / unshare) keeps the rest with the owner or an admin. Runs list: "Shared with you". Audit `run shared` / `run unshared`. tests/test_share_compare.py.
+- 0.1.62 (2026-10-28, Jake; BRD review gap 5, BR-06.2): run emails. `recet/web/notify.py`: when a run ends, `Runner._finish` starts a thread that
+  emails the owner (finished or failed; not a stopped run or a passing input check) through RECET_WEB_SMTP_* (none set = no email; docker-compose passes
+  them from the server's .env), with headline totals from run_settings.json and the RECET_WEB_BASE_URL link. Account page: "Email me when a run finishes
+  or fails" (user_settings `notify_runs`, on by default). Audit `run email sent` / `run email failed`. ARCHITECTURE 8.6; tests/test_notify.py.
+- 0.1.61 (2026-10-28, Jake; BRD review gap 4, BR-06.13): the combined 8,760 by climate zone. `profile8760.portfolio_profile` adds
+  `net_kwh_<Y>_CZ<zone>` (`zone_label`: the filed AC_Climate_Zone, CZ prepended to a bare number), `combine_profiles` adds them up over parts, and
+  `profile8760.peaks` writes `portfolio_8760_peaks_<tag>` (per year: portfolio, each PA, each zone; own peak, largest added load, kWh and share at the
+  portfolio's peak hour). The peak is the max net-savings hour, not a DEER peak-period definition. tests/test_profile_zones.py.
+- 0.1.60 (2026-10-28, Jake; BRD review gap 3, BR-04.1): results by program year. The portfolio summary has a `program year` group (Used_Year;
+  `SummaryParts.GROUPS`, which summarize now shares). Results: group-sum key `_year` (CUBE_VERSION 2, so kept sums are rebuilt), a Program year level, and
+  `years` (a list; empty = every year) on RunResults.table / count / measure_level_allowed and results_view.table / filter_pa; web `?years=2028&years=2029`
+  (checkboxes under Program years, also on results.csv), window: a Program years menu. `year_of` falls back to ClaimYearQuarter for old runs.
+- 0.1.59 (2026-10-28, Jake; BRD review gap 2, BR-06.16): PrgIDs that do not line up between Measure.csv and ProgramCost.csv no longer stop the run (CET stops
+  it; C17 item 11). `run_poc.load_job` no longer raises; `preflight._program_alignment` warns `measures_without_program_costs` (priced with no program costs,
+  CreditedPA blank) and `program_costs_without_measures` (with the nominal dollars no cost test includes), in one piece and in parts. A load ValueError is now
+  `inputs_unreadable` (it was mislabelled program_alignment). tests/test_program_alignment.py: the result equals the aligned job with those costs at 0.
+- 0.1.58 (2026-10-28, Jake; BRD review gap 1, BR-06.7): statewide allocation reconciles. `statewide_allocation._allocate`'s report carries
+  `reconciliation` (per Year, SW PrgID, allocated field: the total before allocation and over each IOU's produced rows; Measure fields as NumUnits x field),
+  `statewide_allocation.reconciliation(files, programcost)` adds them over a job's file or parts, and `jobs.write_reconciliation` writes
+  `statewide_reconciliation_<tag>` after preflight (OUTPUT_FIELDS 2.13) with a log note per field that does not reconcile (factors not summing to 1, usually
+  a fuel whose factors are all 0). tests/test_statewide_reconciliation.py prices a job both ways: benefits add up wherever the inputs do. ARCHITECTURE 1.3
+  marks BR-06.8 partly met (tests are code).
 - 0.1.57 (2026-10-28, Jake): an RUL_Yrs equal to EUL_Yrs is no RUL, as CalcCE's InputMeasurevw has it (`CASE WHEN RUL >= EUL THEN 0 ELSE RUL END`):
   `engine.rul_in_use` in the electric / gas / water lifetime values, bill impacts and participant cost (grouped and per measure) and in
   `tests/reference_calc.py`. Before, a fractional life blended the 2nd baseline into its last part-quarter / year, and the participant cost took the

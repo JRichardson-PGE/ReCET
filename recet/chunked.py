@@ -189,6 +189,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if len(unshaped):
             log(f"  {len(unshaped)} measure(s) have no 8,760 shape and are left out of the profile (listed in the unshaped table)")
         result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format, excel)
+        result.files["portfolio_8760_peaks"] = outputs.write_table(profile8760.peaks(prof, years), run_dir / f"portfolio_8760_peaks_{tag}", cfg.output_format, excel)
         if len(unshaped):
             result.files["portfolio_8760_unshaped"] = outputs.write_table(unshaped, run_dir / f"portfolio_8760_unshaped_{tag}", cfg.output_format, excel)
         for y, s in psum.items():

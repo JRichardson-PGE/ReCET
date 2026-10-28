@@ -40,12 +40,15 @@ CEDARS.
 | Hourly valuation, load shifting (BR-06.6) | value savings in the hour they occur; a measure that only moves load has value | each measure's 8,760 profile is multiplied by that hour's avoided cost **before** summing (C5.1); kWh-per-unit profiles (C4.5) | met |
 | ACC per measure (BR-06.5) | price records on the ACC that applies to them; flag the ones that are not | optional `ACCVersion` column (C3.5); the "Priced for" check flags records whose ACC does not normally apply to their program year (`versions.expected_accs`) | met |
 | Version labels (BR-11.7) | name each ACC release unambiguously | versions keyed and shown by ACC year ("2026 ACC"); CET's Avoided Cost Version numbers mapped on read (`versions.py`) | met |
-| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks | `run_poc.participant_cost_test` | met |
+| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test`; every test is code in `pipeline/cost_tests.py` | partly met: the PCT is added, but tests and value streams are not configuration (needs D14) |
 | Filing checks (BR-06.3, BR-03.6, BR-03.3) | check a job against CEDARS' upload rules before upload | CEDARS' published claims and budget-filing rule files, shipped unchanged and versioned by effective date (`filing_rules.py`); failing records flagged, never blocked; the rule set used recorded in `run_settings.json` | met; multi-file batch upload dropped for ReCET |
 | Output templates and key metrics (BR-06.10) | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
+| Program costs need not line up (BR-06.16) | calculate measures whose program has no program-cost record | a measure with no `ProgramCost.csv` row is priced with no program costs, and a row with no measures is charged to none; preflight warns about both (`preflight._program_alignment`; C17 item 11) | met |
 | Minimal input set (BR-06.15) | an exploratory run needs only the fields that change a result | descriptive columns may be left out (`templates.with_defaults`); a missing calculation column is still an error | met, except lifecycle savings as input (not built, by decision) |
-| Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); each run in its own process | partly met (section 11) |
-| Statewide allocation | split a statewide program across the IOUs | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15) | met |
+| Run status (BR-06.2) | queue position, progress, estimated completion; notification; isolation | queue position, progress bar, time left and queue estimates (`progress.py`, `web/eta.py`); an email to the owner when a run finishes or fails (`web/notify.py`); each run in its own process | partly met: scaling and isolation are not built (section 11) |
+| Compare and share runs (BR-06.11) | compare any two runs; share a run with another user | the web Compare page and CSV (`results_view.compare`: each run's value, the difference and the % change at the portfolio, program year, segment, sector or program level); a run shared read-only by email (`run_shares`) | met for the web app; the desktop window still compares two ACCs of one job only |
+| Statewide allocation (BR-06.7) | split a statewide program across the IOUs; the allocated totals reconcile to the unallocated ones | `pipeline/statewide_allocation.py` with the CEDARS allocation factors (C15); `statewide_reconciliation` table (`statewide_allocation.reconciliation`) | met; factors come from a file, not a Programs module |
+| Data dictionary (BR-08.1) | every field with its definition, source and version, cost-test treatment, time basis, aggregation, rounding and years in use | INPUT_FIELDS.md and OUTPUT_FIELDS.md (definitions, units, formulas); every run's `field_definitions` table adds the attributes per column (`field_attributes.py`, rules on the name and the documented unit, checked against the cost tests by `tests/test_field_attributes.py`) | met for the measure-level file; the attributes are rules, not a maintained registry |
 | Supplied data | users' own profiles, ACC files, run parameters, factors, program metadata | `overrides.py`: a supplied key replaces the built-in one, a new key extends it; every kind has a template and a check | met |
 | Transparency | every output traceable to its inputs | every output column documented with its full formula and a worked number; `ProfileSource` and `*PricingStatus` columns say how each fuel was priced; `run_settings.json` records everything needed to reproduce a run | met |
 
@@ -133,6 +136,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
 | `web/eta.py` | interface | when a queued run should start and finish |
+| `web/notify.py` | interface | the email to a run's owner when it finishes or fails (SMTP) |
 | `web/jobzip.py` | interface | the job upload: one zip with `Measure.csv` and an optional `ProgramCost.csv`, extracted safely |
 | `web/auth.py` | interface | passwords, sessions, setup links, CSRF tokens, login rate limits |
 | `web/db.py` | interface | the SQLite store |
@@ -177,6 +181,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
 | `field_docs.py` | outputs | each output column's definition and documentation link, read from these documents |
+| `field_attributes.py` | outputs | each column's data-dictionary attributes: unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use (BR-08.1) |
 | `output_templates.py` | outputs | named, ordered column lists for the measure-level file |
 
 ## 5. A run, end to end
@@ -310,6 +315,8 @@ prices it on another version within the same run (C3.5). Each ACC's hours follow
      key_metrics_acc<v>.<fmt>           headline results with definitions; top programs, sectors and end uses
      field_definitions_acc<v>.<fmt>     each column of the measure-level file with its definition and link
      filing_validation_acc<v>.<fmt>     with CEDARS filing checks on: each failing record and rule
+     statewide_reconciliation_acc<v>.<fmt>   with statewide allocation: each allocated field before allocation and by IOU
+     portfolio_8760_acc<v>.<fmt> / portfolio_8760_peaks_acc<v>.<fmt>   with the combined 8,760: hourly net kWh by PA and climate zone, and their peaks
      preflight.txt / .json / preflight_findings.xlsx      the input check
      run_settings.json                  every setting, file, version and count needed to repeat the run
      log.txt                            the run's log
@@ -359,7 +366,7 @@ owners can start them again. The health check is `GET /healthz`.
 ### 8.2 State
 
 The SQLite database (`recet_web.sqlite3`, WAL mode, a new connection per call) holds: `users`, `sessions` (hashed tokens), `setup_links` (hashed one-time
-tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `user_settings` (each user's default output template), `value_list_changes` and `audit` (sign-ins, runs, user
+tokens), `login_failures`, `runs`, `drafts`, `views` (saved Results columns), `output_templates`, `user_settings` (each user's default output template and run-email choice), `run_shares` (runs shared read-only with another user), `value_list_changes` and `audit` (sign-ins, runs, user
 changes). Everything else is files: `runs/<id>/` (`inputs/`, `config.json`, `log.txt`, `progress.json`, `progress_log.jsonl`, `estimate.json`, `out/`) and
 `drafts/<id>/` (`draft.json`, an optional base workbook, a rerun's settings and supplied files). Runs are kept `RECET_WEB_RETENTION_DAYS` (7) and untouched
 drafts `RECET_WEB_DRAFT_DAYS` (30).
@@ -399,7 +406,9 @@ running runs' own time left, and a calibration against this server's recent runs
   HTTPS-only by default (`RECET_WEB_SECURE_COOKIES`). Disabling a user or resetting a password deletes their sessions.
 * Every form carries the session's CSRF token (the Edit inputs page sends it as a header).
 * Login is rate-limited: 5 failures per account or 20 per address in 15 minutes lock further attempts.
-* A run or draft belongs to its creator; other users get "not found", admins see everything.
+* A run or draft belongs to its creator; other users get "not found", admins see everything. A run's owner may share it, read-only, with another
+  active user (`run_shares`): they can open its pages, results and files, compare it and rerun its inputs as a run of their own, but Stop, Delete and
+  sharing stay with the owner (`Ctx.run_for(owner=True)`).
 * Uploads are capped per file (`RECET_WEB_MAX_UPLOAD_MB`, 150) and a job zip by its unzipped size (`RECET_WEB_MAX_UNZIPPED_MB`, 1,024), counted as it is
   extracted whatever the zip's headers claim. Only `Measure` and `ProgramCost` members are accepted, each written to a fixed name, so a crafted path cannot
   write elsewhere. Uploaded files are stored under fixed names, never the uploader's.
@@ -421,11 +430,24 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
 | `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
 | `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"parquet_row_group": 50000}`, parquet row groups of 50,000) |
+| `RECET_WEB_BASE_URL` | none | the site's address (`https://example.org`), for the links in run emails |
+| `RECET_WEB_SMTP_HOST` | none | the SMTP server for run emails; none = no emails (section 8.6) |
+| `RECET_WEB_SMTP_PORT` | 587 | its port |
+| `RECET_WEB_SMTP_SECURITY` | `starttls` | `starttls`, `ssl` (port 465) or `none` (a local relay) |
+| `RECET_WEB_SMTP_USER`, `RECET_WEB_SMTP_PASSWORD` | none | the sign-in, if the server needs one (the password in the server's `.env`, never in git) |
+| `RECET_WEB_SMTP_FROM` | `RECET_WEB_SMTP_USER` | the From address |
 | `RECET_MEM_LIMIT` | `1400m` | the container's memory limit (docker-compose) |
 | `RECET_DATA` | `/data` in the image | the reference data folder |
 | `RECET_HOME` | `~/.recet` | the config folder (and the web state's parent) |
 | `RECET_CACHE`, `RECET_NO_CACHE` | `~/.recet/cache` | where the cache is, or no cache |
 | `RECET_PROGRESS_FILE` | set by the runner | where a run writes its progress |
+
+### 8.6 Run emails
+
+When a run ends the worker hands it to `web/notify.py` on a thread of its own: if `RECET_WEB_SMTP_HOST` is set and the owner has not turned it off (Account
+page, `user_settings` key `notify_runs`), the owner gets one email with the run's name, status, time taken, headline totals (finished) or status message
+(failed) and the run page's link. Stopped runs and input checks that pass are not emailed; nothing from the inputs or the log is. Each attempt is in the
+audit log; a mail failure never changes the run.
 
 ## 9. Performance and memory design
 
@@ -461,7 +483,7 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
 
 ## 11. Limits and what is not built
 
-* **BR-06.2 is only partly met.** Queue position, progress and time estimates are built; email on finish or failure, adding workers under heavy load, and
+* **BR-06.2 is only partly met.** Queue position, progress, time estimates and email on finish or failure are built; adding workers under heavy load and
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
   one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
