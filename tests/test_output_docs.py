@@ -128,12 +128,12 @@ def _terms(key: str) -> list[dict]:
     rq = d["rul"] * 4.0
     share = GAS_SHARE[raw["AC_Gas_Impact_Profile"]]
     rows = []
-    for k, year, q, w in ref.quarter_schedule(d["claim_year"], d["claim_quarter"], d["eul"]):
+    for k, year, q, w in ref.quarter_schedule(d["Used_Year"], d["Used_Quarter"], d["eul"]):
         row = {"k": k, "year": year, "q": q, "hours": HOURS[q], "w": w, "months": sum(share[m] for m in range(*MONTHS[q]))}
         row["phase"] = "1st" if (rq <= 0 or k + 1 <= rq) else ("2nd" if k >= rq else f"blend {rq - k:.3f}")
-        row["elec"] = ref.phased(k, rq, d["shape_scale_1st"] * adj_e, d["shape_scale_2nd"] * adj_e)
+        row["elec"] = ref.phased(k, rq, d["AC_Net_kWh_1st_Baseline"] * adj_e, d["AC_Net_kWh_2nd_Baseline"] * adj_e)
         row["gas"] = ref.phased(k, rq, d["therms_1st"] * adj_t, d["therms_2nd"] * adj_t)
-        row["water"] = ref.phased(k, rq, d["water_scale_1st"] * adj_e, d["water_scale_2nd"] * adj_e)
+        row["water"] = ref.phased(k, rq, d["AC_Net_kWh_Water_1st_Baseline"] * adj_e, d["AC_Net_kWh_Water_2nd_Baseline"] * adj_e)
         for sfx, test, qtr, co2 in (("", "TRC", st["qtr"], 0.10), ("_SB", "SCT Base", st["qtr_sct"], 0.30), ("_SH", "SCT High", st["qtr_sct"], 0.50)):
             df = 1 / (1 + qtr) ** ((year - 2028) * 4 + q)
             energy = de.ENERGY[test]
@@ -241,12 +241,12 @@ def test_every_input_field_named_in_the_document_exists():
 
 
 def test_old_column_names_appear_only_in_the_rename_note(runs):
-    """Columns renamed or dropped in 0.1.50 are named only in 2.1's note of the old names (fieldnames.OUTPUT_RENAMES / OUTPUT_REMOVED), and a run writes none."""
+    """Columns renamed or dropped in 0.1.50 or 0.1.55 are named only in 2.1's note of the old names (fieldnames.OUTPUT_RENAMES / OUTPUT_REMOVED), and a run writes none."""
     cols = set(runs["A"]["frame"].index) | set(runs["B"]["frame"].index)
     old = set(fieldnames.OUTPUT_RENAMES) | set(fieldnames.OUTPUT_REMOVED)
     assert not (old & cols)
     text = TEXT[DOC]
-    note = text[text.index("**Column names (0.1.50).**"):text.index("### 2.2 ")]
+    note = text[text.index("**Column names (0.1.50, 0.1.55).**"):text.index("### 2.2 ")]
     rest = text.replace(note, "")
     bad = sorted({t for t in re.findall(r"`([A-Za-z][A-Za-z0-9_]*)`", rest) if t in old and t not in ("FilingValidation", "FilingRules", "ACCCheck")})   # filing_validation columns; 2.9b names the old ACCCheck
     assert not bad, f"old column names used outside the rename note: {bad}"

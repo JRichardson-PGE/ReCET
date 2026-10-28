@@ -55,8 +55,12 @@ CET_RANGES = [("NTGRkW", 0, 1.5, True, False), ("NTGRkWh", 0, 1.5, True, False),
               ("RealizationRatekW", 0, 2, True, False), ("RealizationRatekWh", 0, 2, True, False), ("RealizationRateTherm", 0, 2, True, False),
               ("InstallationRatekW", 0, 1, True, False), ("InstallationRatekWh", 0, 1, True, False), ("InstallationRateTherm", 0, 1, True, False),
               ("MeasInflation", 0, 1, False, False), ("UnitMeaCost1stBaseline", 0, float("inf"), False, False), ("UnitMeaCost2ndBaseline", 0, float("inf"), False, False)]
-# Values the arithmetic cannot do without: a blank turns the measure's results blank (CET marks each of these NotEmpty)
-NEEDED_VALUES = ("NumUnits", "EUL_Yrs", "NTGRkWh", "UnitkWh1stBaseline")
+# The numeric fields CET marks NotEmpty (cet_spec.sql): a blank is an error, as in CET, and the pricing uses them as filed (no default fills them in). The other
+# numeric fields (UnitkWhIOUWater*, UnitDirectInstallLab/Mat, UnitEndUserRebate, UnitIncentiveToOthers, UnitTaxCredits, MeasInflation) may be blank: read as 0.
+NEEDED_VALUES = ("NumUnits", "UnitkW1stBaseline", "UnitkWh1stBaseline", "UnitTherm1stBaseline", "UnitkW2ndBaseline", "UnitkWh2ndBaseline", "UnitTherm2ndBaseline",
+                 "UnitMeaCost1stBaseline", "UnitMeaCost2ndBaseline", "NTGRkW", "NTGRkWh", "NTGRTherm", "NTGRCost", "EUL_Yrs", "RUL_Yrs",
+                 "RealizationRatekW", "RealizationRatekWh", "RealizationRateTherm", "InstallationRatekW", "InstallationRatekWh", "InstallationRateTherm",
+                 "UnitGasInfraBens", "UnitRefrigCosts", "UnitRefrigBens", "UnitMiscCosts", "UnitMiscBens")
 VALID_GAS_SECTORS = {"RESIDENTIAL", "COMMERCIAL", "CORE"}
 MAX_CELLS = 5000          # cells listed per issue (the web editor highlights them)
 
@@ -203,9 +207,9 @@ def _check_programs(rep: PreflightReport, measures: pd.DataFrame, programcost_cs
     flagged Exclude_From_CE, and a ProgramCost PA that differs from the program list's PA. None of these stops the run. `mrows(mask)` turns a mask over
     `measures` into Measure.csv row numbers."""
     from . import outputs, programs
-    meta = programs.lookup(measures["prg_id"])
-    pid = measures["prg_id"].astype(str).str.strip().to_numpy()
-    year = measures["claim_year"].to_numpy()
+    meta = programs.lookup(measures["PrgID"])
+    pid = measures["PrgID"].astype(str).str.strip().to_numpy()
+    year = measures["Used_Year"].to_numpy()
     missing = meta["Prg_MatchedOn"].to_numpy() == "(not found)"
     rep.agg["programs"] = (set(pid), set(pid[missing]))
     rep.stats["programs"] = f"{len(set(pid)):,} ({len(set(pid[missing])):,} not in the program metadata)"
@@ -307,9 +311,9 @@ def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpos
     go to rep.agg["acc_check"] for _finish_acc_check (a file checked in parts adds its parts' up)."""
     from . import versions
     run_key = acc.key if acc is not None else ""
-    named = (measures["acc_version"].astype(str) != "").to_numpy()
-    keys = np.where(named, measures["acc_version"].astype(str).to_numpy(), run_key)
-    years = measures["claim_year"].astype(int).to_numpy()
+    named = (measures["ACCVersion"].astype(str) != "").to_numpy()
+    keys = np.where(named, measures["ACCVersion"].astype(str).to_numpy(), run_key)
+    years = measures["Used_Year"].astype(int).to_numpy()
     label = versions.acc_purpose_label(purpose)
     counts = rep.agg.setdefault("acc_check", {})
     for (key, year), idx in pd.Series(np.arange(len(measures))).groupby([keys, years]).groups.items():
@@ -326,7 +330,7 @@ def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpos
         other[idx[~named[idx]]] = True
         rep.add("warning", "acc_not_for_program_year",
                 f"priced on the {acc_year} ACC, which does not normally apply to program year {year} for {label}: {_expected_text(set(exp), int(year), purpose)}",
-                len(idx), measures["measure_id"].iloc[idx[:5]].tolist(),
+                len(idx), measures["CEInputID"].iloc[idx[:5]].tolist(),
                 _cells("Measure", mrows(own), "ACCVersion") + _cells("Measure", mrows(other), "ClaimYearQuarter"))
 
 
@@ -336,7 +340,7 @@ def _finish_acc_check(rep: PreflightReport, purpose: str) -> None:
     counts = rep.agg.pop("acc_check", None)
     if counts is None:
         return
-    rows = [{"acc_version": k, "acc": a, "program_year": y, "measures": c["measures"], "status": c["status"], "expected_accs": c["expected"]}
+    rows = [{"ACCVersion": k, "acc": a, "program_year": y, "measures": c["measures"], "status": c["status"], "expected_accs": c["expected"]}
             for (k, a, y), c in sorted(counts.items(), key=lambda kv: (kv[0][2], kv[0][0]))]
     n = sum(r["measures"] for r in rows)
     flagged = sum(r["measures"] for r in rows if r["status"] == "flagged")
@@ -557,13 +561,19 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     for col in NEEDED_VALUES:
         blank = df[col].isna() | (df[col].astype(str).str.strip() == "")
         if blank.any():
-            rep.add("error", "blank_required_value", f"{col} is blank (CET requires a value; the measure's results would come out blank)", int(blank.sum()),
+            rep.add("error", "blank_required_value", f"{col} is blank (CET requires a value; enter 0 if there is none)", int(blank.sum()),
                     df["CEInputID"][blank].tolist(), _cells("Measure", blank, col))
-    rul = pd.to_numeric(df["RUL_Yrs"], errors="coerce").fillna(0.0)
-    blank2 = (rul > 0) & (df["UnitkWh2ndBaseline"].isna() | (df["UnitkWh2ndBaseline"].astype(str).str.strip() == ""))
-    if blank2.any():
-        rep.add("error", "blank_second_baseline", "UnitkWh2ndBaseline is blank on early-replacement measures (RUL_Yrs > 0), which are priced on it after the RUL", int(blank2.sum()),
-                df["CEInputID"][blank2].tolist(), _cells("Measure", blank2, "UnitkWh2ndBaseline"))
+    rul = pd.to_numeric(df["RUL_Yrs"], errors="coerce")
+    eul = pd.to_numeric(df["EUL_Yrs"], errors="coerce")
+    for col, v in (("EUL_Yrs", eul), ("RUL_Yrs", rul)):
+        negative = v < 0
+        if negative.any():
+            rep.add("error", "negative_life", f"{col} is negative (CET allows 0 or more)", int(negative.sum()), df["CEInputID"][negative].tolist(),
+                    _cells("Measure", negative, col))
+    rul_above_eul = rul > eul
+    if rul_above_eul.any():
+        rep.add("error", "rul_above_eul", "RUL_Yrs is greater than EUL_Yrs: the remaining useful life of the existing equipment cannot exceed the measure's life",
+                int(rul_above_eul.sum()), df["CEInputID"][rul_above_eul].tolist(), _cells("Measure", rul_above_eul, "RUL_Yrs"))
     if rep.errors:
         return rep
     for col, lo, hi, lo_open, hi_open in ([] if filing is not None else CET_RANGES):     # the filing rules check the same ranges, under their IDs
@@ -573,10 +583,10 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             rng = f"{'(' if lo_open else '['}{lo}, {hi if hi != float('inf') else 'no upper limit'}{')' if hi_open else ']'}"
             rep.add("warning", "outside_cet_range", f"{col} is outside CET's allowed range {rng}: CET would reject this upload", int(bad.sum()), df[col][bad].unique(),
                     _cells("Measure", bad, col))
-    eul = pd.to_numeric(df["EUL_Yrs"], errors="coerce")
-    if ((rul > 0) & (rul >= eul)).any():
-        rep.add("warning", "rul_not_below_eul", "RUL_Yrs is not below EUL_Yrs; such a measure is treated as single-baseline for its whole life", int(((rul > 0) & (rul >= eul)).sum()),
-                cells=_cells("Measure", (rul > 0) & (rul >= eul), "RUL_Yrs"))
+    rul_equals_eul = (rul > 0) & (rul == eul)
+    if rul_equals_eul.any():
+        rep.add("warning", "rul_not_below_eul", "RUL_Yrs equals EUL_Yrs; such a measure is treated as single-baseline for its whole life", int(rul_equals_eul.sum()),
+                cells=_cells("Measure", rul_equals_eul, "RUL_Yrs"))
 
     # measure_id (CEInputID, with "<IOU>_" in front after statewide allocation) -> Measure.csv row, for the checks on the loaded measures below
     raw_pos = {str(v).strip(): i for i, v in enumerate(df["CEInputID"])}
@@ -589,7 +599,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         return raw_pos.get(rest) if rest and head in VALID_PA else None
 
     def mrows(mask) -> list[int]:
-        ids = measures["measure_id"].to_numpy()[np.asarray(mask, dtype=bool)] if not isinstance(mask, pd.DataFrame) else mask["measure_id"].to_numpy()
+        ids = measures["CEInputID"].to_numpy()[np.asarray(mask, dtype=bool)] if not isinstance(mask, pd.DataFrame) else mask["CEInputID"].to_numpy()
         return [r for r in (_raw_row(m) for m in ids) if r is not None]
 
     from . import run_poc
@@ -610,24 +620,24 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             pass
         rep.add("error", "program_alignment", str(exc), cells=where)
         return rep
-    rep.stats["claim years"] = f"{measures['claim_year'].min()}-{measures['claim_year'].max()}"
-    named = measures.loc[measures["acc_version"] != "", "acc_version"]
+    rep.stats["claim years"] = f"{measures['Used_Year'].min()}-{measures['Used_Year'].max()}"
+    named = measures.loc[measures["ACCVersion"] != "", "ACCVersion"]
     if len(named):                                  # the optional ACCVersion column (BRD BR-06.5): each measure may name its own ACC version
         from . import paths, versions
         run_key = acc.key if acc is not None else None
         rep.stats["measures by ACC version"] = ", ".join(f"{k}: {n:,}" for k, n in named.value_counts().sort_index().items())
         for k in sorted(named.unique()):
-            rows = mrows(measures["acc_version"] == k)
+            rows = mrows(measures["ACCVersion"] == k)
             if k != run_key and k not in versions.BUILTIN:
                 rep.add("error", "bad_acc_version", f"ACCVersion {k!r} is not a built-in ACC version ({', '.join(versions.BUILTIN)}) or this run's version",
                         len(rows), [k], _cells("Measure", rows, "ACCVersion"))
             elif k != run_key and paths.ref_path(versions.BUILTIN[k].electric_key) is None:
                 rep.add("error", "acc_version_file_missing", f"the {versions.BUILTIN[k].label} electric file is not in the reference data folder, so the measures "
                         f"that name it cannot be priced", len(rows), [k], _cells("Measure", rows, "ACCVersion"))
-    rep.stats["First Year (base year) that will be used"] = base_year or int(measures["claim_year"].min())
+    rep.stats["First Year (base year) that will be used"] = base_year or int(measures["Used_Year"].min())
     _check_acc_applies(rep, measures, acc, acc_purpose, mrows)
     if part is not None:
-        prg = measures["prg_id"].astype(str).str.strip()
+        prg = measures["PrgID"].astype(str).str.strip()
         rep.agg["measure_prg_ids"] = set(prg)
         if part.program_ids is not None:
             rep.agg["no_cost_cells"] = [("Measure", r, "PrgID") for r in sorted(set(mrows(~prg.isin(part.program_ids))))]
@@ -645,7 +655,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             def bare(ids):                                       # with or without the "<IOU>_" that statewide allocation adds
                 return set(ids) | {i.partition("_")[2] for i in ids if i.partition("_")[0] in VALID_PA}
             no_meas = bare(gap["program_costs_without_measures"])
-            no_cost = measures["prg_id"].astype(str).str.strip().isin(gap["measure_programs_without_costs"])
+            no_cost = measures["PrgID"].astype(str).str.strip().isin(gap["measure_programs_without_costs"])
             where = [("Measure", r, "PrgID") for r in sorted(set(mrows(no_cost)))]
             if "PrgID" in pc.columns:
                 where += _cells("ProgramCost", pc["PrgID"].astype(str).str.strip().isin(no_meas), "PrgID")
@@ -654,10 +664,11 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     _check_programs(rep, measures, programcost_csv, allocate_statewide, apply_exclude_from_ce, mrows)
 
     # --- electric profile coverage
-    elec = measures[(measures["shape_scale"] != 0) | (measures["shape_scale_2nd"] != 0) | (measures["annual_net_kw_1st"] != 0)]
+    net_kw_1st = measures["NumUnits"] * measures["UnitkW1stBaseline"] * measures["NTGRkW"]
+    elec = measures[(measures["AC_Net_kWh_ScaledProfile_1st_Baseline"] != 0) | (measures["AC_Net_kWh_ScaledProfile_2nd_Baseline"] != 0) | (net_kw_1st != 0)]
     cat = real_impact_profiles._catalog_hourly() if real_impact_profiles.is_available() else None
     user = real_impact_profiles.user_profiles()
-    keys = elec.groupby(["shape_key", "PA", "target_sector"]).size().rename("n").reset_index()
+    keys = elec.groupby(["AC_Elec_Impact_Profile", "IOU_AC_Territory", "AC_Elec_Target_Sector"]).size().rename("n").reset_index()
     counts = {"user profile": 0, "library": 0, "library (sector-loose match)": 0, "NO PROFILE": 0}
     missing_examples: list = []
     missing_keys: list = []
@@ -666,62 +677,62 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     zone_gaps = 0
     for r in keys.itertuples():
         n = int(r.n)
-        if user is not None and user.match(r.shape_key, r.PA, r.target_sector) is not None:
+        if user is not None and user.match(r.AC_Elec_Impact_Profile, r.IOU_AC_Territory, r.AC_Elec_Target_Sector) is not None:
             counts["user profile"] += n
             continue
-        pid, exact = real_impact_profiles.match_profile_id(r.shape_key, r.PA, r.target_sector) if cat is not None else (None, False)
+        pid, exact = real_impact_profiles.match_profile_id(r.AC_Elec_Impact_Profile, r.IOU_AC_Territory, r.AC_Elec_Target_Sector) if cat is not None else (None, False)
         if pid is not None:
             counts["library" if exact else "library (sector-loose match)"] += n
             if not exact:
-                loose_examples.append(f"{r.shape_key} | {r.PA} | {r.target_sector}")
-                loose_keys.append((r.shape_key, r.PA, r.target_sector))
+                loose_examples.append(f"{r.AC_Elec_Impact_Profile} | {r.IOU_AC_Territory} | {r.AC_Elec_Target_Sector}")
+                loose_keys.append((r.AC_Elec_Impact_Profile, r.IOU_AC_Territory, r.AC_Elec_Target_Sector))
             continue
         counts["NO PROFILE"] += n
-        missing_examples.append(f"{r.shape_key} | {r.PA} | {r.target_sector}")
-        missing_keys.append((r.shape_key, r.PA, r.target_sector))
+        missing_examples.append(f"{r.AC_Elec_Impact_Profile} | {r.IOU_AC_Territory} | {r.AC_Elec_Target_Sector}")
+        missing_keys.append((r.AC_Elec_Impact_Profile, r.IOU_AC_Territory, r.AC_Elec_Target_Sector))
     rep.stats["electric-savings measures"] = f"{len(elec):,}"
     for k, v in counts.items():
         if v:
             rep.stats[f"  electric shape: {k}"] = f"{v:,}"
     def with_keys(keys_: list) -> pd.DataFrame:
-        return elec[pd.MultiIndex.from_frame(elec[["shape_key", "PA", "target_sector"]]).isin(keys_)] if keys_ else elec.iloc[:0]
+        return elec[pd.MultiIndex.from_frame(elec[["AC_Elec_Impact_Profile", "IOU_AC_Territory", "AC_Elec_Target_Sector"]]).isin(keys_)] if keys_ else elec.iloc[:0]
 
     if counts["NO PROFILE"]:
         hit = with_keys(missing_keys)
         rep.add("warning", "no_electric_profile", "electric measures with no 8,760 profile are NOT priced (ElecPricingStatus = UNPRICED); "
                 "supply a profile for them or check the AC_Elec_Impact_Profile spelling", counts["NO PROFILE"], missing_examples,
-                _cells("Measure", mrows(hit), "AC_Elec_Impact_Profile"), {IMPACT_KWH: float(hit["shape_scale"].sum())})
+                _cells("Measure", mrows(hit), "AC_Elec_Impact_Profile"), {IMPACT_KWH: float(hit["AC_Net_kWh_ScaledProfile_1st_Baseline"].sum())})
     if counts["library (sector-loose match)"]:
         # which records, and how much energy rides on a profile matched without its sector (examples: end use | IOU | AC_Elec_Target_Sector given)
         hit = with_keys(loose_keys)
         rep.add("info", "loose_profile_match", "matched the library profile on (end use, IOU) only, because AC_Elec_Target_Sector has no exact match",
                 counts["library (sector-loose match)"], loose_examples, _cells("Measure", mrows(hit), "AC_Elec_Target_Sector"),
-                {IMPACT_KWH: float(hit["shape_scale"].sum())})
+                {IMPACT_KWH: float(hit["AC_Net_kWh_ScaledProfile_1st_Baseline"].sum())})
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
 
     # --- kWh-per-unit profiles (BRD BR-06.6): the measure's electric kWh comes from the profile, not from UnitkWh1stBaseline / UnitkWh2ndBaseline
     if user is not None and any(e.scaled for e in user.entries):
-        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["shape_key"], measures["PA"], measures["target_sector"], measures["climate_zone"])]
+        zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["AC_Elec_Impact_Profile"], measures["IOU_AC_Territory"], measures["AC_Elec_Target_Sector"], measures["AC_Climate_Zone"])]
         scaled = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) is not None for k, pa, ts, z in
-                            zip(measures["shape_key"], measures["PA"], measures["target_sector"], zones)], index=measures.index)
+                            zip(measures["AC_Elec_Impact_Profile"], measures["IOU_AC_Territory"], measures["AC_Elec_Target_Sector"], zones)], index=measures.index)
         if scaled.any():
             rep.add("info", "kwh_per_unit_profile", "priced on a kWh-per-unit 8,760 profile: the measure's annual kWh is the profile's (its UnitkWh1stBaseline is "
                     "not used; a 2nd baseline keeps the file's UnitkWh2ndBaseline / UnitkWh1stBaseline ratio)", int(scaled.sum()),
-                    measures.loc[scaled, "measure_id"].head(5).tolist(), _cells("Measure", mrows(scaled), "AC_Elec_Impact_Profile"))
-            zero_net = measures[scaled & (measures["unit_kwh_1st"] == 0) & ((measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0))]
+                    measures.loc[scaled, "CEInputID"].head(5).tolist(), _cells("Measure", mrows(scaled), "AC_Elec_Impact_Profile"))
+            zero_net = measures[scaled & (measures["Used_UnitkWh1stBaseline"] == 0) & ((measures["UnitkWhIOUWater1stBaseline"] != 0) | (measures["UnitkWhIOUWater2ndBaseline"] != 0))]
             if len(zero_net):
                 rep.add("warning", "zero_net_profile_water", "water energy on a load-shifting (zero-net) kWh-per-unit profile is priced on that profile, which nets to "
-                        "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["measure_id"].head(5).tolist(),
+                        "zero, so its WaterEnergyBen is about 0; give water-energy savings on a separate measure", len(zero_net), zero_net["CEInputID"].head(5).tolist(),
                         _cells("Measure", mrows(zero_net), "UnitkWhIOUWater1stBaseline"))
 
     # --- a separate 2nd-baseline shape (AC_Elec_Impact_Profile_2nd_Baseline) on an early replacement
-    second = measures[(measures["shape_key_2nd"] != measures["shape_key"]) & (measures["rul_years_exact"] > 0)
-                      & (measures["rul_years_exact"] < measures["eul_years_exact"]) & (measures["shape_scale_2nd"] != 0)]
+    second = measures[(measures["AC_Elec_Impact_Profile_2nd_Baseline"] != measures["AC_Elec_Impact_Profile"]) & (measures["RUL_Yrs"] > 0)
+                      & (measures["RUL_Yrs"] < measures["EUL_Yrs"]) & (measures["AC_Net_kWh_ScaledProfile_2nd_Baseline"] != 0)]
     if len(second):
         rep.stats["measures with a separate 2nd-baseline shape"] = f"{len(second):,}"
         missing2, eg2, where2 = 0, [], []
-        for key, g in second.groupby(["shape_key_2nd", "PA", "target_sector"]):
+        for key, g in second.groupby(["AC_Elec_Impact_Profile_2nd_Baseline", "IOU_AC_Territory", "AC_Elec_Target_Sector"]):
             has_user = user is not None and user.match(*key) is not None
             has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
             if not (has_user or has_lib):
@@ -733,35 +744,35 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
                     "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
 
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
-    water = measures[(measures["kwh_water_1st"] != 0) | (measures["kwh_water_2nd"] != 0)]
+    water = measures[(measures["UnitkWhIOUWater1stBaseline"] != 0) | (measures["UnitkWhIOUWater2ndBaseline"] != 0)]
     rep.stats["water-energy measures"] = f"{len(water):,}"
     if len(water):
         no_prof = 0
         eg = []
         where: list = []
-        for key, g in water.groupby(["shape_key_water", "PA", "target_sector"]):          # AC_Elec_Impact_Profile_Water, or the measure's own shape
+        for key, g in water.groupby(["AC_Elec_Impact_Profile_Water", "IOU_AC_Territory", "AC_Elec_Target_Sector"]):          # AC_Elec_Impact_Profile_Water, or the measure's own shape
             has_user = user is not None and user.match(*key) is not None
             has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
             if not (has_user or has_lib):
                 no_prof += len(g)
                 eg.append(" | ".join(map(str, key)))
-                own = g["shape_key_water"] != g["shape_key"]
+                own = g["AC_Elec_Impact_Profile_Water"] != g["AC_Elec_Impact_Profile"]
                 where += _cells("Measure", mrows(g[own]), "AC_Elec_Impact_Profile_Water") + _cells("Measure", mrows(g[~own]), "AC_Elec_Impact_Profile")
         if no_prof:
             rep.add("warning", "no_water_profile", "water-energy measures with no electric profile (the water energy is priced on the measure's electric profile) are NOT priced "
                     "(WaterPricingStatus = UNPRICED)", no_prof, eg, where)
 
     # --- gas profile coverage
-    gas = measures[(measures["annual_net_therms_1st"] != 0) | (measures["annual_net_therms_2nd"] != 0)]
+    gas = measures[(measures["AC_Net_Therms_1st_Baseline"] != 0) | (measures["AC_Net_Therms_2nd_Baseline"] != 0)]
     rep.stats["gas-savings measures"] = f"{len(gas):,}"
-    no_gas = gas[gas["gas_profile_key"].isna() | ~gas["gas_profile_key"].map(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(str(k)) is not None)]
+    no_gas = gas[gas["AC_Gas_Impact_Profile"].isna() | ~gas["AC_Gas_Impact_Profile"].map(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(str(k)) is not None)]
     if len(no_gas):
         rep.add("warning", "no_gas_profile", "gas measures whose AC_Gas_Impact_Profile is not a known monthly profile are NOT priced (GasPricingStatus = UNPRICED); "
-                "supply the profile or fix the name", len(no_gas), no_gas["gas_profile_key"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "AC_Gas_Impact_Profile"),
-                {IMPACT_THERMS: float(no_gas["annual_net_therms_1st"].sum())})
-    bad_gs = gas[~gas["gas_sector"].astype(str).str.upper().isin(VALID_GAS_SECTORS)]
+                "supply the profile or fix the name", len(no_gas), no_gas["AC_Gas_Impact_Profile"].fillna("(blank)").unique(), _cells("Measure", mrows(no_gas), "AC_Gas_Impact_Profile"),
+                {IMPACT_THERMS: float(no_gas["AC_Net_Therms_1st_Baseline"].sum())})
+    bad_gs = gas[~gas["AC_Gas_Target_Sector"].astype(str).str.upper().isin(VALID_GAS_SECTORS)]
     if len(bad_gs):
-        rep.add("error", "bad_gas_sector", f"AC_Gas_Target_Sector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["gas_sector"].unique(),
+        rep.add("error", "bad_gas_sector", f"AC_Gas_Target_Sector must be one of Residential/Commercial/Core for measures with gas savings", len(bad_gs), bad_gs["AC_Gas_Target_Sector"].unique(),
                 _cells("Measure", mrows(bad_gs), "AC_Gas_Target_Sector"))
 
     # --- ACC horizon and run-parameter version
@@ -775,9 +786,9 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             yrs = pq.read_table(str(real_avoided_cost_v2._pq()), columns=["year"]).column("year").to_numpy()
             e0, e1 = int(yrs.min()), int(yrs.max())
             g0, g1 = gas_avoided_cost.year_range()
-            last = (measures["claim_year"] + np.ceil(measures["eul_years_exact"])).astype(int)
+            last = (measures["Used_Year"] + np.ceil(measures["EUL_Yrs"])).astype(int)
             rep.stats["ACC years"] = f"electric {e0}-{e1}, gas {g0}-{g1}"
-            early_m, long_m = (measures["claim_year"] < e0).to_numpy(), (last > e1 + 1).to_numpy()
+            early_m, long_m = (measures["Used_Year"] < e0).to_numpy(), (last > e1 + 1).to_numpy()
             early, long = int(early_m.sum()), int(long_m.sum())
             if early:
                 rep.add("warning", "before_acc_horizon", f"claim year is before the first ACC year ({e0}): those years are priced with the {e0} values", early,

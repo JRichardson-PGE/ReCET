@@ -11,11 +11,12 @@ from recet import fieldnames, output_templates, outputs, results_view
 def test_old_names_map_to_new_ones_and_dropped_ones_go():
     assert fieldnames.output_name("NetElecCO2") == "FirstYearNetElecCO2"
     assert fieldnames.output_name("GrossPM10Lifecycle") == "LifecycleGrossElecPM10"
-    assert fieldnames.output_name("poc_water_scale_2nd") == "AC_kWh_Water_2nd_Baseline"
+    assert fieldnames.output_name("poc_water_scale_2nd") == "AC_Net_kWh_Water_2nd_Baseline"
     assert fieldnames.output_name("CreditedIOU") == "CreditedPA" and fieldnames.output_name("POC_ACC") == "Used_ACCVersion"
     assert fieldnames.output_name("poc_PA") == "" and fieldnames.output_name("ACCCheck") == "" and fieldnames.output_name("WeightedSavings") == ""
     assert fieldnames.output_name("ElecBen") == "ElecBen"
-    assert len(set(fieldnames.OUTPUT_RENAMES.values())) == len(fieldnames.OUTPUT_RENAMES)        # no two old names share a new one
+    assert not set(fieldnames.OUTPUT_RENAMES.values()) & set(fieldnames.OUTPUT_RENAMES)            # every new name is current (a renamed name maps to its latest)
+    assert fieldnames.output_name("AC_kWh_1st_Baseline") == fieldnames.output_name("poc_shape_scale") == "AC_Net_kWh_1st_Baseline"     # 0.1.50 and 0.1.55 names
     assert not set(fieldnames.OUTPUT_RENAMES) & fieldnames.OUTPUT_REMOVED
 
 

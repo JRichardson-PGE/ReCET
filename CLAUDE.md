@@ -90,6 +90,19 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.55 (2026-10-28, Jake; plan and workbook in CEDARS-Review `deliverables/recet_renaming/`): the calculation code uses the input and output field names.
+  The loader (`data_loading._derive_fields`) keeps the Measure fields under their own names (no `num_units`, `ntgr_kwh`, `shape_key` ... aliases) and names
+  each derived value for the output it is written as (`Used_Year`, `AC_Net_kWh_1st_Baseline`, `Fuel_Sub_Flag`) or `Used_<field>` (`Used_UnitkWh1stBaseline`:
+  a kWh-per-unit profile's own annual kWh, flagged by the new output `Scaled_Profile_Flag`). Measure side `PA` is now `IOU_AC_Territory`; result frames are
+  keyed by `CEInputID`. Rules for new code: never put a non-input value under an input's name (NTG + MEBens is `NTGRkWh_plus_MEBens`; market effects are a
+  factor applied when a pricer's `Priced_Quantity_1st/2nd_Baseline` / `Billed_*` columns are filled, never a rewrite of `AC_Net_*`); the profile multiplier is
+  `AC_Net_kWh_ScaledProfile_*_Baseline` (= `AC_Net_kWh_*_Baseline` except on a kWh-per-unit profile). Outputs renamed (old names still accepted in templates and
+  views): `AC_kWh_*` / `AC_Therms_*` -> `AC_Net_kWh_*` / `AC_Net_Therms_*`, the four `*_sct` participant PVs -> `*_SCT`. Pricing result: `HourlyPricingResult`
+  (`values` with `LifetimeValuePV` grouped / `QuarterValuePV` per measure, `unpriced_ids`, `route`); the first proof of concept's batching fields and the
+  fallback-shape / portfolio paths are gone. Preflight: every CET NotEmpty numeric field is required (`blank_required_value`; the loader no longer fills NTG / IR /
+  RR / costs), negative EUL/RUL (`negative_life`) and RUL > EUL (`rul_above_eul`) are errors, RUL = EUL a warning; `blank_second_baseline` is gone. The 0.25-year
+  EUL floor is gone (CalcCE has none). Checked: all eight real jobs of `before_after.py` (2028-2031 consolidated, 2028 allocated with 5% ME and components, 2029 on
+  the 2026 ACC, SWWH025 in parts, CET 121841) give every output identical to 0.1.54 (1e-9), the only new column `Scaled_Profile_Flag`.
 - 0.1.54 (2026-10-28, Jake): output templates are built with a two-list field picker (web Templates page: `static/app.js` over a JSON catalog in the
   page, the textarea kept as the submitted value and the paste box; window: `gui_templates.py`, replacing the text box). Left list: Show = all / input
   fields / program fields (Prg_*) / output fields / one OUTPUT_FIELDS group (`output_templates.KINDS`, `kind()`), search over names and definitions;

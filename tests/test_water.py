@@ -108,7 +108,7 @@ def test_program_cost_weights_count_water_benefit():
     """Two measures in one program, one with only an electric benefit and one with only a water benefit: the program's costs are shared in proportion to
     their positive benefits INCLUDING water (CalcCE's BenPos / BensSum)."""
     z = 0.0
-    d = pd.DataFrame({"measure_id": ["e", "w"], "prg_id": ["P", "P"], "NTGRkWh": [1.0, 1.0], "ntgr_therm": [1.0, 1.0],
+    d = pd.DataFrame({"CEInputID": ["e", "w"], "PrgID": ["P", "P"], "NTGRkWh_plus_MEBens": [1.0, 1.0], "NTGRTherm_plus_MEBens": [1.0, 1.0],
                       "ElecBen": [300.0, z], "GasBen": [z, z], "WaterEnergyBen": [z, 100.0], "OtherBen": [z, z],
                       "ElecSupplyCost": [z, z], "GasSupplyCost": [z, z], "WaterEnergyCost": [z, z], "OtherCost": [z, z],
                       "OtherBenGross": [z, z], "OtherCostGross": [z, z], "TaxCredits": [z, z], "TaxCreditsGross": [z, z]})
@@ -117,11 +117,11 @@ def test_program_cost_weights_count_water_benefit():
             d[c + s] = d[c]
         d["WaterEnergyBen" + s] = d["WaterEnergyBen"]
         d["WaterEnergyCost" + s] = 0.0
-    for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "RebatesandIncentsPV_sct",
-              "NetParticipantCostPV_sct", "NetParticipantCostAdjustedPV_sct", "GrossParticipantCostPV_sct", "LifecycleBillReducElec", "LifecycleBillReducGas", "LifecycleBillIncrElec", "LifecycleBillIncrGas"):
+    for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "RebatesandIncentsPV_SCT",
+              "NetParticipantCostPV_SCT", "NetParticipantCostAdjustedPV_SCT", "GrossParticipantCostPV_SCT", "LifecycleBillReducElec", "LifecycleBillReducGas", "LifecycleBillIncrElec", "LifecycleBillIncrGas"):
         d[c] = 0.0
     prog = pd.DataFrame({"PrgID": ["P"], "SumCosts": [1000.0], "SumCostsNPV": [1000.0], "SumCostsNPV_SCT": [1000.0]})
-    out = cost_tests.compute_cost_tests(d, prog).set_index("measure_id")
+    out = cost_tests.compute_cost_tests(d, prog).set_index("CEInputID")
     assert out.loc["e", "WeightedBenefits"] == pytest.approx(0.75) and out.loc["w", "WeightedBenefits"] == pytest.approx(0.25)
     assert out.loc["w", "WeightedProgramCost"] == pytest.approx(250.0)
     assert out.loc["w", "TRCCost"] == pytest.approx(250.0) and out.loc["w", "TotalSystemBenefit"] == pytest.approx(100.0)
@@ -130,7 +130,7 @@ def test_program_cost_weights_count_water_benefit():
 def test_summary_and_columns_carry_water(tmp_path):
     r = run_job(_cfg(tmp_path, measure={"UnitkWhIOUWater1stBaseline": 500}, run_name="cols"), log=lambda s: None)
     assert {"WaterEnergyBen", "WaterEnergyCost", "WaterEnergyBen_SB", "WaterEnergyCost_SH", "WaterEnergyBenGross", "WaterPricingStatus",
-            "AC_kWh_Water_1st_Baseline"} <= set(r.frame.columns)
+            "AC_Net_kWh_Water_1st_Baseline"} <= set(r.frame.columns)
     summ = pd.read_csv(r.files["portfolio_summary"])
     assert summ.loc[0, "WaterEnergyBen"] == pytest.approx(r.frame.iloc[0]["WaterEnergyBen"])
     assert "no_water_profile" not in (r.run_dir / "preflight.txt").read_text()

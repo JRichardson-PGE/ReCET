@@ -13,4 +13,4 @@ import os as _os
 # when recet is imported before numpy (every recet command, the window and the web app do); set OPENBLAS_NUM_THREADS yourself to choose otherwise.
 _os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
-__version__ = "0.1.54"
+__version__ = "0.1.55"
