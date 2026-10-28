@@ -11,7 +11,7 @@ is unchanged.
                             the cost treatment ("CA TRC" or "USI" for PAC); a discount rate (a PA's own goes on each measure instead)
     first_year_avoided_costs_by_id   empty (no NEIs in a CET job)
 
-Gas is not built yet: the first comparisons (C3) are electric only. The ACC's hours are numbered 1..8760 in ReCET's files and 0..8759 in OpenBCA's.
+Gas (GAS_STREAM, monthly) is filled by translate.py from ReCET's gas routes; `build` writes electric only. The ACC's hours are numbered 1..8760 in ReCET's files and 0..8759 in OpenBCA's.
 
 OpenBCA rounds every avoided cost to $0.001/kWh: core_layer0_base.avoided_costs_ts casts the value `::NUMERIC`, which DuckDB reads as DECIMAL(18,3).
 Annual sums move by up to 0.03% on the 2024 ACC (C2, 2026-10-28). That is OpenBCA's own behaviour and is left as it is (its outputs are reported
@@ -28,6 +28,7 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 ELECTRIC_STREAM = "CA ACC Electric (E)"
+GAS_STREAM = "CA ACC Gas (G)"     # monthly, $/MMBtu (the gas ACC's $/therm x 10); built by translate.py
 # OpenBCA's own rows for costs and program-level values, as its value-stream parser writes them (excel_input_parsing/models/
 # openbca_input_value_stream_groups.py: config_measure_cost_fields_map_dict and repeating_annual_costs), every one in the test.
 COST_ROWS = [
@@ -87,7 +88,8 @@ def avoided_costs_ts(acc_file: str | Path, subsets: Iterable[tuple[str, str]], y
 
 
 def value_stream_groups() -> pd.DataFrame:
-    rows = [(ELECTRIC_STREAM, "Electric", True, "Time Series - Hourly", np.nan, "electric", False)]
+    rows = [(ELECTRIC_STREAM, "Electric", True, "Time Series - Hourly", np.nan, "electric", False),
+            (GAS_STREAM, "Natural Gas", True, "Time Series - Monthly", np.nan, "natural_gas", False)]
     rows += [(name, cat, True, "Single Value - First Year" if grp == "first_year" else "Time Series - Annual", np.nan, grp, False)
              for name, cat, grp in COST_ROWS]
     return pd.DataFrame(rows, columns=["avoided_cost", "impact_category", "include_in_test", "calc_type", "pct_adder", "value_stream_group", "marginal_ghg"])

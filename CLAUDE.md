@@ -107,12 +107,18 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   route's get_acc_series per subset "PGE CZ13", nearest ACC year beyond the file; Unit Quantity x NTG x savings = AC_Net_kWh_ScaledProfile_1st_Baseline;
   rate = 4 x DiscountRateQtr; incentives = rebate + to-others + DI; measure cost = CET's nominal one; ProgramCost's ten fields -> Program Admin Costs), set
   up from the run's RunConfig (`jobs.prepare`), and flags each measure's known differences (`VALUE_DIFFERENCES`: fractional_eul, ntg_cost, dual_baseline,
-  excess_incentive, unpriced; plus start_quarter, fractional_units, gas, other). `recet openbca compare-recet` (compare_job) runs ReCET and OpenBCA (TRC
+  excess_incentive, unpriced; plus start_quarter, fractional_units, water, other). `recet openbca compare-recet` (compare_job) runs ReCET and OpenBCA (TRC
   as "CA TRC", PAC as "USI") and writes compare_<test>.csv and summary.csv. OpenBCA discounts from each measure's own start quarter (CalcCE from Q1 of
   the First Year) and leaves upfront costs undiscounted, so a measure's benefits and costs are both higher by (1 + r/4)^quarters; compare after that
   factor. Results 2026-10-28 (2024 ACC, records from the 2028 consolidated job): C3, 20 matched records: electric within 1.7e-4 (the $0.001/kWh
   rounding), costs equal, jst_ratio 0.119238 / 0.147843 vs ReCET on the same terms 0.119238 / 0.147844; C4, a 50-measure sample: 47 within 5e-5
   after the start-quarter factor, the other 3 are a fractional EUL (+9.4%), a dual baseline (x2.29) and an excess incentive (TRC cost x0.15).
+  Gas (Jake, same day): each gas profile (gas_savings_profiles.get_shape) goes as a monthly Natural Gas load shape and each (IOU, gas sector, profile)
+  route's get_years_for_measure TRC series (clamped to the gas ACC's years) as stream `ca_config.GAS_STREAM` in $/MMBtu (x10), savings in MMBtu; OpenBCA
+  has one subset per measure, so a gas measure's is "<elec subset> | G<n>"; one NTG per measure (NTGRkWh, NTGRTherm when no kWh), each fuel's savings
+  divided by it so the product is ReCET's priced quantity. C3 gas, 13 matched records (12 dual fuel, PGE/SCE/SCG/SDGE, Annual and Winter Only):
+  gas within 6e-6 per measure, jst_ratio 1.370003 / 1.382122 vs 1.369957 / 1.382075. C4 with gas: 20 of 21 gas measures within 3e-6 after the
+  start-quarter factor (the fractional EUL one x1.058); jst 0.666 / 1.119 vs 0.655 / 1.078 on the same terms (start quarters and the 3 differences).
   Same PR: run_poc.run_gas_benefit crashed under pandas 3 on a job whose gas profiles are named but none has gas savings (an empty str Series sums to "").
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
