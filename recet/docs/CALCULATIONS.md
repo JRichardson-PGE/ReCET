@@ -710,6 +710,10 @@ The factors are the built-in table, with the rows of a supplied SW allocation fa
 For every IOU with a non-zero factor, one row is made with `<IOU>_` prepended to `CEInputID` and `PrgID` (program-cost `PA` is set to that IOU). A measure is still priced on its own `IOU_AC_Territory`; a program's costs are shared
 only among that IOU's measures and discounted at that IOU's rate. Without the option, statewide rows are priced as filed (the way the four real CET runs treated them). `CreditedPA` is the `PA` of each measure's program in `ProgramCost.csv`: with the option, the IOU each statewide share was allocated to; without it, the filed `PA` (`SW` for a statewide program).
 
+The run writes `statewide_reconciliation_acc<version>` (OUTPUT_FIELDS 2.13): each allocated field of each statewide program and year, totalled before
+allocation and over each IOU's share, with the difference. Factors that sum to 1 make every field reconcile; a fuel whose factors are all 0 for a program
+(gas on an all-electric program) drops that fuel's quantities from every share, and the table and the run log say so.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## C16 Optional and secondary outputs

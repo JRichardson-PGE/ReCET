@@ -146,8 +146,78 @@ def _allocate(df: pd.DataFrame, table: str, id_cols: list[str], years: pd.Series
     result = pd.concat(parts).iloc[np.lexsort((ordering[:, 1], ordering[:, 0]))].reset_index(drop=True)
     report = {"input_rows": len(df), "statewide_rows": int(is_sw.sum()),
               "allocated_rows": len(result) - int((~is_sw).sum()), "output_rows": len(result),
-              "unmatched_sw_programs": unmatched_sw, "fields_without_a_rule_passed_through": unruled}
+              "unmatched_sw_programs": unmatched_sw, "fields_without_a_rule_passed_through": unruled,
+              "reconciliation": _totals(sw, years[is_sw], prg[is_sw], parts[1:], fields, table)}
     return result, report
+
+
+def _quantity(df: pd.DataFrame, field: str, table: str) -> np.ndarray:
+    """What a field adds up to: on measures, NumUnits x the per-unit field (NumUnits is passed through); on program costs, the field itself."""
+    v = pd.to_numeric(df[field], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    if table == "measure" and "NumUnits" in df.columns:
+        v = v * pd.to_numeric(df["NumUnits"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    return v
+
+
+def _totals(sw: pd.DataFrame, years: pd.Series, prg: pd.Series, iou_parts: list[pd.DataFrame], fields: list[str], table: str) -> pd.DataFrame:
+    """Per (Year, statewide PrgID, field): the statewide rows' total before allocation and each IOU's allocated rows' total, from the rows _allocate
+    actually produced (each IOU part keeps the statewide row's index, so it maps back to the row's year and program). Added up over files by
+    `reconciliation`."""
+    cols = ["Year", "PrgID", "field", "unallocated_total", *IOUS]
+    if not len(sw) or not fields:
+        return pd.DataFrame(columns=cols)
+    key = pd.DataFrame({"Year": years.to_numpy(), "PrgID": prg.to_numpy()}, index=sw.index)
+    out = []
+    for f in fields:
+        t = key.assign(field=f, unallocated_total=_quantity(sw, f, table))
+        for iou, part in zip(IOUS, iou_parts):
+            t[iou] = pd.Series(_quantity(part, f, table), index=part.index).reindex(sw.index).fillna(0.0).to_numpy()
+        out.append(t.groupby(["Year", "PrgID", "field"], as_index=False, sort=False)[["unallocated_total", *IOUS]].sum())
+    return pd.concat(out, ignore_index=True)[cols]
+
+
+RECONCILE_TOLERANCE = 1e-9          # relative: an allocated total within this of the unallocated one reconciles
+
+
+def reconciliation(measure_files: list, programcost_file=None, factors: pd.DataFrame | None = None) -> pd.DataFrame:
+    """The allocation's reconciliation (BRD BR-06.7): for each statewide program, year and allocated field, the total before allocation, each IOU's
+    share, their sum and the difference. `measure_files`: the job's Measure.csv, or the parts of a run in parts (their totals are added up).
+
+    The check is on the inputs, which is where allocation happens: every quantity and cost is then priced as filed, and pricing is linear in them, so
+    the IOU shares' benefits add up to the program's whenever its inputs do (tests/test_statewide_reconciliation.py prices both). A field does not
+    reconcile when its factors for that program and year do not sum to 1, most often because every IOU's factor for that fuel is 0 (for example
+    therms on a program whose gas factors are all 0): that quantity is then dropped from every share."""
+    from ..templates import with_defaults
+    from .delimited import read_cet_csv
+    factors = load_factors() if factors is None else factors
+    pieces = []
+    for f in measure_files:
+        _, rep = allocate_measure_inputs(with_defaults(read_cet_csv(Path(f), low_memory=False)), factors=factors)
+        pieces.append(rep["reconciliation"].assign(table="Measure"))
+    if programcost_file:
+        _, rep = allocate_program_costs(read_cet_csv(Path(programcost_file), low_memory=False), factors=factors)
+        pieces.append(rep["reconciliation"].assign(table="ProgramCost"))
+    cols = ["table", "Year", "PrgID", "field", "factor", "factor_sum", "unallocated_total", *IOUS, "allocated_total", "difference", "reconciles", "note"]
+    pieces = [p for p in pieces if len(p)]
+    if not pieces:
+        return pd.DataFrame(columns=cols)
+    t = pd.concat(pieces, ignore_index=True).groupby(["table", "Year", "PrgID", "field"], as_index=False, sort=False)[["unallocated_total", *IOUS]].sum()
+    rules = load_field_rules()
+    t["factor"] = [rules["measure" if tb == "Measure" else "program_cost"].get(f, "") for tb, f in zip(t["table"], t["field"])]
+    t["factor_sum"] = [float(sum(factors.at[(y, p), f"{iou}{_RULE_TO_COLUMN[r]}"] for iou in IOUS)) if r in _RULE_TO_COLUMN else np.nan
+                       for y, p, r in zip(t["Year"], t["PrgID"], t["factor"])]
+    t["allocated_total"] = t[IOUS].sum(axis=1)
+    t["difference"] = t["allocated_total"] - t["unallocated_total"]
+    t["reconciles"] = t["difference"].abs() <= RECONCILE_TOLERANCE * t["unallocated_total"].abs().clip(lower=1.0)
+
+    def note(r) -> str:
+        if r["reconciles"]:
+            return ""
+        if abs(r["factor_sum"]) < 1e-12:
+            return f"every IOU's {r['factor'].lower()} is 0 for this program and year, so this quantity is in no IOU's share"
+        return f"the IOUs' {r['factor'].lower()}s sum to {r['factor_sum']:.4f}, not 1"
+    t["note"] = t.apply(note, axis=1) if len(t) else ""
+    return t.sort_values(["table", "Year", "PrgID"], kind="stable").reset_index(drop=True)[cols]
 
 
 def warn_unmatched(report: dict, what: str) -> None:

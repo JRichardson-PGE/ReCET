@@ -2064,6 +2064,31 @@ The key-metrics summary (BRD BR-06.10): the headline results and the main driver
 | `TRC_ratio`, `PAC_ratio` | Driver rows: the item's ratios, recomputed from its sums. |
 | `definition`, `documentation` | Portfolio rows: the metric's definition and its entry in this document, as in 2.11. |
 
+### 2.13 `statewide_reconciliation_acc<version>` (with statewide allocation)
+
+With **Allocate statewide programs** on (C15), the check that the allocation reconciles (BRD BR-06.7): for each statewide program and year, every field the
+allocation scales, added up before allocation and over each IOU's allocated rows, from the rows the run actually priced. One row per (table, year, program, field).
+
+| Column | Meaning |
+|---|---|
+| `table` | `Measure` or `ProgramCost`. |
+| `Year` | The year the factors are looked up by: the claim year (`ClaimYearQuarter`), or `PrgYear` for a `ProgramCost` row without one. |
+| `PrgID` | The statewide program as filed (`SW_...`). |
+| `field` | The allocated field, e.g. `UnitkWh1stBaseline` or `AdminCostsOther`. |
+| `factor` | Its rule: `Electric Factor`, `Gas Factor` or `Weighted Factor`. |
+| `factor_sum` | That factor summed over PGE, SDGE, SCE and SCG for the program and year (1 when the table is complete). |
+| `unallocated_total` | The field's total over the program's rows before allocation: `NumUnits` x the per-unit field for `Measure` (`NumUnits` is passed through), the field itself for `ProgramCost`. |
+| `PGE`, `SDGE`, `SCE`, `SCG` | The same total over each IOU's allocated rows (`<IOU>_SW_...`); 0 for an IOU with no share. |
+| `allocated_total` | The sum of the four IOU columns. |
+| `difference` | `allocated_total - unallocated_total`. |
+| `reconciles` | `True` when the difference is within 1e-9 of the unallocated total (relative; absolute below 1). |
+| `note` | Why a field does not reconcile: every IOU's factor for that fuel is 0 for the program and year (the quantity is in no IOU's share; for example therms of a program whose gas factors are all 0), or the factors sum to something other than 1. |
+
+The check is on the inputs because that is where allocation happens. Each IOU's share is then priced like any measure, and every benefit, cost and saving is
+linear in the allocated quantities, so where a program's inputs reconcile its IOU shares' benefits add up to the unallocated program's (tested by pricing a
+job both ways). Program costs reconcile in nominal dollars; their present values can differ because each IOU's share is discounted at that IOU's rate (C15).
+A field that does not reconcile is also a note in the run log and in `run_settings.json` (the first 20). Nothing is stopped.
+
 Also written into the run folder: `_prepared_inputs/` (a Parquet conversion of any supplied ACC that was not already Parquet) and, from the GUI, `_gui_job.json` in the output folder (the settings the GUI launched the run with).
 
 ---------------------------------------------------------------------------------------------------------------------------------
