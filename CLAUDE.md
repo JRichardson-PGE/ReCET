@@ -95,6 +95,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.70 (2026-10-29, Jake; 0.1.69 is the prior-CET-releases PR #58): the screen-reader pass. `tests/screenreader` is an NVDA walk-through of the web
+  app (Guidepup 0.36 + Playwright, Windows only, not part of pytest): `serve_a11y.py` serves this checkout on a throwaway state, `recet.nvda.spec.ts` drives
+  NVDA and Chrome through sign in, Runs, New run, a run, Results and Edit inputs and writes what NVDA said after each key to `results/<flow>.json` (ignored
+  by git). Guidepup finds the browser with Alt+Esc and failed on a busy desktop; `focusWindow.ps1` raises Chrome by its title first, and the title match
+  ignores spaces (NVDA says "Re CET"). A locked PC fails every run. Fixes from NVDA 2026.2's transcripts: Run / Results / Compare cards get a visually
+  hidden h2 each (only the h1 was a heading); Validate inputs keeps the focus while busy (aria-disabled, not disabled) and says each check heading once in
+  `#check-announce` (#check-result is rebuilt every poll, so it is no live region); the row-filter count is set when typing pauses (500 ms); the value-list
+  pager hands the focus over when its button disables itself. Never disable the focused control; announce through a persistent status element.
 - 0.1.68 (2026-10-29, Jake; WCAG 2.2 AA audit rows 1, 2, 15, 16: the Edit inputs grid; 0.1.67 is the rest of the pages): `edit.js fixRoles` repairs
   Tabulator 6.3.1's grid roles on tableBuilt (header contents and body table = presentation, the scroll box = the body rowgroup, grid aria-label); the help
   line (`#help`, aria-live, focusable) follows the active cell on arrow keys as well as clicks and leads with the cell's problems (`showHelp(t, col, cellEl)`,
