@@ -26,7 +26,7 @@ Open **New run**.
    budget filing): records priced on an ACC that does not normally apply to their program year are flagged (in the input check and on the run
    page), never stopped. **Compare with** prices the job on a second ACC as well. **First Year**
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
-   **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
+   **Societal Cost Tests** take about 15% of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
 4. **Outputs.** CSV (each file zipped), Excel (for jobs of up to 50,000 measures; a larger job writes zipped CSV), or Parquet. **Output template**
    picks the measure-level file's columns and their order: all columns, a built-in template, or one you saved on the **Templates** page. It starts on
