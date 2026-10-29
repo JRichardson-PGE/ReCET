@@ -206,10 +206,11 @@ test("6 edit inputs grid", async ({ page, nvda }) => {
   await t.keys("ArrowLeft", 1, 1200);
   await t.keys("Tab", 3, 600);
   await t.step("focus the Measure grid", () => page.locator("#grid-Measure .tabulator-tableholder").focus(), 800, ["#help"]);
+  await t.cmd("toggleBetweenBrowseAndFocusMode");   // the page tells screen-reader users to do this before using the arrow keys in the grid
   for (const k of ["ArrowDown", "ArrowDown", "ArrowRight", "ArrowRight", "ArrowRight"]) await t.step(k, () => nvda.press(k), 800, ["#help"]);
   await t.step("click the EUL_Yrs cell of T3 (negative life)",
     () => page.locator(".tabulator-row").nth(2).locator(".tabulator-cell[tabulator-field='EUL_Yrs']").click(), 1000, ["#help"]);
-  await t.step("Escape (leave the cell editor)", () => nvda.press("Escape"), 800, ["#help"]);
+  await t.step("Enter (keep the cell; NVDA takes Escape)", () => nvda.press("Enter"), 800, ["#help"]);
   await t.step("ArrowLeft", () => nvda.press("ArrowLeft"), 800, ["#help"]);
   await t.step("ArrowRight (back to EUL_Yrs)", () => nvda.press("ArrowRight"), 800, ["#help"]);
   await t.step("focus help line", () => page.locator("#help").focus());
