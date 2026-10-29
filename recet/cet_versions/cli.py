@@ -5,7 +5,9 @@
                           [--first-year 2024] [--me-bens 0.05 --me-cost 0.05] [--export-dir FOLDER | --tables FOLDER]
 
 The output folder gets the release's own four output tables (SavedCE.csv, SavedSavings.csv, SavedEmissions.csv,
-SavedCost.csv, CET's columns in CET's order) and run.json (the release, its label and the run's parameters).
+SavedCost.csv, CET's columns in CET's order) and run.json (the release, its label and the run's parameters). A job is priced
+--part-size measures at a time (default 10,000), so a 1,000,000-row job needs about the memory of a 10,000-row one; the
+tables are then in CET_ID order within each part.
 """
 from __future__ import annotations
 
@@ -54,24 +56,34 @@ def cmd_list(a) -> int:
 
 
 def cmd_run(a) -> int:
-    from . import QuarterlyTables, get, run
+    import shutil
+    from . import QuarterlyTables, get, price
+    from .parts import PART_SIZE, plan
     rel = get(a.release)
-    measures = _read(a.measures)
-    programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    first_year = a.first_year or int(measures.ClaimYearQuarter.str[:4].astype(int).min())
-    version = _cet_version(a) if not a.tables else None
-    tables = QuarterlyTables.from_folder(a.tables) if a.tables else QuarterlyTables.from_release(rel.name, version, a.export_dir, measures)
-    res = run(measures, programs, rel.name, tables, first_year=first_year, me_bens=a.me_bens, me_cost=a.me_cost)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    for name, df in res.tables().items():
-        df.to_csv(out / f"{name}.csv", index=False)
+    programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
+    from .job import cet_inputs
+
+    def read(f):                                  # a CEDARS upload has no PA: each record takes its program's (job.cet_inputs)
+        return cet_inputs(_read(f), programs)[0]
+
+    job = plan(a.measures, PART_SIZE if a.part_size is None else a.part_size, read, out / "_parts")
+    first_year = a.first_year or job.first_claim_year
+    version = _cet_version(a) if not a.tables else None
+    tables = QuarterlyTables.from_folder(a.tables) if a.tables else QuarterlyTables.from_release(rel.name, version, a.export_dir, job.keys)
+    priced = 0
+    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), programs, rel.name, tables, first_year, a.me_bens, a.me_cost)):
+        priced += len(res.ce)
+        for name, df in res.tables().items():       # part by part (a large job is never held whole); CET_ID order within a part
+            df.to_csv(out / f"{name}.csv", index=False, mode="w" if i == 0 else "a", header=i == 0)
+    shutil.rmtree(out / "_parts", ignore_errors=True)
     info = {"release": rel.name, "label": rel.label, "backup": rel.backup, "built": rel.built, "cet_version": tables.version,
             "acc": _acc_of(tables.version), "first_year": first_year, "me_bens": a.me_bens, "me_cost": a.me_cost,
-            "measures": len(res.ce), "inputs": {"measures": str(a.measures), "programcost": a.programcost}}
+            "measures": priced, "parts": job.parts, "inputs": {"measures": str(a.measures), "programcost": a.programcost}}
     (out / "run.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     acc = f"{info['acc']} ACC" if info["acc"] else f"Version {tables.version}"
-    print(f"{rel.label}, {acc}: {len(res.ce)} measures priced; outputs in {out}")
+    print(f"{rel.label}, {acc}: {priced} measures priced" + (f" in {job.parts} parts" if job.parts > 1 else "") + f"; outputs in {out}")
     return 0
 
 
@@ -93,6 +105,8 @@ def add_parser(sub) -> None:
     r.add_argument("--me-cost", type=float, default=0.0, help="market effects on costs")
     r.add_argument("--export-dir", help="the release tables' parquet export (default: <reference data folder>/cet_versions)")
     r.add_argument("--tables", help="a folder of the release's tables as CSVs plus meta.json (the test fixtures' layout) instead of the export")
+    r.add_argument("--part-size", type=int, help="measures priced at a time (default 10,000; 0 = the whole job at once). Memory grows with it, "
+                                                 "not with the job: about 30 MB per 1,000 measures")
     r.set_defaults(func=cmd_run)
 
 

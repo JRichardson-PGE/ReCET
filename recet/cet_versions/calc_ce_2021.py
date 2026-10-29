@@ -19,12 +19,17 @@ from .tables import QuarterlyTables
 def _elec_view(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, first_year: int) -> pd.DataFrame:
     """AvoidedCostElecvw: the rebased table joined on PA, end use, climate zone and target sector ('0' = every sector)."""
     cols = ["PA", "Version", "TS", "EU", "CZ", "Qtr", "Qac", "Gen", "TD", "DSType"]
-    src = _source(t.ac_elec, cols, first_year, t.base_year, t.max_qac_elec)
-    src = src.assign(pa_k=key(src.PA), v_k=key(src.Version.astype(str)), ts_k=key(src.TS.astype(str)), eu_k=key(src.EU), cz_k=key(src.CZ))
-    src = src.merge(s[["pa_k", "v_k", "Rqf"]], on=["pa_k", "v_k"])
-    im = e.assign(ts_k=key(e.TS), eu_k=key(e.EU), cz_k=key(e.CZ.str.rstrip()))
-    v = src.drop(columns=["PA", "TS", "EU", "CZ", "Version"]).merge(
-        im.rename(columns={"ts_k": "e_ts_k"}), on=["pa_k", "eu_k", "cz_k"])
+
+    def source():
+        src = _source(t.ac_elec, cols, first_year, t.base_year, t.max_qac_elec)
+        src = src.assign(pa_k=key(src.PA), v_k=key(src.Version.astype(str)), ts_k=key(src.TS.astype(str)), eu_k=key(src.EU), cz_k=key(src.CZ))
+        src = src.merge(s[["pa_k", "v_k", "Rqf"]], on=["pa_k", "v_k"])
+        return src.drop(columns=["PA", "TS", "EU", "CZ", "Version", "Qtr"])
+
+    src = t.cached(("ce2021_elec", first_year), source)
+    im = e[["CET_ID", "pa_k", "TS", "EU", "CZ", "Qm", "eulq1", "eulq2", "kW1", "kWh1", "kW2", "kWh2", "NTGRkW"]]
+    im = im.assign(ts_k=key(im.TS), eu_k=key(im.EU), cz_k=key(im.CZ.str.rstrip())).drop(columns=["TS", "EU", "CZ"])
+    v = src.merge(im.rename(columns={"ts_k": "e_ts_k"}), on=["pa_k", "eu_k", "cz_k"])
     v = v[(v.ts_k == v.e_ts_k) | (v.ts_k == "0")].reset_index(drop=True)
     kw = (v.DSType.astype("string").str.rstrip().str.casefold() == "kw").fillna(False).to_numpy()
     v["DS1"] = np.where(kw, v.kW1, v.kWh1)
@@ -36,12 +41,17 @@ def _elec_view(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, first_year:
 def _gas_view(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, first_year: int, raw: pd.DataFrame) -> pd.DataFrame:
     """AvoidedCostGasvw: joined on ACGasKey = PA + GasSector + GasSavingsProfile (NULL when any of them is)."""
     cols = ["PA", "Version", "GS", "GP", "Qtr", "Qac", "Total", "ACGasKey"]
-    src = _source(t.ac_gas, cols, first_year, t.base_year, t.max_qac_gas)
-    src = src.assign(pa_k=key(src.PA), v_k=key(src.Version.astype(str)), gk=key(src.ACGasKey))
-    src = src.merge(s[["pa_k", "v_k", "Rqf"]], on=["pa_k", "v_k"])
+
+    def source():
+        src = _source(t.ac_gas, cols, first_year, t.base_year, t.max_qac_gas)
+        src = src.assign(pa_k=key(src.PA), v_k=key(src.Version.astype(str)), gk=key(src.ACGasKey))
+        src = src.merge(s[["pa_k", "v_k", "Rqf"]], on=["pa_k", "v_k"])
+        return src.drop(columns=["PA", "GS", "GP", "Version", "ACGasKey", "Qtr"])
+
+    src = t.cached(("ce2021_gas", first_year), source)
     gk = key(raw.PA + raw.E3GasSector + raw.E3GasSavProfile)
-    im = e.drop(columns=["pa_k"]).assign(gk=gk.to_numpy())
-    v = src.drop(columns=["PA", "GS", "GP", "Version", "ACGasKey"]).merge(im, on="gk")
+    im = e[["CET_ID", "Qm", "eulq1", "eulq2", "NTGRThm"]].assign(gk=gk.to_numpy())
+    v = src.merge(im, on="gk")
     v["d"] = dec_pow(v.Rqf, v.Qac)
     return v
 
@@ -114,7 +124,14 @@ def benefits(e, s, t, raw, first_year, me_bens) -> pd.DataFrame:
     return ce
 
 
-def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataFrame, first_year: int, me_cost: float) -> pd.DataFrame:
+def program_sums(ce: pd.DataFrame) -> pd.DataFrame:
+    """BenefitsSum and ClaimCount per PrgID (21.0 sums the positive TRC electric and gas benefits)."""
+    return pd.DataFrame({"PrgID": ce.PrgID, "SumElecBen": pos(ce.ElecBen), "SumGasBen": pos(ce.GasBen), "ClaimCount": 1}).groupby("PrgID", sort=False).sum()
+
+
+def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataFrame, first_year: int, me_cost: float,
+          sums: pd.DataFrame | None = None) -> pd.DataFrame:
+    """TRC / PAC costs; `sums` are the whole job's `program_sums` when `ce` is one part of it."""
     pcs = _program_costs(programs, s, first_year)
     E = e.merge(s[["pa_k", "Rqf"]], on="pa_k", how="inner")
     dqm = dec_pow(E.Rqf, E.Qm)
@@ -124,8 +141,8 @@ def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataF
                        "GrossMeasCostPV": E.Qty * (E.UnitMeasureGrossCost - adj) / dqm})
     ri = ri.groupby("CET_ID", sort=False).sum(min_count=1).reset_index()
 
-    bs = pd.DataFrame({"PrgID": ce.PrgID, "SumElecBen": pos(ce.ElecBen), "SumGasBen": pos(ce.GasBen)}).groupby("PrgID", sort=False).sum()
-    cc = ce.groupby("PrgID", sort=False).size().rename("ClaimCount")
+    bs = (program_sums(ce) if sums is None else sums).copy()
+    cc = bs.pop("ClaimCount")
     X = ce.merge(E[["CET_ID", "Qty", "Qm", "Rqf", "IncentiveToOthers", "DILaborCost", "DIMaterialCost", "EndUserRebate", "NTGRCost"]],
                  on="CET_ID", how="inner")
     X = X.assign(prg_k=key(X.PrgID)).merge(pcs, on="prg_k", how="left").merge(ri, on="CET_ID", how="left")
@@ -150,10 +167,14 @@ def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataF
     return ce.merge(X[["CET_ID"]].assign(**o), on="CET_ID", how="left")
 
 
+def ratios(ce: pd.DataFrame) -> pd.DataFrame:
+    b = ce.ElecBen + ce.GasBen
+    return ce.assign(TRCRatio=divide_or_zero(b, ce.TRCCost), PACRatio=divide_or_zero(b, ce.PACCost),
+                     TRCRatioNoAdmin=divide_or_zero(b, ce.TRCCostNoAdmin), PACRatioNoAdmin=divide_or_zero(b, ce.PACCostNoAdmin))
+
+
 def calc_ce(e, s, programs, t, release: Release, first_year, me_bens, me_cost, raw) -> pd.DataFrame:
     ce = benefits(e, s, t, raw, first_year, me_bens)
     ce = costs(ce, e, s, programs, first_year, me_cost)
     ce = bills(ce, e, s, t, release, me_bens)
-    b = ce.ElecBen + ce.GasBen
-    return ce.assign(TRCRatio=divide_or_zero(b, ce.TRCCost), PACRatio=divide_or_zero(b, ce.PACCost),
-                     TRCRatioNoAdmin=divide_or_zero(b, ce.TRCCostNoAdmin), PACRatioNoAdmin=divide_or_zero(b, ce.PACCostNoAdmin))
+    return ratios(ce)

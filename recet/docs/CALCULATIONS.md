@@ -1045,5 +1045,11 @@ are matched by position, not by name.
 **Tables for a real run.** Small tables (`E3Settings`, `CETAvoidedCostVersions`, the rate-schedule mappings, `E3CombustionType` and, before 25.1,
 `E3RateScheduleGas`) ship in `recet/data/cet_versions/<release>/`. The large ones (the avoided-cost tables, `E3Emissions`, `E3RateScheduleElec`) are read
 from the parquet export in the reference data folder, `<folder>/cet_versions/manifest.csv` and `tables/` (CEDARS-Research
-`poc/export_cet_backup_tables.py`); only the job's PAs and end uses are kept in memory.
+`poc/export_cet_backup_tables.py`); only the job's PAs, end uses and climate zones are kept in memory.
+
+**A large job.** A replica prices `replica_part_size` measures at a time (10,000), in two passes: the first prices each part's benefits and adds up the
+sums CET takes over the whole job (each program's positive benefits and claim count, the savings weights' totals), the second finishes each part with the
+whole job's sums. So a part's measures get the program-cost share and savings weight they get in a whole-job run, values equal to rounding (the sums are
+added in a different order), and memory stays about that of one part: 1,000,000 measures on CET 25.1 peak at about 1.4 GB. Rows sharing a CEInputID are one
+CET_ID to CET and are priced together, in a last part.
 

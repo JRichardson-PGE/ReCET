@@ -59,6 +59,22 @@ def test_replica_equals_runcet(run):
     assert not problems, json.dumps(problems, indent=1)
 
 
+@pytest.mark.parametrize("run", RUNS, ids=lambda p: "/".join(p.parts[-3:]))
+def test_replica_in_chunks_equals_runcet(run):
+    """The same runs priced 7 measures at a time (a large job's chunking): still RunCET's outputs to 1e-9, in the same order."""
+    params = json.loads((run / "params.json").read_text())
+    tables = QuarterlyTables.from_folder(run.parent / "tables")
+    args = (_read(run / "measure.csv"), _read(run / "programcost.csv"), params["release"], tables)
+    kw = dict(first_year=int(params["FirstYear"]), me_bens=float(params["MEBens"]), me_cost=float(params["MECost"]))
+    res = cet_versions.run(*args, **kw, chunk_size=7)
+    problems = {name: differences(df, _read(run / f"{name}.csv")) for name, df in res.tables().items()}
+    problems = {k: v for k, v in problems.items() if v}
+    assert not problems, json.dumps(problems, indent=1)
+    whole = cet_versions.run(*args, **kw)
+    for name, df in res.tables().items():
+        assert list(df.CET_ID) == list(whole.tables()[name].CET_ID), name
+
+
 def test_every_release_has_reference_runs():
     for r in cet_versions.RELEASES:
         assert any(p.parts[-3] == r for p in RUNS), r
@@ -101,6 +117,19 @@ def test_cli_run_writes_the_tables(tmp_path):
     for name in cet_versions.TABLES.values():
         assert not differences(_read(tmp_path / f"{name}.csv"), _read(run / f"{name}.csv")), name
     assert json.loads((tmp_path / "run.json").read_text())["acc"] == 2022
+
+
+def test_cli_run_in_parts(tmp_path):
+    """--part-size: the job read and priced a few measures at a time (parts.plan + price), the tables still RunCET's."""
+    from recet import cli
+    run = DATA / "25.0" / "C3_avc2026" / "me0"
+    with pytest.raises(SystemExit) as done:
+        cli.main(["cet-version", "run", "--release", "25.0", "--tables", str(run.parent / "tables"), "--measures", str(run / "measure.csv"),
+                  "--programcost", str(run / "programcost.csv"), "--first-year", "2028", "--part-size", "9", "--out", str(tmp_path)])
+    assert done.value.code == 0
+    for name in cet_versions.TABLES.values():
+        assert not differences(_read(tmp_path / f"{name}.csv"), _read(run / f"{name}.csv")), name
+    assert json.loads((tmp_path / "run.json").read_text())["parts"] == 5 and not (tmp_path / "_parts").exists()
 
 
 def test_versions_not_offered_are_refused(tmp_path):
