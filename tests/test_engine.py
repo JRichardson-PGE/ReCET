@@ -201,8 +201,8 @@ def _zipped(members: dict[str, bytes]) -> bytes:
 
 
 def test_a_cedars_upload_runs_on_a_replica(tmp_path):
-    """A CEDARS Measure.csv (no PA; FuelID for CET's FuelType; statewide records with their IOU_AC_Territory) prices as the reference run's CET
-    input table: each record's PA is its program's, a statewide record's its territory."""
+    """A CEDARS Measure.csv (no PA; FuelID for CET's FuelType) prices as CEDARS hands it to CET: each record's PA is its IOU_AC_Territory and a
+    non-IOU program's ProgramCost rows are SCE's."""
     run = DATA / "25.1" / C3 / "me0"
     m, p = _read(run / "measure.csv"), _read(run / "programcost.csv")
     sw = set(p.loc[p.PA.str.strip().str.upper() == "SW", "PrgID"])
@@ -226,16 +226,18 @@ def test_a_cedars_upload_runs_on_a_replica(tmp_path):
         assert not differences(ours, want.tables()[name].astype(str).replace("nan", "")), name
         ref = _read(run / f"{name}.csv")
         assert not differences(ours[~ours.CET_ID.isin(sw_ids)].reset_index(drop=True), ref[~ref.CET_ID.isin(sw_ids)].reset_index(drop=True)), name
-    assert any("statewide record" in n for n in res.notes) and any("costed as SCE" in n for n in res.notes)
+    assert any("on their IOU_AC_Territory" in n for n in res.notes) and any("costed as SCE" in n for n in res.notes)
     frame = pd.read_csv(res.files["measure_level"])
     assert "IOU_AC_Territory" in frame and len(frame) == len(m)
     assert frame["PA"].notna().all()                                                            # the PA each record was priced on (SavedCE)
 
 
 def test_cet_inputs_pa():
-    m = pd.DataFrame({"PrgID": ["PGE_1", "SW_X", "SCE_2", "SW_Y"], "IOU_AC_Territory": ["PGE", "SCE", "SCE", None], "FuelID": [None] * 4})
-    p = pd.DataFrame({"PA": ["PGE", "SW"], "PrgID": ["pge_1 ", "SW_X"]})
+    m = pd.DataFrame({"PrgID": ["PGE_1", "SW_X", "SCE_2", "SW_Y", "MCE01", "PGE_1"], "IOU_AC_Territory": ["PGE", "SCE", "SCE", None, "PGE", ""],
+                      "FuelID": [None] * 6})
+    p = pd.DataFrame({"PA": ["PGE", "SW", "MCE"], "PrgID": ["pge_1 ", "SW_X", "MCE01"]})
     out, n = cet_job.cet_inputs(m, p)
-    assert list(out.PA) == ["PGE", "SCE", "SCE", "SW"] and n == 1 and "FuelType" in out and "FuelID" not in out
-    q, k = cet_job.cet_programs(p.assign(PA=["PGE", " sw "]))
-    assert list(q.PA) == ["PGE", "SCE"] and k == 1 and list(p.PA) == ["PGE", "SW"]              # the caller's table is not changed
+    # the territory whenever there is one (CEDARS, jobs 122714 / 122716 / 122738), else the program's PA, else the PrgID's prefix
+    assert list(out.PA) == ["PGE", "SCE", "SCE", "SW", "PGE", "PGE"] and n == 2 and "FuelType" in out and "FuelID" not in out
+    q, k = cet_job.cet_programs(p.assign(PA=["PGE", " sw ", "BAY"]))
+    assert list(q.PA) == ["PGE", "SCE", "SCE"] and k == 2 and list(p.PA) == ["PGE", "SW", "MCE"]   # every non-IOU PA; the caller's table not changed
