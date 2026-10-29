@@ -269,8 +269,8 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
 
     has_gas_savings = (measures["AC_Net_Therms_1st_Baseline"] != 0) | (measures["AC_Net_Therms_2nd_Baseline"] != 0)
     n_with_gas_savings = int(has_gas_savings.sum())
-    n_with_gas_profile = int(measures.loc[has_gas_savings, "AC_Gas_Impact_Profile"]
-                             .apply(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None).sum())
+    n_with_gas_profile = sum(not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None     # a plain sum: an empty pandas 3 str Series sums to ""
+                             for k in measures.loc[has_gas_savings, "AC_Gas_Impact_Profile"])
 
     result = price_gas_benefit(measures, get_gas_shape, get_gas_acc_years, get_discount_rate_qtr, base_year,
                                route_key=_route_keys(measures, ["AC_Gas_Impact_Profile", "IOU_AC_Territory", "AC_Gas_Target_Sector"]))   # one lookup per route

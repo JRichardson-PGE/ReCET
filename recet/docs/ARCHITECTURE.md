@@ -131,7 +131,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
 | `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
 | `gui_templates.py` | interface | the window's output-template editor: two-list field picker and the default template (over `output_templates.py`) |
-| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data` |
+| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `openbca` |
 | `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
@@ -175,6 +175,11 @@ Every module in the package. Paths are relative to `recet/`.
 | `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
 | `paths.py` | data | where package data, the reference data folder and the cache are |
 | `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
+| `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
+| `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
+| `openbca/workbook.py` | job | writes an OpenBCA Program Input workbook in OpenBCA's template layout |
+| `openbca/translate.py` | job | a CET job as an OpenBCA job priced on ReCET's own electric and gas shapes, avoided costs and discount rates, with every known difference flagged; `compare_job` runs both tools and compares them (C3 / C4) |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
