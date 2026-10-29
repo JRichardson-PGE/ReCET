@@ -195,6 +195,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `cet_versions/calc_cost.py` | pricing | replica: CalcCost: participant costs, weighted program costs, discounted savings, levelized values |
 | `cet_versions/sql.py` | pricing | replica: SQL Server's arithmetic as CET meets it: NULLs, decimal POWER rounding, collation keys, 1.000 / n |
 | `cet_versions/job.py` | pricing | the run's engine (D13): a replica run through `jobs.run_job` (New run, `recet run --engine`), its measure-level table in ReCET's layout, the options it refuses |
+| `cet_versions/parts.py` | data | a replica job read part by part: Measure.csv split once, scanned for the table keys, First Year and repeated CEInputIDs |
 | `cet_versions/cli.py` | interface | `recet cet-version list` and `run` |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |

@@ -148,7 +148,8 @@ def cet_inputs(measures: pd.DataFrame, programs: pd.DataFrame) -> tuple[pd.DataF
 def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
     """The measure-level table of a replica run: the input columns (ReCET's names, as filed), each Saved* column under ReCET's name (a column already
     there is not repeated), one row per input measure in input order; a measure the release did not price (e.g. a PA it has no avoided costs for)
-    has blank outputs. Then the program metadata columns."""
+    has blank outputs. Rows sharing a CEInputID are one CET_ID to CET (priced together), so each shows that CET_ID's outputs. Then the program
+    metadata columns."""
     from .. import fieldnames, outputs
     frame = raw.reset_index(drop=True).copy()
     frame.insert(0, "Used_ACCVersion", acc_label)
@@ -158,6 +159,7 @@ def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
     for t in res.tables().values():
         t = fieldnames.cet_outputs_to_recet(t).copy()
         t.index = t["CET_ID"].astype(str).str.strip()
+        t = t[~t.index.duplicated()]
         for c in t.columns:
             if c not in have:
                 add[c] = t[c].reindex(ids).to_numpy()
@@ -169,7 +171,7 @@ def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
 def run_job(cfg, log=print):
     """Run `cfg` (a jobs.RunConfig whose engine is a replica) end to end; returns a jobs.RunResult. Raises ValueError for `problems`."""
     from .. import jobs, outputs, paths, progress, results_view, versions, workbook
-    from . import QuarterlyTables, run
+    from . import TABLES, QuarterlyTables, price
     t_start = time.time()
     rel = release_of(cfg.engine)
     bad = problems(cfg)
@@ -204,58 +206,100 @@ def run_job(cfg, log=print):
     log("\n== loading ==")
     progress.plan(False, cfg.output_format, True, True, False)
     progress.report("loading")
+    from .. import key_metrics
+    from .parts import PART_SIZE, plan
+    size = PART_SIZE if cfg.replica_part_size is None else int(cfg.replica_part_size)      # RunConfig.replica_part_size; 0 = one part
+    work = run_dir / "_parts"
     programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    measures, on_territory = cet_inputs(_read(cfg.measures), programs)
+    counted = [0]
+
+    def read(f):
+        m, n = cet_inputs(_read(f), programs)
+        counted[0] += n
+        return m
+
+    job = plan(cfg.measures, size, read, work)
+    on_territory = counted[0]                 # counted while the job was scanned (every row read once)
     if on_territory:
         note = (f"{on_territory:,} statewide record(s) are priced on their IOU_AC_Territory (CEDARS does not pass statewide programs to CET, which has "
                 "no avoided costs or settings for PA SW)")
         result.notes.append(note)
         log(f"note: {note}")
-    if "ACCVersion" in measures and measures["ACCVersion"].fillna("").astype(str).str.strip().ne("").any():
+    if job.acc_version_set:
         note = f"the ACCVersion column is a ReCET option: the {rel.label} prices every record on the {versions.acc_short(acc)}"
         result.notes.append(note)
         log(f"note: {note}")
-    first_year = cfg.base_year or int(measures["ClaimYearQuarter"].astype(str).str[:4].astype(int).min())
+    first_year = cfg.base_year or job.first_claim_year
     me = float(cfg.market_effects or 0.0)
-    log(f"{len(measures):,} measures, First Year {first_year}, market effects {me:.0%} on benefits and costs")
+    log(f"{job.rows:,} measures, First Year {first_year}, market effects {me:.0%} on benefits and costs"
+        + (f"; priced in {job.parts} parts of up to {size:,}" if job.parts > 1 else ""))
+    if job.duplicated:
+        log(f"note: {len(job.duplicated):,} CEInputID(s) are on more than one row; CET prices such rows together, so they are priced (and listed) last")
     tl = time.time()
-    tables = QuarterlyTables.from_release(rel.name, version, None, measures)
+    tables = QuarterlyTables.from_release(rel.name, version, None, job.keys)
     log(f"the release's Version {version} tables read in {time.time() - tl:.0f}s ({len(tables.ac_elec):,} electric and {len(tables.ac_gas):,} gas "
         "avoided-cost rows for this job)")
 
-    log(f"\n== pricing ({rel.label}) ==")
+    log(f"\n== pricing and writing ({rel.label}) ==")
     progress.report("pricing")
     tp = time.time()
-    res = run(measures, programs, rel.name, tables, first_year=first_year, me_bens=me, me_cost=me)
-    priced = len(res.ce)
-    log(f"priced in {time.time() - tp:.0f}s: {priced:,} of {len(measures):,} measures in SavedCE")
-    if priced < len(measures):
-        note = (f"{len(measures) - priced:,} measure(s) are not in the release's outputs (CET leaves out a measure whose PA has no avoided costs or "
+    excel = jobs.excel_limit(cfg, result, log)
+    cfg.output_format = jobs.run_format(cfg, job.rows, log)
+    whole = job.parts == 1
+    label = versions.acc_short(acc)
+    saved = {name: outputs.TableWriter(run_dir / f"{name}_{tag}", cfg.output_format, job.rows, cfg.parquet_row_group, excel=excel)
+             for name in TABLES.values()} if not whole else {}
+    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, job.rows, cfg.parquet_row_group, keep_parquet=True, excel=excel,
+                                 select=cfg.output_template or None)
+    summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
+    km_parts, result_sums, result_columns = [], [], None
+    priced = 0
+    frame = None
+    texts = job.frames(lambda f: outputs.read_raw(f))
+    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), programs, rel.name, tables, first_year, me, me)):
+        priced += len(res.ce)
+        for name, df in res.tables().items():
+            if whole:
+                result.files[name] = outputs.write_table(df, run_dir / f"{name}_{tag}", cfg.output_format, excel)
+            else:
+                saved[name].write(df)
+        frame = measure_level(next(texts), res, label)
+        writer.write(frame)
+        if not whole:
+            summary_parts.add(frame)
+            km_parts.append(key_metrics.sums(frame))
+            result_sums.append(results_view.group_sums(frame))
+            result_columns = result_columns or list(frame.columns)
+            frame = None
+        del res
+        progress.report("writing", i + 1, job.parts)
+    for name, w in saved.items():
+        result.files[name] = w.close()
+    log(f"priced in {time.time() - tp:.0f}s: {priced:,} of {job.rows:,} measures in SavedCE")
+    if priced < job.rows:
+        note = (f"{job.rows - priced:,} measure(s) are not in the release's outputs (CET leaves out a measure whose PA has no avoided costs or "
                 f"settings, e.g. a statewide program's): their output columns are blank")
         result.notes.append(note)
         log(f"note: {note}")
+    if not whole:
+        result.notes.append(f"run in {job.parts} parts of up to {size:,} measures: the measure-level table is in its file only")
 
-    log("\n== writing results ==")
-    progress.report("writing")
-    excel = jobs.excel_limit(cfg, result, log)
-    cfg.output_format = jobs.run_format(cfg, len(measures), log)
-    for name, df in res.tables().items():
-        result.files[name] = outputs.write_table(df, run_dir / f"{name}_{tag}", cfg.output_format, excel)
-    frame = measure_level(outputs.read_raw(cfg.measures), res, versions.acc_short(acc))
+    progress.report("file", 0, 1)
+    result.files["measure_level"] = writer.close(lambda j, c: progress.report("file", progress.file_share(j, c, writer.fmt), 1))
     result.frame = frame
-    writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, len(frame), cfg.parquet_row_group, keep_parquet=True, excel=excel,
-                                 select=cfg.output_template or None)
-    writer.write(frame)
-    result.files["measure_level"] = writer.close()
-    from .. import key_metrics
-    jobs.write_template_files(cfg, writer, key_metrics.sums(frame), run_dir, tag, excel, result, log)
-    summary = outputs.summarize(frame, cfg.apply_exclude_from_ce)
+    jobs.write_template_files(cfg, writer, key_metrics.sums(frame) if whole else key_metrics.combine(km_parts), run_dir, tag, excel, result, log)
+    summary = outputs.summarize(frame, cfg.apply_exclude_from_ce) if whole else summary_parts.result()
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
 
     progress.report("finishing")
     write_settings(cfg, rel, version, acc, run_dir, result, t_start, priced, first_year)
-    results_view.keep_group_sums(run_dir, frame)
+    if whole:
+        results_view.keep_group_sums(run_dir, frame)
+    else:
+        results_view.keep_group_sums(run_dir, sums=results_view.combine_parts(result_sums, result_columns))
+    import shutil
+    shutil.rmtree(work, ignore_errors=True)
     log(f"\ndone in {time.time() - t_start:.0f}s -- results in {run_dir}")
     progress.report("done")
     return result

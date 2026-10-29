@@ -28,20 +28,25 @@ def key(s) -> pd.Series:
     return s.astype("string").str.rstrip(" ").str.casefold()
 
 
+def _dec_pow1(bb: float, kk: float) -> float:
+    hit = _POW.get((bb, kk))
+    if hit is None:
+        p = bb ** (int(kk) if kk == int(kk) else kk)
+        hit = _POW[(bb, kk)] = float(Decimal(p).quantize(_SIX, rounding=ROUND_HALF_UP))
+    return hit
+
+
 def dec_pow(base, n) -> np.ndarray:
-    """POWER(decimal(.,6) base, n): the power rounded half up to six decimal places (NULL in, NULL out)."""
+    """POWER(decimal(.,6) base, n): the power rounded half up to six decimal places (NULL in, NULL out). Each distinct
+    (base, n) pair is computed once: a job has a few discount rates and a few hundred quarters, but millions of rows."""
     b = np.broadcast_to(np.asarray(base, dtype=float), np.shape(n)).ravel()
     k = np.asarray(n, dtype=float).ravel()
-    out = np.empty(len(k))
-    for i, (bb, kk) in enumerate(zip(b, k)):
-        if np.isnan(bb) or np.isnan(kk):
-            out[i] = NaN
-            continue
-        hit = _POW.get((bb, kk))
-        if hit is None:
-            p = bb ** (int(kk) if kk == int(kk) else kk)
-            hit = _POW[(bb, kk)] = float(Decimal(p).quantize(_SIX, rounding=ROUND_HALF_UP))
-        out[i] = hit
+    out = np.full(len(k), NaN)
+    ok = ~(np.isnan(b) | np.isnan(k))
+    if ok.any():
+        pairs, inv = np.unique(np.stack([b[ok], k[ok]], axis=1), axis=0, return_inverse=True)
+        vals = np.array([_dec_pow1(float(bb), float(kk)) for bb, kk in pairs])
+        out[ok] = vals[inv.ravel()]
     return out.reshape(np.shape(n))
 
 
