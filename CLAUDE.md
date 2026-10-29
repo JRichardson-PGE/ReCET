@@ -95,6 +95,13 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.72 (2026-10-29, Jake: "For D13 enable this in ReCET calculations"): the calculation engine. `RunConfig.engine` ("" / "recet" = ReCET, "cet-<release>" =
+  a replica), CLI `--engine`, New run's Calculation engine select (with "Which ACCs each engine has"; replica-only ACCs in their own optgroup). `jobs.run_job`
+  hands a replica to `cet_versions/job.run_job`, which writes the release's Saved* tables and a measure-level file in ReCET's layout (`measure_level`: inputs,
+  Saved* columns under ReCET's names via `cet_outputs_to_recet`, Prg_ columns), the summary and group sums, so Results / Compare work across engines.
+  run_settings.json has an `engine` block (`engine_record`); run page and Compare show it (`Ctx.engine_label`). `job.REFUSED`: a replica refuses supplied
+  ACC / profile files, statewide allocation, components, 8,760, a second ACC, filing checks and Check inputs only (a filing accepts only ReCET's release);
+  the web drops server run_defaults in REFUSED for replicas. File inputs are 24 px tall (axe target-size with every details open; New run, run, Results and Compare clean in both schemes). Replica runs need the parquet export in `<reference folder>/cet_versions/`. tests/test_engine.py.
 - 0.1.71 (2026-10-29): `cet_versions.QuarterlyTables.from_release` reads an avoided-cost parquet in 1M-row batches and keeps only the job's PA / end-use
   rows before it becomes a DataFrame (the largest quarter is read from the Qac column alone). The first real 25.1 run on the laptop ran out of memory
   (17.3 GB) loading the whole 23.3M-row 2026 electric table; C3 needs about 1,100 rows. 24.3 (2022 ACC) and 25.0 (2024 ACC) already matched RunCET on the full export.

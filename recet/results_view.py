@@ -288,8 +288,7 @@ def group_sums(frame: pd.DataFrame) -> pd.DataFrame:
     keys = list(k.columns)
     x = pd.concat([k, frame[cols].astype(float)], axis=1)
     g = x.groupby(keys, sort=False, dropna=False)
-    out = g[cols].sum(min_count=1)
-    out[COUNT] = g.size()
+    out = pd.concat([g[cols].sum(min_count=1), g.size().rename(COUNT)], axis=1).copy()   # one block: a wide sum came out fragmented and warned
     return out.reset_index()
 
 

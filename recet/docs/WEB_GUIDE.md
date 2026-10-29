@@ -20,7 +20,10 @@ Open **New run**.
    its own is not accepted). Each upload has a **template** link beside it. **Optional supplied files** replace the built-in 8,760 electric profiles, gas
    monthly profiles, run parameters, statewide allocation factors or program metadata for this run only; their layouts are in
    [Input formats](INPUT_FORMATS.md). The page states the size limits (150 MB per file, 1,024 MB once unzipped, unless your site set others).
-3. **Pricing.** The **ACC version** is named by the year E3 released the calculator ("2026 ACC"); the 2021 and 2022 ACCs are TRC only. **Which ACC
+3. **Pricing.** **Calculation engine** is ReCET's current release (the default; the only one a filing accepts) or a replica of an earlier CET release
+   (21.0 to 25.1), which prices the job exactly as that release's RunCET did, its errors included, on that release's own avoided-cost tables, for
+   evaluation and history. **Which ACCs each engine has** lists them; a replica takes none of the options below except First Year, Market effects, the
+   Societal Cost Tests switch, Emissions and the output choices. The run page and the comparison name each run's engine. The **ACC version** is named by the year E3 released the calculator ("2026 ACC"); the 2021 and 2022 ACCs are TRC only. **Which ACC
    applies to my filing?** below it is a short table, one row per ACC: the budget filings priced on it and the program years whose claims use it (the ACC
    of the year's final budget filing); ACCs not yet in ReCET are dimmed. **Priced for** says what the run is for (any filing, Quarterly Claims, or one
    budget filing): records priced on an ACC that does not normally apply to their program year are flagged (in the input check and on the run
