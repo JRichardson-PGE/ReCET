@@ -107,34 +107,57 @@ class QuarterlyTables:
             with p.open(encoding="utf-8") as f:
                 return pd.read_csv(f, dtype=TEXT, keep_default_na=False, na_values=[""])
 
-        def large(name, required=True):
+        def large(name, required=True, keep=None):
+            """The table, with only the rows whose `keep` columns' keys are in the given sets. A parquet is read in
+            batches and filtered before it becomes a DataFrame: 25.1's 2026 electric table has 23.3M rows."""
             if name in files:
                 import pyarrow as pa
+                import pyarrow.compute as pc
                 import pyarrow.parquet as pq
-                t = pq.read_table(files[name])
-                t = t.cast(pa.schema([pa.field(f.name, pa.float64() if pa.types.is_decimal(f.type) else
-                                               pa.string() if f.name in TEXT else f.type) for f in t.schema]))
+                pf = pq.ParquetFile(files[name])
+                schema = pa.schema([pa.field(f.name, pa.float64() if pa.types.is_decimal(f.type) else
+                                             pa.string() if f.name in TEXT else f.type) for f in pf.schema_arrow])
+                kept = []
+                for b in pf.iter_batches(batch_size=1_000_000):
+                    t = pa.Table.from_batches([b]).cast(schema)
+                    for col, keys in (keep or {}).items():
+                        values = pd.Series(pc.unique(t[col]).to_pylist(), dtype=object)
+                        ok = values[key(values).isin(keys).fillna(False).astype(bool)]
+                        t = t.filter(pc.is_in(t[col], value_set=pa.array(list(ok), pa.string())))
+                    kept.append(t)
+                t = pa.concat_tables(kept) if kept else schema.empty_table()
                 return t.to_pandas().astype({c: object for c in t.column_names if c in TEXT})
             df = small(name)
-            if df is None and required:
-                raise FileNotFoundError(f"CET {release}: table {name} is neither in {manifest} nor shipped with ReCET")
+            if df is None:
+                if required:
+                    raise FileNotFoundError(f"CET {release}: table {name} is neither in {manifest} nor shipped with ReCET")
+                return df
+            for col, keys in (keep or {}).items():
+                df = df[key(df[col]).isin(keys).fillna(False).astype(bool)]
             return df
+
+        def max_qac(name):
+            if name in files:
+                import pyarrow.compute as pc
+                import pyarrow.parquet as pq
+                return int(pc.max(pq.read_table(files[name], columns=["Qac"])["Qac"].cast("float64")).as_py())
+            return int(pd.to_numeric(small(name).Qac).max())
 
         versions = small("CETAvoidedCostVersions")
         row = versions[version_key(versions.Version) == version_key(pd.Series([str(version)]))[0]]
         if row.empty:
             raise ValueError(f"CET {release} has no avoided-cost Version {version}; it has {', '.join(versions.Version)}")
         row = row.iloc[0]
-        ac_elec, ac_gas = large(row.AVCElecTable), large(row.AVCGasTable)
-        max_e, max_g = int(pd.to_numeric(ac_elec.Qac).max()), int(pd.to_numeric(ac_gas.Qac).max())
+        # the largest quarter is the whole table's (CalcCE caps a measure's quarters at it), so it is read before filtering
+        max_e, max_g = max_qac(row.AVCElecTable), max_qac(row.AVCGasTable)
+        keep_elec = keep_gas = None
         if measures is not None:
             pas = set(key(measures.PA).dropna())
-            ac_elec = ac_elec[key(ac_elec.PA).isin(pas)]
             shape = measures["E3MeaElecEndUseShape"].astype("string")
             eus = set(key(shape.str.replace(r"(?i)^(non_res|res):(?=deer)", "", regex=True)).dropna()) | set(key(shape).dropna())
-            ac_elec = ac_elec[key(ac_elec.EU).isin(eus)]
-            ac_gas = ac_gas[key(ac_gas.PA).isin(pas)]
-        ac_elec, ac_gas = ac_elec.reset_index(drop=True), ac_gas.reset_index(drop=True)
+            keep_elec, keep_gas = {"PA": pas, "EU": eus}, {"PA": pas}
+        ac_elec = large(row.AVCElecTable, keep=keep_elec).reset_index(drop=True)
+        ac_gas = large(row.AVCGasTable, keep=keep_gas).reset_index(drop=True)
         vk = set(version_key(ac_elec.Version.dropna()).unique()) | {version_key(pd.Series([str(version)]))[0]}
         emissions = large("E3Emissions")
         emissions = emissions[version_key(emissions.Version).isin(vk)].reset_index(drop=True)
