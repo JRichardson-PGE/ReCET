@@ -2,7 +2,7 @@
 {% block title %}Users{% endblock %}
 {% block content %}
 <h1>Users</h1>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 {% if link %}
 <div class="card ok-card">
   <p><strong>Setup link for {{ link_for }}</strong> (works once, for {{ link_hours }} hours). Send it to them yourself; it is not shown again.</p>
@@ -19,7 +19,7 @@
     <button class="primary">Add and make a setup link</button>
   </form>
 </section>
-<table class="list">
+<div class="hscroll"><table class="list">
   <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Runs</th><th></th></tr></thead>
   <tbody>
   {% for x in users %}
@@ -39,6 +39,6 @@
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

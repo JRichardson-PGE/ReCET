@@ -4,7 +4,7 @@
 <h1>Edit inputs</h1>
 <p class="muted">Build or change a small job (up to {{ max_rows }} measures) cell by cell, with CET's dropdown values and the same checks as a run, then run it.
 Larger jobs are edited offline (Excel) and run from <a href="{{ u('/runs/new') }}">New run</a>. Drafts are kept {{ draft_days }} days after their last change.</p>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 
 <section class="card">
   <h2>Your drafts</h2>

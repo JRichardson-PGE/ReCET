@@ -269,8 +269,8 @@ def run_gas_benefit(measures: pd.DataFrame, cost_test: str = "TRC", acc_version:
 
     has_gas_savings = (measures["AC_Net_Therms_1st_Baseline"] != 0) | (measures["AC_Net_Therms_2nd_Baseline"] != 0)
     n_with_gas_savings = int(has_gas_savings.sum())
-    n_with_gas_profile = int(measures.loc[has_gas_savings, "AC_Gas_Impact_Profile"]
-                             .apply(lambda k: not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None).sum())
+    n_with_gas_profile = sum(not pd.isna(k) and gas_savings_profiles.get_shape(k) is not None     # a plain sum: an empty pandas 3 str Series sums to ""
+                             for k in measures.loc[has_gas_savings, "AC_Gas_Impact_Profile"])
 
     result = price_gas_benefit(measures, get_gas_shape, get_gas_acc_years, get_discount_rate_qtr, base_year,
                                route_key=_route_keys(measures, ["AC_Gas_Impact_Profile", "IOU_AC_Territory", "AC_Gas_Target_Sector"]))   # one lookup per route
@@ -794,7 +794,7 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
     market_effects_bens / market_effects_cost: CET's run-level Market Effects (MarketEffectBens / MarketEffectCost, 0 or 0.05). Benefits use
     NTG + MEBens (the Gross columns divide by NTG + MEBens too), costs use MECost. (The window, command line and RunConfig set both from one option,
     jobs.RunConfig.market_effects; the two stay separate here because CET keeps them separate.) Not validated against a CET run made with a nonzero setting.
-    include_societal=False skips the two societal pricing passes (about two thirds of the run time); every SB/SH/SCB/SCH column is then blank (NaN).
+    include_societal=False skips the two societal pricing passes (about 15% of a 1M run on the server: 58 of 392 s); every SB/SH/SCB/SCH column is then blank (NaN).
 
     Every cost-effectiveness output in one table: the regular TRC/PAC/RIM/SCB/
     SCH costs and ratios plus their Gross and NoAdmin variants, Gross benefits
@@ -857,7 +857,8 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
     out = cost_tests.compute_cost_tests(d, prog, totals)
     out = out.merge(savings_outputs(measures, market_effects_bens), on="CEInputID", how="left")
     if not include_societal:
-        out[[c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]] = float("nan")
+        societal = [c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]
+        out = out.assign(**dict.fromkeys(societal, float("nan"))).copy()   # copy: one block (column-by-column NaNs fragment the frame; pandas warned per part)
     return out
 
 

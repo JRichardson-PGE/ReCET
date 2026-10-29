@@ -133,3 +133,9 @@ def test_an_excel_job_over_the_limit_writes_every_table_as_zipped_csv(tmp_path):
     assert settings["notes"] == r.notes and settings["config"]["output_format"] == "csv.zip"
     small = run_job(_cfg(tmp_path, output_format="xlsx", run_name="xl2"), log=lambda s: None)                     # within the default limit: Excel
     assert small.files["measure_level"].suffix == ".xlsx" and small.files["portfolio_summary"].suffix == ".xlsx" and not small.notes
+
+
+def test_a_job_with_gas_profiles_named_but_no_gas_savings_runs(tmp_path):
+    """pandas 3 reads a filled AC_Gas_Impact_Profile column as str, and an empty str Series sums to "" (run_poc.run_gas_benefit's count of matched profiles)."""
+    cfg = _cfg(tmp_path, measures=str(make_measure_csv(tmp_path / "M.csv", AC_Gas_Impact_Profile="Res_Furnace")))
+    assert run_job(cfg, log=lambda s: None).frame.iloc[0]["GasBen"] == 0
