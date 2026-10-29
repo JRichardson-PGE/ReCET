@@ -67,7 +67,7 @@ class RunConfig:
     portfolio_8760: bool = False             # combined 8,760 electric load profile
     profile_years: list[int] = field(default_factory=list)   # calendar years of the combined profile (default: First Year)
     market_effects: float = 0.0              # CET's Market Effects: 0 or 0.05, applied to benefits AND costs (CET's MEBens and MECost set together)
-    include_societal: bool = True            # SCB / SCH (about two thirds of the run time)
+    include_societal: bool = True            # SCB / SCH (about 15% of the run time)
     emissions: bool = True                   # CO2 / NOx / PM10 columns
     allocate_statewide: bool = False         # split statewide (SW_) programs across the IOUs
     apply_exclude_from_ce: bool = False      # leave programs flagged Exclude_From_CE out of the portfolio summary (they are still priced)

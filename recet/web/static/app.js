@@ -2,6 +2,19 @@
 (function () {
   "use strict";
 
+  // A page that comes back with an error message (a form the server refused): move the focus to the message, so a keyboard or screen-reader user
+  // hears it (WCAG 3.3.1). Not the run page's live message, which updates while the page is open.
+  var alertBox = document.querySelector("main p.alert[role=alert]:not(.hidden):not(#run-message)");
+  if (alertBox) { alertBox.tabIndex = -1; alertBox.focus(); }
+
+  // A live page (run page, runs list) reloads itself when a run ends, to show its files; it waits while the person is typing or has the focus in
+  // a control, and says so instead (WCAG 2.4.3: a reload would drop the focus and anything typed).
+  var reloadWhenIdle = function (say) {
+    var a = document.activeElement;
+    if (!a || a === document.body || a.id === "main") { window.location.reload(); return; }
+    say("The run ended. Reload the page to see its results and files.");
+  };
+
   // Confirm before destructive form posts.
   document.querySelectorAll("form.confirm").forEach(function (f) {
     f.addEventListener("submit", function (e) { if (!window.confirm(f.dataset.confirm || "Are you sure?")) e.preventDefault(); });
@@ -89,13 +102,14 @@
     xhr.send(new FormData(runForm));
   });
 
-  // Results: selects submit their form; the column picker sends the ticked columns.
-  document.querySelectorAll("select.autosubmit, input.autosubmit").forEach(function (s) {
-    s.addEventListener("change", function () {
-      if (s.name === "view") { var c = s.form.querySelector("input[name=columns]"); if (c) c.remove(); }
-      s.form.submit();
+  // Results and Compare: the filters are sent by their Apply button, never on change (WCAG 3.2.2). A different saved view replaces the unsaved columns.
+  document.querySelectorAll("select[data-view]").forEach(function (s) {
+    var was = s.value;
+    s.form.addEventListener("submit", function () {
+      if (s.value !== was) { var c = s.form.querySelector("input[name=columns]"); if (c) c.remove(); }
     });
   });
+  // Results: the column picker sends the ticked columns.
   var pick = document.getElementById("pick");
   if (pick) {
     var ticked = function () { return Array.prototype.map.call(pick.querySelectorAll(".pick input:checked"), function (x) { return x.value; }); };
@@ -125,7 +139,8 @@
           }
           var more = d.offset > offset;
           offset = d.offset;
-          var st = document.getElementById("run-status");
+          var st = document.getElementById("run-status"), say = document.getElementById("run-announce");
+          if (say && st.textContent !== d.status_text) say.textContent = "Run status: " + d.status_text;      // announced only when it changes
           st.textContent = d.status_text;
           st.className = "status big s-" + d.status;
           var pos = document.getElementById("run-position");
@@ -142,7 +157,7 @@
           }
           if (more) { setTimeout(poll, 50); return; }
           if (d.status === "queued" || d.status === "running") { setTimeout(poll, 1500); return; }
-          if (live) { window.location.reload(); }
+          if (live) reloadWhenIdle(function (m) { pos.textContent = m; if (say) say.textContent = m; });
         })
         .catch(function () { setTimeout(poll, 5000); });
     };
@@ -162,7 +177,11 @@
             var x = d[id], row = runsTable.querySelector('tr[data-id="' + id + '"]');
             if (!row) return;
             if (x.status !== "queued" && x.status !== "running") ended = true;
-            var st = row.querySelector(".status");
+            var st = row.querySelector(".status"), say = document.getElementById("runs-announce");
+            if (say && st.textContent !== x.status_text) {
+              var name = row.cells[1] ? row.cells[1].textContent.trim().split("\n")[0] : "A run";
+              say.textContent = name + ": " + x.status_text;
+            }
             st.textContent = x.status_text;
             st.className = "status s-" + x.status;
             var wait = row.querySelector(".live-wait"), box = row.querySelector(".progress");
@@ -176,7 +195,7 @@
               box.querySelector(".live-text").textContent = Math.round(x.progress.fraction * 100) + "%" + (left.length > 1 ? " · " + left[left.length - 1] : "");
             }
           });
-          if (ended) { window.location.reload(); return; }
+          if (ended) { reloadWhenIdle(function (m) { var s = document.getElementById("runs-announce"); if (s) s.textContent = m; }); return; }
           setTimeout(tick, 4000);
         })
         .catch(function () { setTimeout(tick, 15000); });
@@ -191,8 +210,12 @@
     var heads = table.tHead ? table.tHead.rows[0].cells : [];
     Array.prototype.forEach.call(heads, function (th, col) {
       th.classList.add("sort-head");
-      th.tabIndex = 0;
       th.setAttribute("aria-sort", "none");
+      var btn = document.createElement("button");             // the heading's text becomes a button: reachable by Tab and announced as one
+      btn.type = "button";
+      btn.className = "sort-btn";
+      while (th.firstChild) btn.appendChild(th.firstChild);
+      th.appendChild(btn);
       var sort = function () {
         var dir = th.getAttribute("aria-sort") === "descending" ? "ascending" : "descending";
         Array.prototype.forEach.call(heads, function (h) { h.setAttribute("aria-sort", "none"); });
@@ -214,7 +237,6 @@
         rows.forEach(function (tr) { body.appendChild(tr); });
       };
       th.addEventListener("click", sort);
-      th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sort(); } });
     });
   });
   document.querySelectorAll("input[data-filter]").forEach(function (box) {
@@ -318,7 +340,7 @@
       var f = byName[name], o = document.createElement("option");
       o.value = name; o.textContent = name;
       o.title = f ? (f.g + (f.d ? ": " + f.d : "")) : "Not in the field list (a per-component column, or a name ReCET does not write)";
-      if (!f && !/^(Elec|Gas)Value_/.test(name)) o.className = "unknown";
+      if (!f && !/^(Elec|Gas)Value_/.test(name)) { o.className = "unknown"; o.textContent = name + " (not in the field list)"; }   // not by colour alone
       return o;
     };
     var renderAvail = function () {

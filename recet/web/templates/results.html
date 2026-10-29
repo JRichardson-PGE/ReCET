@@ -2,6 +2,8 @@
 {% block title %}Results · {{ run.label or run.id }}{% endblock %}
 {% block main_class %}page wide{% endblock %}
 {% block content %}
+{% macro tile_help(tiles) %}{% if tiles|selectattr('help')|list %}<details class="tile-help small"><summary>What these numbers are</summary>
+  <dl>{% for t in tiles if t.help %}<dt>{{ t.label }}</dt><dd>{{ t.help }}</dd>{% endfor %}</dl></details>{% endif %}{% endmacro %}
 <div class="head-row">
   <h1>Results: {{ run.label or run.id }}</h1>
   <a class="button" href="{{ u('/runs/' + run.id) }}">Run page, files and log</a>
@@ -25,19 +27,21 @@
 <form method="get" class="filters" id="filters">
   {% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% endif %}
   <input type="hidden" name="level" value="{{ level }}">
-  <label>PA <select name="pa" class="autosubmit">{% for p in pas %}<option {% if p == pa %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
-  <label>View <select name="view" class="autosubmit">
+  <label>PA <select name="pa">{% for p in pas %}<option {% if p == pa %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+  <label>View <select name="view" data-view>
     {% if not view %}<option value="" selected>(unsaved columns)</option>{% endif %}
     {% for v in views %}<option {% if v == view %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
   {% if not view %}<input type="hidden" name="columns" value="{{ keys|join(',') }}">{% endif %}
   <button type="button" id="columns-btn" aria-expanded="false" aria-controls="columns">Columns…</button>
   {% if all_years|length > 1 %}
-  <fieldset class="years" title="Total the tables over these program years (claim years); none ticked = every year">
+  <fieldset class="years" aria-describedby="years-help">
     <legend>Program years</legend>
-    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" class="autosubmit" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+    <span class="small muted" id="years-help">(totals over the ticked years; none ticked = every year)</span>
     {% if years %}<a class="small" href="?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">all years</a>{% endif %}
   </fieldset>
   {% endif %}
+  <button>Apply</button>
 </form>
 <p class="muted small">{{ file_name }} · {{ '{:,}'.format(n_measures) }} measures{% if years %} · totalled over program year{{ 's' if years|length > 1 }} {{ years|join(', ') }}{% endif %}. Every level above the measure is a sum of its measures; ratios are recomputed from the summed benefits and costs.</p>
 
@@ -79,6 +83,7 @@
 <section class="tiles" aria-label="Portfolio results{{ ' for ' + pa if pa != rv.ALL_PAS }}">
   {% for t in tiles %}<div class="tile" title="{{ t.help }}"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.value }}</span></div>{% endfor %}
 </section>
+{{ tile_help(tiles) }}
 {% endif %}
 {% if chart %}
 <details class="card chart-card" open>
@@ -102,11 +107,12 @@
   {% endif %}
   {% endfor %}
 </p>
+{% if measure_ok is defined and not measure_ok %}<p class="small muted">The measure level is shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures; the measure-level table is in the run's downloads.</p>{% endif %}
 {% if note %}<p class="note">{{ note }}</p>{% endif %}
 {% if table is not none %}
 <div class="table-tools">
   <label class="inline small">Filter rows <input type="search" data-filter="results-table" data-count="filter-count" placeholder="program, PA, text…" autocomplete="off"></label>
-  <span class="small muted" id="filter-count"></span>
+  <span class="small muted" id="filter-count" role="status"></span>
   <span class="small muted">Click a column heading to sort.</span>
   <a class="button" href="{{ u('/runs/' + run.id + '/results.csv') }}?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'years': years_param, 'columns': '' if view else keys|join(',')}|urlencode }}">Download this table (CSV)</a>
 </div>
@@ -114,6 +120,9 @@
   <thead><tr>{% for c in table.columns %}<th title="{{ catalog[c].help if c in catalog else '' }}" scope="col">{{ labels[c] if c in labels else c }}</th>{% endfor %}</tr></thead>
   <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog or c == 'Measures' else '' }}" {% if (c in catalog or c == 'Measures') and v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,}'.format(v) if c == 'Measures' and v is number else rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
 </table></div>
+{% set defs = table.columns|list|select('in', catalog)|list %}
+{% if defs %}<details class="small"><summary>Column definitions</summary>
+  <dl class="tile-help">{% for c in defs if catalog[c].help %}<dt>{{ labels[c] if c in labels else c }}</dt><dd>{{ catalog[c].help }}</dd>{% endfor %}</dl></details>{% endif %}
 {% if table|length == 0 %}<p class="muted">No rows for this PA{{ ' and these years' if years }} at this level.</p>{% endif %}
 {% endif %}
 {% endif %}

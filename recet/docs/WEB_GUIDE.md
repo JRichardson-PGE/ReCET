@@ -26,7 +26,7 @@ Open **New run**.
    budget filing): records priced on an ACC that does not normally apply to their program year are flagged (in the input check and on the run
    page), never stopped. **Compare with** prices the job on a second ACC as well. **First Year**
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
-   **Societal Cost Tests** take about two thirds of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
+   **Societal Cost Tests** take about 15% of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
 4. **Outputs.** CSV (each file zipped), Excel (for jobs of up to 50,000 measures; a larger job writes zipped CSV), or Parquet. **Output template**
    picks the measure-level file's columns and their order: all columns, a built-in template, or one you saved on the **Templates** page. It starts on
@@ -78,6 +78,7 @@ until you show them. Queued and running runs update in place. Runs other users s
 **Results** (on the run page) shows the run's outputs as tables.
 
 - **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
+- Change **PA**, **View** or **Program years** and press **Apply** (nothing reloads until you do).
 - **Program years** (a run with more than one claim year) totals every table, the headline numbers and the chart over the years ticked; none ticked, or
   **all years**, is every year (BRD BR-04.1).
 - **Levels:** portfolio, program segment, program sector, program year, program, and measure. Every level above the measure is a sum of its measures; ratios are
@@ -86,6 +87,7 @@ until you show them. Queued and running runs update in place. Runs other users s
 - The **headline numbers** and a **total system benefit by program sector** chart sit above the table.
 - **Columns…** chooses the columns, grouped (ratios, benefits, costs, savings, emissions, societal tests); **Find** narrows the list. **Save view**
   keeps a choice under a name, and **View** switches between your views (Default is built in).
+- **What these numbers are** (under the headline numbers) and **Column definitions** (under the table) define each number shown.
 - Click a column heading to **sort**; **Filter rows** keeps the rows containing some text. **Download this table (CSV)** saves the table as shown.
 - A run that compared two ACCs has a **Comparison** tab and one tab per ACC.
 

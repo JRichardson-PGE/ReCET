@@ -8,8 +8,8 @@
 <h1>{% for t, f in fields %}{{ f }}{% if not loop.last %}, {% endif %}{% endfor %}</h1>
 <p>{% for t, f in fields %}{{ t }}.{{ f }}{% if not loop.last %}, {% endif %}{% endfor %} offers the codes below (CET list <code>{{ name }}</code>).
 A code is offered for a claim year from its first through its last valid year.{% if note %} {{ note }}{% endif %}</p>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
-{% if done %}<p class="card ok-card">{{ done }}</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+{% if done %}<p class="card ok-card" role="status">{{ done }}</p>{% endif %}
 {% if user.role == 'admin' %}
 <section class="card">
   <h2>Add a code</h2>
@@ -36,7 +36,7 @@ A code is offered for a claim year from its first through its last valid year.{%
   <label>Find <input type="search" id="vl-filter" placeholder="code or description"></label>
   <label><input type="checkbox" id="vl-retired"> Show retired codes</label>
   <label>Per page <select id="vl-size"><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option><option value="500">500</option><option value="0">All</option></select></label>
-  <span class="small" id="vl-count"></span>
+  <span class="small" id="vl-count" role="status"></span>
 </p>
 {% if user.role == 'admin' %}
 <form method="post" action="{{ u('/docs/value-lists/' + name) }}" id="vl-act">
@@ -44,7 +44,7 @@ A code is offered for a claim year from its first through its last valid year.{%
   <p class="small vl-year"><label>Last valid claim year for codes you retire <input type="number" name="end_year" min="2000" max="2100" value="{{ this_year }}"></label></p>
 </form>
 {% endif %}
-<table class="list" id="vl-table">
+<div class="hscroll"><table class="list" id="vl-table">
   <thead><tr><th>Code</th><th>Description</th><th>First valid year</th><th>Last valid year</th><th>Status</th><th>Source</th>{% if user.role == 'admin' %}<th></th>{% endif %}</tr></thead>
   <tbody>
   {% for r in rows %}
@@ -59,8 +59,8 @@ A code is offered for a claim year from its first through its last valid year.{%
   </tr>
   {% endfor %}
   </tbody>
-</table>
-<p class="vl-pager" id="vl-pager"><button type="button" id="vl-prev">&larr; Previous</button> <span class="small" id="vl-page"></span> <button type="button" id="vl-next">Next &rarr;</button></p>
+</table></div>
+<p class="vl-pager" id="vl-pager"><button type="button" id="vl-prev">&larr; Previous</button> <span class="small" id="vl-page" role="status"></span> <button type="button" id="vl-next">Next &rarr;</button></p>
 {% if changes %}
 <h2>Admin changes to this list</h2>
 <table class="list">

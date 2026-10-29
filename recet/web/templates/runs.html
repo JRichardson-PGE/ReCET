@@ -9,6 +9,7 @@
 {% if n_expired %}{% if show_expired %}<a href="{{ u('/runs' + ('?all=1' if everyone else '')) }}">Hide the {{ n_expired }} expired</a>{% else %}<a href="{{ u('/runs?expired=1' + ('&all=1' if everyone else '')) }}">Show the {{ n_expired }} expired</a>{% endif %}{% endif %}
 {% if user.role == 'admin' %}{% if everyone %}<a href="{{ u('/runs' + ('?expired=1' if show_expired else '')) }}">Show only mine</a>{% else %}<a href="{{ u('/runs?all=1' + ('&expired=1' if show_expired else '')) }}">Show everyone's</a>{% endif %}{% endif %}</p>
 {% if runs %}
+<p id="runs-announce" class="sr-only" role="status"></p>
 <div class="hscroll">
 <table class="list" id="runs-table" data-live="{{ 1 if live_ids else 0 }}" data-url="{{ u('/runs/live') }}" data-ids="{{ live_ids|join(',') }}">
   <thead><tr><th>Started</th><th>Run</th><th>ACC</th><th class="num">Measures</th><th>Inputs</th>{% if everyone %}<th>Owner</th>{% endif %}<th>Status</th></tr></thead>
