@@ -160,13 +160,7 @@
       clipboardCopyRowRange: "range", clipboardPasteParser: "range", clipboardPasteAction: "range",
       history: true
     });
-    g.on("tableBuilt", function () { fixRoles(t, g); });
-    // keyboard (arrows move the range): the help line follows the active cell, with its problems, so nothing is hover-only (WCAG 2.1.1)
-    g.element.addEventListener("keyup", function (e) {
-      if (!/^(Arrow|Tab|Home|End|Page)/.test(e.key) || e.target.tagName === "INPUT") return;
-      var c = g.element.querySelector(".tabulator-cell.tabulator-range-only-cell-selected") || g.element.querySelector(".tabulator-cell.tabulator-range-selected");
-      if (c) showHelp(t, c.getAttribute("tabulator-field"), c);
-    });
+    g.on("tableBuilt", function () { fixRoles(t, g); cellFocus(t, g); });
     ["cellEdited", "clipboardPasted", "rowAdded", "rowDeleted", "historyUndo", "historyRedo", "dataChanged"].forEach(function (ev) {
       g.on(ev, function () { changed(t); });
     });
@@ -231,6 +225,48 @@
     if (hc) hc.setAttribute("role", "presentation");
     if (holder) { holder.setAttribute("role", "rowgroup"); holder.setAttribute("aria-label", t + " rows"); }
     if (body) body.setAttribute("role", "presentation");
+  }
+
+  // The grid is one tab stop, as in the ARIA grid pattern. The keyboard focus sits on the active cell, so a screen reader names the cell and
+  // switches to its focus mode by itself (NVDA stayed in browse mode on the scroll box, and the arrows never reached the grid), the arrows
+  // move it, and the help line follows it with the cell's problems (nothing hover-only, WCAG 2.1.1). Tab and Shift+Tab leave the grid:
+  // Tabulator's Tab moved to the next cell, so the keyboard could not get out (2.1.2). Tab still moves an open editor to the next cell.
+  function cellFocus(t, g) {
+    var holder = g.element.querySelector(".tabulator-tableholder"), header = g.element.querySelector(".tabulator-header");
+    var range = g.modules && g.modules.selectRange;
+    if (!holder || !range) return;
+    if (header) header.setAttribute("tabindex", "-1");
+    var editing = function () { return g.element.querySelector(".tabulator-cell.tabulator-editing"); };
+    var active = function () {
+      var c = range.activeRange && range.getActiveCell(), e = c && c.getElement && c.getElement();
+      return e && e.isConnected && holder.contains(e) ? e : null;
+    };
+    // the tab stop: the active cell while it is drawn (scrolling drops rows), else the scroll box, which hands the focus on
+    var stop = function () {
+      var e = active();
+      g.element.querySelectorAll('.tabulator-cell[tabindex]').forEach(function (c) { if (c !== e) c.removeAttribute("tabindex"); });
+      if (e) e.setAttribute("tabindex", "0");
+      holder.setAttribute("tabindex", e ? "-1" : "0");
+      return e;
+    };
+    var toCell = function () {
+      var f = document.activeElement, inGrid = g.element.contains(f), e = stop();   // stop() blurs the cell it takes the tabindex from
+      if (inGrid && !editing() && f !== e) (e || holder).focus({ preventScroll: true });
+      if (e) showHelp(t, e.getAttribute("tabulator-field"), e);
+    };
+    holder.addEventListener("focus", function () { setTimeout(toCell, 0); });    // a click, or an edit closing
+    holder.addEventListener("focusin", function (ev) {                          // Tab in
+      if (ev.target.classList.contains("tabulator-cell")) showHelp(t, ev.target.getAttribute("tabulator-field"), ev.target);
+    });
+    g.on("rangeChanged", function () { setTimeout(toCell, 0); });
+    g.element.addEventListener("keyup", function (e) {                          // the first move sends no rangeChanged
+      if (/^(Arrow|Home|End|Page)/.test(e.key) && e.target.tagName !== "INPUT") toCell();
+    });
+    g.on("renderComplete", stop);
+    g.element.addEventListener("keydown", function (e) {
+      if (e.key === "Tab" && !editing()) e.stopPropagation();                   // before Tabulator's keybinding takes it
+    }, true);
+    stop();
   }
 
   function updateCounts() {

@@ -120,6 +120,9 @@ async function open(page: Page, url: string, ready: string) {
 }
 
 test.describe.configure({ mode: "serial" });
+// Full capture: each step records everything NVDA says until it has been quiet for a second. Guidepup's default ("initial") keeps only the
+// first phrase, which missed what is announced after a control's own name (Validate inputs' result came after "unavailable").
+test.use({ nvdaStartOptions: { capture: true } });
 
 test("1 sign in page", async ({ page, nvda }) => {
   const t = new Transcript("1_login", page, nvda);
@@ -189,7 +192,7 @@ test("5 results", async ({ page, nvda }) => {
   await t.cmd("moveToNextColumn", 3);
   await t.cmd("moveToNextRow", 2);
   await t.step("focus row filter", () => page.locator("input[data-filter='results-table']").focus());
-  await t.step("type 'Po'", () => nvda.type("Po"), 2500, ["#filter-count"]);   // the row count is a role=status line
+  await t.step("type 'Po'", () => nvda.type("Po"), 2500, ["#filter-count"]);   // the row count is announced (#announcer) once typing pauses
   await t.keys("Tab");
   t.save();
 });
@@ -205,9 +208,12 @@ test("6 edit inputs grid", async ({ page, nvda }) => {
   await t.keys("ArrowRight", 1, 1200);
   await t.keys("ArrowLeft", 1, 1200);
   await t.keys("Tab", 3, 600);
-  await t.step("focus the Measure grid", () => page.locator("#grid-Measure .tabulator-tableholder").focus(), 800, ["#help"]);
-  await t.cmd("toggleBetweenBrowseAndFocusMode");   // the page tells screen-reader users to do this before using the arrow keys in the grid
+  await t.step("focus help line", () => page.locator("#help").focus());
+  // Tab lands on the grid's active cell, where NVDA should switch to focus mode by itself, so the arrows move between cells
+  await t.step("Tab (into the grid)", () => nvda.press("Tab"), 1000, ["#help"]);
   for (const k of ["ArrowDown", "ArrowDown", "ArrowRight", "ArrowRight", "ArrowRight"]) await t.step(k, () => nvda.press(k), 800, ["#help"]);
+  await t.keys("Shift+Tab", 1, 800);   // out of the grid again (no keyboard trap)
+  await t.keys("Tab", 1, 800);         // back to the same cell
   await t.step("click the EUL_Yrs cell of T3 (negative life)",
     () => page.locator(".tabulator-row").nth(2).locator(".tabulator-cell[tabulator-field='EUL_Yrs']").click(), 1000, ["#help"]);
   await t.step("Enter (keep the cell; NVDA takes Escape)", () => nvda.press("Enter"), 800, ["#help"]);
