@@ -1,8 +1,0 @@
-CombustorType,Controls,LookupCode,CO2,NOx
-Large Boilers (>100 MMBtu/hr Heat Input),Controlled – Flue Gas Recirculation,Large Boilers (>100 MMBtu/hr Heat Input):Controlled – Flue Gas Recirculation,0.00585,0.0098
-Large Boilers (>100 MMBtu/hr Heat Input),Controlled Low NOx Burner,Large Boilers (>100 MMBtu/hr Heat Input):Controlled Low NOx Burner,0.00585,0.0137
-Large Boilers (>100 MMBtu/hr Heat Input),Uncontrolled,Large Boilers (>100 MMBtu/hr Heat Input):Uncontrolled,0.00585,0.0186
-Residential Furnaces (<0.3),Uncontrolled,Residential Furnaces (<0.3):Uncontrolled,0.00585,0.0092
-Small Boilers (<100 MMBtu/hr Heat Input),Controlled – Flue Gas Recirculation,Small Boilers (<100 MMBtu/hr Heat Input):Controlled – Flue Gas Recirculation,0.00585,0.0031
-Small Boilers (<100 MMBtu/hr Heat Input),Controlled Low NOx Burner,Small Boilers (<100 MMBtu/hr Heat Input):Controlled Low NOx Burner,0.00585,0.0049
-Small Boilers (<100 MMBtu/hr Heat Input),Uncontrolled,Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled,0.00585,0.0098

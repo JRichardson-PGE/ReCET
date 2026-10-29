@@ -521,7 +521,7 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   (C17).
 * **Prior CET releases are replicas, checked against the releases themselves.** `recet/cet_versions` prices a job exactly as CET 21.0, 22.1, 24.1,
   24.2, 24.3, 25.0 or 25.1 does, errors included (Jake, 2026-10-29; CALCULATIONS C20). It shares no code with ReCET's hourly engine.
-  `tests/test_cet_versions.py` requires every output column of every measure to equal that release's own RunCET run to 1e-9, on 21 reference runs
+  `tests/test_cet_versions.py` requires every output column of every measure to equal that release's own RunCET run to 1e-9, on 19 reference runs
   made on restored copies of each release's database backup.
 * **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
 
