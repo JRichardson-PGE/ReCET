@@ -993,12 +993,13 @@ The replica shares no code with ReCET's engine, so nothing in C0-C19 changes whe
 **Releases.** One per CPUC database backup: 21.0 (2020-08-24), 22.1 (2021-12-09), 24.1 (2023-05-16), 24.2 (2023-09-20), 24.3 (2024-08-28), 25.0
 (2025-05-18) and 25.1 (2026-10-07). `recet cet-version list` shows which ACCs each one has (an ACC is named by its year; the release's tables use CET's
 Avoided Cost Version numbers, `versions.CET_VERSION_TO_ACC`). 25.1 lists a Version 2027 with no tables in its backup: Version 2027 was a corrected
-Version 2026 (the 2024 ACC), and the 2026-10-07 backup carries only the corrected tables, under Version 2026 (Jake, 2026-10-29; `Release.version_notes`).
-So a 25.1 replica on the 2024 ACC prices on the corrected tables. Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
+Version 2026 (the 2024 ACC), and the 2026-10-07 backup carries only the corrected tables, under Version 2026 (Jake, 2026-10-29). So a 25.1 replica
+on the 2024 ACC prices on the corrected tables. 21.0's backup lists a Version 2021 too, but the next ACC was not part of 21.0 (Jake, 2026-10-29): the
+backup's tables for it are an unfinished load (Version labels `2020`, `2016`, `PG&E`). Neither Version is offered (`Release.not_offered`). Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
 E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does.
 
 **Acceptance.** A replica is accepted only when every output column of every measure equals that release's own RunCET run to 1e-9 (relative; NULL must
-be NULL). `tests/test_cet_versions.py` checks 21 reference runs: for each release a 30-measure synthetic job built to exercise every branch (with and
+be NULL). `tests/test_cet_versions.py` checks 19 reference runs: for each release a 30-measure synthetic job built to exercise every branch (with and
 without 5% market effects), and for 25.0 and 25.1 also two jobs of 41 and 50 real PG&E records. The runs were made on restored copies of the backups and
 their table slices are in `tests/data/cet_versions/` (CEDARS-Research `poc/cet_version_fixtures.py`).
 
@@ -1025,8 +1026,7 @@ are matched by position, not by name.
   the replica does the same.)
 * 24.1: the dual-baseline net lifecycle kWh are multiplied by EUL a second time.
 * 24.3 and before: the gas rate-schedule mapping's `Commercial` and `Residential` sectors for PG&E, RCEA and SJCE end in a line break, so those measures
-  match no gas rate and get no gas bill reduction. 21.0 on the 2020 ACC (Version 2021): that table has `PG&E` in its Version column, so no measure
-  gets an electric benefit or electric emissions.
+  match no gas rate and get no gas bill reduction.
 * 25.0: `SaveCost` leaves `LevSCBCostNoAdmin` and `LevSCHCostNoAdmin` out of its insert list, so they are always blank.
 * 25.0 and 25.1: `BenefitsSum`'s column list is out of step with its `SELECT`, so the gross program-cost weight uses the positive tax credits as the
   electric benefit; two positional lists rotate `LevBenElec`, `LevBenElec_SB` and `LevBenElec_SH`.
