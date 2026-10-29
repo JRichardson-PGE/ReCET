@@ -46,8 +46,9 @@ def cmd_list(a) -> int:
     for r in RELEASES.values():
         with resources.files("recet.data").joinpath(f"cet_versions/{r.name}/CETAvoidedCostVersions.csv").open(encoding="utf-8") as f:
             v = pd.read_csv(f, dtype=str)
-        notes = dict(r.version_notes)
-        accs = ", ".join(notes.get(x) or (f"{_acc_of(x)} ACC" if _acc_of(x) else f"Version {x}") for x in sorted(v.Version, key=float))
+        skip = dict(r.not_offered)
+        accs = ", ".join(f"{_acc_of(x)} ACC" if _acc_of(x) else f"Version {x}" for x in sorted(v.Version, key=float) if x not in skip)
+        accs += "".join(f"\n      not offered: Version {x} ({why})" for x, why in r.not_offered)
         print(f"{r.name:5} {r.label:20} backup {r.built} ({r.backup})\n      ACCs: {accs}")
     return 0
 
