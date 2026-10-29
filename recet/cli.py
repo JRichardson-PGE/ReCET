@@ -4,6 +4,7 @@
     recet run --measures M.csv [--programcost P.csv] --acc 2026 --out results
     recet run --config job.json             a saved configuration (the GUI's "Save settings" writes one)
     recet run --workbook job.xlsx --acc 2026 --out results      a job workbook instead of the CSVs
+    recet run --engine cet-24.3 --acc 2022 --measures M.csv --out results      the job on a CET replica engine instead of ReCET's own (D13)
     recet preflight --measures M.csv --acc 2026
     recet template all --out templates      every template + INPUT_FORMATS.md
     recet template workbook --out job.xlsx  an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760)
@@ -34,6 +35,8 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--workbook", help="an Excel job workbook instead of the CSVs (Measure sheet required; see `recet template workbook`)")
     g.add_argument("--out", dest="out_dir", help="output folder (a run sub-folder is created inside it)")
     g.add_argument("--name", dest="run_name", help="run folder name prefix (default: a timestamp)")
+    g.add_argument("--engine", help="the calculation engine: recet (default: ReCET's own hourly pricing) or cet-<release> (an exact replica of that CET "
+                   "release, errors included: cet-25.1, cet-25.0, cet-24.3, cet-24.2, cet-24.1, cet-22.1, cet-21.0; see `recet cet-version list`)")
     g = ap.add_argument_group("ACC version and supplied files")
     g.add_argument("--acc", dest="acc_version", help="ACC version: 2021, 2022, 2024, 2026, or a new label defined by the files below")
     g.add_argument("--acc-electric-file", help="electric ACC file: replaces the built-in one for --acc (or defines a new version)")

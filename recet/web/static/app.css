@@ -50,6 +50,7 @@ input[type=text], input[type=email], input[type=password], input[type=number], i
 textarea { font: inherit; border: 1px solid var(--control); border-radius: 5px; background: var(--bg); color: var(--fg); }
 input.short { width: 8rem; display: inline-block; }
 input.copy { width: min(100%, 46rem); }
+input[type=file] { min-height: 24px; }   /* 2.5.8: at least 24 x 24 px (a file input is 21 px tall by default) */
 button, .button { font: inherit; padding: .4rem .9rem; border: 1px solid var(--control); border-radius: 5px; background: var(--card); color: var(--fg);
   cursor: pointer; text-decoration: none; display: inline-block; }
 button:hover, .button:hover { border-color: var(--accent); }

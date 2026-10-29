@@ -7,7 +7,7 @@
   <h1>{{ run.label or 'Run ' + run.id }}</h1>
   <span class="status big s-{{ run.status }}" id="run-status">{{ status_text.get(run.status, run.status) }}</span>
 </div>
-<p class="muted">{{ acc_label(run.acc_version) }}{% if run.compare_with %} vs {{ acc_label(run.compare_with) }}{% endif %}{% if run.preflight_only %} · input check only{% endif %}
+<p class="muted">{% if engine %}{{ engine }} · {% endif %}{{ acc_label(run.acc_version) }}{% if run.compare_with %} vs {{ acc_label(run.compare_with) }}{% endif %}{% if run.preflight_only %} · input check only{% endif %}
  · started {{ fmt_time(run.created_at) }}{% if run.owner_email != user.email %} · by {{ run.owner_email }}{% endif %}
  {% if expires %}· {{ expires }}{% endif %}{% if run.label %} · <span class="small">{{ run.id }}</span>{% endif %}</p>
 {% if settings %}<p class="small settings-line">{{ settings }}</p>{% endif %}

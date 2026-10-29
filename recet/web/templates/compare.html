@@ -6,8 +6,8 @@
   <h1>Compare two runs</h1>
   <a class="button" href="{{ u('/runs/' + a.id) }}">Back to the run</a>
 </div>
-<p><strong>A:</strong> <a href="{{ u('/runs/' + a.id + '/results') }}">{{ a.label or a.id }}</a> <span class="muted">· {{ acc_label(a.acc_version) }} · {{ fmt_time(a.created_at) }}{% if a.owner_email != user.email %} · {{ a.owner_email }}{% endif %}</span><br>
-<strong>B:</strong> <a href="{{ u('/runs/' + b.id + '/results') }}">{{ b.label or b.id }}</a> <span class="muted">· {{ acc_label(b.acc_version) }} · {{ fmt_time(b.created_at) }}{% if b.owner_email != user.email %} · {{ b.owner_email }}{% endif %}</span></p>
+<p><strong>A:</strong> <a href="{{ u('/runs/' + a.id + '/results') }}">{{ a.label or a.id }}</a> <span class="muted">· {{ engine_a }} · {{ acc_label(a.acc_version) }} · {{ fmt_time(a.created_at) }}{% if a.owner_email != user.email %} · {{ a.owner_email }}{% endif %}</span><br>
+<strong>B:</strong> <a href="{{ u('/runs/' + b.id + '/results') }}">{{ b.label or b.id }}</a> <span class="muted">· {{ engine_b }} · {{ acc_label(b.acc_version) }} · {{ fmt_time(b.created_at) }}{% if b.owner_email != user.email %} · {{ b.owner_email }}{% endif %}</span></p>
 
 <form method="get" class="filters">
   <input type="hidden" name="level" value="{{ level }}">

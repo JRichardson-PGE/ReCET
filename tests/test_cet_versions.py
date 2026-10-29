@@ -77,12 +77,14 @@ def test_from_release_reads_the_export(tmp_path):
         for c in df.columns:
             if c not in ("PA", "Version", "TS", "EU", "CZ", "Qtr", "DSType", "ACElecKey", "ACKey", "GS", "GP", "ComboField", "ACGasKey", "Schedule"):
                 df[c] = pd.to_numeric(df[c])
+        if slice_ == "ac_elec":   # a PA the job does not have: filtered out while the parquet is read
+            df = pd.concat([df, df.head(3).assign(PA="ZZ")], ignore_index=True)
         df.to_parquet(tmp_path / "tables" / f"{table}.parquet")
         rows.append(f"x,25.1,{table},{len(df)},{df.shape[1]},0,tables/{table}.parquet,0")
     (tmp_path / "manifest.csv").write_text("\n".join(rows) + "\n")
     measures, programs = _read(run / "measure.csv"), _read(run / "programcost.csv")
     tables = QuarterlyTables.from_release("25.1", "2026", tmp_path, measures=measures)
-    assert tables.base_year == 2024 and tables.max_qac_elec == 123
+    assert tables.base_year == 2024 and tables.max_qac_elec == 123 and "ZZ" not in set(tables.ac_elec.PA)
     params = json.loads((run / "params.json").read_text())
     res = cet_versions.run(measures, programs, "25.1", tables, first_year=int(params["FirstYear"]))
     problems = {name: differences(df, _read(run / f"{name}.csv")) for name, df in res.tables().items()}

@@ -48,6 +48,9 @@ class RunConfig:
     workbook: str | None = None              # an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760 sheets) instead of files
     out_dir: str = "recet_results"
     run_name: str = ""                       # folder name prefix; default is a timestamp
+    # --- the engine (D13, BR-06.4): "" / "recet" = ReCET's own hourly pricing; "cet-<release>" = an exact replica of that CET release (cet_versions/job.py),
+    #     on the release's own quarterly tables, CET's errors included. A filing accepts only ReCET's own engine.
+    engine: str = ""
     # --- ACC version and supplied ACC files
     acc_version: str = "2024"                # "2024", "2026", or a new label defined by the supplied files
     acc_electric_file: str | None = None     # replaces the built-in electric ACC for acc_version (or defines a new version)
@@ -249,8 +252,10 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
     """run_settings.json: everything needed to reproduce the run. `parts`: how a chunked run split the job."""
     from . import __version__, paths
     ref = paths.ref_status()
+    from .cet_versions.job import engine_record
     settings = {
         "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
+        "engine": engine_record(cfg.engine),
         "config": asdict(cfg),
         "acc": {"key": acc.key, "label": acc.label, "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
                 "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
@@ -332,6 +337,9 @@ def write_reconciliation(cfg: RunConfig, parts, run_dir: Path, tag: str, excel, 
 
 
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
+    from .cet_versions import job as cet_job
+    if cet_job.release_of(cfg.engine) is not None:
+        return cet_job.run_job(cfg, log)            # a CET replica (D13): its own run, its own files
     t_start = time.time()
     if not cfg.measures and not cfg.workbook:
         raise ValueError("no Measure.csv or job workbook given")
@@ -535,6 +543,9 @@ def run_compare(cfg: RunConfig, log: Log = print) -> RunResult:
     from . import outputs, progress
     if not cfg.compare_with or cfg.compare_with == cfg.acc_version:
         raise ValueError("compare_with must name a different ACC version")
+    from .cet_versions import job as cet_job
+    if cet_job.release_of(cfg.engine) is not None:
+        raise ValueError(f"the {cet_job.label(cfg.engine)} cannot compare two ACCs in one run: run each ACC and compare the two runs")
     folder = Path(cfg.out_dir) / (cfg.run_name.strip() or datetime.now().strftime("compare_%Y%m%d_%H%M%S"))
     folder.mkdir(parents=True, exist_ok=True)
     frames, results = {}, {}
