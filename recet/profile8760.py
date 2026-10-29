@@ -17,7 +17,11 @@ Shapes and calendar:
 * `hour_of_year` is the ACC hour index (1 = Jan 1 00:00); `datetime` labels it on the ACC's calendar, 2018 (every forecast year of the ACC follows 2018's
   weekdays), so the same hour carries the same weekday in every year's column.
 
-Output frame: hour_of_year, datetime (ACC calendar, 2018), then per year `net_kwh_<Y>` (all IOUs) and `net_kwh_<Y>_<PA>` for each PA present.
+Output frame: hour_of_year, datetime (ACC calendar, 2018), then per year `net_kwh_<Y>` (all IOUs), `net_kwh_<Y>_<PA>` for each PA present and
+`net_kwh_<Y>_CZ<zone>` for each climate zone present (the measure's AC_Climate_Zone as filed, e.g. CZ13 or CZSystem; BRD BR-06.13).
+
+`peaks(profile, years)` (the portfolio_8760_peaks table): per year, for the portfolio, each PA and each climate zone, the year's net kWh, the hour of its
+largest net savings (its own peak) and of its largest added load, and its kWh in the portfolio's peak hour (coincident with the portfolio peak).
 """
 from __future__ import annotations
 
@@ -29,6 +33,16 @@ import pandas as pd
 from .pipeline import real_impact_profiles, system_zones
 
 HOURS = 8760
+
+
+def zone_label(zone) -> str:
+    """The climate-zone column suffix of a measure's AC_Climate_Zone: "13" -> "CZ13", "CZ13" stays, blank -> "CZ(blank)"."""
+    z = str(zone if zone is not None else "").strip()
+    if z.endswith(".0") and z[:-2].isdigit():
+        z = z[:-2]
+    if not z or z.lower() == "nan":
+        return "CZ(blank)"
+    return z if z.upper().startswith("CZ") else f"CZ{z}"
 
 
 def _overlap(a0: float, a1: float, b0: float, b1: float) -> float:
@@ -54,6 +68,7 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
     """(profile frame, unshaped-measures table, summary dict). See the module docstring."""
     years = sorted(int(y) for y in years)
     pas = sorted(measures["IOU_AC_Territory"].astype(str).unique())
+    zones = sorted({zone_label(z) for z in measures["AC_Climate_Zone"]}) if "AC_Climate_Zone" in measures else []
     shape_cache: dict[tuple, tuple | None] = {}
 
     def shape_for(m):
@@ -66,6 +81,7 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
 
     # weight per (shape key, PA) per year, so each distinct shape is added once per year
     acc: dict[tuple[int, str], np.ndarray] = {(y, pa): np.zeros(HOURS) for y in years for pa in pas}
+    acc_zone: dict[tuple[int, str], np.ndarray] = {(y, z): np.zeros(HOURS) for y in years for z in zones}
     unshaped: list[dict] = []
     kwh_total = {y: 0.0 for y in years}
     kwh_unshaped = {y: 0.0 for y in years}
@@ -94,6 +110,7 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
         for y in years:
             if wy[y]:
                 acc[(y, key[1])] += wy[y] * shape
+                acc_zone[(y, zone_label(key[3]))] += wy[y] * shape
 
     df = pd.DataFrame({"hour_of_year": np.arange(1, HOURS + 1)})
     df.insert(1, "datetime", pd.date_range(f"{real_impact_profiles.acc_calendar_year()}-01-01", periods=HOURS, freq="h"))
@@ -101,6 +118,8 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
         df[f"net_kwh_{y}"] = sum(acc[(y, pa)] for pa in pas)
         for pa in pas:
             df[f"net_kwh_{y}_{pa}"] = acc[(y, pa)]
+        for z in zones:
+            df[f"net_kwh_{y}_{z}"] = acc_zone[(y, z)]
     summary = {y: {"delivered_net_kwh": kwh_total[y], "in_profile_kwh": float(df[f"net_kwh_{y}"].sum()), "unshaped_kwh": kwh_unshaped[y],
                    "peak_hour_kwh": float(df[f"net_kwh_{y}"].max()), "peak_hour_of_year": int(df.loc[df[f"net_kwh_{y}"].idxmax(), "hour_of_year"])}
                for y in years}
@@ -110,17 +129,48 @@ def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[s
 
 
 def combine_profiles(parts: list[tuple[pd.DataFrame, pd.DataFrame, dict]], years: list[int]) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """portfolio_profile's (profile, unshaped, summary) for a whole job from the same for each of its parts (a chunked run): the hourly kWh add up per PA."""
+    """portfolio_profile's (profile, unshaped, summary) for a whole job from the same for each of its parts (a chunked run): the hourly kWh add up per PA
+    and per climate zone."""
     years = sorted(int(y) for y in years)
-    pas = sorted({c.rsplit("_", 1)[1] for p, _u, _s in parts for c in p.columns if c.startswith("net_kwh_") and c.count("_") == 3})
+    pas = sorted({c.rsplit("_", 1)[1] for p, _u, _s in parts for c in p.columns if c.startswith("net_kwh_") and c.count("_") == 3
+                  and not c.rsplit("_", 1)[1].startswith("CZ")})
+    zones = sorted({c.rsplit("_", 1)[1] for p, _u, _s in parts for c in p.columns if c.startswith("net_kwh_") and c.rsplit("_", 1)[1].startswith("CZ")})
     df = parts[0][0][["hour_of_year", "datetime"]].copy()
+
+    def total(col):
+        return sum((p[col].to_numpy() for p, _u, _s in parts if col in p), np.zeros(HOURS))
     for y in years:
-        by_pa = {pa: sum((p[f"net_kwh_{y}_{pa}"].to_numpy() for p, _u, _s in parts if f"net_kwh_{y}_{pa}" in p), np.zeros(HOURS)) for pa in pas}
+        by_pa = {pa: total(f"net_kwh_{y}_{pa}") for pa in pas}
         df[f"net_kwh_{y}"] = sum(by_pa[pa] for pa in pas) if pas else np.zeros(HOURS)
         for pa in pas:
             df[f"net_kwh_{y}_{pa}"] = by_pa[pa]
+        for z in zones:
+            df[f"net_kwh_{y}_{z}"] = total(f"net_kwh_{y}_{z}")
     summary = {y: {"delivered_net_kwh": sum(s[y]["delivered_net_kwh"] for _p, _u, s in parts), "in_profile_kwh": float(df[f"net_kwh_{y}"].sum()),
                    "unshaped_kwh": sum(s[y]["unshaped_kwh"] for _p, _u, s in parts), "peak_hour_kwh": float(df[f"net_kwh_{y}"].max()),
                    "peak_hour_of_year": int(df.loc[df[f"net_kwh_{y}"].idxmax(), "hour_of_year"])} for y in years}
     unshaped = [u for _p, u, _s in parts if len(u)]
     return df, (pd.concat(unshaped, ignore_index=True) if unshaped else pd.DataFrame()), summary
+
+
+def peaks(profile: pd.DataFrame, years: list[int]) -> pd.DataFrame:
+    """The portfolio_8760_peaks table: one row per year and group (the portfolio, each PA, each climate zone) of `profile` (portfolio_profile's frame)."""
+    rows = []
+    stamps = profile["datetime"].to_numpy() if "datetime" in profile else None
+    for y in sorted(int(y) for y in years):
+        port = profile[f"net_kwh_{y}"].to_numpy(dtype=float)
+        peak_i = int(np.argmax(port))
+        cols = [("portfolio", "all measures", f"net_kwh_{y}")]
+        for c in profile.columns:
+            if c.startswith(f"net_kwh_{y}_"):
+                suffix = c[len(f"net_kwh_{y}_"):]
+                cols.append(("climate zone" if suffix.startswith("CZ") else "IOU territory (PA)", suffix, c))
+        for group, value, c in cols:
+            v = profile[c].to_numpy(dtype=float)
+            hi, lo = int(np.argmax(v)), int(np.argmin(v))
+            rows.append({"year": y, "group": group, "value": value, "net_kwh": float(v.sum()),
+                         "peak_hour_of_year": hi + 1, "peak_datetime": stamps[hi] if stamps is not None else None, "peak_kwh": float(v[hi]),
+                         "max_added_load_hour_of_year": lo + 1 if v[lo] < 0 else None, "max_added_load_kwh": float(v[lo]) if v[lo] < 0 else 0.0,
+                         "kwh_at_portfolio_peak": float(v[peak_i]),
+                         "share_of_portfolio_peak": float(v[peak_i] / port[peak_i]) if port[peak_i] else None})
+    return pd.DataFrame(rows)

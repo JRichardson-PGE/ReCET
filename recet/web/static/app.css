@@ -81,6 +81,8 @@ details > summary { cursor: pointer; font-weight: 600; margin: .3rem 0; }
 .tabs a.on { border-color: var(--line); background: var(--card); font-weight: 600; margin-bottom: -1px; }
 .tabs span.off { padding: .35rem .8rem; cursor: not-allowed; }
 .filters { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+.filters fieldset.years { border: 0; margin: 0; padding: 0; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.filters fieldset.years legend { float: left; padding: 0 .3rem 0 0; font-weight: 600; }
 .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .2rem 1rem; margin: .5rem 0 .8rem; max-height: 22rem; overflow: auto; }
 form.inline { display: flex; gap: .6rem; align-items: end; margin-top: .8rem; flex-wrap: wrap; }
 form.inline label { flex-direction: row; align-items: center; gap: .4rem; }
