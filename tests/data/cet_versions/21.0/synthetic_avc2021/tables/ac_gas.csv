@@ -1,0 +1,869 @@
+ID,PA,Version,FirstYear,GS,GP,ComboField,Qtr,Qac,Commodity,TD,Total,ACGasKey
+1,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2020Q1,0,0.210886323,0.07768329,0.288569613,PGECommercialAnnual
+2,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2020Q2,1,0.203106351,0.0,0.203106351,PGECommercialAnnual
+3,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2020Q3,2,0.213562916,0.0,0.213562916,PGECommercialAnnual
+4,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2020Q4,3,0.226783329,0.05178886,0.278572189,PGECommercialAnnual
+5,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2021Q1,4,0.23309324,0.079389501,0.312482741,PGECommercialAnnual
+6,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2021Q2,5,0.22551042,0.0,0.22551042,PGECommercialAnnual
+7,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2021Q3,6,0.232039833,0.0,0.232039833,PGECommercialAnnual
+8,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2021Q4,7,0.23780507,0.052926334,0.290731404,PGECommercialAnnual
+9,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2022Q1,8,0.244109475,0.081133186,0.325242661,PGECommercialAnnual
+10,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2022Q2,9,0.232832699,0.0,0.232832699,PGECommercialAnnual
+11,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2022Q3,10,0.239990537,0.0,0.239990537,PGECommercialAnnual
+12,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2022Q4,11,0.245897654,0.054088791,0.299986445,PGECommercialAnnual
+13,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2023Q1,12,0.254870469,0.082915169,0.337785638,PGECommercialAnnual
+14,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2023Q2,13,0.244184916,0.0,0.244184916,PGECommercialAnnual
+15,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2023Q3,14,0.251443962,0.0,0.251443962,PGECommercialAnnual
+16,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2023Q4,15,0.257647137,0.05527678,0.312923917,PGECommercialAnnual
+17,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2024Q1,16,0.267253124,0.084736292,0.351989416,PGECommercialAnnual
+18,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2024Q2,17,0.256596763,0.0,0.256596763,PGECommercialAnnual
+19,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2024Q3,18,0.263480964,0.0,0.263480964,PGECommercialAnnual
+20,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2024Q4,19,0.268636629,0.056490861,0.32512749,PGECommercialAnnual
+21,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2025Q1,20,0.289682628,0.086460989,0.376143617,PGECommercialAnnual
+22,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2025Q2,21,0.280319666,0.0,0.280319666,PGECommercialAnnual
+23,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2025Q3,22,0.284953894,0.0,0.284953894,PGECommercialAnnual
+24,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2025Q4,23,0.288048352,0.05764066,0.345689011,PGECommercialAnnual
+25,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2026Q1,24,0.312411977,0.088224157,0.400636133,PGECommercialAnnual
+26,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2026Q2,25,0.304342415,0.0,0.304342415,PGECommercialAnnual
+27,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2026Q3,26,0.306726669,0.0,0.306726669,PGECommercialAnnual
+28,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2026Q4,27,0.30775992,0.058816104,0.366576024,PGECommercialAnnual
+29,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2027Q1,28,0.335075289,0.089987324,0.425062613,PGECommercialAnnual
+30,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2027Q2,29,0.328299128,0.0,0.328299128,PGECommercialAnnual
+31,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2027Q3,30,0.328433408,0.0,0.328433408,PGECommercialAnnual
+32,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2027Q4,31,0.327405451,0.059991549,0.387397,PGECommercialAnnual
+33,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2028Q1,32,0.357584396,0.091750491,0.449334888,PGECommercialAnnual
+34,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2028Q2,33,0.352101636,0.0,0.352101636,PGECommercialAnnual
+35,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2028Q3,34,0.349985941,0.0,0.349985941,PGECommercialAnnual
+36,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2028Q4,35,0.346896777,0.061166994,0.408063771,PGECommercialAnnual
+37,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2029Q1,36,0.371425332,0.093513658,0.46493899,PGECommercialAnnual
+38,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2029Q2,37,0.365813095,0.0,0.365813095,PGECommercialAnnual
+39,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2029Q3,38,0.363620778,0.0,0.363620778,PGECommercialAnnual
+40,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2029Q4,39,0.360456477,0.062342439,0.422798915,PGECommercialAnnual
+41,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2030Q1,40,0.384927314,0.095276826,0.480204139,PGECommercialAnnual
+42,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2030Q2,41,0.379080782,0.0,0.379080782,PGECommercialAnnual
+43,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2030Q3,42,0.376570748,0.0,0.376570748,PGECommercialAnnual
+44,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2030Q4,43,0.373205919,0.063517884,0.436723803,PGECommercialAnnual
+45,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2031Q1,44,0.397046594,0.097039993,0.494086587,PGECommercialAnnual
+46,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2031Q2,45,0.391039596,0.0,0.391039596,PGECommercialAnnual
+47,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2031Q3,46,0.388619917,0.0,0.388619917,PGECommercialAnnual
+48,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2031Q4,47,0.385190057,0.064693329,0.449883385,PGECommercialAnnual
+49,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2032Q1,48,0.415271432,0.09880316,0.514074593,PGECommercialAnnual
+50,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2032Q2,49,0.409141193,0.0,0.409141193,PGECommercialAnnual
+51,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2032Q3,50,0.40667021,0.0,0.40667021,PGECommercialAnnual
+52,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2032Q4,51,0.403170782,0.065868773,0.469039555,PGECommercialAnnual
+53,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2033Q1,52,0.435048385,0.100566327,0.535614712,PGECommercialAnnual
+54,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2033Q2,53,0.428798838,0.0,0.428798838,PGECommercialAnnual
+55,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2033Q3,54,0.426304601,0.0,0.426304601,PGECommercialAnnual
+56,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2033Q4,55,0.422745417,0.067044218,0.489789636,PGECommercialAnnual
+57,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2034Q1,56,0.456577076,0.102329495,0.558906571,PGECommercialAnnual
+58,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2034Q2,57,0.450198261,0.0,0.450198261,PGECommercialAnnual
+59,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2034Q3,58,0.447641518,0.0,0.447641518,PGECommercialAnnual
+60,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2034Q4,59,0.444008331,0.068219663,0.512227994,PGECommercialAnnual
+61,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2035Q1,60,0.479940898,0.104092662,0.58403356,PGECommercialAnnual
+62,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2035Q2,61,0.473433973,0.0,0.473433973,PGECommercialAnnual
+63,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2035Q3,62,0.470851297,0.0,0.470851297,PGECommercialAnnual
+64,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2035Q4,63,0.467153871,0.069395108,0.536548979,PGECommercialAnnual
+65,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2036Q1,64,0.505170288,0.105855829,0.611026117,PGECommercialAnnual
+66,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2036Q2,65,0.498534481,0.0,0.498534481,PGECommercialAnnual
+67,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2036Q3,66,0.495901489,0.0,0.495901489,PGECommercialAnnual
+68,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2036Q4,67,0.492133314,0.070570553,0.562703867,PGECommercialAnnual
+69,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2037Q1,68,0.532505683,0.107618996,0.640124679,PGECommercialAnnual
+70,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2037Q2,69,0.525741187,0.0,0.525741187,PGECommercialAnnual
+71,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2037Q3,70,0.523063975,0.0,0.523063975,PGECommercialAnnual
+72,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2037Q4,71,0.519226679,0.071745998,0.590972677,PGECommercialAnnual
+73,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2038Q1,72,0.562123191,0.109382164,0.671505355,PGECommercialAnnual
+74,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2038Q2,73,0.555230007,0.0,0.555230007,PGECommercialAnnual
+75,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2038Q3,74,0.552508575,0.0,0.552508575,PGECommercialAnnual
+76,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2038Q4,75,0.548602158,0.072921443,0.6215236,PGECommercialAnnual
+77,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2039Q1,76,0.594227515,0.111145331,0.705372846,PGECommercialAnnual
+78,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2039Q2,77,0.587205641,0.0,0.587205641,PGECommercialAnnual
+79,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2039Q3,78,0.58443999,0.0,0.58443999,PGECommercialAnnual
+80,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2039Q4,79,0.580464451,0.074096887,0.654561339,PGECommercialAnnual
+81,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2040Q1,80,0.629040051,0.112908498,0.741948549,PGECommercialAnnual
+82,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2040Q2,81,0.621889488,0.0,0.621889488,PGECommercialAnnual
+83,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2040Q3,82,0.619079617,0.0,0.619079617,PGECommercialAnnual
+84,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2040Q4,83,0.615034956,0.075272332,0.690307289,PGECommercialAnnual
+85,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2041Q1,84,0.666800201,0.114671666,0.781471867,PGECommercialAnnual
+86,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2041Q2,85,0.65952095,0.0,0.65952095,PGECommercialAnnual
+87,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2041Q3,86,0.656666859,0.0,0.656666859,PGECommercialAnnual
+88,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2041Q4,87,0.652553077,0.076447777,0.729000854,PGECommercialAnnual
+89,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2042Q1,88,0.70776679,0.116434833,0.824201623,PGECommercialAnnual
+90,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2042Q2,89,0.700358849,0.0,0.700358849,PGECommercialAnnual
+91,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2042Q3,90,0.697460539,0.0,0.697460539,PGECommercialAnnual
+92,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2042Q4,91,0.693277635,0.077623222,0.770900857,PGECommercialAnnual
+93,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2043Q1,92,0.75221958,0.118198,0.87041758,PGECommercialAnnual
+94,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2043Q2,93,0.744682951,0.0,0.744682951,PGECommercialAnnual
+95,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2043Q3,94,0.74174042,0.0,0.74174042,PGECommercialAnnual
+96,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2043Q4,95,0.737488396,0.078798667,0.816287062,PGECommercialAnnual
+97,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2044Q1,96,0.800460916,0.119961167,0.920422083,PGECommercialAnnual
+98,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2044Q2,97,0.792795597,0.0,0.792795597,PGECommercialAnnual
+99,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2044Q3,98,0.789808847,0.0,0.789808847,PGECommercialAnnual
+100,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2044Q4,99,0.785487701,0.079974112,0.865461813,PGECommercialAnnual
+101,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2045Q1,100,0.852817487,0.121724335,0.974541822,PGECommercialAnnual
+102,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2045Q2,101,0.84502348,0.0,0.84502348,PGECommercialAnnual
+103,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2045Q3,102,0.841992509,0.0,0.841992509,PGECommercialAnnual
+104,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2045Q4,103,0.837602242,0.081149556,0.918751799,PGECommercialAnnual
+105,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2046Q1,104,0.909642232,0.123487502,1.033129734,PGECommercialAnnual
+106,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2046Q2,105,0.901719536,0.0,0.901719536,PGECommercialAnnual
+107,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2046Q3,106,0.898644346,0.0,0.898644346,PGECommercialAnnual
+108,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2046Q4,107,0.894184957,0.082325001,0.976509959,PGECommercialAnnual
+109,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2047Q1,108,0.971316389,0.125250669,1.096567058,PGECommercialAnnual
+110,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2047Q2,109,0.963265003,0.0,0.963265003,PGECommercialAnnual
+111,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2047Q3,110,0.960145593,0.0,0.960145593,PGECommercialAnnual
+112,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2047Q4,111,0.955617083,0.083500446,1.03911753,PGECommercialAnnual
+113,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2048Q1,112,1.0382517,0.127013836,1.165265536,PGECommercialAnnual
+114,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2048Q2,113,1.030071625,0.0,1.030071625,PGECommercialAnnual
+115,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2048Q3,114,1.026907995,0.0,1.026907995,PGECommercialAnnual
+116,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2048Q4,115,1.022310364,0.084675891,1.106986255,PGECommercialAnnual
+117,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2049Q1,116,1.110892794,0.128777004,1.239669797,PGECommercialAnnual
+118,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2049Q2,117,1.10258403,0.0,1.10258403,PGECommercialAnnual
+119,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2049Q3,118,1.099376181,0.0,1.099376181,PGECommercialAnnual
+120,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2049Q4,119,1.094709428,0.085851336,1.180560764,PGECommercialAnnual
+121,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2050Q1,120,1.189719746,0.130540171,1.320259917,PGECommercialAnnual
+122,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2050Q2,121,1.181282294,0.0,1.181282294,PGECommercialAnnual
+123,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2050Q3,122,1.178030224,0.0,1.178030224,PGECommercialAnnual
+124,PGE,2020-06-24_PGE,2020,Commercial,Annual,PGECommercialAnnual,2050Q4,123,1.173294351,0.087026781,1.260321131,PGECommercialAnnual
+125,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2020Q1,0,0.0,0.0,0.0,PGECommercialSummer Only
+126,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2020Q2,1,0.406212701,0.0,0.406212701,PGECommercialSummer Only
+127,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2020Q3,2,0.427125832,0.0,0.427125832,PGECommercialSummer Only
+128,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2020Q4,3,0.0,0.0,0.0,PGECommercialSummer Only
+129,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2021Q1,4,0.0,0.0,0.0,PGECommercialSummer Only
+130,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2021Q2,5,0.451020839,0.0,0.451020839,PGECommercialSummer Only
+131,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2021Q3,6,0.464079666,0.0,0.464079666,PGECommercialSummer Only
+132,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2021Q4,7,0.0,0.0,0.0,PGECommercialSummer Only
+133,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2022Q1,8,0.0,0.0,0.0,PGECommercialSummer Only
+134,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2022Q2,9,0.465665397,0.0,0.465665397,PGECommercialSummer Only
+135,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2022Q3,10,0.479981074,0.0,0.479981074,PGECommercialSummer Only
+136,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2022Q4,11,0.0,0.0,0.0,PGECommercialSummer Only
+137,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2023Q1,12,0.0,0.0,0.0,PGECommercialSummer Only
+138,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2023Q2,13,0.488369832,0.0,0.488369832,PGECommercialSummer Only
+139,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2023Q3,14,0.502887924,0.0,0.502887924,PGECommercialSummer Only
+140,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2023Q4,15,0.0,0.0,0.0,PGECommercialSummer Only
+141,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2024Q1,16,0.0,0.0,0.0,PGECommercialSummer Only
+142,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2024Q2,17,0.513193525,0.0,0.513193525,PGECommercialSummer Only
+143,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2024Q3,18,0.526961929,0.0,0.526961929,PGECommercialSummer Only
+144,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2024Q4,19,0.0,0.0,0.0,PGECommercialSummer Only
+145,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2025Q1,20,0.0,0.0,0.0,PGECommercialSummer Only
+146,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2025Q2,21,0.560639333,0.0,0.560639333,PGECommercialSummer Only
+147,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2025Q3,22,0.569907789,0.0,0.569907789,PGECommercialSummer Only
+148,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2025Q4,23,0.0,0.0,0.0,PGECommercialSummer Only
+149,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2026Q1,24,0.0,0.0,0.0,PGECommercialSummer Only
+150,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2026Q2,25,0.608684831,0.0,0.608684831,PGECommercialSummer Only
+151,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2026Q3,26,0.613453338,0.0,0.613453338,PGECommercialSummer Only
+152,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2026Q4,27,0.0,0.0,0.0,PGECommercialSummer Only
+153,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2027Q1,28,0.0,0.0,0.0,PGECommercialSummer Only
+154,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2027Q2,29,0.656598256,0.0,0.656598256,PGECommercialSummer Only
+155,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2027Q3,30,0.656866815,0.0,0.656866815,PGECommercialSummer Only
+156,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2027Q4,31,0.0,0.0,0.0,PGECommercialSummer Only
+157,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2028Q1,32,0.0,0.0,0.0,PGECommercialSummer Only
+158,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2028Q2,33,0.704203271,0.0,0.704203271,PGECommercialSummer Only
+159,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2028Q3,34,0.699971882,0.0,0.699971882,PGECommercialSummer Only
+160,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2028Q4,35,0.0,0.0,0.0,PGECommercialSummer Only
+161,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2029Q1,36,0.0,0.0,0.0,PGECommercialSummer Only
+162,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2029Q2,37,0.731626191,0.0,0.731626191,PGECommercialSummer Only
+163,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2029Q3,38,0.727241556,0.0,0.727241556,PGECommercialSummer Only
+164,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2029Q4,39,0.0,0.0,0.0,PGECommercialSummer Only
+165,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2030Q1,40,0.0,0.0,0.0,PGECommercialSummer Only
+166,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2030Q2,41,0.758161565,0.0,0.758161565,PGECommercialSummer Only
+167,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2030Q3,42,0.753141496,0.0,0.753141496,PGECommercialSummer Only
+168,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2030Q4,43,0.0,0.0,0.0,PGECommercialSummer Only
+169,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2031Q1,44,0.0,0.0,0.0,PGECommercialSummer Only
+170,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2031Q2,45,0.782079192,0.0,0.782079192,PGECommercialSummer Only
+171,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2031Q3,46,0.777239834,0.0,0.777239834,PGECommercialSummer Only
+172,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2031Q4,47,0.0,0.0,0.0,PGECommercialSummer Only
+173,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2032Q1,48,0.0,0.0,0.0,PGECommercialSummer Only
+174,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2032Q2,49,0.818282385,0.0,0.818282385,PGECommercialSummer Only
+175,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2032Q3,50,0.81334042,0.0,0.81334042,PGECommercialSummer Only
+176,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2032Q4,51,0.0,0.0,0.0,PGECommercialSummer Only
+177,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2033Q1,52,0.0,0.0,0.0,PGECommercialSummer Only
+178,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2033Q2,53,0.857597675,0.0,0.857597675,PGECommercialSummer Only
+179,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2033Q3,54,0.852609202,0.0,0.852609202,PGECommercialSummer Only
+180,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2033Q4,55,0.0,0.0,0.0,PGECommercialSummer Only
+181,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2034Q1,56,0.0,0.0,0.0,PGECommercialSummer Only
+182,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2034Q2,57,0.900396521,0.0,0.900396521,PGECommercialSummer Only
+183,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2034Q3,58,0.895283035,0.0,0.895283035,PGECommercialSummer Only
+184,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2034Q4,59,0.0,0.0,0.0,PGECommercialSummer Only
+185,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2035Q1,60,0.0,0.0,0.0,PGECommercialSummer Only
+186,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2035Q2,61,0.946867947,0.0,0.946867947,PGECommercialSummer Only
+187,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2035Q3,62,0.941702594,0.0,0.941702594,PGECommercialSummer Only
+188,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2035Q4,63,0.0,0.0,0.0,PGECommercialSummer Only
+189,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2036Q1,64,0.0,0.0,0.0,PGECommercialSummer Only
+190,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2036Q2,65,0.997068962,0.0,0.997068962,PGECommercialSummer Only
+191,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2036Q3,66,0.991802978,0.0,0.991802978,PGECommercialSummer Only
+192,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2036Q4,67,0.0,0.0,0.0,PGECommercialSummer Only
+193,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2037Q1,68,0.0,0.0,0.0,PGECommercialSummer Only
+194,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2037Q2,69,1.051482374,0.0,1.051482374,PGECommercialSummer Only
+195,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2037Q3,70,1.04612795,0.0,1.04612795,PGECommercialSummer Only
+196,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2037Q4,71,0.0,0.0,0.0,PGECommercialSummer Only
+197,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2038Q1,72,0.0,0.0,0.0,PGECommercialSummer Only
+198,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2038Q2,73,1.110460013,0.0,1.110460013,PGECommercialSummer Only
+199,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2038Q3,74,1.105017151,0.0,1.105017151,PGECommercialSummer Only
+200,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2038Q4,75,0.0,0.0,0.0,PGECommercialSummer Only
+201,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2039Q1,76,0.0,0.0,0.0,PGECommercialSummer Only
+202,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2039Q2,77,1.174411283,0.0,1.174411283,PGECommercialSummer Only
+203,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2039Q3,78,1.16887998,0.0,1.16887998,PGECommercialSummer Only
+204,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2039Q4,79,0.0,0.0,0.0,PGECommercialSummer Only
+205,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2040Q1,80,0.0,0.0,0.0,PGECommercialSummer Only
+206,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2040Q2,81,1.243778976,0.0,1.243778976,PGECommercialSummer Only
+207,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2040Q3,82,1.238159234,0.0,1.238159234,PGECommercialSummer Only
+208,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2040Q4,83,0.0,0.0,0.0,PGECommercialSummer Only
+209,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2041Q1,84,0.0,0.0,0.0,PGECommercialSummer Only
+210,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2041Q2,85,1.319041899,0.0,1.319041899,PGECommercialSummer Only
+211,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2041Q3,86,1.313333717,0.0,1.313333717,PGECommercialSummer Only
+212,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2041Q4,87,0.0,0.0,0.0,PGECommercialSummer Only
+213,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2042Q1,88,0.0,0.0,0.0,PGECommercialSummer Only
+214,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2042Q2,89,1.400717699,0.0,1.400717699,PGECommercialSummer Only
+215,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2042Q3,90,1.394921077,0.0,1.394921077,PGECommercialSummer Only
+216,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2042Q4,91,0.0,0.0,0.0,PGECommercialSummer Only
+217,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2043Q1,92,0.0,0.0,0.0,PGECommercialSummer Only
+218,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2043Q2,93,1.489365901,0.0,1.489365901,PGECommercialSummer Only
+219,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2043Q3,94,1.48348084,0.0,1.48348084,PGECommercialSummer Only
+220,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2043Q4,95,0.0,0.0,0.0,PGECommercialSummer Only
+221,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2044Q1,96,0.0,0.0,0.0,PGECommercialSummer Only
+222,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2044Q2,97,1.585591195,0.0,1.585591195,PGECommercialSummer Only
+223,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2044Q3,98,1.579617694,0.0,1.579617694,PGECommercialSummer Only
+224,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2044Q4,99,0.0,0.0,0.0,PGECommercialSummer Only
+225,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2045Q1,100,0.0,0.0,0.0,PGECommercialSummer Only
+226,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2045Q2,101,1.690046959,0.0,1.690046959,PGECommercialSummer Only
+227,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2045Q3,102,1.683985019,0.0,1.683985019,PGECommercialSummer Only
+228,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2045Q4,103,0.0,0.0,0.0,PGECommercialSummer Only
+229,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2046Q1,104,0.0,0.0,0.0,PGECommercialSummer Only
+230,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2046Q2,105,1.803439072,0.0,1.803439072,PGECommercialSummer Only
+231,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2046Q3,106,1.797288691,0.0,1.797288691,PGECommercialSummer Only
+232,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2046Q4,107,0.0,0.0,0.0,PGECommercialSummer Only
+233,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2047Q1,108,0.0,0.0,0.0,PGECommercialSummer Only
+234,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2047Q2,109,1.926530006,0.0,1.926530006,PGECommercialSummer Only
+235,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2047Q3,110,1.920291186,0.0,1.920291186,PGECommercialSummer Only
+236,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2047Q4,111,0.0,0.0,0.0,PGECommercialSummer Only
+237,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2048Q1,112,0.0,0.0,0.0,PGECommercialSummer Only
+238,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2048Q2,113,2.06014325,0.0,2.06014325,PGECommercialSummer Only
+239,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2048Q3,114,2.053815991,0.0,2.053815991,PGECommercialSummer Only
+240,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2048Q4,115,0.0,0.0,0.0,PGECommercialSummer Only
+241,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2049Q1,116,0.0,0.0,0.0,PGECommercialSummer Only
+242,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2049Q2,117,2.205168061,0.0,2.205168061,PGECommercialSummer Only
+243,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2049Q3,118,2.198752362,0.0,2.198752362,PGECommercialSummer Only
+244,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2049Q4,119,0.0,0.0,0.0,PGECommercialSummer Only
+245,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2050Q1,120,0.0,0.0,0.0,PGECommercialSummer Only
+246,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2050Q2,121,2.362564588,0.0,2.362564588,PGECommercialSummer Only
+247,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2050Q3,122,2.356060449,0.0,2.356060449,PGECommercialSummer Only
+248,PGE,2020-06-24_PGE,2020,Commercial,Summer Only,PGECommercialSummer Only,2050Q4,123,0.0,0.0,0.0,PGECommercialSummer Only
+745,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2020Q1,0,0.209185386,0.087142303,0.296327688,PGEResidentialAnnual
+746,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2020Q2,1,0.201405413,0.0,0.201405413,PGEResidentialAnnual
+747,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2020Q3,2,0.211861978,0.0,0.211861978,PGEResidentialAnnual
+748,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2020Q4,3,0.225082392,0.058094869,0.28317726,PGEResidentialAnnual
+749,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2021Q1,4,0.231222209,0.089056268,0.320278477,PGEResidentialAnnual
+750,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2021Q2,5,0.223639388,0.0,0.223639388,PGEResidentialAnnual
+751,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2021Q3,6,0.230168802,0.0,0.230168802,PGEResidentialAnnual
+752,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2021Q4,7,0.235934038,0.059370846,0.295304884,PGEResidentialAnnual
+753,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2022Q1,8,0.24205134,0.091012272,0.333063612,PGEResidentialAnnual
+754,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2022Q2,9,0.230774564,0.0,0.230774564,PGEResidentialAnnual
+755,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2022Q3,10,0.237932402,0.0,0.237932402,PGEResidentialAnnual
+756,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2022Q4,11,0.24383952,0.060674848,0.304514368,PGEResidentialAnnual
+757,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2023Q1,12,0.252606521,0.093011236,0.345617757,PGEResidentialAnnual
+758,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2023Q2,13,0.241920968,0.0,0.241920968,PGEResidentialAnnual
+759,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2023Q3,14,0.249180014,0.0,0.249180014,PGEResidentialAnnual
+760,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2023Q4,15,0.255383189,0.062007491,0.31739068,PGEResidentialAnnual
+761,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2024Q1,16,0.264762781,0.095054105,0.359816887,PGEResidentialAnnual
+762,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2024Q2,17,0.25410642,0.0,0.25410642,PGEResidentialAnnual
+763,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2024Q3,18,0.260990622,0.0,0.260990622,PGEResidentialAnnual
+764,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2024Q4,19,0.266146286,0.063369403,0.32951569,PGEResidentialAnnual
+765,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2025Q1,20,0.287014231,0.096988809,0.38400304,PGEResidentialAnnual
+766,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2025Q2,21,0.277651269,0.0,0.277651269,PGEResidentialAnnual
+767,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2025Q3,22,0.282285497,0.0,0.282285497,PGEResidentialAnnual
+768,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2025Q4,23,0.285379955,0.064659206,0.35003916,PGEResidentialAnnual
+769,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2026Q1,24,0.309546407,0.098966666,0.408513073,PGEResidentialAnnual
+770,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2026Q2,25,0.301476846,0.0,0.301476846,PGEResidentialAnnual
+771,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2026Q3,26,0.303861099,0.0,0.303861099,PGEResidentialAnnual
+772,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2026Q4,27,0.30489435,0.065977777,0.370872127,PGEResidentialAnnual
+773,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2027Q1,28,0.332012547,0.100944523,0.43295707,PGEResidentialAnnual
+774,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2027Q2,29,0.325236385,0.0,0.325236385,PGEResidentialAnnual
+775,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2027Q3,30,0.325370665,0.0,0.325370665,PGEResidentialAnnual
+776,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2027Q4,31,0.324342708,0.067296349,0.391639057,PGEResidentialAnnual
+777,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2028Q1,32,0.354324481,0.10292238,0.457246862,PGEResidentialAnnual
+778,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2028Q2,33,0.34884172,0.0,0.34884172,PGEResidentialAnnual
+779,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2028Q3,34,0.346726026,0.0,0.346726026,PGEResidentialAnnual
+780,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2028Q4,35,0.343636862,0.06861492,0.412251782,PGEResidentialAnnual
+781,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2029Q1,36,0.367968244,0.104900238,0.472868481,PGEResidentialAnnual
+782,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2029Q2,37,0.362356008,0.0,0.362356008,PGEResidentialAnnual
+783,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2029Q3,38,0.36016369,0.0,0.36016369,PGEResidentialAnnual
+784,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2029Q4,39,0.356999389,0.069933492,0.42693288,PGEResidentialAnnual
+785,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2030Q1,40,0.381273053,0.106878095,0.488151148,PGEResidentialAnnual
+786,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2030Q2,41,0.375426522,0.0,0.375426522,PGEResidentialAnnual
+787,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2030Q3,42,0.372916488,0.0,0.372916488,PGEResidentialAnnual
+788,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2030Q4,43,0.369551659,0.071252063,0.440803722,PGEResidentialAnnual
+789,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2031Q1,44,0.393195161,0.108855952,0.502051113,PGEResidentialAnnual
+790,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2031Q2,45,0.387188163,0.0,0.387188163,PGEResidentialAnnual
+791,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2031Q3,46,0.384768484,0.0,0.384768484,PGEResidentialAnnual
+792,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2031Q4,47,0.381338624,0.072570635,0.453909258,PGEResidentialAnnual
+793,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2032Q1,48,0.411222826,0.110833809,0.522056636,PGEResidentialAnnual
+794,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2032Q2,49,0.405092587,0.0,0.405092587,PGEResidentialAnnual
+795,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2032Q3,50,0.402621604,0.0,0.402621604,PGEResidentialAnnual
+796,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2032Q4,51,0.399122176,0.073889206,0.473011382,PGEResidentialAnnual
+797,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2033Q1,52,0.430802606,0.112811666,0.543614272,PGEResidentialAnnual
+798,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2033Q2,53,0.424553059,0.0,0.424553059,PGEResidentialAnnual
+799,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2033Q3,54,0.422058822,0.0,0.422058822,PGEResidentialAnnual
+800,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2033Q4,55,0.418499639,0.075207778,0.493707416,PGEResidentialAnnual
+801,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2034Q1,56,0.452134125,0.114789524,0.566923648,PGEResidentialAnnual
+802,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2034Q2,57,0.445755309,0.0,0.445755309,PGEResidentialAnnual
+803,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2034Q3,58,0.443198566,0.0,0.443198566,PGEResidentialAnnual
+804,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2034Q4,59,0.439565379,0.076526349,0.516091729,PGEResidentialAnnual
+805,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2035Q1,60,0.475300774,0.116767381,0.592068155,PGEResidentialAnnual
+806,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2035Q2,61,0.468793849,0.0,0.468793849,PGEResidentialAnnual
+807,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2035Q3,62,0.466211173,0.0,0.466211173,PGEResidentialAnnual
+808,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2035Q4,63,0.462513747,0.077844921,0.540358667,PGEResidentialAnnual
+809,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2036Q1,64,0.500332991,0.118745238,0.619078229,PGEResidentialAnnual
+810,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2036Q2,65,0.493697184,0.0,0.493697184,PGEResidentialAnnual
+811,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2036Q3,66,0.491064192,0.0,0.491064192,PGEResidentialAnnual
+812,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2036Q4,67,0.487296017,0.079163492,0.566459509,PGEResidentialAnnual
+813,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2037Q1,68,0.527471213,0.120723095,0.648194308,PGEResidentialAnnual
+814,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2037Q2,69,0.520706717,0.0,0.520706717,PGEResidentialAnnual
+815,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2037Q3,70,0.518029506,0.0,0.518029506,PGEResidentialAnnual
+816,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2037Q4,71,0.514192209,0.080482064,0.594674273,PGEResidentialAnnual
+817,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2038Q1,72,0.556891549,0.122700953,0.679592502,PGEResidentialAnnual
+818,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2038Q2,73,0.549998364,0.0,0.549998364,PGEResidentialAnnual
+819,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2038Q3,74,0.547276933,0.0,0.547276933,PGEResidentialAnnual
+820,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2038Q4,75,0.543370515,0.081800635,0.62517115,PGEResidentialAnnual
+821,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2039Q1,76,0.5887987,0.12467881,0.71347751,PGEResidentialAnnual
+822,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2039Q2,77,0.581776827,0.0,0.581776827,PGEResidentialAnnual
+823,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2039Q3,78,0.579011175,0.0,0.579011175,PGEResidentialAnnual
+824,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2039Q4,79,0.575035636,0.083119207,0.658154843,PGEResidentialAnnual
+825,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2040Q1,80,0.623414063,0.126656667,0.75007073,PGEResidentialAnnual
+826,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2040Q2,81,0.6162635,0.0,0.6162635,PGEResidentialAnnual
+827,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2040Q3,82,0.613453629,0.0,0.613453629,PGEResidentialAnnual
+828,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2040Q4,83,0.609408969,0.084437778,0.693846747,PGEResidentialAnnual
+829,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2041Q1,84,0.660977041,0.128634524,0.789611565,PGEResidentialAnnual
+830,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2041Q2,85,0.653697789,0.0,0.653697789,PGEResidentialAnnual
+831,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2041Q3,86,0.650843698,0.0,0.650843698,PGEResidentialAnnual
+832,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2041Q4,87,0.646729917,0.08575635,0.732486266,PGEResidentialAnnual
+833,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2042Q1,88,0.701746457,0.130612381,0.832358838,PGEResidentialAnnual
+834,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2042Q2,89,0.694338516,0.0,0.694338516,PGEResidentialAnnual
+835,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2042Q3,90,0.691440206,0.0,0.691440206,PGEResidentialAnnual
+836,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2042Q4,91,0.687257303,0.087074921,0.774332223,PGEResidentialAnnual
+837,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2043Q1,92,0.746002075,0.132590239,0.878592313,PGEResidentialAnnual
+838,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2043Q2,93,0.738465445,0.0,0.738465445,PGEResidentialAnnual
+839,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2043Q3,94,0.735522914,0.0,0.735522914,PGEResidentialAnnual
+840,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2043Q4,95,0.73127089,0.088393492,0.819664383,PGEResidentialAnnual
+841,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2044Q1,96,0.794046238,0.134568096,0.928614334,PGEResidentialAnnual
+842,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2044Q2,97,0.786380919,0.0,0.786380919,PGEResidentialAnnual
+843,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2044Q3,98,0.783394169,0.0,0.783394169,PGEResidentialAnnual
+844,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2044Q4,99,0.779073023,0.089712064,0.868785087,PGEResidentialAnnual
+845,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2045Q1,100,0.846205636,0.136545953,0.982751589,PGEResidentialAnnual
+846,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2045Q2,101,0.838411629,0.0,0.838411629,PGEResidentialAnnual
+847,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2045Q3,102,0.835380658,0.0,0.835380658,PGEResidentialAnnual
+848,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2045Q4,103,0.830990391,0.091030635,0.922021027,PGEResidentialAnnual
+849,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2046Q1,104,0.902833208,0.13852381,1.041357019,PGEResidentialAnnual
+850,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2046Q2,105,0.894910512,0.0,0.894910512,PGEResidentialAnnual
+851,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2046Q3,106,0.891835322,0.0,0.891835322,PGEResidentialAnnual
+852,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2046Q4,107,0.887375933,0.092349207,0.97972514,PGEResidentialAnnual
+853,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2047Q1,108,0.964310192,0.140501668,1.10481186,PGEResidentialAnnual
+854,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2047Q2,109,0.956258807,0.0,0.956258807,PGEResidentialAnnual
+855,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2047Q3,110,0.953139397,0.0,0.953139397,PGEResidentialAnnual
+856,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2047Q4,111,0.948610887,0.093667778,1.042278665,PGEResidentialAnnual
+857,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2048Q1,112,1.03104833,0.142479525,1.173527855,PGEResidentialAnnual
+858,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2048Q2,113,1.022868256,0.0,1.022868256,PGEResidentialAnnual
+859,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2048Q3,114,1.019704626,0.0,1.019704626,PGEResidentialAnnual
+860,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2048Q4,115,1.015106995,0.09498635,1.110093345,PGEResidentialAnnual
+861,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2049Q1,116,1.103492252,0.144457382,1.247949634,PGEResidentialAnnual
+862,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2049Q2,117,1.095183488,0.0,1.095183488,PGEResidentialAnnual
+863,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2049Q3,118,1.091975639,0.0,1.091975639,PGEResidentialAnnual
+864,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2049Q4,119,1.087308886,0.096304921,1.183613808,PGEResidentialAnnual
+865,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2050Q1,120,1.182122031,0.146435239,1.328557271,PGEResidentialAnnual
+866,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2050Q2,121,1.173684579,0.0,1.173684579,PGEResidentialAnnual
+867,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2050Q3,122,1.17043251,0.0,1.17043251,PGEResidentialAnnual
+868,PGE,2020-06-24_PGE,2020,Residential,Annual,PGEResidentialAnnual,2050Q4,123,1.165696636,0.097623493,1.263320129,PGEResidentialAnnual
+993,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2020Q1,0,0.418370771,0.174284606,0.592655377,PGEResidentialWinter Only
+994,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2020Q2,1,0.0,0.0,0.0,PGEResidentialWinter Only
+995,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2020Q3,2,0.0,0.0,0.0,PGEResidentialWinter Only
+996,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2020Q4,3,0.450164783,0.116189737,0.56635452,PGEResidentialWinter Only
+997,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2021Q1,4,0.462444417,0.178112537,0.640556954,PGEResidentialWinter Only
+998,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2021Q2,5,0.0,0.0,0.0,PGEResidentialWinter Only
+999,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2021Q3,6,0.0,0.0,0.0,PGEResidentialWinter Only
+1000,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2021Q4,7,0.471868077,0.118741691,0.590609768,PGEResidentialWinter Only
+1001,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2022Q1,8,0.48410268,0.182024544,0.666127224,PGEResidentialWinter Only
+1002,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2022Q2,9,0.0,0.0,0.0,PGEResidentialWinter Only
+1003,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2022Q3,10,0.0,0.0,0.0,PGEResidentialWinter Only
+1004,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2022Q4,11,0.487679039,0.121349696,0.609028735,PGEResidentialWinter Only
+1005,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2023Q1,12,0.505213041,0.186022472,0.691235514,PGEResidentialWinter Only
+1006,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2023Q2,13,0.0,0.0,0.0,PGEResidentialWinter Only
+1007,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2023Q3,14,0.0,0.0,0.0,PGEResidentialWinter Only
+1008,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2023Q4,15,0.510766379,0.124014982,0.63478136,PGEResidentialWinter Only
+1009,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2024Q1,16,0.529525563,0.19010821,0.719633773,PGEResidentialWinter Only
+1010,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2024Q2,17,0.0,0.0,0.0,PGEResidentialWinter Only
+1011,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2024Q3,18,0.0,0.0,0.0,PGEResidentialWinter Only
+1012,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2024Q4,19,0.532292572,0.126738807,0.659031379,PGEResidentialWinter Only
+1013,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2025Q1,20,0.574028462,0.193977617,0.768006079,PGEResidentialWinter Only
+1014,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2025Q2,21,0.0,0.0,0.0,PGEResidentialWinter Only
+1015,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2025Q3,22,0.0,0.0,0.0,PGEResidentialWinter Only
+1016,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2025Q4,23,0.57075991,0.129318411,0.700078321,PGEResidentialWinter Only
+1017,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2026Q1,24,0.619092814,0.197933332,0.817026146,PGEResidentialWinter Only
+1018,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2026Q2,25,0.0,0.0,0.0,PGEResidentialWinter Only
+1019,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2026Q3,26,0.0,0.0,0.0,PGEResidentialWinter Only
+1020,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2026Q4,27,0.6097887,0.131955554,0.741744254,PGEResidentialWinter Only
+1021,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2027Q1,28,0.664025093,0.201889046,0.865914139,PGEResidentialWinter Only
+1022,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2027Q2,29,0.0,0.0,0.0,PGEResidentialWinter Only
+1023,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2027Q3,30,0.0,0.0,0.0,PGEResidentialWinter Only
+1024,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2027Q4,31,0.648685417,0.134592697,0.783278114,PGEResidentialWinter Only
+1025,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2028Q1,32,0.708648963,0.205844761,0.914493723,PGEResidentialWinter Only
+1026,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2028Q2,33,0.0,0.0,0.0,PGEResidentialWinter Only
+1027,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2028Q3,34,0.0,0.0,0.0,PGEResidentialWinter Only
+1028,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2028Q4,35,0.687273724,0.13722984,0.824503565,PGEResidentialWinter Only
+1029,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2029Q1,36,0.735936487,0.209800475,0.945736962,PGEResidentialWinter Only
+1030,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2029Q2,37,0.0,0.0,0.0,PGEResidentialWinter Only
+1031,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2029Q3,38,0.0,0.0,0.0,PGEResidentialWinter Only
+1032,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2029Q4,39,0.713998777,0.139866983,0.853865761,PGEResidentialWinter Only
+1033,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2030Q1,40,0.762546106,0.213756189,0.976302296,PGEResidentialWinter Only
+1034,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2030Q2,41,0.0,0.0,0.0,PGEResidentialWinter Only
+1035,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2030Q3,42,0.0,0.0,0.0,PGEResidentialWinter Only
+1036,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2030Q4,43,0.739103317,0.142504126,0.881607444,PGEResidentialWinter Only
+1037,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2031Q1,44,0.786390322,0.217711904,1.004102226,PGEResidentialWinter Only
+1038,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2031Q2,45,0.0,0.0,0.0,PGEResidentialWinter Only
+1039,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2031Q3,46,0.0,0.0,0.0,PGEResidentialWinter Only
+1040,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2031Q4,47,0.762677247,0.145141269,0.907818516,PGEResidentialWinter Only
+1041,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2032Q1,48,0.822445653,0.221667618,1.044113271,PGEResidentialWinter Only
+1042,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2032Q2,49,0.0,0.0,0.0,PGEResidentialWinter Only
+1043,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2032Q3,50,0.0,0.0,0.0,PGEResidentialWinter Only
+1044,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2032Q4,51,0.798244352,0.147778412,0.946022764,PGEResidentialWinter Only
+1045,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2033Q1,52,0.861605212,0.225623333,1.087228545,PGEResidentialWinter Only
+1046,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2033Q2,53,0.0,0.0,0.0,PGEResidentialWinter Only
+1047,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2033Q3,54,0.0,0.0,0.0,PGEResidentialWinter Only
+1048,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2033Q4,55,0.836999277,0.150415555,0.987414832,PGEResidentialWinter Only
+1049,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2034Q1,56,0.904268249,0.229579047,1.133847297,PGEResidentialWinter Only
+1050,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2034Q2,57,0.0,0.0,0.0,PGEResidentialWinter Only
+1051,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2034Q3,58,0.0,0.0,0.0,PGEResidentialWinter Only
+1052,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2034Q4,59,0.879130759,0.153052698,1.032183457,PGEResidentialWinter Only
+1053,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2035Q1,60,0.950601548,0.233534762,1.18413631,PGEResidentialWinter Only
+1054,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2035Q2,61,0.0,0.0,0.0,PGEResidentialWinter Only
+1055,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2035Q3,62,0.0,0.0,0.0,PGEResidentialWinter Only
+1056,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2035Q4,63,0.925027493,0.155689841,1.080717334,PGEResidentialWinter Only
+1057,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2036Q1,64,1.000665982,0.237490476,1.238156458,PGEResidentialWinter Only
+1058,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2036Q2,65,0.0,0.0,0.0,PGEResidentialWinter Only
+1059,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2036Q3,66,0.0,0.0,0.0,PGEResidentialWinter Only
+1060,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2036Q4,67,0.974592034,0.158326984,1.132919019,PGEResidentialWinter Only
+1061,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2037Q1,68,1.054942426,0.241446191,1.296388617,PGEResidentialWinter Only
+1062,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2037Q2,69,0.0,0.0,0.0,PGEResidentialWinter Only
+1063,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2037Q3,70,0.0,0.0,0.0,PGEResidentialWinter Only
+1064,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2037Q4,71,1.028384419,0.160964127,1.189348546,PGEResidentialWinter Only
+1065,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2038Q1,72,1.113783099,0.245401905,1.359185004,PGEResidentialWinter Only
+1066,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2038Q2,73,0.0,0.0,0.0,PGEResidentialWinter Only
+1067,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2038Q3,74,0.0,0.0,0.0,PGEResidentialWinter Only
+1068,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2038Q4,75,1.086741031,0.16360127,1.250342301,PGEResidentialWinter Only
+1069,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2039Q1,76,1.177597401,0.24935762,1.42695502,PGEResidentialWinter Only
+1070,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2039Q2,77,0.0,0.0,0.0,PGEResidentialWinter Only
+1071,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2039Q3,78,0.0,0.0,0.0,PGEResidentialWinter Only
+1072,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2039Q4,79,1.150071273,0.166238413,1.316309686,PGEResidentialWinter Only
+1073,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2040Q1,80,1.246828126,0.253313334,1.50014146,PGEResidentialWinter Only
+1074,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2040Q2,81,0.0,0.0,0.0,PGEResidentialWinter Only
+1075,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2040Q3,82,0.0,0.0,0.0,PGEResidentialWinter Only
+1076,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2040Q4,83,1.218817938,0.168875556,1.387693494,PGEResidentialWinter Only
+1077,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2041Q1,84,1.321954082,0.257269049,1.57922313,PGEResidentialWinter Only
+1078,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2041Q2,85,0.0,0.0,0.0,PGEResidentialWinter Only
+1079,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2041Q3,86,0.0,0.0,0.0,PGEResidentialWinter Only
+1080,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2041Q4,87,1.293459833,0.171512699,1.464972532,PGEResidentialWinter Only
+1081,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2042Q1,88,1.403492914,0.261224763,1.664717677,PGEResidentialWinter Only
+1082,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2042Q2,89,0.0,0.0,0.0,PGEResidentialWinter Only
+1083,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2042Q3,90,0.0,0.0,0.0,PGEResidentialWinter Only
+1084,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2042Q4,91,1.374514605,0.174149842,1.548664447,PGEResidentialWinter Only
+1085,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2043Q1,92,1.492004149,0.265180477,1.757184627,PGEResidentialWinter Only
+1086,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2043Q2,93,0.0,0.0,0.0,PGEResidentialWinter Only
+1087,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2043Q3,94,0.0,0.0,0.0,PGEResidentialWinter Only
+1088,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2043Q4,95,1.46254178,0.176786985,1.639328765,PGEResidentialWinter Only
+1089,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2044Q1,96,1.588092475,0.269136192,1.857228667,PGEResidentialWinter Only
+1090,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2044Q2,97,0.0,0.0,0.0,PGEResidentialWinter Only
+1091,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2044Q3,98,0.0,0.0,0.0,PGEResidentialWinter Only
+1092,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2044Q4,99,1.558146046,0.179424128,1.737570174,PGEResidentialWinter Only
+1093,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2045Q1,100,1.692411272,0.273091906,1.965503178,PGEResidentialWinter Only
+1094,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2045Q2,101,0.0,0.0,0.0,PGEResidentialWinter Only
+1095,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2045Q3,102,0.0,0.0,0.0,PGEResidentialWinter Only
+1096,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2045Q4,103,1.661980782,0.182061271,1.844042053,PGEResidentialWinter Only
+1097,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2046Q1,104,1.805666417,0.277047621,2.082714038,PGEResidentialWinter Only
+1098,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2046Q2,105,0.0,0.0,0.0,PGEResidentialWinter Only
+1099,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2046Q3,106,0.0,0.0,0.0,PGEResidentialWinter Only
+1100,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2046Q4,107,1.774751867,0.184698414,1.959450281,PGEResidentialWinter Only
+1101,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2047Q1,108,1.928620384,0.281003335,2.209623719,PGEResidentialWinter Only
+1102,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2047Q2,109,0.0,0.0,0.0,PGEResidentialWinter Only
+1103,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2047Q3,110,0.0,0.0,0.0,PGEResidentialWinter Only
+1104,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2047Q4,111,1.897221774,0.187335557,2.084557331,PGEResidentialWinter Only
+1105,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2048Q1,112,2.062096661,0.28495905,2.34705571,PGEResidentialWinter Only
+1106,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2048Q2,113,0.0,0.0,0.0,PGEResidentialWinter Only
+1107,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2048Q3,114,0.0,0.0,0.0,PGEResidentialWinter Only
+1108,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2048Q4,115,2.03021399,0.1899727,2.22018669,PGEResidentialWinter Only
+1109,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2049Q1,116,2.206984504,0.288914764,2.495899268,PGEResidentialWinter Only
+1110,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2049Q2,117,0.0,0.0,0.0,PGEResidentialWinter Only
+1111,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2049Q3,118,0.0,0.0,0.0,PGEResidentialWinter Only
+1112,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2049Q4,119,2.174617773,0.192609843,2.367227616,PGEResidentialWinter Only
+1113,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2050Q1,120,2.364244063,0.292870479,2.657114542,PGEResidentialWinter Only
+1114,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2050Q2,121,0.0,0.0,0.0,PGEResidentialWinter Only
+1115,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2050Q3,122,0.0,0.0,0.0,PGEResidentialWinter Only
+1116,PGE,2020-06-24_PGE,2020,Residential,Winter Only,PGEResidentialWinter Only,2050Q4,123,2.331393272,0.195246986,2.526640258,PGEResidentialWinter Only
+2109,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2020Q1,0,0.417611929,0.111109301,0.528721229,SCGResidentialWinter Only
+2110,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2020Q2,1,0.0,0.0,0.0,SCGResidentialWinter Only
+2111,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2020Q3,2,0.0,0.0,0.0,SCGResidentialWinter Only
+2112,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2020Q4,3,0.449204143,0.074072867,0.52327701,SCGResidentialWinter Only
+2113,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2021Q1,4,0.461530842,0.113473417,0.575004259,SCGResidentialWinter Only
+2114,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2021Q2,5,0.0,0.0,0.0,SCGResidentialWinter Only
+2115,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2021Q3,6,0.0,0.0,0.0,SCGResidentialWinter Only
+2116,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2021Q4,7,0.470894689,0.075648945,0.546543634,SCGResidentialWinter Only
+2117,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2022Q1,8,0.483183748,0.115887836,0.599071584,SCGResidentialWinter Only
+2118,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2022Q2,9,0.0,0.0,0.0,SCGResidentialWinter Only
+2119,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2022Q3,10,0.0,0.0,0.0,SCGResidentialWinter Only
+2120,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2022Q4,11,0.486737408,0.077258557,0.563995965,SCGResidentialWinter Only
+2121,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2023Q1,12,0.504298707,0.118353627,0.622652334,SCGResidentialWinter Only
+2122,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2023Q2,13,0.0,0.0,0.0,SCGResidentialWinter Only
+2123,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2023Q3,14,0.0,0.0,0.0,SCGResidentialWinter Only
+2124,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2023Q4,15,0.509816797,0.078902418,0.588719215,SCGResidentialWinter Only
+2125,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2024Q1,16,0.528600956,0.120871884,0.649472839,SCGResidentialWinter Only
+2126,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2024Q2,17,0.0,0.0,0.0,SCGResidentialWinter Only
+2127,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2024Q3,18,0.0,0.0,0.0,SCGResidentialWinter Only
+2128,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2024Q4,19,0.531350403,0.080581256,0.611931659,SCGResidentialWinter Only
+2129,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2025Q1,20,0.572957121,0.123260826,0.696217947,SCGResidentialWinter Only
+2130,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2025Q2,21,0.0,0.0,0.0,SCGResidentialWinter Only
+2131,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2025Q3,22,0.0,0.0,0.0,SCGResidentialWinter Only
+2132,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2025Q4,23,0.569709314,0.082173884,0.651883198,SCGResidentialWinter Only
+2133,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2026Q1,24,0.61787474,0.125701363,0.743576103,SCGResidentialWinter Only
+2134,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2026Q2,25,0.0,0.0,0.0,SCGResidentialWinter Only
+2135,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2026Q3,26,0.0,0.0,0.0,SCGResidentialWinter Only
+2136,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2026Q4,27,0.608629679,0.083800909,0.692430588,SCGResidentialWinter Only
+2137,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2027Q1,28,0.662660285,0.128141901,0.790802186,SCGResidentialWinter Only
+2138,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2027Q2,29,0.0,0.0,0.0,SCGResidentialWinter Only
+2139,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2027Q3,30,0.0,0.0,0.0,SCGResidentialWinter Only
+2140,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2027Q4,31,0.64741797,0.085427934,0.732845904,SCGResidentialWinter Only
+2141,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2028Q1,32,0.707137421,0.130582439,0.83771986,SCGResidentialWinter Only
+2142,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2028Q2,33,0.0,0.0,0.0,SCGResidentialWinter Only
+2143,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2028Q3,34,0.0,0.0,0.0,SCGResidentialWinter Only
+2144,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2028Q4,35,0.685897852,0.087054959,0.772952811,SCGResidentialWinter Only
+2145,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2029Q1,36,0.73438437,0.133022976,0.867407347,SCGResidentialWinter Only
+2146,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2029Q2,37,0.0,0.0,0.0,SCGResidentialWinter Only
+2147,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2029Q3,38,0.0,0.0,0.0,SCGResidentialWinter Only
+2148,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2029Q4,39,0.7125859,0.088681984,0.801267884,SCGResidentialWinter Only
+2149,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2030Q1,40,0.760952137,0.135463514,0.896415651,SCGResidentialWinter Only
+2150,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2030Q2,41,0.0,0.0,0.0,SCGResidentialWinter Only
+2151,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2030Q3,42,0.0,0.0,0.0,SCGResidentialWinter Only
+2152,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2030Q4,43,0.73765814,0.090309009,0.827967149,SCGResidentialWinter Only
+2153,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2031Q1,44,0.784763358,0.137904052,0.92266741,SCGResidentialWinter Only
+2154,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2031Q2,45,0.0,0.0,0.0,SCGResidentialWinter Only
+2155,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2031Q3,46,0.0,0.0,0.0,SCGResidentialWinter Only
+2156,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2031Q4,47,0.761200791,0.091936034,0.853136826,SCGResidentialWinter Only
+2157,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2032Q1,48,0.820783797,0.140344589,0.961128386,SCGResidentialWinter Only
+2158,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2032Q2,49,0.0,0.0,0.0,SCGResidentialWinter Only
+2159,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2032Q3,50,0.0,0.0,0.0,SCGResidentialWinter Only
+2160,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2032Q4,51,0.796736102,0.09356306,0.890299162,SCGResidentialWinter Only
+2161,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2033Q1,52,0.859907414,0.142785127,1.002692541,SCGResidentialWinter Only
+2162,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2033Q2,53,0.0,0.0,0.0,SCGResidentialWinter Only
+2163,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2033Q3,54,0.0,0.0,0.0,SCGResidentialWinter Only
+2164,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2033Q4,55,0.835457654,0.095190085,0.930647738,SCGResidentialWinter Only
+2165,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2034Q1,56,0.902532674,0.145225665,1.047758339,SCGResidentialWinter Only
+2166,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2034Q2,57,0.0,0.0,0.0,SCGResidentialWinter Only
+2167,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2034Q3,58,0.0,0.0,0.0,SCGResidentialWinter Only
+2168,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2034Q4,59,0.877554732,0.09681711,0.974371842,SCGResidentialWinter Only
+2169,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2035Q1,60,0.948827197,0.147666202,1.0964934,SCGResidentialWinter Only
+2170,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2035Q2,61,0.0,0.0,0.0,SCGResidentialWinter Only
+2171,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2035Q3,62,0.0,0.0,0.0,SCGResidentialWinter Only
+2172,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2035Q4,63,0.923415462,0.098444135,1.021859597,SCGResidentialWinter Only
+2173,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2036Q1,64,0.998853521,0.15010674,1.148960261,SCGResidentialWinter Only
+2174,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2036Q2,65,0.0,0.0,0.0,SCGResidentialWinter Only
+2175,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2036Q3,66,0.0,0.0,0.0,SCGResidentialWinter Only
+2176,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2036Q4,67,0.972945066,0.10007116,1.073016226,SCGResidentialWinter Only
+2177,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2037Q1,68,1.053091689,0.152547277,1.205638967,SCGResidentialWinter Only
+2178,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2037Q2,69,0.0,0.0,0.0,SCGResidentialWinter Only
+2179,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2037Q3,70,0.0,0.0,0.0,SCGResidentialWinter Only
+2180,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2037Q4,71,1.026702247,0.101698185,1.128400432,SCGResidentialWinter Only
+2181,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2038Q1,72,1.111894085,0.154987815,1.266881901,SCGResidentialWinter Only
+2182,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2038Q2,73,0.0,0.0,0.0,SCGResidentialWinter Only
+2183,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2038Q3,74,0.0,0.0,0.0,SCGResidentialWinter Only
+2184,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2038Q4,75,1.085023655,0.10332521,1.188348865,SCGResidentialWinter Only
+2185,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2039Q1,76,1.175670111,0.157428353,1.333098464,SCGResidentialWinter Only
+2186,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2039Q2,77,0.0,0.0,0.0,SCGResidentialWinter Only
+2187,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2039Q3,78,0.0,0.0,0.0,SCGResidentialWinter Only
+2188,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2039Q4,79,1.148318692,0.104952235,1.253270928,SCGResidentialWinter Only
+2189,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2040Q1,80,1.24486256,0.15986889,1.404731451,SCGResidentialWinter Only
+2190,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2040Q2,81,0.0,0.0,0.0,SCGResidentialWinter Only
+2191,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2040Q3,82,0.0,0.0,0.0,SCGResidentialWinter Only
+2192,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2040Q4,83,1.217030154,0.10657926,1.323609414,SCGResidentialWinter Only
+2193,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2041Q1,84,1.31995024,0.162309428,1.482259668,SCGResidentialWinter Only
+2194,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2041Q2,85,0.0,0.0,0.0,SCGResidentialWinter Only
+2195,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2041Q3,86,0.0,0.0,0.0,SCGResidentialWinter Only
+2196,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2041Q4,87,1.291636845,0.108206285,1.399843131,SCGResidentialWinter Only
+2197,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2042Q1,88,1.401450795,0.164749966,1.566200761,SCGResidentialWinter Only
+2198,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2042Q2,89,0.0,0.0,0.0,SCGResidentialWinter Only
+2199,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2042Q3,90,0.0,0.0,0.0,SCGResidentialWinter Only
+2200,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2042Q4,91,1.372656413,0.10983331,1.482489724,SCGResidentialWinter Only
+2201,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2043Q1,92,1.489923755,0.167190503,1.657114258,SCGResidentialWinter Only
+2202,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2043Q2,93,0.0,0.0,0.0,SCGResidentialWinter Only
+2203,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2043Q3,94,0.0,0.0,0.0,SCGResidentialWinter Only
+2204,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2043Q4,95,1.460648384,0.111460336,1.57210872,SCGResidentialWinter Only
+2205,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2044Q1,96,1.585973804,0.169631041,1.755604845,SCGResidentialWinter Only
+2206,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2044Q2,97,0.0,0.0,0.0,SCGResidentialWinter Only
+2207,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2044Q3,98,0.0,0.0,0.0,SCGResidentialWinter Only
+2208,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2044Q4,99,1.556217446,0.113087361,1.669304807,SCGResidentialWinter Only
+2209,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2045Q1,100,1.690254325,0.172071579,1.862325903,SCGResidentialWinter Only
+2210,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2045Q2,101,0.0,0.0,0.0,SCGResidentialWinter Only
+2211,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2045Q3,102,0.0,0.0,0.0,SCGResidentialWinter Only
+2212,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2045Q4,103,1.660016979,0.114714386,1.774731364,SCGResidentialWinter Only
+2213,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2046Q1,104,1.803471193,0.174512116,1.97798331,SCGResidentialWinter Only
+2214,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2046Q2,105,0.0,0.0,0.0,SCGResidentialWinter Only
+2215,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2046Q3,106,0.0,0.0,0.0,SCGResidentialWinter Only
+2216,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2046Q4,107,1.772752859,0.116341411,1.88909427,SCGResidentialWinter Only
+2217,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2047Q1,108,1.926386884,0.176952654,2.103339538,SCGResidentialWinter Only
+2218,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2047Q2,109,0.0,0.0,0.0,SCGResidentialWinter Only
+2219,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2047Q3,110,0.0,0.0,0.0,SCGResidentialWinter Only
+2220,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2047Q4,111,1.895187562,0.117968436,2.013155998,SCGResidentialWinter Only
+2221,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2048Q1,112,2.059824885,0.179393192,2.239218076,SCGResidentialWinter Only
+2222,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2048Q2,113,0.0,0.0,0.0,SCGResidentialWinter Only
+2223,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2048Q3,114,0.0,0.0,0.0,SCGResidentialWinter Only
+2224,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2048Q4,115,2.028144575,0.119595461,2.147740036,SCGResidentialWinter Only
+2225,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2049Q1,116,2.204674451,0.181833729,2.38650818,SCGResidentialWinter Only
+2226,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2049Q2,117,0.0,0.0,0.0,SCGResidentialWinter Only
+2227,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2049Q3,118,0.0,0.0,0.0,SCGResidentialWinter Only
+2228,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2049Q4,119,2.172513153,0.121222486,2.29373564,SCGResidentialWinter Only
+2229,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2050Q1,120,2.361895734,0.184274267,2.546170001,SCGResidentialWinter Only
+2230,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2050Q2,121,0.0,0.0,0.0,SCGResidentialWinter Only
+2231,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2050Q3,122,0.0,0.0,0.0,SCGResidentialWinter Only
+2232,SCG,2020-06-24_SoCal,2020,Residential,Winter Only,SCGResidentialWinter Only,2050Q4,123,2.329253449,0.122849511,2.45210296,SCGResidentialWinter Only
+3349,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2020Q1,0,0.210506902,0.036975353,0.247482255,SCECommercialAnnual
+3350,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2020Q2,1,0.202776309,0.0,0.202776309,SCECommercialAnnual
+3351,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2020Q3,2,0.213166506,0.0,0.213166506,SCECommercialAnnual
+3352,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2020Q4,3,0.226303009,0.024650235,0.250953244,SCECommercialAnnual
+3353,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2021Q1,4,0.232636453,0.037762092,0.270398544,SCECommercialAnnual
+3354,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2021Q2,5,0.225101761,0.0,0.225101761,SCECommercialAnnual
+3355,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2021Q3,6,0.231589731,0.0,0.231589731,SCECommercialAnnual
+3356,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2021Q4,7,0.237318376,0.025174728,0.262493104,SCECommercialAnnual
+3357,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2022Q1,8,0.243650009,0.038565571,0.28221558,SCECommercialAnnual
+3358,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2022Q2,9,0.232444807,0.0,0.232444807,SCECommercialAnnual
+3359,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2022Q3,10,0.239557214,0.0,0.239557214,SCECommercialAnnual
+3360,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2022Q4,11,0.245426839,0.025710381,0.271137219,SCECommercialAnnual
+3361,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2023Q1,12,0.254413301,0.039386146,0.293799447,SCECommercialAnnual
+3362,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2023Q2,13,0.243795571,0.0,0.243795571,SCECommercialAnnual
+3363,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2023Q3,14,0.251008543,0.0,0.251008543,SCECommercialAnnual
+3364,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2023Q4,15,0.257172347,0.02625743,0.283429777,SCECommercialAnnual
+3365,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2024Q1,16,0.266790821,0.04022418,0.307015001,SCECommercialAnnual
+3366,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2024Q2,17,0.256202095,0.0,0.256202095,SCECommercialAnnual
+3367,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2024Q3,18,0.263042603,0.0,0.263042603,SCECommercialAnnual
+3368,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2024Q4,19,0.268165544,0.02681612,0.294981664,SCECommercialAnnual
+3369,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2025Q1,20,0.289146958,0.041019181,0.330166139,SCECommercialAnnual
+3370,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2025Q2,21,0.279843423,0.0,0.279843423,SCECommercialAnnual
+3371,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2025Q3,22,0.284448237,0.0,0.284448237,SCECommercialAnnual
+3372,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2025Q4,23,0.287523054,0.027346121,0.314869175,SCECommercialAnnual
+3373,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2026Q1,24,0.31180294,0.041831352,0.353634291,SCECommercialAnnual
+3374,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2026Q2,25,0.303784596,0.0,0.303784596,SCECommercialAnnual
+3375,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2026Q3,26,0.306153717,0.0,0.306153717,SCECommercialAnnual
+3376,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2026Q4,27,0.307180409,0.027887568,0.335067977,SCECommercialAnnual
+3377,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2027Q1,28,0.334392885,0.042643523,0.377036408,SCECommercialAnnual
+3378,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2027Q2,29,0.327659732,0.0,0.327659732,SCECommercialAnnual
+3379,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2027Q3,30,0.32779316,0.0,0.32779316,SCECommercialAnnual
+3380,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2027Q4,31,0.326771728,0.028429015,0.355200743,SCECommercialAnnual
+3381,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2028Q1,32,0.356828626,0.043455694,0.400284319,SCECommercialAnnual
+3382,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2028Q2,33,0.351380664,0.0,0.351380664,SCECommercialAnnual
+3383,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2028Q3,34,0.349278398,0.0,0.349278398,SCECommercialAnnual
+3384,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2028Q4,35,0.346208841,0.028970462,0.375179304,SCECommercialAnnual
+3385,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2029Q1,36,0.370649273,0.044267865,0.414917138,SCECommercialAnnual
+3386,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2029Q2,37,0.365072658,0.0,0.365072658,SCECommercialAnnual
+3387,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2029Q3,38,0.362894256,0.0,0.362894256,SCECommercialAnnual
+3388,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2029Q4,39,0.359750038,0.02951191,0.389261947,SCECommercialAnnual
+3389,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2030Q1,40,0.384130329,0.045080035,0.429210364,SCECommercialAnnual
+3390,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2030Q2,41,0.378320906,0.0,0.378320906,SCECommercialAnnual
+3391,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2030Q3,42,0.375826803,0.0,0.375826803,SCECommercialAnnual
+3392,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2030Q4,43,0.372483331,0.030053357,0.402536688,SCECommercialAnnual
+3393,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2031Q1,44,0.396233112,0.045892206,0.442125319,SCECommercialAnnual
+3394,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2031Q2,45,0.390264241,0.0,0.390264241,SCECommercialAnnual
+3395,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2031Q3,46,0.38785992,0.0,0.38785992,SCECommercialAnnual
+3396,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2031Q4,47,0.384451829,0.030594804,0.415046633,SCECommercialAnnual
+3397,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2032Q1,48,0.414440504,0.046704377,0.461144882,SCECommercialAnnual
+3398,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2032Q2,49,0.408349173,0.0,0.408349173,SCECommercialAnnual
+3399,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2032Q3,50,0.405893874,0.0,0.405893874,SCECommercialAnnual
+3400,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2032Q4,51,0.402416657,0.031136251,0.433552909,SCECommercialAnnual
+3401,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2033Q1,52,0.434199485,0.047516548,0.481716034,SCECommercialAnnual
+3402,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2033Q2,53,0.427989605,0.0,0.427989605,SCECommercialAnnual
+3403,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2033Q3,54,0.425511199,0.0,0.425511199,SCECommercialAnnual
+3404,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2033Q4,55,0.421974606,0.031677699,0.453652304,SCECommercialAnnual
+3405,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2034Q1,56,0.455709288,0.048328719,0.504038007,SCECommercialAnnual
+3406,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2034Q2,57,0.44937096,0.0,0.44937096,SCECommercialAnnual
+3407,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2034Q3,58,0.446830444,0.0,0.446830444,SCECommercialAnnual
+3408,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2034Q4,59,0.443220318,0.032219146,0.475439464,SCECommercialAnnual
+3409,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2035Q1,60,0.479053723,0.04914089,0.528194613,SCECommercialAnnual
+3410,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2035Q2,61,0.472588098,0.0,0.472588098,SCECommercialAnnual
+3411,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2035Q3,62,0.470021814,0.0,0.470021814,SCECommercialAnnual
+3412,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2035Q4,63,0.466347855,0.032760593,0.499108448,SCECommercialAnnual
+3413,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2036Q1,64,0.504264057,0.049953061,0.554217118,SCECommercialAnnual
+3414,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2036Q2,65,0.497670368,0.0,0.497670368,SCECommercialAnnual
+3415,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2036Q3,66,0.495054088,0.0,0.495054088,SCECommercialAnnual
+3416,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2036Q4,67,0.49130983,0.033302041,0.52461187,SCECommercialAnnual
+3417,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2037Q1,68,0.531580314,0.050765232,0.582345546,SCECommercialAnnual
+3418,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2037Q2,69,0.524858753,0.0,0.524858753,SCECommercialAnnual
+3419,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2037Q3,70,0.522198534,0.0,0.522198534,SCECommercialAnnual
+3420,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2037Q4,71,0.518385593,0.033843488,0.552229081,SCECommercialAnnual
+3421,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2038Q1,72,0.561178685,0.051577403,0.612756087,SCECommercialAnnual
+3422,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2038Q2,73,0.554329251,0.0,0.554329251,SCECommercialAnnual
+3423,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2038Q3,74,0.551625093,0.0,0.551625093,SCECommercialAnnual
+3424,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2038Q4,75,0.54774347,0.034384935,0.582128405,SCECommercialAnnual
+3425,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2039Q1,76,0.59326387,0.052389573,0.645653444,SCECommercialAnnual
+3426,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2039Q2,77,0.586286565,0.0,0.586286565,SCECommercialAnnual
+3427,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2039Q3,78,0.583538467,0.0,0.583538467,SCECommercialAnnual
+3428,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2039Q4,79,0.579588161,0.034926382,0.614514543,SCECommercialAnnual
+3429,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2040Q1,80,0.628057268,0.053201744,0.681259012,SCECommercialAnnual
+3430,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2040Q2,81,0.62095209,0.0,0.62095209,SCECommercialAnnual
+3431,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2040Q3,82,0.618160053,0.0,0.618160053,SCECommercialAnnual
+3432,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2040Q4,83,0.614141064,0.03546783,0.649608894,SCECommercialAnnual
+3433,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2041Q1,84,0.66579828,0.054013915,0.719812195,SCECommercialAnnual
+3434,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2041Q2,85,0.65856523,0.0,0.65856523,SCECommercialAnnual
+3435,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2041Q3,86,0.655729254,0.0,0.655729254,SCECommercialAnnual
+3436,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2041Q4,87,0.651641583,0.036009277,0.68765086,SCECommercialAnnual
+3437,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2042Q1,88,0.706745731,0.054826086,0.761571817,SCECommercialAnnual
+3438,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2042Q2,89,0.699384809,0.0,0.699384809,SCECommercialAnnual
+3439,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2042Q3,90,0.696504894,0.0,0.696504894,SCECommercialAnnual
+3440,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2042Q4,91,0.69234854,0.036550724,0.728899264,SCECommercialAnnual
+3441,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2043Q1,92,0.751179383,0.055638257,0.80681764,SCECommercialAnnual
+3442,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2043Q2,93,0.743690589,0.0,0.743690589,SCECommercialAnnual
+3443,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2043Q3,94,0.740766734,0.0,0.740766734,SCECommercialAnnual
+3444,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2043Q4,95,0.736541698,0.037092171,0.773633869,SCECommercialAnnual
+3445,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2044Q1,96,0.799401581,0.056450428,0.855852009,SCECommercialAnnual
+3446,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2044Q2,97,0.791784914,0.0,0.791784914,SCECommercialAnnual
+3447,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2044Q3,98,0.788817121,0.0,0.788817121,SCECommercialAnnual
+3448,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2044Q4,99,0.784523401,0.037633619,0.82215702,SCECommercialAnnual
+3449,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2045Q1,100,0.851739014,0.057262599,0.909001612,SCECommercialAnnual
+3450,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2045Q2,101,0.843994475,0.0,0.843994475,SCECommercialAnnual
+3451,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2045Q3,102,0.840982742,0.0,0.840982742,SCECommercialAnnual
+3452,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2045Q4,103,0.83662034,0.038175066,0.874795406,SCECommercialAnnual
+3453,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2046Q1,104,0.90854462,0.05807477,0.96661939,SCECommercialAnnual
+3454,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2046Q2,105,0.90067221,0.0,0.90067221,SCECommercialAnnual
+3455,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2046Q3,106,0.897616538,0.0,0.897616538,SCECommercialAnnual
+3456,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2046Q4,107,0.893185453,0.038716513,0.931901967,SCECommercialAnnual
+3457,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2047Q1,108,0.970199639,0.058886941,1.029086579,SCECommercialAnnual
+3458,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2047Q2,109,0.962199356,0.0,0.962199356,SCECommercialAnnual
+3459,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2047Q3,110,0.959099745,0.0,0.959099745,SCECommercialAnnual
+3460,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2047Q4,111,0.954599978,0.03925796,0.993857938,SCECommercialAnnual
+3461,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2048Q1,112,1.037115812,0.059699112,1.096814923,SCECommercialAnnual
+3462,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2048Q2,113,1.028987656,0.0,1.028987656,SCECommercialAnnual
+3463,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2048Q3,114,1.025844106,0.0,1.025844106,SCECommercialAnnual
+3464,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2048Q4,115,1.021275657,0.039799408,1.061075064,SCECommercialAnnual
+3465,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2049Q1,116,1.109737768,0.060511282,1.17024905,SCECommercialAnnual
+3466,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2049Q2,117,1.10148174,0.0,1.10148174,SCECommercialAnnual
+3467,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2049Q3,118,1.098294251,0.0,1.098294251,SCECommercialAnnual
+3468,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2049Q4,119,1.093657119,0.040340855,1.133997974,SCECommercialAnnual
+3469,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2050Q1,120,1.188545582,0.061323453,1.249869035,SCECommercialAnnual
+3470,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2050Q2,121,1.180161682,0.0,1.180161682,SCECommercialAnnual
+3471,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2050Q3,122,1.176930254,0.0,1.176930254,SCECommercialAnnual
+3472,SCE,2020-06-24_SoCal,2020,Commercial,Annual,SCECommercialAnnual,2050Q4,123,1.172224439,0.040882302,1.213106741,SCECommercialAnnual
+4093,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2020Q1,0,0.208805964,0.05555465,0.264360615,SCEResidentialAnnual
+4094,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2020Q2,1,0.201075371,0.0,0.201075371,SCEResidentialAnnual
+4095,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2020Q3,2,0.211465569,0.0,0.211465569,SCEResidentialAnnual
+4096,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2020Q4,3,0.224602071,0.037036434,0.261638505,SCEResidentialAnnual
+4097,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2021Q1,4,0.230765421,0.056736709,0.28750213,SCEResidentialAnnual
+4098,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2021Q2,5,0.223230729,0.0,0.223230729,SCEResidentialAnnual
+4099,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2021Q3,6,0.2297187,0.0,0.2297187,SCEResidentialAnnual
+4100,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2021Q4,7,0.235447345,0.037824472,0.273271817,SCEResidentialAnnual
+4101,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2022Q1,8,0.241591874,0.057943918,0.299535792,SCEResidentialAnnual
+4102,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2022Q2,9,0.230386672,0.0,0.230386672,SCEResidentialAnnual
+4103,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2022Q3,10,0.237499079,0.0,0.237499079,SCEResidentialAnnual
+4104,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2022Q4,11,0.243368704,0.038629279,0.281997983,SCEResidentialAnnual
+4105,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2023Q1,12,0.252149353,0.059176813,0.311326167,SCEResidentialAnnual
+4106,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2023Q2,13,0.241531622,0.0,0.241531622,SCEResidentialAnnual
+4107,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2023Q3,14,0.248744595,0.0,0.248744595,SCEResidentialAnnual
+4108,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2023Q4,15,0.254908398,0.039451209,0.294359607,SCEResidentialAnnual
+4109,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2024Q1,16,0.264300478,0.060435942,0.32473642,SCEResidentialAnnual
+4110,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2024Q2,17,0.253711752,0.0,0.253711752,SCEResidentialAnnual
+4111,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2024Q3,18,0.26055226,0.0,0.26055226,SCEResidentialAnnual
+4112,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2024Q4,19,0.265675201,0.040290628,0.305965829,SCEResidentialAnnual
+4113,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2025Q1,20,0.286478561,0.061630413,0.348108973,SCEResidentialAnnual
+4114,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2025Q2,21,0.277175026,0.0,0.277175026,SCEResidentialAnnual
+4115,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2025Q3,22,0.28177984,0.0,0.28177984,SCEResidentialAnnual
+4116,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2025Q4,23,0.284854657,0.041086942,0.325941599,SCEResidentialAnnual
+4117,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2026Q1,24,0.30893737,0.062850682,0.371788052,SCEResidentialAnnual
+4118,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2026Q2,25,0.300919026,0.0,0.300919026,SCEResidentialAnnual
+4119,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2026Q3,26,0.303288147,0.0,0.303288147,SCEResidentialAnnual
+4120,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2026Q4,27,0.304314839,0.041900454,0.346215294,SCEResidentialAnnual
+4121,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2027Q1,28,0.331330143,0.064070951,0.395401093,SCEResidentialAnnual
+4122,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2027Q2,29,0.32459699,0.0,0.32459699,SCEResidentialAnnual
+4123,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2027Q3,30,0.324730417,0.0,0.324730417,SCEResidentialAnnual
+4124,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2027Q4,31,0.323708985,0.042713967,0.366422952,SCEResidentialAnnual
+4125,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2028Q1,32,0.35356871,0.065291219,0.41885993,SCEResidentialAnnual
+4126,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2028Q2,33,0.348120749,0.0,0.348120749,SCEResidentialAnnual
+4127,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2028Q3,34,0.346018483,0.0,0.346018483,SCEResidentialAnnual
+4128,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2028Q4,35,0.342948926,0.04352748,0.386476406,SCEResidentialAnnual
+4129,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2029Q1,36,0.367192185,0.066511488,0.433703673,SCEResidentialAnnual
+4130,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2029Q2,37,0.36161557,0.0,0.36161557,SCEResidentialAnnual
+4131,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2029Q3,38,0.359437168,0.0,0.359437168,SCEResidentialAnnual
+4132,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2029Q4,39,0.35629295,0.044340992,0.400633942,SCEResidentialAnnual
+4133,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2030Q1,40,0.380476068,0.067731757,0.448207825,SCEResidentialAnnual
+4134,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2030Q2,41,0.374666645,0.0,0.374666645,SCEResidentialAnnual
+4135,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2030Q3,42,0.372172542,0.0,0.372172542,SCEResidentialAnnual
+4136,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2030Q4,43,0.36882907,0.045154505,0.413983575,SCEResidentialAnnual
+4137,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2031Q1,44,0.392381679,0.068952026,0.461333705,SCEResidentialAnnual
+4138,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2031Q2,45,0.386412808,0.0,0.386412808,SCEResidentialAnnual
+4139,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2031Q3,46,0.384008486,0.0,0.384008486,SCEResidentialAnnual
+4140,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2031Q4,47,0.380600396,0.045968017,0.426568413,SCEResidentialAnnual
+4141,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2032Q1,48,0.410391898,0.070172295,0.480564193,SCEResidentialAnnual
+4142,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2032Q2,49,0.404300567,0.0,0.404300567,SCEResidentialAnnual
+4143,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2032Q3,50,0.401845268,0.0,0.401845268,SCEResidentialAnnual
+4144,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2032Q4,51,0.398368051,0.04678153,0.445149581,SCEResidentialAnnual
+4145,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2033Q1,52,0.429953707,0.071392563,0.50134627,SCEResidentialAnnual
+4146,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2033Q2,53,0.423743826,0.0,0.423743826,SCEResidentialAnnual
+4147,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2033Q3,54,0.42126542,0.0,0.42126542,SCEResidentialAnnual
+4148,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2033Q4,55,0.417728827,0.047595042,0.465323869,SCEResidentialAnnual
+4149,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2034Q1,56,0.451266337,0.072612832,0.523879169,SCEResidentialAnnual
+4150,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2034Q2,57,0.444928008,0.0,0.444928008,SCEResidentialAnnual
+4151,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2034Q3,58,0.442387493,0.0,0.442387493,SCEResidentialAnnual
+4152,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2034Q4,59,0.438777366,0.048408555,0.487185921,SCEResidentialAnnual
+4153,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2035Q1,60,0.474413599,0.073833101,0.5482467,SCEResidentialAnnual
+4154,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2035Q2,61,0.467947974,0.0,0.467947974,SCEResidentialAnnual
+4155,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2035Q3,62,0.46538169,0.0,0.46538169,SCEResidentialAnnual
+4156,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2035Q4,63,0.461707731,0.049222067,0.510929798,SCEResidentialAnnual
+4157,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2036Q1,64,0.499426761,0.07505337,0.57448013,SCEResidentialAnnual
+4158,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2036Q2,65,0.492833071,0.0,0.492833071,SCEResidentialAnnual
+4159,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2036Q3,66,0.490216791,0.0,0.490216791,SCEResidentialAnnual
+4160,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2036Q4,67,0.486472533,0.05003558,0.536508113,SCEResidentialAnnual
+4161,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2037Q1,68,0.526545845,0.076273639,0.602819483,SCEResidentialAnnual
+4162,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2037Q2,69,0.519824283,0.0,0.519824283,SCEResidentialAnnual
+4163,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2037Q3,70,0.517164064,0.0,0.517164064,SCEResidentialAnnual
+4164,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2037Q4,71,0.513351123,0.050849092,0.564200216,SCEResidentialAnnual
+4165,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2038Q1,72,0.555947043,0.077493908,0.63344095,SCEResidentialAnnual
+4166,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2038Q2,73,0.549097609,0.0,0.549097609,SCEResidentialAnnual
+4167,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2038Q3,74,0.546393451,0.0,0.546393451,SCEResidentialAnnual
+4168,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2038Q4,75,0.542511827,0.051662605,0.594174432,SCEResidentialAnnual
+4169,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2039Q1,76,0.587835056,0.078714176,0.666549232,SCEResidentialAnnual
+4170,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2039Q2,77,0.58085775,0.0,0.58085775,SCEResidentialAnnual
+4171,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2039Q3,78,0.578109652,0.0,0.578109652,SCEResidentialAnnual
+4172,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2039Q4,79,0.574159346,0.052476118,0.626635464,SCEResidentialAnnual
+4173,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2040Q1,80,0.62243128,0.079934445,0.702365725,SCEResidentialAnnual
+4174,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2040Q2,81,0.615326102,0.0,0.615326102,SCEResidentialAnnual
+4175,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2040Q3,82,0.612534066,0.0,0.612534066,SCEResidentialAnnual
+4176,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2040Q4,83,0.608515077,0.05328963,0.661804707,SCEResidentialAnnual
+4177,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2041Q1,84,0.65997512,0.081154714,0.741129834,SCEResidentialAnnual
+4178,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2041Q2,85,0.65274207,0.0,0.65274207,SCEResidentialAnnual
+4179,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2041Q3,86,0.649906094,0.0,0.649906094,SCEResidentialAnnual
+4180,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2041Q4,87,0.645818423,0.054103143,0.699921565,SCEResidentialAnnual
+4181,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2042Q1,88,0.700725398,0.082374983,0.783100381,SCEResidentialAnnual
+4182,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2042Q2,89,0.693364476,0.0,0.693364476,SCEResidentialAnnual
+4183,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2042Q3,90,0.690484561,0.0,0.690484561,SCEResidentialAnnual
+4184,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2042Q4,91,0.686328207,0.054916655,0.741244862,SCEResidentialAnnual
+4185,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2043Q1,92,0.744961877,0.083595252,0.828557129,SCEResidentialAnnual
+4186,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2043Q2,93,0.737473083,0.0,0.737473083,SCEResidentialAnnual
+4187,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2043Q3,94,0.734549229,0.0,0.734549229,SCEResidentialAnnual
+4188,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2043Q4,95,0.730324192,0.055730168,0.78605436,SCEResidentialAnnual
+4189,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2044Q1,96,0.792986902,0.084815521,0.877802423,SCEResidentialAnnual
+4190,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2044Q2,97,0.785370236,0.0,0.785370236,SCEResidentialAnnual
+4191,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2044Q3,98,0.782402442,0.0,0.782402442,SCEResidentialAnnual
+4192,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2044Q4,99,0.778108723,0.05654368,0.834652403,SCEResidentialAnnual
+4193,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2045Q1,100,0.845127162,0.086035789,0.931162952,SCEResidentialAnnual
+4194,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2045Q2,101,0.837382624,0.0,0.837382624,SCEResidentialAnnual
+4195,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2045Q3,102,0.834370891,0.0,0.834370891,SCEResidentialAnnual
+4196,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2045Q4,103,0.830008489,0.057357193,0.887365682,SCEResidentialAnnual
+4197,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2046Q1,104,0.901735597,0.087256058,0.988991655,SCEResidentialAnnual
+4198,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2046Q2,105,0.893863186,0.0,0.893863186,SCEResidentialAnnual
+4199,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2046Q3,106,0.890807514,0.0,0.890807514,SCEResidentialAnnual
+4200,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2046Q4,107,0.88637643,0.058170705,0.944547135,SCEResidentialAnnual
+4201,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2047Q1,108,0.963193442,0.088476327,1.051669769,SCEResidentialAnnual
+4202,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2047Q2,109,0.955193159,0.0,0.955193159,SCEResidentialAnnual
+4203,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2047Q3,110,0.952093548,0.0,0.952093548,SCEResidentialAnnual
+4204,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2047Q4,111,0.947593781,0.058984218,1.006577999,SCEResidentialAnnual
+4205,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2048Q1,112,1.029912442,0.089696596,1.119609038,SCEResidentialAnnual
+4206,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2048Q2,113,1.021784287,0.0,1.021784287,SCEResidentialAnnual
+4207,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2048Q3,114,1.018640737,0.0,1.018640737,SCEResidentialAnnual
+4208,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2048Q4,115,1.014072287,0.059797731,1.073870018,SCEResidentialAnnual
+4209,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2049Q1,116,1.102337226,0.090916865,1.19325409,SCEResidentialAnnual
+4210,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2049Q2,117,1.094081198,0.0,1.094081198,SCEResidentialAnnual
+4211,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2049Q3,118,1.090893709,0.0,1.090893709,SCEResidentialAnnual
+4212,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2049Q4,119,1.086256577,0.060611243,1.14686782,SCEResidentialAnnual
+4213,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2050Q1,120,1.180947867,0.092137133,1.273085001,SCEResidentialAnnual
+4214,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2050Q2,121,1.172563968,0.0,1.172563968,SCEResidentialAnnual
+4215,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2050Q3,122,1.169332539,0.0,1.169332539,SCEResidentialAnnual
+4216,SCE,2020-06-24_SoCal,2020,Residential,Annual,SCEResidentialAnnual,2050Q4,123,1.164626724,0.061424756,1.22605148,SCEResidentialAnnual

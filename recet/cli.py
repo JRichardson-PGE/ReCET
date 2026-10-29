@@ -14,6 +14,8 @@
     recet openbca run --program-input P.xlsm --configuration C.xlsm --out results     OpenBCA's own engine on its workbooks (needs RECET_OPENBCA_HOME)
     recet openbca compare A/openbca.db B/openbca.db                                  every OpenBCA table of two runs
     recet openbca compare-recet --measures M.csv --programcost P.csv --out cmp        a CET job priced in ReCET and in OpenBCA, measure by measure
+    recet cet-version list                                                           the prior CET releases ReCET reproduces
+    recet cet-version run --release 24.3 --acc 2022 --measures M.csv --programcost P.csv --out results   a job priced exactly as CET 24.3 does
 """
 from __future__ import annotations
 
@@ -263,6 +265,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("openbca", help="run OpenBCA's own engine on its workbooks (see `recet openbca -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_openbca)
+    from .cet_versions import cli as cet_cli
+    cet_cli.add_parser(sub)
     return ap
 
 
@@ -275,6 +279,9 @@ def main(argv: list[str] | None = None) -> None:
         ap.error(f"data {a.action} needs a path")
     if getattr(a, "cmd", None) == "data" and a.action in {"pack", "unpack"} and not a.dest:
         ap.error(f"data {a.action} needs a destination")
+    if getattr(a, "cmd", None) == "cet-version":
+        from .cet_versions import cli as cet_cli
+        sys.exit(cet_cli.main(a))
     sys.exit(a.func(a))
 
 

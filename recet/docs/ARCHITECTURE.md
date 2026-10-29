@@ -136,7 +136,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
 | `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
 | `gui_templates.py` | interface | the window's output-template editor: two-list field picker and the default template (over `output_templates.py`) |
-| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `openbca` |
+| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `openbca`, `cet-version` |
 | `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
@@ -185,6 +185,16 @@ Every module in the package. Paths are relative to `recet/`.
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
 | `openbca/workbook.py` | job | writes an OpenBCA Program Input workbook in OpenBCA's template layout |
 | `openbca/translate.py` | job | a CET job as an OpenBCA job priced on ReCET's own electric and gas shapes, avoided costs and discount rates, with every known difference flagged; `compare_job` runs both tools and compares them (C3 / C4) |
+| `cet_versions/releases.py` | pricing | replica: the prior CET releases ReCET reproduces (21.0 to 25.1) and the switches that say how each one calculates |
+| `cet_versions/tables.py` | data | a release's quarterly tables: a folder of CSVs (the test fixtures) or the shipped small tables plus the parquet export |
+| `cet_versions/inputs.py` | pricing | replica: CET's input views (InputMeasurevw, InputProgramvw, Settingsvw) as each release generates them |
+| `cet_versions/calc_ce.py` | pricing | replica: CalcCE of 22.1 to 25.1: benefits, supply costs, the cost tests' costs, bills, ratios |
+| `cet_versions/calc_ce_2021.py` | pricing | replica: CalcCE of 21.0 (a different procedure) |
+| `cet_versions/calc_savings.py` | pricing | replica: CalcSavings (21.0 / 22.1 and 24.1+ layouts) |
+| `cet_versions/calc_emissions.py` | pricing | replica: CalcEmissions |
+| `cet_versions/calc_cost.py` | pricing | replica: CalcCost: participant costs, weighted program costs, discounted savings, levelized values |
+| `cet_versions/sql.py` | pricing | replica: SQL Server's arithmetic as CET meets it: NULLs, decimal POWER rounding, collation keys, 1.000 / n |
+| `cet_versions/cli.py` | interface | `recet cet-version list` and `run` |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
@@ -516,6 +526,10 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   holds the scripts.
 * **Reproduce the CET unless it is wrong.** Where the CET's own data or code is in error, ReCET does not copy it, and each difference is documented
   (C17).
+* **Prior CET releases are replicas, checked against the releases themselves.** `recet/cet_versions` prices a job exactly as CET 21.0, 22.1, 24.1,
+  24.2, 24.3, 25.0 or 25.1 does, errors included (Jake, 2026-10-29; CALCULATIONS C20). It shares no code with ReCET's hourly engine.
+  `tests/test_cet_versions.py` requires every output column of every measure to equal that release's own RunCET run to 1e-9, on 21 reference runs
+  made on restored copies of each release's database backup.
 * **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
 
 ## 11. Limits and what is not built

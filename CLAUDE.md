@@ -110,6 +110,16 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   cell: a keyboard trap, 2.1.2), an open editor still moves on with Tab. Moving a cell's tabindex blurs it, so `toCell` notes the focus first. The help line
   is no longer a live region (NVDA read the whole description before every cell); it sits just before the grid. NVDA keeps Escape (edits end with Enter
   or Tab). Guidepup's default capture keeps only the first phrase after a key: the spec sets `nvdaStartOptions: { capture: true }`.
+- 0.1.69 (2026-10-29, Jake; plan and evidence in CEDARS-Research `notes/cet_prior_versions.md`): prior CET releases as exact replicas. `recet/cet_versions`
+  prices a job as RunCET of CET 21.0, 22.1, 24.1, 24.2, 24.3, 25.0 or 25.1 does, on that release's own quarterly tables, CET's errors included (Jake: "exact
+  replicas, labelled"; a deliberate exception to "ReCET does not copy CET errors", for evaluation and history only; ReCET's own engine is untouched and
+  shares no code with it). `releases.Release` holds each release's switches; `calc_ce` (22.1+), `calc_ce_2021`, `calc_savings`, `calc_emissions`,
+  `calc_cost` port the SQL; `sql.py` copies SQL Server's arithmetic (NULLs, decimal(18,6) POWER rounded to 6 places, 1.000/n, UNION, collation keys that
+  ignore case and trailing spaces but not line breaks, positional column lists). Accepted only at 1e-9 on every column of every measure:
+  `tests/test_cet_versions.py` over 21 reference runs in `tests/data/cet_versions/` (11 MB, built by CEDARS-Research `poc/cet_version_fixtures.py`).
+  Every copied error is marked "CET error kept" and listed in CALCULATIONS C20. Real runs: `recet cet-version run --release R --acc YEAR`, small tables
+  shipped in `data/cet_versions/<release>/`, large ones from the parquet export at `<reference folder>/cet_versions/` (`QuarterlyTables.from_release`,
+  filtered to the job's PAs and end uses). No web page yet (phase 4).
 - 0.1.68 (2026-10-29, Jake; WCAG 2.2 AA audit rows 1, 2, 15, 16: the Edit inputs grid; 0.1.67 is the rest of the pages): `edit.js fixRoles` repairs
   Tabulator 6.3.1's grid roles on tableBuilt (header contents and body table = presentation, the scroll box = the body rowgroup, grid aria-label); the help
   line (`#help`, aria-live, focusable) follows the active cell on arrow keys as well as clicks and leads with the cell's problems (`showHelp(t, col, cellEl)`,
