@@ -1,0 +1,238 @@
+[
+ {
+  "step": "to web content (Ctrl+Home)",
+  "spoken": [
+   "same page, link, Skip to content"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (1)",
+  "spoken": [
+   "",
+   "main landmark, Screen-reader test run, heading, level 1"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (2)",
+  "spoken": [
+   "Input check, heading, level 2"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (3)",
+  "spoken": [
+   "Sharing, heading, level 2"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (4)",
+  "spoken": [
+   "Files, heading, level 2"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (5)",
+  "spoken": [
+   "Log, heading, level 2"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (6)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (7)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNextHeading (8)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "summary \"What these numbers are\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (1)",
+  "spoken": [
+   "Log, button, collapsed"
+  ],
+  "focus": "summary \"Log\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (2)",
+  "spoken": [
+   "Screen-reader test run Re CET - Google Chrome, region. Tab search, button, collapsed"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (3)",
+  "spoken": [
+   "tool bar. View site information, button"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b",
+  "refocused": true
+ },
+ {
+  "step": "Tab (4)",
+  "spoken": [
+   "Address and search bar, edit, Search Google or type a URL. Press up or down arrow for auto completions. Type to autocomplete dot dot, Ctrl plus, L, selected 127.0.0.1:8765 slash Re CET slash runs slash 20261029-075620-379c 7b"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b",
+  "refocused": true
+ },
+ {
+  "step": "Tab (5)",
+  "spoken": [
+   "Bookmark this tab, button"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b",
+  "refocused": true
+ },
+ {
+  "step": "Tab (6)",
+  "spoken": [
+   "Screen-reader test run Re CET, document. button, collapsed, Log. Skip to content, same page, link"
+  ],
+  "focus": "a.skip \"Skip to content\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b",
+  "refocused": true
+ },
+ {
+  "step": "Tab (7)",
+  "spoken": [
+   "banner landmark, Re CET, link"
+  ],
+  "focus": "a.brand \"ReCET\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (8)",
+  "spoken": [
+   "Main, navigation landmark, New run, link"
+  ],
+  "focus": "a \"New run\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (9)",
+  "spoken": [
+   "Runs, link, current page"
+  ],
+  "focus": "a \"Runs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (10)",
+  "spoken": [
+   "Edit inputs, link"
+  ],
+  "focus": "a \"Edit inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (11)",
+  "spoken": [
+   "Templates, link"
+  ],
+  "focus": "a \"Templates\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (12)",
+  "spoken": [
+   "Docs, link"
+  ],
+  "focus": "a \"Docs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (13)",
+  "spoken": [
+   "Users, link"
+  ],
+  "focus": "a \"Users\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (14)",
+  "spoken": [
+   "Audit, link"
+  ],
+  "focus": "a \"Audit\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (15)",
+  "spoken": [
+   "Test Admin, link, Change your password"
+  ],
+  "focus": "a \"Test Admin\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "Tab (16)",
+  "spoken": [
+   "section, Sign out, button"
+  ],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "focus run log",
+  "spoken": [],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNext (1)",
+  "spoken": [
+   "",
+   "out of section, main landmark, heading, level 1, Screen-reader test run"
+  ],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNext (2)",
+  "spoken": [
+   "Finished"
+  ],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ },
+ {
+  "step": "moveToNext (3)",
+  "spoken": [
+   "2026 ACC started 2026-10-29 07:56 deleted in 6 days 20261029-075620-379c 7b"
+  ],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/20261029-075620-379c7b"
+ }
+]
