@@ -86,6 +86,7 @@
 {{ tile_help(tiles) }}
 {% endif %}
 {% if chart %}
+<h2 class="sr-only">{{ chart.title }}</h2>
 <details class="card chart-card" open>
   <summary>{{ chart.title }}{{ ' (' + pa + ')' if pa != rv.ALL_PAS }}</summary>
   <div class="bars" role="list">
@@ -110,9 +111,10 @@
 {% if measure_ok is defined and not measure_ok %}<p class="small muted">The measure level is shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures; the measure-level table is in the run's downloads.</p>{% endif %}
 {% if note %}<p class="note">{{ note }}</p>{% endif %}
 {% if table is not none %}
+<h2 class="sr-only">Results table</h2>
 <div class="table-tools">
   <label class="inline small">Filter rows <input type="search" data-filter="results-table" data-count="filter-count" placeholder="program, PA, text…" autocomplete="off"></label>
-  <span class="small muted" id="filter-count" role="status"></span>
+  <span class="small muted" id="filter-count"></span>
   <span class="small muted">Click a column heading to sort.</span>
   <a class="button" href="{{ u('/runs/' + run.id + '/results.csv') }}?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'years': years_param, 'columns': '' if view else keys|join(',')}|urlencode }}">Download this table (CSV)</a>
 </div>

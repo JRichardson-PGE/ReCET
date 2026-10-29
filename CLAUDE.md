@@ -95,6 +95,21 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.70 (2026-10-29, Jake; 0.1.69 is the prior-CET-releases PR #58): the screen-reader pass. `tests/screenreader` is an NVDA walk-through of the web
+  app (Guidepup 0.36 + Playwright, Windows only, not part of pytest): `serve_a11y.py` serves this checkout on a throwaway state, `recet.nvda.spec.ts` drives
+  NVDA and Chrome through sign in, Runs, New run, a run, Results and Edit inputs and writes what NVDA said after each key to `results/<flow>.json` (ignored
+  by git). Guidepup finds the browser with Alt+Esc and failed on a busy desktop; `focusWindow.ps1` raises Chrome by its title first, and the title match
+  ignores spaces (NVDA says "Re CET"). A locked PC fails every run. Fixes from NVDA 2026.2's transcripts: Run / Results / Compare cards get a visually
+  hidden h2 each (only the h1 was a heading); Validate inputs keeps the focus while busy (aria-disabled, not disabled); its result and the row-filter count
+  (500 ms after typing pauses) are spoken through one page-wide `#announcer` (base.html; `window.recetAnnounce` in app.js clears it and sets the text 150 ms
+  later: NVDA spoke neither as a role=status beside the control, nor a result that replaced "Saving…" at once); New run's ACC select is described by the
+  help box's title, not its whole table, and Priced for is named by its label only. The value-list pager hands the focus over when its button disables
+  itself. Never disable the focused control; announce through `recetAnnounce`, not a new live region. Edit inputs grid (`edit.js cellFocus`): it is one
+  tab stop and the focus sits on the active cell (roving tabindex 0; the scroll box gets -1 while a cell is drawn and hands the focus on), so NVDA
+  switches to focus mode by itself and reads each cell with its column and problem; Tab / Shift+Tab leave the grid (Tabulator's Tab moved to the next
+  cell: a keyboard trap, 2.1.2), an open editor still moves on with Tab. Moving a cell's tabindex blurs it, so `toCell` notes the focus first. The help line
+  is no longer a live region (NVDA read the whole description before every cell); it sits just before the grid. NVDA keeps Escape (edits end with Enter
+  or Tab). Guidepup's default capture keeps only the first phrase after a key: the spec sets `nvdaStartOptions: { capture: true }`.
 - 0.1.69 (2026-10-29, Jake; plan and evidence in CEDARS-Research `notes/cet_prior_versions.md`): prior CET releases as exact replicas. `recet/cet_versions`
   prices a job as RunCET of CET 21.0, 22.1, 24.1, 24.2, 24.3, 25.0 or 25.1 does, on that release's own quarterly tables, CET's errors included (Jake: "exact
   replicas, labelled"; a deliberate exception to "ReCET does not copy CET errors", for evaluation and history only; ReCET's own engine is untouched and

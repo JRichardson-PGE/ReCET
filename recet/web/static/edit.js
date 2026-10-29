@@ -160,13 +160,7 @@
       clipboardCopyRowRange: "range", clipboardPasteParser: "range", clipboardPasteAction: "range",
       history: true
     });
-    g.on("tableBuilt", function () { fixRoles(t, g); });
-    // keyboard (arrows move the range): the help line follows the active cell, with its problems, so nothing is hover-only (WCAG 2.1.1)
-    g.element.addEventListener("keyup", function (e) {
-      if (!/^(Arrow|Tab|Home|End|Page)/.test(e.key) || e.target.tagName === "INPUT") return;
-      var c = g.element.querySelector(".tabulator-cell.tabulator-range-only-cell-selected") || g.element.querySelector(".tabulator-cell.tabulator-range-selected");
-      if (c) showHelp(t, c.getAttribute("tabulator-field"), c);
-    });
+    g.on("tableBuilt", function () { fixRoles(t, g); cellFocus(t, g); });
     ["cellEdited", "clipboardPasted", "rowAdded", "rowDeleted", "historyUndo", "historyRedo", "dataChanged"].forEach(function (ev) {
       g.on(ev, function () { changed(t); });
     });
@@ -207,7 +201,8 @@
     st.grids[t] = g;
   }
 
-  // the help line (a polite live region): the column's description and what it changes, and the cell's problems when it is flagged
+  // the help line: the column's description and what it changes, and the cell's problems when it is flagged. Not a live region: a screen reader
+  // reads the focused cell (its column, value and problem) and NVDA read the whole description before every cell; it is one Shift+Tab away.
   var lastHelp = "";
   function showHelp(t, col, cellEl) {
     var help = document.getElementById("help");
@@ -217,7 +212,7 @@
     var sev = !cellEl ? "" : cellEl.classList.contains("issue-error") ? "Stops the run: " : cellEl.classList.contains("issue-warning") ? "Check: " : "Note: ";
     var text = (issue ? sev + issue.replace(/\n/g, "; ") + "  |  " : "") + col + ": " + (L.help[col] || "no description")
       + (L.tooltips[col] ? "  |  " + L.tooltips[col] : "");
-    if (text === lastHelp) return;                            // moving along a row of one column's cells: say it once
+    if (text === lastHelp) return;                            // moving along one column's cells: leave it
     lastHelp = text;
     help.textContent = text;
   }
@@ -231,6 +226,48 @@
     if (hc) hc.setAttribute("role", "presentation");
     if (holder) { holder.setAttribute("role", "rowgroup"); holder.setAttribute("aria-label", t + " rows"); }
     if (body) body.setAttribute("role", "presentation");
+  }
+
+  // The grid is one tab stop, as in the ARIA grid pattern. The keyboard focus sits on the active cell, so a screen reader names the cell and
+  // switches to its focus mode by itself (NVDA stayed in browse mode on the scroll box, and the arrows never reached the grid), the arrows
+  // move it, and the help line follows it with the cell's problems (nothing hover-only, WCAG 2.1.1). Tab and Shift+Tab leave the grid:
+  // Tabulator's Tab moved to the next cell, so the keyboard could not get out (2.1.2). Tab still moves an open editor to the next cell.
+  function cellFocus(t, g) {
+    var holder = g.element.querySelector(".tabulator-tableholder"), header = g.element.querySelector(".tabulator-header");
+    var range = g.modules && g.modules.selectRange;
+    if (!holder || !range) return;
+    if (header) header.setAttribute("tabindex", "-1");
+    var editing = function () { return g.element.querySelector(".tabulator-cell.tabulator-editing"); };
+    var active = function () {
+      var c = range.activeRange && range.getActiveCell(), e = c && c.getElement && c.getElement();
+      return e && e.isConnected && holder.contains(e) ? e : null;
+    };
+    // the tab stop: the active cell while it is drawn (scrolling drops rows), else the scroll box, which hands the focus on
+    var stop = function () {
+      var e = active();
+      g.element.querySelectorAll('.tabulator-cell[tabindex]').forEach(function (c) { if (c !== e) c.removeAttribute("tabindex"); });
+      if (e) e.setAttribute("tabindex", "0");
+      holder.setAttribute("tabindex", e ? "-1" : "0");
+      return e;
+    };
+    var toCell = function () {
+      var f = document.activeElement, inGrid = g.element.contains(f), e = stop();   // stop() blurs the cell it takes the tabindex from
+      if (inGrid && !editing() && f !== e) (e || holder).focus({ preventScroll: true });
+      if (e) showHelp(t, e.getAttribute("tabulator-field"), e);
+    };
+    holder.addEventListener("focus", function () { setTimeout(toCell, 0); });    // a click, or an edit closing
+    holder.addEventListener("focusin", function (ev) {                          // Tab in
+      if (ev.target.classList.contains("tabulator-cell")) showHelp(t, ev.target.getAttribute("tabulator-field"), ev.target);
+    });
+    g.on("rangeChanged", function () { setTimeout(toCell, 0); });
+    g.element.addEventListener("keyup", function (e) {                          // the first move sends no rangeChanged
+      if (/^(Arrow|Home|End|Page)/.test(e.key) && e.target.tagName !== "INPUT") toCell();
+    });
+    g.on("renderComplete", stop);
+    g.element.addEventListener("keydown", function (e) {
+      if (e.key === "Tab" && !editing()) e.stopPropagation();                   // before Tabulator's keybinding takes it
+    }, true);
+    stop();
   }
 
   function updateCounts() {
@@ -562,7 +599,7 @@
     chkAcc.value = c.acc_version || def.acc_version;
     chkSw.checked = c.run ? !!c.allocate_statewide : !!def.allocate_statewide;
     chkFiling.value = (c.run ? c.filing_validation : def.filing_validation) || "";
-    chkBtn.disabled = false;
+    chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
     if (c.run) {
       chk.info = c;
       if (c.rev === d.rev) { chk.snap = ridSnapshot(); chk.snapRun = c.run; }   // the page holds the checked revision: its rows are the checked rows
@@ -610,7 +647,16 @@
     remark(touched);
   }
 
+  // The check's state for a screen reader: #check-result is rebuilt on every poll, so it is not a live region; each new heading ("Saving and
+  // starting the check…", "Checking the inputs…", then the result) is said once through the page's announcer (app.js).
+  var chkSaid = "";
+  function chkSay(text) {
+    if (text === chkSaid) return;
+    chkSaid = text;
+    if (window.recetAnnounce) window.recetAnnounce(text);
+  }
   function checkHead(text, kind) {
+    chkSay(text);
     var head = el("div", "check-head");
     head.appendChild(el("span", "check-title " + (kind || ""), text));
     if (chk.info && chk.info.run_url) {
@@ -733,19 +779,19 @@
           chk.timer = setTimeout(poll, Date.now() - chk.started > 60000 ? 4000 : 1500);
         } else {
           chk.busy = false;
-          chkBtn.disabled = false;
+          chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
         }
       })
       .catch(function () {
         if (Date.now() - chk.started < 600000) chk.timer = setTimeout(poll, 5000);   // a dropped connection: keep trying for a while
-        else { chk.busy = false; chkBtn.disabled = false; }
+        else { chk.busy = false; chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled"); }
       });
   }
 
   function runCheck() {
     if (chk.busy || !st.loaded) return;
     chk.busy = true;
-    chkBtn.disabled = true;
+    chkBtn.setAttribute("aria-disabled", "true");          // not disabled: that would drop the keyboard focus to the page
     chkOut.hidden = false;
     chkOut.textContent = "";
     chkOut.appendChild(checkHead("Saving and starting the check…", "muted"));
@@ -767,11 +813,12 @@
     }).then(function (res) {
       if (!res.ok) {
         chk.busy = false;
-        chkBtn.disabled = false;
+        chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
         chkOut.textContent = "";
         chk.info = null;
         chkOut.appendChild(checkHead(res.status === 401 ? "Signed out: reload the page and sign in again." : "The check did not start.", "bad"));
         chkOut.appendChild(el("p", "small", res.j.error || res.j.detail || ("Error " + res.status)));
+        chkSay("The check did not start. " + (res.j.error || res.j.detail || ("Error " + res.status)));   // say why, not just that
         return;
       }
       chk.info = res.j;
@@ -780,7 +827,7 @@
       poll(true);
     }).catch(function (e) {
       chk.busy = false;
-      chkBtn.disabled = false;
+      chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
       chkOut.textContent = "";
       chkOut.appendChild(checkHead("The check did not start: " + e.message, "bad"));
     });
