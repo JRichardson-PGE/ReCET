@@ -996,7 +996,7 @@ Avoided Cost Version numbers, `versions.CET_VERSION_TO_ACC`). 25.1 lists a Versi
 Version 2026 (the 2024 ACC), and the 2026-10-07 backup carries only the corrected tables, under Version 2026 (Jake, 2026-10-29). So a 25.1 replica
 on the 2024 ACC prices on the corrected tables. 21.0's backup lists a Version 2021 too, but the next ACC was not part of 21.0 (Jake, 2026-10-29): the
 backup's tables for it are an unfinished load (Version labels `2020`, `2016`, `PG&E`). Neither Version is offered (`Release.not_offered`). Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
-E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does.
+E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does. A CEDARS upload's Measure.csv has no PA column: a replica run gives each record its program's PA (ProgramCost) and a statewide record its IOU_AC_Territory, as the reference runs were made (`cet_versions/job.cet_inputs`).
 
 **Engine.** A run's calculation engine is ReCET's own (the default) or one of these replicas (D13, BR-06.4): `RunConfig.engine` "cet-<release>",
 `recet run --engine cet-24.3`, New run's **Calculation engine** (`cet_versions/job.py`). A replica run goes through the ordinary run path and writes the
