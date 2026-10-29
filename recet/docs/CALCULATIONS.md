@@ -992,7 +992,10 @@ The replica shares no code with ReCET's engine, so nothing in C0-C19 changes whe
 
 **Releases.** One per CPUC database backup: 21.0 (2020-08-24), 22.1 (2021-12-09), 24.1 (2023-05-16), 24.2 (2023-09-20), 24.3 (2024-08-28), 25.0
 (2025-05-18) and 25.1 (2026-10-07). `recet cet-version list` shows which ACCs each one has (an ACC is named by its year; the release's tables use CET's
-Avoided Cost Version numbers, `versions.CET_VERSION_TO_ACC`). 25.1 lists the 2026 ACC (Version 2027) but its backup has no tables for it.
+Avoided Cost Version numbers, `versions.CET_VERSION_TO_ACC`). 25.1 lists a Version 2027 with no tables in its backup: Version 2027 was a corrected
+Version 2026 (the 2024 ACC), and the 2026-10-07 backup carries only the corrected tables, under Version 2026 (Jake, 2026-10-29; `Release.version_notes`).
+So a 25.1 replica on the 2024 ACC prices on the corrected tables. Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
+E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does.
 
 **Acceptance.** A replica is accepted only when every output column of every measure equals that release's own RunCET run to 1e-9 (relative; NULL must
 be NULL). `tests/test_cet_versions.py` checks 21 reference runs: for each release a 30-measure synthetic job built to exercise every branch (with and

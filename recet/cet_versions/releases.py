@@ -46,6 +46,8 @@ class Release:
     gas_named_excluded: bool = False             # 21.0: a measure that names a RateScheduleGas gets no gas rates at all
     # --- SaveCE / SaveCost ...: columns the Save procedure leaves out of its insert list, so they are always NULL
     saved_blank: tuple[tuple[str, str], ...] = ()
+    # Versions listed in CETAvoidedCostVersions whose meaning differs from versions.CET_VERSION_TO_ACC: (Version, what `list` shows)
+    version_notes: tuple[tuple[str, str], ...] = ()
     notes: tuple[str, ...] = field(default=())
 
     @property
@@ -59,6 +61,8 @@ RELEASES: dict[str, Release] = {r.name: r for r in [
         fuel_sub_types=("AllElec-New", "FuelSub-ToElec", "FuelSub-ToGas"), fuel_type_from_impact=True, tax_credits=True,
         trim_program_keys=True, sct="full", bills="split", nox_gas_lookup=True, rate_yr1_base=2024,
         elec_rate_by_target_sector=True, gas_named_schedule=True,
+        # Jake 2026-10-29: Version 2027 was a corrected Version 2026 (2024 ACC); this backup keeps only the corrected tables, as 2026
+        version_notes=(("2027", "Version 2027 (a corrected Version 2026; no tables in this backup, its corrected tables are Version 2026)"),),
     ),
     Release(
         name="25.0", backup="CEDARS_CET_25_0.bak", built="2025-05-18",
