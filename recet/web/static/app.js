@@ -2,6 +2,16 @@
 (function () {
   "use strict";
 
+  // One place to tell a screen reader something that happened without moving the focus (a row count, a check's result). The text is cleared and
+  // set again a moment later, so a repeated or quickly replaced message is still spoken; calls within that moment keep only the last.
+  var announcer = document.getElementById("announcer"), announceTimer = null;
+  window.recetAnnounce = function (text) {
+    if (!announcer) return;
+    clearTimeout(announceTimer);
+    announcer.textContent = "";
+    announceTimer = setTimeout(function () { announcer.textContent = text; }, 150);
+  };
+
   // A page that comes back with an error message (a form the server refused): move the focus to the message, so a keyboard or screen-reader user
   // hears it (WCAG 3.3.1). Not the run page's live message, which updates while the page is open.
   var alertBox = document.querySelector("main p.alert[role=alert]:not(.hidden):not(#run-message)");
@@ -250,11 +260,11 @@
         tr.hidden = !hit;
         if (hit) shown++;
       });
-      // the count is a status line: set it once typing pauses, so a screen reader says it once and not over each typed letter
+      var said = q ? shown.toLocaleString() + " of " + rows.length.toLocaleString() + " rows shown" : "";
+      if (count) count.textContent = said;
+      // spoken once typing pauses, not over each typed letter (NVDA did not read the count as a role=status line beside the box)
       clearTimeout(timer);
-      timer = setTimeout(function () {
-        if (count) count.textContent = q ? shown.toLocaleString() + " of " + rows.length.toLocaleString() + " rows shown" : "";
-      }, 500);
+      timer = setTimeout(function () { if (said) window.recetAnnounce(said); }, 500);
     });
   });
 

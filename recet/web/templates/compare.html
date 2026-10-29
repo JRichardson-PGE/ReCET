@@ -37,7 +37,7 @@
 <h2 class="sr-only">Comparison table</h2>
 <div class="table-tools">
   <label class="inline small">Filter rows <input type="search" data-filter="compare-table" data-count="filter-count" placeholder="program, text…" autocomplete="off"></label>
-  <span class="small muted" id="filter-count" role="status"></span>
+  <span class="small muted" id="filter-count"></span>
   <a class="button" href="{{ u('/runs/' + a.id + '/compare.csv') }}?{{ {'with': b.id, 'level': level, 'view': view, 'columns': '' if view else columns, 'years': years_param}|urlencode }}">Download this table (CSV)</a>
 </div>
 <div class="scroll"><table class="data sortable" id="compare-table">
