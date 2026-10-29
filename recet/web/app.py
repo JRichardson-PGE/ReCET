@@ -163,13 +163,19 @@ class Ctx:
         from .. import jobs
         folder = self.runner.folder(run_id)
         acc, cmp_ = cfg["acc_version"], cfg.get("compare_with") or ""
+        from ..cet_versions import job as cet_job
         known = {f.name for f in dc_fields(jobs.RunConfig)}
-        full = {k: v for k, v in {**self.s.run_defaults, **cfg}.items() if k in known}
+        defaults = self.s.run_defaults
+        replica = cet_job.release_of(cfg.get("engine")) is not None
+        if replica:                                     # a server default a replica cannot use (e.g. a test ACC file) is not the user's choice: left out
+            defaults = {k: v for k, v in defaults.items() if k not in dict(cet_job.REFUSED)}
+        full = {k: v for k, v in {**defaults, **cfg}.items() if k in known}
         full.update(out_dir=str(folder / "out"), run_name="run")
         folder.mkdir(parents=True, exist_ok=True)
         write_config(folder, jobs.RunConfig.from_dict(full).__dict__)
         (folder / "log.txt").write_text(f"recet {__version__}  -  {'preflight' if cfg.get('preflight_only') else 'run'}  -  ACC {acc}"
-                                        + (f" vs {cmp_}" if cmp_ else "") + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
+                                        + (f" vs {cmp_}" if cmp_ else "") + (f"  -  {cet_job.label(cfg['engine'])}" if replica else "")
+                                        + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
         inputs_text = "; ".join(names)
         eta.size(folder)                                # count the job's measures once, for the queue's time estimates (eta.py)
         self.db.run("INSERT INTO runs (id, user_id, label, status, acc_version, compare_with, preflight_only, inputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -213,6 +219,20 @@ class Ctx:
         if not p.is_dir() or not p.is_relative_to(base):
             return None
         return p
+
+    def engine_label(self, run) -> str:
+        """The engine that priced the run, as its run_settings.json records it ("ReCET 0.1.70 (hourly)", "CET 25.1 replica"), else as its config names
+        it; "" once its folder is gone."""
+        from ..cet_versions import job as cet_job
+        base = self.result_path(run)
+        try:
+            label = json.loads((base / "run_settings.json").read_text(encoding="utf-8")).get("engine", {}).get("label") if base else None
+        except (OSError, ValueError):
+            label = None
+        if label:
+            return label
+        cfg = self.run_config(run)
+        return cet_job.label(cfg.get("engine")) if cfg is not None else ""
 
     def run_config(self, run) -> dict | None:
         """The run's config.json (every RunConfig field), or None once its folder is gone."""
@@ -361,6 +381,16 @@ def fmt_duration(seconds: float) -> str:
     if s < 3600:
         return f"{s // 60} min {s % 60} s"
     return f"{s // 3600} h {s % 3600 // 60} min"
+
+
+def engine_acc_table(recet_accs) -> list[tuple[str, str, list[str]]]:
+    """(engine key, label, the ACCs it has) of every engine, for New run: ReCET's own has the server's ACCs, a CET replica those of its release."""
+    from ..cet_versions import job as cet_job
+    out = []
+    for key, label in cet_job.engines():
+        rel = cet_job.release_of(key)
+        out.append((key, label, list(recet_accs) if rel is None else [str(a) for a in cet_job.accs(rel)]))
+    return out
 
 
 def acc_name(key) -> str:
@@ -794,7 +824,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             job_files = [JOB_FILE_LABELS[f] for f in job]
             source_run = from_run
         kw.setdefault("form", {})
-        return ctx.render(request, "new_run.html", default_template=ctx.default_template(request.state.user["id"]), status_code=status_code, accs=s.acc_versions, acc_labels={k: acc_name(k) for k in s.acc_versions},
+        engine_accs = engine_acc_table(s.acc_versions)
+        replica_only = sorted({a for _k, _l, have in engine_accs for a in have} - set(s.acc_versions))
+        return ctx.render(request, "new_run.html", default_template=ctx.default_template(request.state.user["id"]), status_code=status_code, accs=s.acc_versions,
+                          acc_labels={k: acc_name(k) for k in [*s.acc_versions, *replica_only]}, replica_accs=replica_only, engines=engine_accs,
                           acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), output_templates=list(ctx.user_templates(request.state.user["id"])),
                           uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
@@ -837,9 +870,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # --- options
         cfg: dict = {}
+        from ..cet_versions import job as cet_job
+        engine = str(form.get("engine", "") or cet_job.RECET).strip()
+        if engine not in dict(cet_job.engines()):
+            return fail("Choose a calculation engine.")
+        replica = cet_job.release_of(engine)
+        cfg["engine"] = "" if replica is None else engine
         acc = str(form.get("acc_version", ""))
-        if acc not in s.acc_versions:
-            return fail("Choose an ACC version.")
+        engine_has = s.acc_versions if replica is None else tuple(str(a) for a in cet_job.accs(replica))
+        if acc not in engine_has:
+            name = cet_job.label(engine)
+            return fail(f"The {name} has no {acc_name(acc) or 'such ACC'}: choose one of " + ", ".join(acc_name(a) for a in engine_has) + "."
+                        if acc else "Choose an ACC version.")
         cfg["acc_version"] = acc
         cmp_ = str(form.get("compare_with", "")).strip()
         if cmp_:
@@ -968,12 +1010,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             shutil.rmtree(folder, ignore_errors=True)
             return fail(str(exc))
 
+        if replica is not None:                 # what a replica cannot do (D13: a filing accepts only ReCET's own engine), now that every option and file is known
+            from ..jobs import RunConfig
+            bad = cet_job.problems(RunConfig.from_dict(cfg))
+            if bad:
+                shutil.rmtree(folder, ignore_errors=True)
+                return fail(bad[0][0].upper() + bad[0][1:] + "." + (f" (Also: {'; '.join(bad[1:])}.)" if len(bad) > 1 else ""))
         if not label:                       # a name to tell runs apart on the list: the job's file (or draft, or earlier run) and the ACC
             stem = (draft["name"] if draft is not None else
                     Path(ups["workbook"].filename).stem if "workbook" in ups else
                     Path(ups["job_zip"].filename).stem if "job_zip" in ups else
                     rerun_stem(from_run) if from_run is not None else "")
-            label = (f"{stem} · " if stem else "") + f"{acc} ACC" + (f" vs {cmp_}" if cmp_ else "") + (" · input check" if cfg.get("preflight_only") else "")
+            label = ((f"{stem} · " if stem else "") + f"{acc} ACC" + (f" vs {cmp_}" if cmp_ else "") + (" · input check" if cfg.get("preflight_only") else "")
+                     + (f" · {replica.label}" if replica is not None else ""))
             label = label[:120]
         ctx.queue_run(request, u, run_id, cfg, label, names)
         return ctx.redirect(f"/runs/{run_id}")
@@ -991,7 +1040,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         owner = run["user_id"] == u["id"] or u["role"] == "admin"
         sharing = dict(owner=owner, shared_with=ctx.shared_with(run["id"]) if owner else [],
                        candidates=compare_candidates(u, run["id"]) if run["status"] == "finished" and run["result_dir"] and not run["preflight_only"] else [])
-        return ctx.render(request, "run.html", **sharing, status_code=status_code, run=run, position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
+        return ctx.render(request, "run.html", **sharing, status_code=status_code, run=run, engine=ctx.engine_label(run) if has_inputs or run["result_dir"] else "", position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
                           retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run),
                           settings=settings_summary(ctx.run_config(run), size) if has_inputs else "", editable=editable, n_measures=n,
                           max_edit_rows=editor.MAX_EDIT_ROWS, check=check, headline=headline, expires=expires_text(run, s.retention_days))
@@ -1333,7 +1382,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return ctx.redirect(f"/runs/{run_id}")
         a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
         views = user_views(u["id"])
-        return ctx.render(request, "compare.html", a=a, b=b, table=table, ids=[c for c in table.columns if "__" not in c], keys=["Measures"] + [k for k in keys if k in cat], catalog=cat, level=level,
+        return ctx.render(request, "compare.html", a=a, b=b, engine_a=ctx.engine_label(a), engine_b=ctx.engine_label(b), table=table, ids=[c for c in table.columns if "__" not in c], keys=["Measures"] + [k for k in keys if k in cat], catalog=cat, level=level,
                           levels=rv.COMPARE_LEVELS, view=view if view in views else ("" if columns else rv.DEFAULT_VIEW_NAME), views=views,
                           columns=columns, all_years=known, years=years, years_param=",".join(years),
                           labels={k: rv.display_label(c) for k, c in cat.items()}, rv=rv, candidates=compare_candidates(u, run_id))
