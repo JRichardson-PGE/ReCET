@@ -214,9 +214,19 @@ def test_a_cedars_upload_runs_on_a_replica(tmp_path):
     cfg = _cfg(tmp_path)
     cfg.measures, cfg.programcost = str(tmp_path / "up" / "Measure.csv"), str(tmp_path / "up" / "ProgramCost.csv")
     res = run_job(cfg, log=lambda s: None)
+    # CEDARS passes a statewide program's ProgramCost rows to CET as SCE's (the published CET's own program table of job 122714); the reference run
+    # kept PA SW. So the records of the other programs equal RunCET's, and the job as a whole equals RunCET on the table CEDARS passes
+    from recet import cet_versions
+    from recet.cet_versions import QuarterlyTables
+    want = cet_versions.run(m, p.assign(PA=p.PA.where(p.PA.str.strip().str.upper() != "SW", "SCE")), "25.1",
+                            QuarterlyTables.from_folder(run.parent / "tables"), first_year=2028)
+    sw_ids = set(m.CEInputID[m.PrgID.isin(sw)])
     for name in ("SavedCE", "SavedSavings", "SavedEmissions", "SavedCost"):
-        assert not differences(_read(res.files[name]), _read(run / f"{name}.csv")), name
-    assert any("statewide record" in n for n in res.notes)
+        ours = _read(res.files[name])
+        assert not differences(ours, want.tables()[name].astype(str).replace("nan", "")), name
+        ref = _read(run / f"{name}.csv")
+        assert not differences(ours[~ours.CET_ID.isin(sw_ids)].reset_index(drop=True), ref[~ref.CET_ID.isin(sw_ids)].reset_index(drop=True)), name
+    assert any("statewide record" in n for n in res.notes) and any("costed as SCE" in n for n in res.notes)
     frame = pd.read_csv(res.files["measure_level"])
     assert "IOU_AC_Territory" in frame and len(frame) == len(m)
     assert frame["PA"].notna().all()                                                            # the PA each record was priced on (SavedCE)
@@ -227,3 +237,5 @@ def test_cet_inputs_pa():
     p = pd.DataFrame({"PA": ["PGE", "SW"], "PrgID": ["pge_1 ", "SW_X"]})
     out, n = cet_job.cet_inputs(m, p)
     assert list(out.PA) == ["PGE", "SCE", "SCE", "SW"] and n == 1 and "FuelType" in out and "FuelID" not in out
+    q, k = cet_job.cet_programs(p.assign(PA=["PGE", " sw "]))
+    assert list(q.PA) == ["PGE", "SCE"] and k == 1 and list(p.PA) == ["PGE", "SW"]              # the caller's table is not changed

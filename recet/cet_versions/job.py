@@ -145,6 +145,25 @@ def cet_inputs(measures: pd.DataFrame, programs: pd.DataFrame) -> tuple[pd.DataF
     return m, int(sw.sum())
 
 
+STATEWIDE_COST_PA = "SCE"
+
+
+def cet_programs(programs: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """A CEDARS upload's ProgramCost rows as CET's input table has them (InputProgramCEDARS): CEDARS gives a statewide program's rows (PA SW)
+    PA SCE before CET runs, SCE having historically funded most statewide programs (Jake, 2026-10-29; the published CET 25.1's own program table
+    of job 122714 has the 72 SW rows as SCE), whatever the program's lead. So its costs are discounted at SCE's rates and shared over its
+    records. Only for an upload: a job already in CET's input form (its Measure file has CET's PA column) is priced as given, as RunCET prices
+    it (the reference runs kept PA SW). Returns the table and the number of rows changed."""
+    if "PA" not in programs:
+        return programs, 0
+    sw = programs["PA"].astype("string").str.strip().str.casefold().eq("sw").fillna(False).astype(bool)
+    if not sw.any():
+        return programs, 0
+    p = programs.copy()
+    p.loc[sw, "PA"] = STATEWIDE_COST_PA
+    return p, int(sw.sum())
+
+
 def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
     """The measure-level table of a replica run: the input columns (ReCET's names, as filed), each Saved* column under ReCET's name (a column already
     there is not repeated), one row per input measure in input order; a measure the release did not price (e.g. a PA it has no avoided costs for)
@@ -211,10 +230,12 @@ def run_job(cfg, log=print):
     size = PART_SIZE if cfg.replica_part_size is None else int(cfg.replica_part_size)      # RunConfig.replica_part_size; 0 = one part
     work = run_dir / "_parts"
     programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    counted = [0]
+    counted, upload = [0], [False]
 
     def read(f):
-        m, n = cet_inputs(_read(f), programs)
+        raw = _read(f)
+        upload[0] = upload[0] or "PA" not in raw            # a CEDARS upload (CET's input table has a PA column)
+        m, n = cet_inputs(raw, programs)
         counted[0] += n
         return m
 
@@ -223,6 +244,12 @@ def run_job(cfg, log=print):
     if on_territory:
         note = (f"{on_territory:,} statewide record(s) are priced on their IOU_AC_Territory (CEDARS does not pass statewide programs to CET, which has "
                 "no avoided costs or settings for PA SW)")
+        result.notes.append(note)
+        log(f"note: {note}")
+    # after the records took their programs' PAs (a statewide record its territory); an upload only
+    cet_costs, sw_rows = cet_programs(programs) if upload[0] else (programs, 0)
+    if sw_rows:
+        note = (f"{sw_rows:,} ProgramCost row(s) of statewide programs (PA SW) are costed as {STATEWIDE_COST_PA}'s, as CEDARS passes them to CET")
         result.notes.append(note)
         log(f"note: {note}")
     if job.acc_version_set:
@@ -256,7 +283,7 @@ def run_job(cfg, log=print):
     priced = 0
     frame = None
     texts = job.frames(lambda f: outputs.read_raw(f))
-    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), programs, rel.name, tables, first_year, me, me)):
+    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), cet_costs, rel.name, tables, first_year, me, me)):
         priced += len(res.ce)
         for name, df in res.tables().items():
             if whole:
