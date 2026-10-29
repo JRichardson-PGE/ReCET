@@ -95,6 +95,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.68 (2026-10-29, Jake; WCAG 2.2 AA audit rows 1, 2, 15, 16: the Edit inputs grid; 0.1.67 is the rest of the pages): `edit.js fixRoles` repairs
+  Tabulator 6.3.1's grid roles on tableBuilt (header contents and body table = presentation, the scroll box = the body rowgroup, grid aria-label); the help
+  line (`#help`, aria-live, focusable) follows the active cell on arrow keys as well as clicks and leads with the cell's problems (`showHelp(t, col, cellEl)`,
+  repeated text not re-announced); flagged cells carry a corner symbol (x stops the run, ! warning) and no-effect headings are italic (not colour alone);
+  `:focus-visible` rings on cells, the scroll box and the header; Measure / ProgramCost tabs follow the ARIA tabs pattern (arrows, roving tabindex; the grid's
+  redraw takes the focus, so the tab takes it back for 0.5 s); "Show this cell" focuses the cell (`goTo` no longer waits on Tabulator's scroll promises,
+  which did not settle for a row already in view, so its flash never ran); the Validate inputs log is a focusable region. Left: column widths change only
+  by dragging (2.5.7; the text stays readable in the editor and help line). axe-core 4.10.2: Edit inputs clean in both schemes.
 - 0.1.67 (2026-10-29, Jake; WCAG 2.2 AA audit of 0.1.64, all gaps outside the Edit inputs grid; 0.1.66 is the SCT-off PR): `--control` is the border of
   fields and buttons (3:1 in both schemes; `--line` is decoration only), `color-scheme: light dark`, `:focus-visible` ring, skip link (`main#main`), `.sr-only`.
   Results / Compare filters are sent by an Apply button, never on change (3.2.2; `select[data-view]` drops the unsaved columns when the view changes). Run page

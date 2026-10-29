@@ -44,24 +44,24 @@
 
 <div class="tabs" role="tablist" aria-label="Tables">
   <button type="button" class="tab active" data-table="Measure" role="tab" id="tab-Measure" aria-selected="true" aria-controls="grid-Measure">Measure <span class="count" data-count="Measure"></span></button>
-  <button type="button" class="tab" data-table="ProgramCost" role="tab" id="tab-ProgramCost" aria-selected="false" aria-controls="grid-ProgramCost">ProgramCost <span class="count" data-count="ProgramCost"></span></button>
+  <button type="button" class="tab" data-table="ProgramCost" role="tab" id="tab-ProgramCost" aria-selected="false" tabindex="-1" aria-controls="grid-ProgramCost">ProgramCost <span class="count" data-count="ProgramCost"></span></button>
 </div>
 <div class="editor-bar">
   <button type="button" data-action="add">Add row</button>
   <button type="button" data-action="duplicate">Duplicate rows</button>
   <button type="button" data-action="delete">Delete rows</button>
   <span class="sep"></span>
-  <button type="button" data-action="undo" title="Ctrl+Z">Undo</button>
-  <button type="button" data-action="redo" title="Ctrl+Y">Redo</button>
+  <button type="button" data-action="undo" title="Ctrl+Z" aria-keyshortcuts="Control+Z">Undo</button>
+  <button type="button" data-action="redo" title="Ctrl+Y" aria-keyshortcuts="Control+Y">Redo</button>
   <span class="sep"></span>
   <label class="inline small">Go to column <input type="search" id="col-find" list="col-names" class="short" placeholder="name" autocomplete="off"></label>
   <datalist id="col-names"></datalist>
   <label class="inline small"><input type="checkbox" id="hide-noeff"> Hide no-effect columns</label>
   <span class="sep"></span>
-  <span class="legend"><span class="calc">changes results</span><span class="noeff">no effect</span>
-    <span class="sw-error">stops the run</span><span class="sw-warning">runs, but check it</span></span>
+  <span class="legend"><span class="calc">changes results</span><span class="noeff">no effect (italic heading)</span>
+    <span class="sw-error">&#x2715; stops the run</span><span class="sw-warning">! runs, but check it</span></span>
 </div>
-<p class="help-line" id="help">Click a cell to see what its column means; hover a header for what it changes. Click a cell (or type) to edit; a cell with ▾ has a list to pick from; select a block and copy or paste with Excel.</p>
+<p class="help-line" id="help" aria-live="polite" tabindex="0">Click a cell, or move to it with the arrow keys, to see what its column means, what it changes and any problem in it. Click a cell or press Enter to edit (Escape cancels); a cell with ▾ has a list to pick from; Shift+arrows or Shift+click select a block to copy or paste with Excel.</p>
 <div id="grid-Measure" class="grid" role="tabpanel" aria-labelledby="tab-Measure"></div>
 <div id="grid-ProgramCost" class="grid" role="tabpanel" aria-labelledby="tab-ProgramCost" hidden></div>
 <p class="muted small" id="profiles-note"></p>
