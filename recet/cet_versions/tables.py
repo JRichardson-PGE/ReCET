@@ -21,15 +21,19 @@ still carry the whole table's value.
 and its large ones from the parquet export in the reference data folder (`<reference folder>/cet_versions/manifest.csv` and
 `tables/`, written by CEDARS-Research `poc/export_cet_backup_tables.py`). Given the job's measures it keeps only the
 avoided-cost rows of the job's PAs, end uses and climate zones (the 2026 table of 25.1 has 23 million rows).
+
+A table also carries a cache (`cache`) for what the calculation derives from it once per run rather than once per chunk of
+measures (the rebased source views and their join keys).
 """
 from __future__ import annotations
 
 import csv
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 TEXT = {"PA": str, "Version": str, "TS": str, "EU": str, "CZ": str, "Qtr": str, "DSType": str, "ACElecKey": str, "GS": str,
@@ -52,6 +56,13 @@ class QuarterlyTables:
     combustion_type: pd.DataFrame
     max_qac_elec: int
     max_qac_gas: int
+    cache: dict = field(default_factory=dict, repr=False, compare=False)
+
+    def cached(self, name, build):
+        """`build()` once per tables object (the views derived from the tables are the same for every chunk of measures)."""
+        if name not in self.cache:
+            self.cache[name] = build()
+        return self.cache[name]
 
     @classmethod
     def from_folder(cls, folder: str | Path) -> "QuarterlyTables":
@@ -107,26 +118,61 @@ class QuarterlyTables:
             with p.open(encoding="utf-8") as f:
                 return pd.read_csv(f, dtype=TEXT, keep_default_na=False, na_values=[""])
 
-        def large(name, required=True, keep=None):
+        def large(name, required=True, keep=None, skip=()):
             """The table, with only the rows whose `keep` columns' keys are in the given sets. A parquet is read in
             batches and filtered before it becomes a DataFrame: 25.1's 2026 electric table has 23.3M rows."""
             if name in files:
                 import pyarrow as pa
                 import pyarrow.compute as pc
                 import pyarrow.parquet as pq
-                pf = pq.ParquetFile(files[name])
+                fields = [f for f in pq.ParquetFile(files[name]).schema_arrow if f.name not in skip]
+                strings = [f.name for f in fields if pa.types.is_string(f.type) or pa.types.is_large_string(f.type)]
+                # text columns stay dictionary-encoded while the file is read (as they are stored): a row group of 25.1's 2026
+                # table is a million rows, and decoded to plain strings it is several hundred MB
+                pf = pq.ParquetFile(files[name], read_dictionary=strings, pre_buffer=False)
                 schema = pa.schema([pa.field(f.name, pa.float64() if pa.types.is_decimal(f.type) else
-                                             pa.string() if f.name in TEXT else f.type) for f in pf.schema_arrow])
+                                             pa.string() if f.name in TEXT or f.name in strings else f.type) for f in fields])
+                columns = [f.name for f in fields]
+
+                def rows_kept(col, keys):
+                    """A mask of the rows whose `col` matches one of `keys` as CET compares text, worked out on each
+                    chunk's dictionary (its distinct values) rather than on every row."""
+                    masks = []
+                    for ch in col.chunks:
+                        if pa.types.is_dictionary(ch.type):
+                            values, idx = ch.dictionary.cast(pa.string()), ch.indices
+                        else:
+                            values, idx = pc.unique(ch.cast(pa.string())), None
+                        good = key(pd.Series(values.to_pylist(), dtype=object)).isin(keys).fillna(False).to_numpy(bool)
+                        if idx is None:
+                            masks.append(pc.is_in(ch.cast(pa.string()), value_set=values.filter(pa.array(good))))
+                        else:
+                            masks.append(pc.is_in(idx, value_set=pa.array(np.flatnonzero(good), idx.type)))
+                    return pa.chunked_array(masks, pa.bool_())
+
+                # each row group in two passes: its key columns first, then (only if a row matches) the whole row group,
+                # one thread at a time; most of a large table's row groups hold nothing the job needs
                 kept = []
-                for b in pf.iter_batches(batch_size=1_000_000):
-                    t = pa.Table.from_batches([b]).cast(schema)
-                    for col, keys in (keep or {}).items():
-                        values = pd.Series(pc.unique(t[col]).to_pylist(), dtype=object)
-                        ok = values[key(values).isin(keys).fillna(False).astype(bool)]
-                        t = t.filter(pc.is_in(t[col], value_set=pa.array(list(ok), pa.string())))
-                    kept.append(t)
+                for i in range(pf.num_row_groups):
+                    mask = None
+                    if keep:
+                        k = pf.read_row_group(i, columns=list(keep), use_threads=False)
+                        for col, keys in keep.items():
+                            m = rows_kept(k[col], keys)
+                            mask = m if mask is None else pc.and_(mask, m)
+                        del k
+                        if not pc.any(mask).as_py():
+                            continue
+                    t = pf.read_row_group(i, columns=columns, use_threads=False)
+                    if mask is not None:
+                        t = t.filter(mask)
+                    kept.append(t.cast(schema))
+                    del t
                 t = pa.concat_tables(kept) if kept else schema.empty_table()
-                return t.to_pandas().astype({c: object for c in t.column_names if c in TEXT})
+                df = t.to_pandas().astype({c: object for c in t.column_names if c in TEXT})
+                del kept, t
+                pa.default_memory_pool().release_unused()
+                return df
             df = small(name)
             if df is None:
                 if required:
@@ -140,6 +186,11 @@ class QuarterlyTables:
             if name in files:
                 import pyarrow.compute as pc
                 import pyarrow.parquet as pq
+                pf = pq.ParquetFile(files[name])
+                j = pf.schema_arrow.get_field_index("Qac")
+                stats = [pf.metadata.row_group(i).column(j).statistics for i in range(pf.metadata.num_row_groups)]
+                if stats and all(s is not None and s.has_min_max for s in stats):   # the row groups' statistics, without reading the column
+                    return int(max(float(s.max) for s in stats))
                 return int(pc.max(pq.read_table(files[name], columns=["Qac"])["Qac"].cast("float64")).as_py())
             return int(pd.to_numeric(small(name).Qac).max())
 
@@ -155,8 +206,10 @@ class QuarterlyTables:
             pas = set(key(measures.PA).dropna())
             shape = measures["E3MeaElecEndUseShape"].astype("string")
             eus = set(key(shape.str.replace(r"(?i)^(non_res|res):(?=deer)", "", regex=True)).dropna()) | set(key(shape).dropna())
-            keep_elec, keep_gas = {"PA": pas, "EU": eus}, {"PA": pas}
-        ac_elec = large(row.AVCElecTable, keep=keep_elec).reset_index(drop=True)
+            czs = set(key(measures["E3ClimateZone"].astype("string").fillna("")).dropna())
+            keep_elec, keep_gas = {"PA": pas, "EU": eus, "CZ": czs}, {"PA": pas}
+        # ID and ACKey (the quarter's key, the widest column) are not read by any calculation
+        ac_elec = large(row.AVCElecTable, keep=keep_elec, skip=("ID", "ACKey")).reset_index(drop=True)
         ac_gas = large(row.AVCGasTable, keep=keep_gas).reset_index(drop=True)
         vk = set(version_key(ac_elec.Version.dropna()).unique()) | {version_key(pd.Series([str(version)]))[0]}
         emissions = large("E3Emissions")

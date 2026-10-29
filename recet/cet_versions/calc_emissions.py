@@ -40,11 +40,14 @@ def _source(t: QuarterlyTables, avc: str) -> pd.DataFrame:
 
 def calc_emissions(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, release: Release, avc: str, me_bens: float) -> pd.DataFrame:
     E = e.assign(cat_k=key(e.PA + e.TS + e.EU + e.CZ.str.rstrip()), Qidx=_qidx(e.Qtr), RULq=e.rulq, EULq=e.eulq)
-    im = E.merge(s[["pa_k", "v_k"]], on="pa_k", how="inner")
-    j = im.merge(_source(t, avc), on=["cat_k", "v_k"])
+    # only the measure columns the quarterly rows need: the join has a row per measure and emission quarter
+    cols = ["CET_ID", "pa_k", "cat_k", "Qidx", "RULq", "EULq", "kWh1", "kWh2", "kWhWater1", "kWhWater2", "Qty", "IRkWh", "RRkWh", "NTGRkWh"]
+    im = E[cols].merge(s[["pa_k", "v_k"]], on="pa_k", how="inner")
+    j = im.merge(t.cached(("emissions", str(avc)), lambda: _source(t, avc)), on=["cat_k", "v_k"])
     j = j[(j.EmQidx >= j.Qidx) & (j.EmQidx < j.Qidx + j.EULq)]
     # a LEFT JOIN: a measure with no emission quarters (no matching key, or no life) keeps one row with NULL rates, so 0
-    j = pd.concat([j, im[~im.CET_ID.isin(j.CET_ID)]], ignore_index=True).sort_values(["CET_ID", "EmQtr"], kind="stable")
+    # (against the distinct CET_IDs: `j` has a row per quarter, and isin over millions of strings is slow)
+    j = pd.concat([j, im[~im.CET_ID.isin(j.CET_ID.unique())]], ignore_index=True).sort_values(["CET_ID", "EmQtr"], kind="stable")
     j["SeqQtr"] = j.groupby("CET_ID").cumcount() + 1
     w1, w2 = (j.kWhWater1, j.kWhWater2) if release.emissions_water else (0.0, 0.0)
     k1, k2 = j.kWh1, j.kWh2
