@@ -1,0 +1,15 @@
+{
+  "name": "recet-screenreader",
+  "private": true,
+  "description": "NVDA screen-reader walk-through of the ReCET web app (Guidepup + Playwright, Windows only).",
+  "scripts": {
+    "setup-nvda": "guidepup install nvda",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@guidepup/guidepup": "0.36.2",
+    "@guidepup/playwright": "0.20.0",
+    "@guidepup/setup": "0.29.3",
+    "@playwright/test": "1.64.1"
+  }
+}
