@@ -90,7 +90,7 @@
   });
 
   // Results: selects submit their form; the column picker sends the ticked columns.
-  document.querySelectorAll("select.autosubmit").forEach(function (s) {
+  document.querySelectorAll("select.autosubmit, input.autosubmit").forEach(function (s) {
     s.addEventListener("change", function () {
       if (s.name === "view") { var c = s.form.querySelector("input[name=columns]"); if (c) c.remove(); }
       s.form.submit();

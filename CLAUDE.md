@@ -90,6 +90,28 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
+  `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
+  (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow
+  `cost_tests.compute_cost_tests` (tests/test_field_attributes.py adds them up to each test's Ben / CostNoAdmin). The research repo's field dictionary
+  workbook does not carry them yet.
+- 0.1.63 (2026-10-28, Jake; BRD review gap 6, BR-06.11): compare any two runs and share a run. `results_view.compare(a, b, level, keys, pa, years)`
+  (`<key>__a/__b/__diff/__pct`, groups matched on their id, a group in one run only blank for the other; `COMPARE_LEVELS` has no measure level); web
+  `/runs/{id}/compare?with=<id>` and `compare.csv`, offered on a finished run's page for the user's own and shared finished runs. Sharing: table
+  `run_shares`; `Ctx.run_for` lets a user a run is shared with read it (pages, results, files, compare, rerun as their own run), and `owner=True` (Stop,
+  Delete, share / unshare) keeps the rest with the owner or an admin. Runs list: "Shared with you". Audit `run shared` / `run unshared`. tests/test_share_compare.py.
+- 0.1.62 (2026-10-28, Jake; BRD review gap 5, BR-06.2): run emails. `recet/web/notify.py`: when a run ends, `Runner._finish` starts a thread that
+  emails the owner (finished or failed; not a stopped run or a passing input check) through RECET_WEB_SMTP_* (none set = no email; docker-compose passes
+  them from the server's .env), with headline totals from run_settings.json and the RECET_WEB_BASE_URL link. Account page: "Email me when a run finishes
+  or fails" (user_settings `notify_runs`, on by default). Audit `run email sent` / `run email failed`. ARCHITECTURE 8.6; tests/test_notify.py.
+- 0.1.61 (2026-10-28, Jake; BRD review gap 4, BR-06.13): the combined 8,760 by climate zone. `profile8760.portfolio_profile` adds
+  `net_kwh_<Y>_CZ<zone>` (`zone_label`: the filed AC_Climate_Zone, CZ prepended to a bare number), `combine_profiles` adds them up over parts, and
+  `profile8760.peaks` writes `portfolio_8760_peaks_<tag>` (per year: portfolio, each PA, each zone; own peak, largest added load, kWh and share at the
+  portfolio's peak hour). The peak is the max net-savings hour, not a DEER peak-period definition. tests/test_profile_zones.py.
+- 0.1.60 (2026-10-28, Jake; BRD review gap 3, BR-04.1): results by program year. The portfolio summary has a `program year` group (Used_Year;
+  `SummaryParts.GROUPS`, which summarize now shares). Results: group-sum key `_year` (CUBE_VERSION 2, so kept sums are rebuilt), a Program year level, and
+  `years` (a list; empty = every year) on RunResults.table / count / measure_level_allowed and results_view.table / filter_pa; web `?years=2028&years=2029`
+  (checkboxes under Program years, also on results.csv), window: a Program years menu. `year_of` falls back to ClaimYearQuarter for old runs.
 - 0.1.59 (2026-10-28, Jake; BRD review gap 2, BR-06.16): PrgIDs that do not line up between Measure.csv and ProgramCost.csv no longer stop the run (CET stops
   it; C17 item 11). `run_poc.load_job` no longer raises; `preflight._program_alignment` warns `measures_without_program_costs` (priced with no program costs,
   CreditedPA blank) and `program_costs_without_measures` (with the nominal dollars no cost test includes), in one piece and in parts. A load ValueError is now

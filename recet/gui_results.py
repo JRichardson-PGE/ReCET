@@ -1,10 +1,10 @@
-"""The window's Results tab: a finished run's results filtered by PA, at five levels, with columns chosen by a saved view. Layout and events only; the tables
+"""The window's Results tab: a finished run's results filtered by PA and program year, at six levels, with columns chosen by a saved view. Layout and events only; the tables
 come from `results_view.py`.
 
 * Top: the run shown, Load results from a folder, Open measure-level table, Export table.
-* Filter row: PA (All PAs or one administrator), View (the built-in Default or a saved view), Edit views (a dialog to add, remove and order columns and save
+* Filter row: PA (All PAs or one administrator), Program years (a menu of the run's years to total over; none ticked = every year, BRD BR-04.1), View (the built-in Default or a saved view), Edit views (a dialog to add, remove and order columns and save
   the view under a name).
-* Tabs: Measure, Program, Program sector, Program segment and Portfolio level. The measure tab is turned off when the filtered run has more than
+* Tabs: Measure, Program, Program year, Program sector, Program segment and Portfolio level. The measure tab is turned off when the filtered run has more than
   results_view.MAX_MEASURE_ROWS measures (open the measure-level file instead).
 * A two-version comparison folder has no measure-level table of its own: its comparison summary is shown on the Portfolio tab as it is.
 """
@@ -28,7 +28,8 @@ except ImportError:                     # tksheet is a dependency; without it th
 BINDINGS = ("single_select", "drag_select", "select_all", "row_select", "column_select", "arrowkeys", "copy", "rc_select", "right_click_popup_menu",
             "column_width_resize", "double_click_column_resize", "find")
 TEXT_WIDTH_CAP, NUMBER_WIDTH_CAP = 280, 170            # pixels; hover a cut-off cell or widen the column to read all of it
-ID_COLUMNS = {"CEInputID", "Description", "PrgID", "PA", "Program name", "Program sector", "Program segment", "Portfolio", "Measures"}
+ID_COLUMNS = {"CEInputID", "Description", "PrgID", "PA", "Program name", "Program year", "Program years", "Program sector", "Program segment", "Portfolio",
+              "Measures"}
 
 
 class ResultsTab:
@@ -64,6 +65,11 @@ class ResultsTab:
         self.pa_box = ttk.Combobox(bar, textvariable=self.pa_var, values=[rv.ALL_PAS], state="readonly", width=16)
         self.pa_box.pack(side="left", padx=(6, 18))
         self.pa_box.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
+        self.year_vars: dict[str, tk.BooleanVar] = {}
+        self.years_btn = ttk.Menubutton(bar, text="Program years: all")
+        self.years_menu = tk.Menu(self.years_btn, tearoff=False)
+        self.years_btn["menu"] = self.years_menu
+        self.years_btn.pack(side="left", padx=(0, 18))
         ttk.Label(bar, text="View").pack(side="left")
         self.view_var = tk.StringVar(value=current_view)
         self.view_box = ttk.Combobox(bar, textvariable=self.view_var, values=list(self.views), state="readonly", width=24)
@@ -133,6 +139,7 @@ class ResultsTab:
                     self.pa_box.config(values=pas, state="readonly")
                     if self.pa_var.get() not in pas:
                         self.pa_var.set(rv.ALL_PAS)
+                    self._set_years(frame.years())
                     self.view_box.config(state="readonly")
                     self.edit_btn.config(state="normal")
                     self.refresh()
@@ -149,6 +156,7 @@ class ResultsTab:
         self.title.config(text=f"{path.name}   ({run_dir})")
         self.status.config(text="Two-version comparison: load one version's run folder for the PA filter, levels and views.")
         self.pa_box.config(values=[rv.ALL_PAS], state="disabled")
+        self.years_btn.config(state="disabled")
         self.view_box.config(state="disabled")
         self.edit_btn.config(state="disabled")
         for key, _ in rv.LEVELS:
@@ -156,6 +164,25 @@ class ResultsTab:
         self.tables = {"portfolio": df}
         self._fill("portfolio", df, plain=True)
         self.nb.select(self.tab_frames["portfolio"])
+
+    def _set_years(self, years: list[str]) -> None:
+        """The Program years menu: one tick per year of the run (none ticked = every year)."""
+        self.years_menu.delete(0, "end")
+        self.year_vars = {y: tk.BooleanVar(value=False) for y in years}
+        self.years_menu.add_command(label="All years", command=self._all_years)
+        self.years_menu.add_separator()
+        for y, v in self.year_vars.items():
+            self.years_menu.add_checkbutton(label=y, variable=v, command=self.refresh)
+        self.years_btn.config(state="normal" if len(years) > 1 else "disabled", text="Program years: all")
+
+    def _all_years(self) -> None:
+        for v in self.year_vars.values():
+            v.set(False)
+        self.refresh()
+
+    def _years(self) -> list[str]:
+        chosen = [y for y, v in self.year_vars.items() if v.get()]
+        return [] if len(chosen) == len(self.year_vars) else chosen
 
     # ------------------------------------------------------------------------------------------------------------------ tables
     def _view_keys(self) -> list[str]:
@@ -168,9 +195,10 @@ class ResultsTab:
     def refresh(self) -> None:
         if self.frame is None:
             return
-        pa, keys = self.pa_var.get(), self._view_keys()
-        n = self.frame.count(pa)
-        allowed = self.frame.measure_level_allowed(pa)
+        pa, keys, years = self.pa_var.get(), self._view_keys(), self._years()
+        self.years_btn.config(text=f"Program years: {', '.join(years) if years else 'all'}")
+        n = self.frame.count(pa, years)
+        allowed = self.frame.measure_level_allowed(pa, years)
         self.tables = {}
         for key, title in rv.LEVELS:
             frame = self.tab_frames[key]
@@ -183,12 +211,12 @@ class ResultsTab:
                     continue
             else:
                 self.nb.tab(frame, state="normal")
-            t = self.frame.table(key, pa, keys)
+            t = self.frame.table(key, pa, keys, years)
             self.tables[key] = t
             self._fill(key, t)
         note = ("" if allowed else f"   Measure level is off for runs above {rv.MAX_RUN_MEASURE_ROWS:,} measures: use Open measure-level table."
                 if not self.frame.measure_level_available() else f"   Measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: pick one PA or use Open measure-level table.")
-        self.status.config(text=f"{n:,} measures{'' if pa == rv.ALL_PAS else ' for ' + pa}.{note}")
+        self.status.config(text=f"{n:,} measures{'' if pa == rv.ALL_PAS else ' for ' + pa}{' in ' + ', '.join(years) if years else ''}.{note}")
 
     def _fill(self, key: str, t: pd.DataFrame, plain: bool = False) -> None:
         s = self.sheets.get(key)
