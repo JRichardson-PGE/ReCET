@@ -116,6 +116,35 @@ def _read(path: str) -> pd.DataFrame:
     return fieldnames.to_cet(read_cet_csv(path, dtype=str, keep_default_na=False, na_values=[""]))
 
 
+def cet_inputs(measures: pd.DataFrame, programs: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """A CEDARS upload's Measure rows as CET's input table has them (InputMeasureCEDARS): a CEDARS Measure.csv has no PA and calls the fuel
+    FuelID. Each record's PA is its program's (ProgramCost PA by PrgID, else the PrgID's prefix); a statewide record (PA SW, for which CET has no
+    avoided costs or settings) is priced on its IOU_AC_Territory, as the reference runs were made (CEDARS-Research poc/cet_reference_jobs.py). A
+    file that already has CET's PA column is used as it is. Returns the table and the number of statewide records priced on their territory."""
+    from .sql import key
+    m = measures.copy()
+    if "FuelType" not in m and "FuelID" in m:
+        m = m.rename(columns={"FuelID": "FuelType"})
+    if "PA" in m:
+        return m, 0
+    prg = m["PrgID"].astype("string")
+    pa = pd.Series(pd.NA, index=m.index, dtype="string")
+    if {"PA", "PrgID"} <= set(programs.columns):
+        by_prg = dict(zip(key(programs["PrgID"].astype("string")), programs["PA"].astype("string")))
+        pa = key(prg).map(by_prg).astype("string")
+    pa = pa.fillna(prg.str.split("_").str[0])
+    sw = key(pa).eq(key(pd.Series(["SW"]))[0]).fillna(False).astype(bool)
+    if "IOU_AC_Territory" in m:
+        terr = m["IOU_AC_Territory"].astype("string").str.strip()
+        sw &= terr.fillna("").ne("")
+        pa = pa.where(~sw, terr)
+    else:
+        sw &= False
+    pa = pa.str.strip()
+    m.insert(0, "PA", pa.astype(object).where(pa.notna(), None))
+    return m, int(sw.sum())
+
+
 def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
     """The measure-level table of a replica run: the input columns (ReCET's names, as filed), each Saved* column under ReCET's name (a column already
     there is not repeated), one row per input measure in input order; a measure the release did not price (e.g. a PA it has no avoided costs for)
@@ -175,8 +204,13 @@ def run_job(cfg, log=print):
     log("\n== loading ==")
     progress.plan(False, cfg.output_format, True, True, False)
     progress.report("loading")
-    measures = _read(cfg.measures)
     programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
+    measures, on_territory = cet_inputs(_read(cfg.measures), programs)
+    if on_territory:
+        note = (f"{on_territory:,} statewide record(s) are priced on their IOU_AC_Territory (CEDARS does not pass statewide programs to CET, which has "
+                "no avoided costs or settings for PA SW)")
+        result.notes.append(note)
+        log(f"note: {note}")
     if "ACCVersion" in measures and measures["ACCVersion"].fillna("").astype(str).str.strip().ne("").any():
         note = f"the ACCVersion column is a ReCET option: the {rel.label} prices every record on the {versions.acc_short(acc)}"
         result.notes.append(note)

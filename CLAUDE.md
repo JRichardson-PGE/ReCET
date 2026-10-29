@@ -95,6 +95,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.73 (2026-10-29): a replica run takes a CEDARS upload's Measure.csv (the first server run of the 10k job failed: `'DataFrame' object has no attribute
+  'PA'`). `cet_versions/job.cet_inputs` builds CET's input table as the reference runs did (CEDARS-Research `poc/cet_reference_jobs.py`): PA = the program's
+  ProgramCost PA (else the PrgID prefix), a statewide record's = its IOU_AC_Territory (with a note: CEDARS does not pass SW to CET), FuelID -> FuelType;
+  a file that has CET's PA column is used as it is. tests/test_engine.py prices the C3 job in upload form equal to RunCET.
 - 0.1.72 (2026-10-29, Jake: "For D13 enable this in ReCET calculations"): the calculation engine. `RunConfig.engine` ("" / "recet" = ReCET, "cet-<release>" =
   a replica), CLI `--engine`, New run's Calculation engine select (with "Which ACCs each engine has"; replica-only ACCs in their own optgroup). `jobs.run_job`
   hands a replica to `cet_versions/job.run_job`, which writes the release's Saved* tables and a measure-level file in ReCET's layout (`measure_level`: inputs,

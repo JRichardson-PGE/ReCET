@@ -167,3 +167,32 @@ def _zipped(members: dict[str, bytes]) -> bytes:
         for k, v in members.items():
             z.writestr(k, v)
     return buf.getvalue()
+
+
+def test_a_cedars_upload_runs_on_a_replica(tmp_path):
+    """A CEDARS Measure.csv (no PA; FuelID for CET's FuelType; statewide records with their IOU_AC_Territory) prices as the reference run's CET
+    input table: each record's PA is its program's, a statewide record's its territory."""
+    run = DATA / "25.1" / C3 / "me0"
+    m, p = _read(run / "measure.csv"), _read(run / "programcost.csv")
+    sw = set(p.loc[p.PA.str.strip().str.upper() == "SW", "PrgID"])
+    assert sw and m.PrgID.isin(sw).any()                                                        # the C3 job has statewide records
+    up = m.drop(columns=["JobID"]).rename(columns={"PA": "IOU_AC_Territory", "FuelType": "FuelID"})
+    (tmp_path / "up").mkdir()
+    up.to_csv(tmp_path / "up" / "Measure.csv", sep="|", index=False)
+    p.drop(columns=["ID", "JobID"]).to_csv(tmp_path / "up" / "ProgramCost.csv", sep="|", index=False)
+    cfg = _cfg(tmp_path)
+    cfg.measures, cfg.programcost = str(tmp_path / "up" / "Measure.csv"), str(tmp_path / "up" / "ProgramCost.csv")
+    res = run_job(cfg, log=lambda s: None)
+    for name in ("SavedCE", "SavedSavings", "SavedEmissions", "SavedCost"):
+        assert not differences(_read(res.files[name]), _read(run / f"{name}.csv")), name
+    assert any("statewide record" in n for n in res.notes)
+    frame = pd.read_csv(res.files["measure_level"])
+    assert "IOU_AC_Territory" in frame and len(frame) == len(m)
+    assert frame["PA"].notna().all()                                                            # the PA each record was priced on (SavedCE)
+
+
+def test_cet_inputs_pa():
+    m = pd.DataFrame({"PrgID": ["PGE_1", "SW_X", "SCE_2", "SW_Y"], "IOU_AC_Territory": ["PGE", "SCE", "SCE", None], "FuelID": [None] * 4})
+    p = pd.DataFrame({"PA": ["PGE", "SW"], "PrgID": ["pge_1 ", "SW_X"]})
+    out, n = cet_job.cet_inputs(m, p)
+    assert list(out.PA) == ["PGE", "SCE", "SCE", "SW"] and n == 1 and "FuelType" in out and "FuelID" not in out
