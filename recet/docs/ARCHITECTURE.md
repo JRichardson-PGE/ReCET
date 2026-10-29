@@ -62,6 +62,7 @@ CEDARS.
 | Reproducibility | a run can be repeated exactly | `run_settings.json` (every setting, file and version), inputs kept with the run, deterministic arithmetic, no sampling | `jobs.write_settings` |
 | Auditability | every number explained | documents checked by tests against the code (section 10) | `recet/docs`, `tests/` |
 | Security (web) | invitation-only, no account takeover, no cross-user access | argon2 passwords, hashed session and setup tokens, CSRF on every form, login rate limits, per-user run ownership, safe zip extraction (section 8.4) | `web/auth.py`, `web/jobzip.py` |
+| Accessibility (web) | WCAG 2.2 Level AA on every web page | not yet: the 2026-10-29 audit found gaps (section 8.7) | Jake, 2026-10-29 |
 | Portability | Windows, macOS, Linux; x86 and ARM | pure Python (numpy, pandas, pyarrow); the web image builds for arm64 and amd64 | `pyproject.toml`, `Dockerfile` |
 | Data hygiene | large files never in git; nothing derived is the only copy | reference data folder with a checksummed manifest; caches rebuildable and deletable | `paths.py`, `datapack.py` |
 
@@ -446,6 +447,13 @@ When a run ends the worker hands it to `web/notify.py` on a thread of its own: i
 page, `user_settings` key `notify_runs`), the owner gets one email with the run's name, status, time taken, headline totals (finished) or status message
 (failed) and the run page's link. Stopped runs and input checks that pass are not emailed; nothing from the inputs or the log is. Each attempt is in the
 audit log; a mail failure never changes the run.
+
+### 8.7 Accessibility
+
+The web pages must meet WCAG 2.2 Level AA (Jake, 2026-10-29), in light and dark colour schemes, with a keyboard alone and with a screen reader. The rules
+for page changes are in the repository's CLAUDE.md. The vendored Tabulator grid (Edit inputs) and Mermaid diagrams (Docs) count as part of the page:
+where they fall short, the page gives an equivalent (a text alternative for a diagram, keyboard commands for the grid). The audit of 2026-10-29
+(0.1.64) found the pages short of it; the gaps are tracked until fixed.
 
 ## 9. Performance and memory design
 

@@ -20,6 +20,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   the retired TOU/SCG quarterly routes, the CET-CO2 comparison option and the research-checkout file fallback were removed. Research scripts in
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
+- The web app (`recet/web`: templates, `static/*.css`, `static/*.js`, the vendored Tabulator and Mermaid as we use them) must meet WCAG 2.2 Level AA
+  (Jake, 2026-10-29; ARCHITECTURE 1.4 and 8.7). Every page change keeps it: a visible label or accessible name on every control, keyboard reach and a
+  visible focus for everything a mouse can do (no hover- or double-click-only actions, no `title` as the only way to learn something), status shown in
+  text and not by colour alone, 4.5:1 text and 3:1 control-border/focus contrast in BOTH colour schemes, `aria-live` for text that updates on its own,
+  targets at least 24 x 24 px, content that reflows at 320 px wide and 200% zoom. Check new colours with a contrast calculator and new pages with axe.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
 - ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. The web pages name a version by
   its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
