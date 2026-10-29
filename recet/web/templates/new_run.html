@@ -67,18 +67,18 @@
   <h2>Pricing</h2>
   <div class="grid2">
     <label>ACC version
-      <select name="acc_version" id="acc-version" aria-describedby="acc-help">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
+      <select name="acc_version" id="acc-version" aria-describedby="acc-help-title">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>Compare with
       <select name="compare_with" id="compare-with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
-    <label>Priced for
-      <select name="acc_purpose" aria-describedby="purpose-help">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+    <label><span id="purpose-label">Priced for</span>
+      <select name="acc_purpose" aria-labelledby="purpose-label" aria-describedby="purpose-help">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
       <span class="small muted" id="purpose-help">Records on an ACC that does not normally apply to their program year are flagged, not stopped.</span></label>
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
   </div>
   <details class="info-box" id="acc-help">
-    <summary>Which ACC applies to my filing?</summary>
+    <summary id="acc-help-title">Which ACC applies to my filing?</summary>
     <table class="list compact acc-map">
       <thead><tr><th>ACC</th><th>Budget filings</th><th>Claims (program years)</th></tr></thead>
       <tbody>{% for r in acc_map %}<tr class="{% if not r.builtin %}dim{% endif %}">
@@ -98,9 +98,9 @@
   <div class="grid2">
     <label class="wide">Output format
       <select name="output_format">{% for o, t in (('csv', 'CSV (each file zipped)'), ('xlsx', 'Excel (up to {:,} measures; a larger job: every file zipped CSV)'.format(excel_max_rows)), ('parquet', 'Parquet')) %}<option value="{{ o }}" {% if f.get('output_format') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
-    <label class="wide">Output template <a href="{{ u('/output-templates') }}">(edit templates)</a>
+    <label class="wide"><span id="template-label">Output template</span> <a href="{{ u('/output-templates') }}">(edit templates)</a>
       {% set chosen = default_template if fresh else f.get('output_template_name', '') %}
-      <select name="output_template"><option value="">All columns</option>{% for t in output_templates %}<option value="{{ t }}" {% if chosen == t %}selected{% endif %}>{{ t }}{% if t == default_template %} (your default){% endif %}</option>{% endfor %}</select></label>
+      <select name="output_template" aria-labelledby="template-label"><option value="">All columns</option>{% for t in output_templates %}<option value="{{ t }}" {% if chosen == t %}selected{% endif %}>{{ t }}{% if t == default_template %} (your default){% endif %}</option>{% endfor %}</select></label>
   </div>
   <div class="checks">
     <label><input type="checkbox" name="emissions" {% if fresh or f.get('emissions') %}checked{% endif %}> Emissions (CO2, NOx, PM10)</label>

@@ -39,7 +39,7 @@
         flagged cell clears its outline until the next check. With CEDARS filing checks, the records CEDARS' upload would reject or warn on are outlined in
         amber too, under the rule's ID.</p></details>
   </div>
-  <div id="check-result" class="check-result" hidden aria-live="polite"></div>
+  <div id="check-result" class="check-result" hidden></div>
 </section>
 
 <div class="tabs" role="tablist" aria-label="Tables">
@@ -61,7 +61,7 @@
   <span class="legend"><span class="calc">changes results</span><span class="noeff">no effect (italic heading)</span>
     <span class="sw-error">&#x2715; stops the run</span><span class="sw-warning">! runs, but check it</span></span>
 </div>
-<p class="help-line" id="help" aria-live="polite" tabindex="0">Click a cell, or move to it with the arrow keys, to see what its column means, what it changes and any problem in it. Click a cell or press Enter to edit (Escape cancels); a cell with ▾ has a list to pick from; Shift+arrows or Shift+click select a block to copy or paste with Excel.</p>
+<p class="help-line" id="help" tabindex="0">Click a cell, or move to it with the arrow keys, to see what its column means, what it changes and any problem in it. Click a cell or press Enter to edit (Escape cancels); a cell with ▾ has a list to pick from; Shift+arrows or Shift+click select a block to copy or paste with Excel. Tab moves into the grid, to the cell you were on, and Tab or Shift+Tab out of it. With a screen reader, Tab into the grid and the arrow keys move between cells (NVDA switches to focus mode on a cell; Insert+Space if not); each cell is read with its column and any problem, and this line, just before the grid (Shift+Tab), holds the column's description. NVDA takes Escape to leave focus mode, so an edit is kept with Enter or Tab and undone with Ctrl+Z.</p>
 <div id="grid-Measure" class="grid" role="tabpanel" aria-labelledby="tab-Measure"></div>
 <div id="grid-ProgramCost" class="grid" role="tabpanel" aria-labelledby="tab-ProgramCost" hidden></div>
 <p class="muted small" id="profiles-note"></p>

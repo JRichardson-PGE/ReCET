@@ -50,6 +50,7 @@
 </div>
 
 {% if check %}
+<h2 class="sr-only">Input check</h2>
 <details class="card check-card" {% if check.n.error or check.unpriced or run.preflight_only %}open{% endif %}>
   <summary>Input check:
     {% if check.n.error %}<span class="bad">{{ check.n.error }} problem{{ 's' if check.n.error != 1 }} stopped the run</span>
@@ -83,6 +84,7 @@
 {% endif %}
 
 {% if candidates %}
+<h2 class="sr-only">Compare with another run</h2>
 <details class="card">
   <summary>Compare with another run</summary>
   <form method="get" action="{{ u('/runs/' + run.id + '/compare') }}" class="inline-form">
@@ -96,6 +98,7 @@
 {% endif %}
 
 {% if owner %}
+<h2 class="sr-only">Sharing</h2>
 <details class="card" {% if shared_with %}open{% endif %}>
   <summary>Sharing{% if shared_with %}: {{ shared_with|length }} user{{ 's' if shared_with|length != 1 }}{% endif %}</summary>
   {% if shared_with %}
@@ -112,6 +115,7 @@
 {% endif %}
 
 {% if files %}
+<h2 class="sr-only">Files</h2>
 <details class="card" open>
   <summary>Files</summary>
   <ul class="files">
@@ -121,6 +125,7 @@
 {% endif %}
 
 {% set live = run.status in ('queued', 'running') %}
+<h2 class="sr-only">Log</h2>
 <details class="card log-card" {% if live or run.status == 'failed' %}open{% endif %}>
   <summary>Log</summary>
   <pre id="log" class="log" tabindex="0" role="region" aria-label="Run log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if live else 0 }}"></pre>

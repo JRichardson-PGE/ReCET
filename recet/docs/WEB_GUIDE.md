@@ -105,7 +105,8 @@ are kept 30 days after their last change.
 - **Editing.** Click a cell to edit it; a cell with ▾ has a list of CET's values to pick from. Select a block and copy or paste it with Excel. Add,
   duplicate and delete rows; undo and redo. Clicking a cell shows what its column means. Column headings are green when the column changes results and
   blue, in italics, when it does not; **Hide no-effect columns** hides the blue ones, and **Go to column** jumps to a column by name.
-- **Keyboard.** Tab into the table, move with the arrow keys and press Enter to edit (Escape cancels); Shift+arrows select a block; Ctrl+C / Ctrl+V copy
+- **Keyboard.** Tab into the table (it returns you to the cell you were on), move with the arrow keys and press Enter to edit (Escape cancels);
+  Tab or Shift+Tab leaves the table, except in an open cell, where Tab keeps the value and moves to the next cell; Shift+arrows select a block; Ctrl+C / Ctrl+V copy
   and paste; Ctrl+Z / Ctrl+Y undo and redo. The line above the table follows the cell you are on: its column's meaning, what it changes and any problem in
   it. Left / Right switch between the Measure and ProgramCost tabs.
 - **Checks.** Every change is saved and checked. The line at the top of the panel gives one verdict: problems that would stop the run (marked ✕, outlined in red),

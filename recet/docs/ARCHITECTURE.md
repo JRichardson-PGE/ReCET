@@ -62,7 +62,7 @@ CEDARS.
 | Reproducibility | a run can be repeated exactly | `run_settings.json` (every setting, file and version), inputs kept with the run, deterministic arithmetic, no sampling | `jobs.write_settings` |
 | Auditability | every number explained | documents checked by tests against the code (section 10) | `recet/docs`, `tests/` |
 | Security (web) | invitation-only, no account takeover, no cross-user access | argon2 passwords, hashed session and setup tokens, CSRF on every form, login rate limits, per-user run ownership, safe zip extraction (section 8.4) | `web/auth.py`, `web/jobzip.py` |
-| Accessibility (web) | WCAG 2.2 Level AA on every web page | the 2026-10-29 audit's gaps fixed in 0.1.67-0.1.68 (axe clean, keyboard checked); column resizing is drag-only and no screen-reader test yet (section 8.7) | Jake, 2026-10-29 |
+| Accessibility (web) | WCAG 2.2 Level AA on every web page | the 2026-10-29 audit's gaps fixed in 0.1.67-0.1.68 (axe clean, keyboard checked) and NVDA's in 0.1.70 (`tests/screenreader`); column resizing is drag-only (section 8.7) | Jake, 2026-10-29 |
 | Portability | Windows, macOS, Linux; x86 and ARM | pure Python (numpy, pandas, pyarrow); the web image builds for arm64 and amd64 | `pyproject.toml`, `Dockerfile` |
 | Data hygiene | large files never in git; nothing derived is the only copy | reference data folder with a checksummed manifest; caches rebuildable and deletable | `paths.py`, `datapack.py` |
 
@@ -487,7 +487,14 @@ and buttons, a visible focus ring and a skip link, Apply buttons instead of filt
 help shown on the page instead of only in tooltips, focusable scroll boxes, text alternatives (`accTitle` / `accDescr`) on the diagrams, error messages
 that take the focus, sort buttons in table headings, and tables that scroll inside their box at 320 px. 0.1.68 fixed the grid's: Tabulator's roles repaired, a help line that follows the active cell from the keyboard and names its
 problems, symbols on flagged cells, focus rings and ARIA tabs. axe-core finds no violations on any page in either scheme; column widths still change only
-by dragging, and no test with a real screen reader has been made yet.
+by dragging. 0.1.70 added a screen-reader walk-through (`tests/screenreader`: NVDA driven by Guidepup in Chrome on Windows, recording what NVDA says after
+each key on sign in, Runs, New run, a run, Results and Edit inputs) and fixed what NVDA 2026.2 showed: headings for each card on the Run, Results and
+Compare pages; Validate inputs keeping the focus; its result and the row-filter count spoken through one page-wide announcer (`#announcer`,
+`recetAnnounce` in app.js); short descriptions on New run's ACC and Priced for fields. The Edit inputs grid is one tab stop with the focus on the active cell, so
+NVDA switches to focus mode on it and reads each cell with its column and any problem; Tab and Shift+Tab leave the grid (Tabulator's Tab had moved to
+the next cell, a keyboard trap); the column's description is on the help line just before the grid, which is not a live region. NVDA keeps Escape for
+leaving focus mode, so an edit ends with Enter or Tab. The walk-through is
+run by hand on a Windows machine (unlocked, left alone for about 5 minutes); its transcripts are read against these rules, not asserted.
 
 ## 9. Performance and memory design
 
