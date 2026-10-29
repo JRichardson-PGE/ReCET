@@ -76,6 +76,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart LR
+    accTitle: ReCET in its context
+    accDescr: Analysts use the desktop window and command line, invited users the browser. ReCET's interfaces, job layer, pricing core and outputs read the E3 ACC releases, CEDARS data and CET tables, and write result files for each run.
     analysts["Analysts<br/>desktop window, command line"] --> recet
     users["Invited users<br/>browser"] --> recet
     subgraph recet["ReCET"]
@@ -102,6 +104,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: ReCET's layers
+    accDescr: Four layers: the interfaces (window, command line, web) hand a RunConfig to the job layer, which runs the pricing core and writes the outputs; the pricing core reads through the data access layer.
     IF["Interfaces<br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
     JOB["Job layer<br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
     CORE["Pricing core<br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills,<br/>participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
@@ -195,6 +199,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: A run, end to end
+    accDescr: A RunConfig is prepared, split into parts when it has more rows than chunk_size, checked by preflight (an error stops the run), loaded, priced measure by measure, given its share of program costs, put through the cost tests, and written.
     cfg(["RunConfig"]) --> prep["prepare<br/>workbook sheets to files<br/>supplied ACC, profile and parameter files<br/>checked and loaded<br/>ACC version resolved (versions.resolve_acc)<br/>pipeline pointed at it (runtime.apply)"]
     prep --> split{"more Measure.csv rows<br/>than chunk_size<br/>(50,000)?"}
     split -->|"yes: split into parts (5.2)"| pre
@@ -224,6 +230,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: A run in parts
+    accDescr: Measure.csv is split into parts and preflighted part by part. Pass 1 prices each part and adds up the program benefit totals; pass 2 shares program costs with those totals, runs the cost tests and appends each part to the outputs, which are then joined.
     m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000, part_001, ...<br/>(1,000,000 measures: 20 parts)"]
     parts --> pf["preflight part by part; whole-file checks once"]
     pf --> p1
@@ -258,6 +266,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: Pricing one measure's electric savings
+    accDescr: The measure's 8,760 shape is rotated onto the ACC's weekdays, multiplied hour by hour by the ACC's avoided cost, summed by quarter, phased by baseline and discounted, summed over the measure's life, and scaled by its annual net kWh.
     m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape: shares summing to 1<br/>(or kWh per unit, C4.5)"]
     shape -->|"rotate once onto the ACC's weekdays (C4.2)"| aligned["aligned shape"]
     acc["ACC hourly avoided cost<br/>for (IOU, zone, cost test, year)"] --> mult
@@ -338,6 +348,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: The web server
+    accDescr: The browser reaches the edge nginx over HTTPS, which forwards to the recet container on an EC2 t4g.small. In the container the web server, a worker thread and a janitor thread share the state volume; the worker starts a run process, which also reads the read-only reference data.
     b["Browser"] -->|HTTPS| nginx["Edge nginx (edge-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
     subgraph HOST["AWS EC2 t4g.small: 2 ARM vCPUs, 2 GiB"]
         nginx -->|"docker network web"| srv
@@ -373,6 +385,8 @@ drafts `RECET_WEB_DRAFT_DAYS` (30).
 
 ```mermaid
 sequenceDiagram
+    accTitle: A web run
+    accDescr: The user starts a run; the web app queues it and shows the expected finish. The worker claims it and starts the run process, which writes its log and progress; the run page polls the web app, which reads them.
     actor U as User
     participant A as Web app
     participant D as Database and<br/>run folder

@@ -4,8 +4,8 @@
 {% block content %}
 <h1>Your account</h1>
 <p>{{ user.email }} · {{ user.role }}</p>
-{% if done == 'email' %}<p class="ok">Saved.</p>{% elif done %}<p class="ok">Password changed. Your other sessions were signed out.</p>{% endif %}
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if done == 'email' %}<p class="ok" role="status">Saved.</p>{% elif done %}<p class="ok" role="status">Password changed. Your other sessions were signed out.</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 <h2>Change password</h2>
 <form method="post" action="{{ u('/account') }}" class="stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">

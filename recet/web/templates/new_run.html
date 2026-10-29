@@ -2,7 +2,7 @@
 {% block title %}New run{% endblock %}
 {% block content %}
 <h1>New run</h1>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="{{ u('/runs') }}" enctype="multipart/form-data" class="run-form" id="run-form">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 {% set f = form %}
@@ -72,7 +72,8 @@
       <select name="compare_with" id="compare-with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
     <label>Priced for
-      <select name="acc_purpose" title="Records priced on an ACC that does not normally apply to their program year are flagged, not stopped">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+      <select name="acc_purpose" aria-describedby="purpose-help">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+      <span class="small muted" id="purpose-help">Records on an ACC that does not normally apply to their program year are flagged, not stopped.</span></label>
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
   </div>
@@ -81,9 +82,9 @@
     <table class="list compact acc-map">
       <thead><tr><th>ACC</th><th>Budget filings</th><th>Claims (program years)</th></tr></thead>
       <tbody>{% for r in acc_map %}<tr class="{% if not r.builtin %}dim{% endif %}">
-        <td class="nowrap">{{ r.acc }}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
+        <td class="nowrap">{{ r.acc }}{% if not r.builtin %} <span class="small">(not in ReCET yet)</span>{% endif %}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
     </table>
-    <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed: not in ReCET yet.</p>
+    <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed rows are not in ReCET yet.</p>
   </details>
   <div class="checks">
     <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about two thirds of the run time)</label>
@@ -122,9 +123,10 @@
 
 <div class="submit-row">
   <button class="primary big" name="go" value="run">Start run</button>
-  <button class="big" name="preflight_only" value="on" title="Runs only the input check a run makes before pricing: what would stop the run or leave measures unpriced. Nothing is priced.">Check inputs only</button>
+  <button class="big" name="preflight_only" value="on" aria-describedby="preflight-help">Check inputs only</button>
   <span id="upload-progress" class="small" role="status" aria-live="polite" hidden><progress max="1" value="0" aria-label="Upload"></progress> <span class="text"></span></span>
-  <span class="muted small">Runs go through a queue, one at a time; input checks go first.</span>
+  <span class="muted small"><span id="preflight-help">Check inputs only runs the input check a run makes before pricing (what would stop the run or leave measures unpriced); nothing is priced.</span>
+    Runs go through a queue, one at a time; input checks go first.</span>
 </div>
 </form>
 {% endblock %}
