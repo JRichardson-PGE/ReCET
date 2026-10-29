@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.66 (2026-10-29; 0.1.65 is the OpenBCA PR): the step 0 server checks (CEDARS-Research TIER2_PLAN) found two small things. A run with SCT off
+  logged a pandas PerformanceWarning per part: `run_poc` blanked the societal columns one by one (fragmenting the frame, which `assemble_measure_level`'s
+  reset_index then warned about); now one `assign(...).copy()`. tests/test_run.py and test_water.py pass with `-W error::pandas.errors.PerformanceWarning`.
+  And SCT is about 15% of a run, not "about two thirds" (server, 1M: 392 s with, 334 s without; pricing 190 -> 133 s): New run's label, WEB_GUIDE, jobs.py.
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
   (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow
