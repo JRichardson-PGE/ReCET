@@ -77,6 +77,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--excel-max-rows", type=int, help="with --format xlsx, a job with more measures than this writes every table as --excel-fallback instead (default 50,000)")
     g.add_argument("--excel-fallback", choices=["csv.zip", "csv", "parquet"], help="the format of every table of a job over --excel-max-rows (default csv.zip)")
     g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
+    g.add_argument("--replica-part-size", type=int, help="with a CET replica engine: measures priced at a time (default 10,000; 0 = the whole job at once)")
     g.add_argument("--chunk-size", type=int, help="run a job with more Measure rows than this in parts of this many, to bound memory (default 50,000; 0 = never)")
 
 

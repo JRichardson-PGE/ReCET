@@ -10,16 +10,27 @@ from .sql import group_sum, one_over
 THERM_CONV = 29.307111111
 
 
-def _weighted(s: pd.DataFrame, kwh: str, thm: str) -> np.ndarray:
+def _positive(s: pd.DataFrame, release: Release) -> tuple[np.ndarray, np.ndarray]:
+    kwh, thm = ("FirstYearGrossKWh", "FirstYearGrossThm") if release.savings == "2022" else ("FirstYearGrosskWh", "FirstYearGrossThm")
+    return np.where(s[kwh] > 0, s[kwh], 0.0), np.where(s[thm] > 0, THERM_CONV * s[thm], 0.0)
+
+
+def program_sums(s: pd.DataFrame, release: Release) -> pd.DataFrame:
+    """Per PrgID, the positive first-year gross kWh and therms (in kWh) and the measure count the savings weights divide by.
+    Sums of parts of a job add up to the whole job's."""
+    k, t = _positive(s, release)
+    return pd.DataFrame({"PrgID": s.PrgID, "k": k, "t": t, "n": 1}).groupby("PrgID", sort=False).sum()
+
+
+def _weighted(s: pd.DataFrame, release: Release, sums: pd.DataFrame | None = None) -> np.ndarray:
     """The savings weight: each measure's share of its program's positive first-year gross kWh + therms (in kWh), else 1/count."""
-    k = np.where(s[kwh] > 0, s[kwh], 0.0)
-    t = np.where(s[thm] > 0, THERM_CONV * s[thm], 0.0)
-    g = pd.DataFrame({"PrgID": s.PrgID, "k": k, "t": t}).groupby("PrgID", sort=False)
-    sk, st, n = s.PrgID.map(g.k.sum()), s.PrgID.map(g.t.sum()), s.PrgID.map(g.size())
+    k, t = _positive(s, release)
+    g = program_sums(s, release) if sums is None else sums
+    sk, st, n = s.PrgID.map(g.k), s.PrgID.map(g.t), s.PrgID.map(g.n)
     return np.where((sk != 0) | (st != 0), (k + t) / (sk + st), one_over(n))
 
 
-def _calc_savings_2022(e: pd.DataFrame, me_bens) -> pd.DataFrame:
+def _calc_savings_2022(e: pd.DataFrame, release: Release, me_bens, sums=None) -> pd.DataFrame:
     """22.1 and before: annual, lifecycle, goal-attainment and first-year savings (no water, no site / water split)."""
     q, R, U = e.Qty, e.RUL, e.EUL
 
@@ -54,13 +65,14 @@ def _calc_savings_2022(e: pd.DataFrame, me_bens) -> pd.DataFrame:
     })
     cols = [c for c in s.columns if c not in ("PA", "PrgID", "CET_ID")]
     s = group_sum(s, ["PA", "PrgID", "CET_ID"], cols)
-    s["WeightedSavings"] = _weighted(s, "FirstYearGrossKWh", "FirstYearGrossThm")
+    s["WeightedSavings"] = _weighted(s, release, sums)
     return s
 
 
-def calc_savings(e: pd.DataFrame, release: Release, me_bens: float) -> pd.DataFrame:
+def calc_savings(e: pd.DataFrame, release: Release, me_bens: float, sums: pd.DataFrame | None = None) -> pd.DataFrame:
+    """`sums` are the whole job's `program_sums` when `e` is one part of it (the default: `e`'s own)."""
     if release.savings == "2022":
-        return _calc_savings_2022(e, me_bens)
+        return _calc_savings_2022(e, release, me_bens, sums)
     q, R, U = e.Qty, e.RUL, e.EUL
     single = R.fillna(0) == 0
 
@@ -104,5 +116,5 @@ def calc_savings(e: pd.DataFrame, release: Release, me_bens: float) -> pd.DataFr
     s = pd.DataFrame(s)
     cols = [c for c in s.columns if c not in ("PA", "PrgID", "CET_ID")]
     s = group_sum(s, ["PA", "PrgID", "CET_ID"], cols)
-    s["WeightedSavings"] = _weighted(s, "FirstYearGrosskWh", "FirstYearGrossThm")
+    s["WeightedSavings"] = _weighted(s, release, sums)
     return s

@@ -95,6 +95,22 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.74 (2026-10-29, Jake: "make the replicas more memory efficient. Someone could try to run 1M rows thru the replicas too"): a replica prices a job in
+  parts, `RunConfig.replica_part_size` (10,000; `--replica-part-size`; 0 = whole; Jake chose a setting of its own rather than `chunk_size`'s 50,000: a
+  200k job on 25.1 peaks at 1.2 GB with 10,000, 4.2 GB with 50,000, same time). `cet_versions.price` runs two passes: pass 1 prices each part's benefits and
+  adds up the program sums (`calc_ce.program_sums` / `calc_ce_2021.program_sums`: positive benefits and claim count per PrgID; `calc_savings.program_sums`:
+  the savings weights' totals), spilling the benefits to parquet; pass 2 finishes each part with the whole job's sums (costs, bills, ratios, savings,
+  emissions, CalcCost) and yields it. `run` is `price` over a DataFrame (parts by CET_ID, every row of a CET_ID in one part, output in CET_ID order).
+  `cet_versions/parts.py`: Measure.csv split once (delimited.split_file), scanned for the table keys, First Year, repeated CEInputIDs (priced together in
+  a last part) and ACCVersion; job.run_job and `recet cet-version run` write Saved*, measure-level, summary, key metrics and Results sums part by part
+  (one-part jobs exactly as before). Tables: the avoided-cost parquet is read row group by row group, key columns first (dictionary-encoded), the whole
+  group only if a row matches, single-threaded, ID / ACKey skipped, also filtered on climate zone; max Qac from the row-group statistics; Arrow's pool
+  released after. Pricing: the quarterly joins carry only the columns they use; the rebased sources are built once per run (`QuarterlyTables.cached`);
+  `sql.dec_pow` computes each distinct (rate, n) once; emissions' NULL-row test checks the distinct CET_IDs (pandas' Arrow-string isin over millions
+  of rows was 45% of the time). Measured on the laptop, 25.1 (its 23.3M-row 2026 table), C3 rows repeated: 20k measures 4.8 GB / 25 s -> 0.6 GB / 8 s;
+  1,000,000 measures 1.32 GB peak / 435 s (`cet-version run`), 1.37 GB / 427 s (`recet run --engine cet-25.1`, every output file). One part: outputs
+  bit-identical to 0.1.73; in parts: equal to rounding (5e-16, the program sums' order). Also: a CEInputID on two rows no longer stops the measure-level
+  table (each row shows its CET_ID's outputs). tests: every reference run priced 7 measures at a time, the CLI and a run in parts, a repeated CEInputID.
 - 0.1.73 (2026-10-29): a replica run takes a CEDARS upload's Measure.csv (the first server run of the 10k job failed: `'DataFrame' object has no attribute
   'PA'`). `cet_versions/job.cet_inputs` builds CET's input table as the reference runs did (CEDARS-Research `poc/cet_reference_jobs.py`): PA = the program's
   ProgramCost PA (else the PrgID prefix), a statewide record's = its IOU_AC_Territory (with a note: CEDARS does not pass SW to CET), FuelID -> FuelType;

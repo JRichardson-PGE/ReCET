@@ -89,6 +89,9 @@ class RunConfig:
                                              # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
+    replica_part_size: int = 10_000          # a CET replica engine prices this many measures at a time (cet_versions.price); 0 = the whole job at once.
+                                             # Smaller than chunk_size: a replica expands each measure to its quarters (a 200k-measure job on CET 25.1
+                                             # peaks at 1.2 GB with 10,000, at 4.2 GB with 50,000, in the same time)
     # --- test hook (not shown in the GUI)
     subset_step: int = 1
 

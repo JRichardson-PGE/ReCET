@@ -87,17 +87,26 @@ def benefits(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, release: Rele
 
     # AvoidedCostElecvw
     ecols = ["PA", "Version", "TS", "EU", "CZ", "Qtr", "Qac", "Gen", "TD"] + (["Gen_SB", "TD_SB", "Gen_SH", "TD_SH"] if sct_e else []) + ["DSType", "ACElecKey"]
-    src = _source(t.ac_elec, ecols, first_year, base_year, t.max_qac_elec)
-    src = src.assign(pa_k=key(src.PA), ts_k=key(src.TS), eu_k=key(src.EU), cz_k=key(src.CZ), v_k=version_key(src.Version))
-    im = e.merge(se, on="pa_k", how="inner")
-    im = im.assign(ts_k=key(im.TS), eu_k=key(im.EU), cz_k=key(im.CZ))
-    av = im.merge(src.drop(columns=["PA", "TS", "EU", "CZ", "Version"]), on=["pa_k", "ts_k", "eu_k", "cz_k", "v_k"])
+
+    def elec_source():
+        src = _source(t.ac_elec, ecols, first_year, base_year, t.max_qac_elec)
+        src = src.assign(pa_k=key(src.PA), ts_k=key(src.TS), eu_k=key(src.EU), cz_k=key(src.CZ), v_k=version_key(src.Version),
+                         is_kw=(src.DSType.astype("string").str.rstrip().str.casefold() == "kw").fillna(False).to_numpy())
+        return src.drop(columns=["PA", "TS", "EU", "CZ", "Version", "Qtr", "ACElecKey", "DSType"])
+
+    src = t.cached(("ce_elec", first_year, sct_e), elec_source)
+    # the settings' Version is the one the quarterly rows carry (av.Version): its SCT test is worked out per settings row
+    sev = se.assign(sct_other=~version_key(se.Version).isin([v.casefold() for v in release.sct_elec_versions])) if release.sct_elec_versions else se
+    # only the measure columns the quarterly rows need: the join has a row per measure, quarter and demand type
+    im = e[["CET_ID", "pa_k", "TS", "EU", "CZ", "Qm", "eulq", "eulq1", "eulq2", "kW1", "kWh1", "kW2", "kWh2"]].merge(sev, on="pa_k", how="inner")
+    im = im.assign(ts_k=key(im.TS), eu_k=key(im.EU), cz_k=key(im.CZ)).drop(columns=["TS", "EU", "CZ"])
+    av = im.merge(src, on=["pa_k", "ts_k", "eu_k", "cz_k", "v_k"])
     av = av[(av.Qac >= av.Qm) & (av.Qac <= av.Qm + trunc(av.eulq))].reset_index(drop=True)
     if release.sct_elec_versions:
-        other = ~version_key(av.Version).isin([v.casefold() for v in release.sct_elec_versions])
+        other = av.sct_other.to_numpy(bool)
         for c in ["Gen_SB", "Gen_SH", "TD_SB", "TD_SH"]:
             av.loc[other, c] = 0.0
-    kw = (av.DSType.astype("string").str.rstrip().str.casefold() == "kw").fillna(False).to_numpy()
+    kw = av.is_kw.to_numpy(bool)
     av["DS1"] = np.where(kw, av.kW1, av.kWh1)
     av["DS2"] = np.where(kw, av.kW2, av.kWh2)
     trc, soc = _discount(av, release, False), _discount(av, release, True)
@@ -110,11 +119,15 @@ def benefits(e: pd.DataFrame, s: pd.DataFrame, t: QuarterlyTables, release: Rele
     gvals = ["Total"] + (["Total_SB", "Total_SH"] if sct_g else [])
     gcols = ["ID", "PA", "Version", "FirstYear", "GS", "GP", "ComboField", "Qtr", "Qac", "Commodity", "TD", "Total", "ACGasKey"] + (
         ["Commodity_SB", "TD_SB", "Total_SB", "Commodity_SH", "TD_SH", "Total_SH"] if sct_g else [])
-    gsrc = _source(t.ac_gas, gcols, first_year, base_year, t.max_qac_gas)
-    gsrc = gsrc.assign(pa_k=key(gsrc.PA), gs_k=key(gsrc.GS), gp_k=key(gsrc.GP), v_k=version_key(gsrc.Version))
-    img = e.merge(se, on="pa_k", how="inner")
-    img = img.assign(gs_k=key(img.GS), gp_k=key(img.GP))
-    gv = img.merge(gsrc[["pa_k", "gs_k", "gp_k", "v_k", "Qac"] + gvals], on=["pa_k", "gs_k", "gp_k", "v_k"])
+    def gas_source():
+        gsrc = _source(t.ac_gas, gcols, first_year, base_year, t.max_qac_gas)
+        gsrc = gsrc.assign(pa_k=key(gsrc.PA), gs_k=key(gsrc.GS), gp_k=key(gsrc.GP), v_k=version_key(gsrc.Version))
+        return gsrc[["pa_k", "gs_k", "gp_k", "v_k", "Qac"] + gvals]
+
+    gsrc = t.cached(("ce_gas", first_year, sct_g), gas_source)
+    img = e[["CET_ID", "pa_k", "GS", "GP", "Qm", "eulq", "eulq1", "eulq2"]].merge(se, on="pa_k", how="inner")
+    img = img.assign(gs_k=key(img.GS), gp_k=key(img.GP)).drop(columns=["GS", "GP"])
+    gv = img.merge(gsrc, on=["pa_k", "gs_k", "gp_k", "v_k"])
     gv = gv[(gv.Qac >= gv.Qm) & (gv.Qac <= gv.Qm + trunc(gv.eulq))].reset_index(drop=True)
     trc, soc = _discount(gv, release, False), _discount(gv, release, True)
     gv["Gas"] = gv.Total / trc
@@ -189,9 +202,23 @@ def _program_costs(c: pd.DataFrame, s: pd.DataFrame, first_year: int) -> pd.Data
     return g.groupby("prg_k", sort=False).agg(SumCosts=("tot", "sum"), SumCostsNPV=("SumCostsNPV", "sum")).reset_index()
 
 
+def program_sums(ce: pd.DataFrame) -> pd.DataFrame:
+    """BenefitsSum and ClaimCount per PrgID: each benefit column's positive values summed over the program's measures, and
+    the program's measure count. Sums of parts of a job add up to the whole job's (`combine_sums`)."""
+    ben_cols = [c for c in ce.columns if ("Ben" in c and "Bill" not in c) or c.startswith("TaxCredits")]
+    g = pd.DataFrame({"PrgID": ce.PrgID, **{"Sum" + c: pos(ce[c]) for c in ben_cols}, "ClaimCount": 1}).groupby("PrgID", sort=False)
+    return g.sum()
+
+
+def combine_sums(parts: list[pd.DataFrame]) -> pd.DataFrame:
+    """The whole job's program sums from its parts' (programs in order of first appearance)."""
+    return parts[0] if len(parts) == 1 else pd.concat(parts).groupby(level=0, sort=False).sum()
+
+
 def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataFrame, release: Release, first_year: int,
-          me_cost: float) -> pd.DataFrame:
-    """'Updating SC, TRC, and PAC costs': program-cost shares, participant costs and each test's cost."""
+          me_cost: float, sums: pd.DataFrame | None = None) -> pd.DataFrame:
+    """'Updating SC, TRC, and PAC costs': program-cost shares, participant costs and each test's cost. `sums` are the whole
+    job's `program_sums` when `ce` is one part of it (the default: `ce`'s own)."""
     sct_e, sct_g = release.sct in ("elec", "full"), release.sct == "full"
     pcs = _program_costs(programs, s, first_year)
     E = e.merge(s[["pa_k", "Raf", "Rqf", "Raf_SCT", "Rqf_SCT"]], on="pa_k", how="inner")
@@ -212,13 +239,12 @@ def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataF
     ri = ri.groupby(["PrgID", "CET_ID"], sort=False).sum(min_count=1).reset_index().drop(columns="PrgID")
 
     # BenefitsSum (per PrgID) and ClaimCount
-    ben_cols = [c for c in ce.columns if ("Ben" in c and "Bill" not in c) or c.startswith("TaxCredits")]
-    bs = pd.DataFrame({"PrgID": ce.PrgID, **{"Sum" + c: pos(ce[c]) for c in ben_cols}}).groupby("PrgID", sort=False).sum()
+    bs = (program_sums(ce) if sums is None else sums).copy()
+    cc = bs.pop("ClaimCount")
     if release.tax_credits:
         # CET error kept: BenefitsSum's column list is out of step with its SELECT (CTE names are positional), so
         # SumElecBenGross holds the positive TaxCreditsGross
         bs["SumElecBenGross"] = bs.SumTaxCreditsGross
-    cc = ce.groupby("PrgID", sort=False).size().rename("ClaimCount")
 
     X = ce.merge(e[["CET_ID", "pa_k", "Qty", "Qm", "IncentiveToOthers", "DILaborCost", "DIMaterialCost", "EndUserRebate", "NTGRCost"]],
                  on="CET_ID", how="left")
@@ -296,7 +322,9 @@ def costs(ce: pd.DataFrame, e: pd.DataFrame, s: pd.DataFrame, programs: pd.DataF
 def _rate_view(e: pd.DataFrame, s: pd.DataFrame, rates: pd.DataFrame, mapping: pd.DataFrame, release: Release, fuel: str) -> pd.DataFrame:
     """E3RateScheduleElecvw / E3RateScheduleGasvw: each measure's rates by year, from its mapped schedule (or its own)."""
     rcol = "RateE" if fuel == "elec" else "RateG"
-    E = e.merge(s[["pa_k", "v_k", "Raf"]], on="pa_k", how="inner")
+    # only the measure columns the yearly rows need, with the claim year worked out per measure (not per year row)
+    cols = ["CET_ID", "pa_k", "AVCVersion", "TS", "GS", "ElecRateSchedule", "GasRateSchedule", "Qy_m", "eul1", "eul2", "EUL"]
+    E = e[cols].assign(claim_year=e.Qtr.str[:4].astype(int)).merge(s[["pa_k", "v_k", "Raf"]], on="pa_k", how="inner")
     if fuel == "elec":
         E = E[version_key(E.AVCVersion) == E.v_k]
     r = rates.assign(pa_k=key(rates.PA), v_k=version_key(rates.Version), sch_k=key(rates.Schedule),
@@ -319,8 +347,7 @@ def _rate_view(e: pd.DataFrame, s: pd.DataFrame, rates: pd.DataFrame, mapping: p
         named = E[E[own].fillna("") != ""]
         parts.append(named.assign(sch_k=key(named[own])))
     v = pd.concat(parts).merge(r[["pa_k", "v_k", "sch_k", "Qy", rcol]], on=["pa_k", "v_k", "sch_k"])
-    yr = v.Qtr.str[:4].astype(int)
-    v["Yr1"] = yr - release.rate_yr1_base if release.rate_yr1_base is not None else v.Qy_m
+    v["Yr1"] = v.claim_year - release.rate_yr1_base if release.rate_yr1_base is not None else v.Qy_m
     return v[["CET_ID", "Raf", "Qy", "sch_k", rcol, "Yr1", "eul1", "eul2", "EUL"]].drop_duplicates()
 
 

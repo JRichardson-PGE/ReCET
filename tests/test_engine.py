@@ -40,7 +40,8 @@ def reference_folder(tmp_path: Path, releases=("25.1", "25.0")) -> Path:
 
 def _cfg(tmp_path, release="25.1", **kw) -> RunConfig:
     run = DATA / release / C3 / "me0"
-    return RunConfig(measures=str(run / "measure.csv"), programcost=str(run / "programcost.csv"), out_dir=str(tmp_path / "out"), acc_version="2024",
+    kw.setdefault("measures", str(run / "measure.csv"))
+    return RunConfig(programcost=str(run / "programcost.csv"), out_dir=str(tmp_path / "out"), acc_version="2024",
                      engine=f"cet-{release}", reference_dir=str(reference_folder(tmp_path)), base_year=2028, run_name=f"r{release}", **kw)
 
 
@@ -62,6 +63,36 @@ def test_a_replica_runs_through_the_ordinary_run_path(tmp_path):
     sums = rv.RunResults.from_file(Path(res.files["measure_level"]))                           # the Results page's tables
     port = sums.table("portfolio", rv.ALL_PAS, ["TotalSystemBenefit", "TRC_ratio"])
     assert port["Measures"].iloc[0] == 41 and abs(port["TotalSystemBenefit"].iloc[0] - res.totals["TotalSystemBenefit"]) < 1e-3
+
+
+def test_a_replica_run_in_parts(tmp_path):
+    """A job larger than a part is priced part by part (cet_versions.price via parts.plan): the release's tables still equal RunCET's, the
+    measure-level table has every measure, and the totals equal a whole-job run's."""
+    whole = run_job(_cfg(tmp_path / "w"), log=lambda s: None)
+    res = run_job(_cfg(tmp_path / "p", replica_part_size=7), log=lambda s: None)
+    run = DATA / "25.1" / C3 / "me0"
+    for name in ("SavedCE", "SavedSavings", "SavedEmissions", "SavedCost"):
+        assert not differences(_read(res.files[name]), _read(run / f"{name}.csv")), name
+    frame = pd.read_csv(res.files["measure_level"])
+    assert len(frame) == 41 and set(frame.CEInputID) == set(pd.read_csv(whole.files["measure_level"]).CEInputID)
+    assert res.frame is None and any("parts" in n for n in res.notes)
+    for k, v in whole.totals.items():
+        assert abs(res.totals[k] - v) <= 1e-9 * max(abs(v), 1.0), k
+    assert not (res.run_dir / "_parts").exists()
+
+
+def test_a_replica_keeps_a_repeated_ceinputid_together(tmp_path):
+    """Rows sharing a CEInputID in different parts are priced together (CET groups a CET_ID's rows), as in a whole-job run. (CET's joins on CET_ID
+    multiply such rows, as the replica does: three rows sharing one ID already make millions of quarterly rows; CEDARS IDs are unique.)"""
+    m = pd.read_csv(DATA / "25.1" / C3 / "me0" / "measure.csv", dtype=str, keep_default_na=False)
+    m.loc[[2, 35], "CEInputID"] = "SHARED"
+    p = tmp_path / "m.csv"
+    m.to_csv(p, index=False)
+    a = run_job(_cfg(tmp_path / "w", measures=str(p)), log=lambda s: None)
+    b = run_job(_cfg(tmp_path / "p", measures=str(p), replica_part_size=7), log=lambda s: None)
+    for name in ("SavedCE", "SavedSavings", "SavedEmissions", "SavedCost"):     # SHARED has a row per (PA, PrgID), as in CET
+        x, y = (pd.read_csv(r.files[name]).sort_values(["CET_ID", "PA", "PrgID"]).reset_index(drop=True) for r in (b, a))
+        pd.testing.assert_frame_equal(x, y, rtol=1e-9, check_dtype=False, obj=name)
 
 
 def test_two_engines_side_by_side(tmp_path):
