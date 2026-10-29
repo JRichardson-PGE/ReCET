@@ -95,6 +95,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.75 (2026-10-29, Jake: "CEDARS is always assuming SCE for programs with SW PA in the CET, but SCE is not all of the programs' lead. SCE has
+  historically been the largest funder"): a CEDARS upload's statewide ProgramCost rows (PA SW) are costed as SCE's (`cet_versions/job.cet_programs`,
+  logged), as CEDARS passes them; a job in CET's input form (Measure PA column) is priced as given. Found by running the two 10k jobs on the published
+  CET 25.1 (CET_UI 122716 IOU-only, 122714 with 8,927 statewide records; CET's echoed ProgramCost had the 72 SW rows as SCE): the replica on the raw
+  uploads now equals CET's outputs in all 180 exported columns of all 10,000 records of each, to 1e-9 (before: 31 program-cost columns differed on the
+  statewide records). tests/test_engine.py: the C3 upload equals RunCET on the SW -> SCE program table, and RunCET's own outputs off the statewide records.
 - 0.1.74 (2026-10-29, Jake: "make the replicas more memory efficient. Someone could try to run 1M rows thru the replicas too"): a replica prices a job in
   parts, `RunConfig.replica_part_size` (10,000; `--replica-part-size`; 0 = whole; Jake chose a setting of its own rather than `chunk_size`'s 50,000: a
   200k job on 25.1 peaks at 1.2 GB with 10,000, 4.2 GB with 50,000, same time). `cet_versions.price` runs two passes: pass 1 prices each part's benefits and
