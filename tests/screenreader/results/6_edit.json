@@ -1,0 +1,234 @@
+[
+ {
+  "step": "to web content (Ctrl+Home)",
+  "spoken": [
+   "2028Q 1"
+  ],
+  "focus": "input \"2028Q1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "moveToNextHeading (1)",
+  "spoken": [
+   "",
+   "no next heading"
+  ],
+  "focus": "input \"2028Q1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "moveToNextHeading (2)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "input \"2028Q1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "moveToNextHeading (3)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "input \"2028Q1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "focus Measure tab",
+  "spoken": [],
+  "focus": "button#tab-Measure.tab.active[role=tab] \"Measure (3)\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "ArrowRight",
+  "spoken": [
+   "Program Cost (0), tab, selected, 2 of 2"
+  ],
+  "focus": "button#tab-ProgramCost.tab.active[role=tab] \"ProgramCost (0)\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "ArrowLeft",
+  "spoken": [
+   "Measure (3), tab, selected, 1 of 2"
+  ],
+  "focus": "button#tab-Measure.tab.active[role=tab] \"Measure (3)\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "Tab (1)",
+  "spoken": [
+   "Add row, button"
+  ],
+  "focus": "button \"Add row\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "Tab (2)",
+  "spoken": [
+   "Duplicate rows, button"
+  ],
+  "focus": "button \"Duplicate rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "Tab (3)",
+  "spoken": [
+   "Delete rows, button"
+  ],
+  "focus": "button \"Delete rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "focus the Measure grid",
+  "spoken": [],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "ArrowDown",
+  "spoken": [
+   "button, Control plus, Z, Undo"
+  ],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "ArrowDown",
+  "spoken": [
+   "button, Control plus, Y, Redo"
+  ],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "ArrowRight",
+  "spoken": [
+   "e"
+  ],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "ArrowRight",
+  "spoken": [
+   "d"
+  ],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "ArrowRight",
+  "spoken": [
+   "o"
+  ],
+  "focus": "div.tabulator-tableholder[role=rowgroup] \"Measure rows\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "PrgID: text - The program the measure belongs to; must equal a PrgID in ProgramCost.csv (and vice versa). Groups measures for the program-cost share and, through the program's PA in ProgramCost.csv, gives CreditedPA. | PrgID CHANGES RESULTS Affects: the program-cost share (WeightedProgramCost) and so the program-cost part of the TRC, PAC, RIM and SCT costs and ratios; summary groupings (credited PA, program segment); statewide allocation when it is on. Measures with the same PrgID share that program's ProgramCost costs in proportion to their positive benefits. It does not change the measure's own benefits."
+  }
+ },
+ {
+  "step": "click the EUL_Yrs cell of T3 (negative life)",
+  "spoken": [],
+  "focus": "input \"-1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "Stops the run: outside CET's allowed range [0, 40]: CET would reject this upload (the POC still prices it); EUL_Yrs is negative (CET allows 0 or more) | EUL_Yrs: Years (fractional allowed) - Effective useful life of measure in years. In ReCET: Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). | EUL_Yrs CHANGES RESULTS Affects: every lifetime value: benefits, supply costs, bill impacts, lifecycle emissions, total system benefit, and every cost-test cost and ratio. Savings run for EUL years from the claim quarter, the last quarter prorated."
+  }
+ },
+ {
+  "step": "Escape (leave the cell editor)",
+  "spoken": [
+   ""
+  ],
+  "focus": "input \"-1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "Stops the run: outside CET's allowed range [0, 40]: CET would reject this upload (the POC still prices it); EUL_Yrs is negative (CET allows 0 or more) | EUL_Yrs: Years (fractional allowed) - Effective useful life of measure in years. In ReCET: Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). | EUL_Yrs CHANGES RESULTS Affects: every lifetime value: benefits, supply costs, bill impacts, lifecycle emissions, total system benefit, and every cost-test cost and ratio. Savings run for EUL years from the claim quarter, the last quarter prorated."
+  }
+ },
+ {
+  "step": "ArrowLeft",
+  "spoken": [
+   "out of edit, row 4, Unitk Wh IOU Water 2nd Baseline, column 25, clickable"
+  ],
+  "focus": "input \"-1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "Stops the run: outside CET's allowed range [0, 40]: CET would reject this upload (the POC still prices it); EUL_Yrs is negative (CET allows 0 or more) | EUL_Yrs: Years (fractional allowed) - Effective useful life of measure in years. In ReCET: Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). | EUL_Yrs CHANGES RESULTS Affects: every lifetime value: benefits, supply costs, bill impacts, lifecycle emissions, total system benefit, and every cost-test cost and ratio. Savings run for EUL years from the claim quarter, the last quarter prorated."
+  }
+ },
+ {
+  "step": "ArrowRight (back to EUL_Yrs)",
+  "spoken": [
+   "EUL Yrs, column 26, clickable, edit"
+  ],
+  "focus": "input \"-1\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#help": "Stops the run: outside CET's allowed range [0, 40]: CET would reject this upload (the POC still prices it); EUL_Yrs is negative (CET allows 0 or more) | EUL_Yrs: Years (fractional allowed) - Effective useful life of measure in years. In ReCET: Savings run from the claim quarter in whole quarters, the last one prorated (C2.1); the value is used as filed (0 gives no savings quarters). | EUL_Yrs CHANGES RESULTS Affects: every lifetime value: benefits, supply costs, bill impacts, lifecycle emissions, total system benefit, and every cost-test cost and ratio. Savings run for EUL years from the claim quarter, the last quarter prorated."
+  }
+ },
+ {
+  "step": "focus help line",
+  "spoken": [],
+  "focus": "p#help.help-line \"Stops the run: outside CET's allowed range [0, 40]: CET woul\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "focus Validate inputs",
+  "spoken": [],
+  "focus": "button#check-btn \"Validate inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "Enter (Validate inputs)",
+  "spoken": [
+   "Saving and starting the check..."
+  ],
+  "focus": "button#check-btn \"Validate inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381",
+  "live": {
+   "#issue-summary": "2 problems in the cells would stop the run (marked ✕, outlined in red); 4 cells to check.",
+   "#check-result": "The check did not start.\n\nThe edited inputs have 2 problem(s) that would stop the run: Measure row 3, EUL_Yrs: EUL_Yrs is negative (CET allows 0 or more); Measure row 3, RUL_Yrs: RUL_Yrs is greater than EUL_Yrs: the remaining useful life of the existing equipment cannot exceed the measure's life. They are marked in red in the table."
+  }
+ },
+ {
+  "step": "focus check result",
+  "spoken": [],
+  "focus": "button#check-btn \"Validate inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "moveToNext (1)",
+  "spoken": [
+   "",
+   "against the"
+  ],
+  "focus": "button#check-btn \"Validate inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ },
+ {
+  "step": "moveToNext (2)",
+  "spoken": [
+   "ACC version to check against, combo box, collapsed, 2026"
+  ],
+  "focus": "button#check-btn \"Validate inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/edit?draft=779684ff4e7e5381"
+ }
+]
