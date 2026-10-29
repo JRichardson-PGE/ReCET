@@ -1,0 +1,335 @@
+[
+ {
+  "step": "to web content (Ctrl+Home)",
+  "spoken": [
+   "out of section, same page, link, Skip to content"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (1)",
+  "spoken": [
+   "",
+   "main landmark, New run, heading, level 1"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (2)",
+  "spoken": [
+   "section, Inputs, heading, level 2"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (3)",
+  "spoken": [
+   "Pricing, heading, level 2"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (4)",
+  "spoken": [
+   "Outputs, heading, level 2"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (5)",
+  "spoken": [
+   "CEDARS filing checks, heading, level 2"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "moveToNextHeading (6)",
+  "spoken": [
+   "no next heading"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (1)",
+  "spoken": [
+   "Checks, combo box, None, collapsed"
+  ],
+  "focus": "select#filing-validation \"None\nQuarterly Claims\nBudget filing\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (2)",
+  "spoken": [
+   "Start run, button"
+  ],
+  "focus": "button.primary.big \"Start run\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (3)",
+  "spoken": [
+   "Check inputs only, button, Check inputs only runs the input check a run makes before pricing (what would stop the run or leave measures unpriced); nothing is priced."
+  ],
+  "focus": "button.big \"Check inputs only\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (4)",
+  "spoken": [
+   "New run Re CET - Google Chrome, region. Tab search, button, collapsed"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (5)",
+  "spoken": [
+   "tool bar. View site information, button"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new",
+  "refocused": true
+ },
+ {
+  "step": "Tab (6)",
+  "spoken": [
+   "Address and search bar, edit, Search Google or type a URL. Press up or down arrow for auto completions. Type to autocomplete dot dot, Ctrl plus, L, selected 127.0.0.1:8765 slash Re CET slash runs slash new"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new",
+  "refocused": true
+ },
+ {
+  "step": "Tab (7)",
+  "spoken": [
+   "Bookmark this tab, button"
+  ],
+  "focus": "(body)",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new",
+  "refocused": true
+ },
+ {
+  "step": "Tab (8)",
+  "spoken": [
+   "New run Re CET, document. button, Check inputs only. Skip to content, same page, link"
+  ],
+  "focus": "a.skip \"Skip to content\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new",
+  "refocused": true
+ },
+ {
+  "step": "Tab (9)",
+  "spoken": [
+   "banner landmark, Re CET, link"
+  ],
+  "focus": "a.brand \"ReCET\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (10)",
+  "spoken": [
+   "Main, navigation landmark, New run, same page, link, current page"
+  ],
+  "focus": "a \"New run\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (11)",
+  "spoken": [
+   "Runs, link"
+  ],
+  "focus": "a \"Runs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (12)",
+  "spoken": [
+   "Edit inputs, link"
+  ],
+  "focus": "a \"Edit inputs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (13)",
+  "spoken": [
+   "Templates, link"
+  ],
+  "focus": "a \"Templates\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (14)",
+  "spoken": [
+   "Docs, link"
+  ],
+  "focus": "a \"Docs\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (15)",
+  "spoken": [
+   "Users, link"
+  ],
+  "focus": "a \"Users\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (16)",
+  "spoken": [
+   "Audit, link"
+  ],
+  "focus": "a \"Audit\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (17)",
+  "spoken": [
+   "Test Admin, link, Change your password"
+  ],
+  "focus": "a \"Test Admin\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (18)",
+  "spoken": [
+   "section, Sign out, button"
+  ],
+  "focus": "button.link \"Sign out\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (19)",
+  "spoken": [
+   "main landmark. form landmark. Name (optional; blank names the run after its input file and ACC), edit, blank"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (20)",
+  "spoken": [
+   "Job workbook ( dot xlsx), radio button, checked, 1 of 2"
+  ],
+  "focus": "input \"workbook\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (21)",
+  "spoken": [
+   "Job workbook: No file chosen, button"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (22)",
+  "spoken": [
+   "template, link"
+  ],
+  "focus": "a.small \"template\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (23)",
+  "spoken": [
+   "Optional supplied files, button, collapsed"
+  ],
+  "focus": "summary \"Optional supplied files\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (24)",
+  "spoken": [
+   "ACC version, combo box, 2026 ACC, collapsed, Which ACC applies to my filing?"
+  ],
+  "focus": "select#acc-version \"2024 ACC\n2026 ACC\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (25)",
+  "spoken": [
+   "Compare with, combo box, (no comparison), collapsed"
+  ],
+  "focus": "select#compare-with \"(no comparison)\n2024 ACC\n2026 ACC\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (26)",
+  "spoken": [
+   "First Year, edit, earliest claim year, blank"
+  ],
+  "focus": "input \"\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (27)",
+  "spoken": [
+   "Priced for, combo box, Any filing (the AC Cs valid for the program year), collapsed, Records on an ACC that does not normally apply to their program year are flagged, not stopped."
+  ],
+  "focus": "select \"Any filing (the ACCs valid for the program year)\nQuarterly C\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (28)",
+  "spoken": [
+   "Market effects, combo box, 0 percent, collapsed"
+  ],
+  "focus": "select \"0%\n5% (benefits and costs)\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (29)",
+  "spoken": [
+   "Which ACC applies to my filing?, button, collapsed"
+  ],
+  "focus": "summary#acc-help-title \"Which ACC applies to my filing?\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (30)",
+  "spoken": [
+   "Societal Cost Tests (SCT Base and High; about 15 percent of the run time), check box, checked"
+  ],
+  "focus": "input \"on\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (31)",
+  "spoken": [
+   "Split statewide (SW ) programs across the IO Us, check box, not checked"
+  ],
+  "focus": "input \"on\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (32)",
+  "spoken": [
+   "Price each ACC component separately, check box, not checked"
+  ],
+  "focus": "input \"on\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (33)",
+  "spoken": [
+   "Output format, combo box, CSV (each file zipped), collapsed"
+  ],
+  "focus": "select \"CSV (each file zipped)\nExcel (up to 50,000 measures; a large\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ },
+ {
+  "step": "Tab (34)",
+  "spoken": [
+   "(edit templates), link"
+  ],
+  "focus": "a \"(edit templates)\"",
+  "url": "http://127.0.0.1:8765/ReCET/runs/new"
+ }
+]
