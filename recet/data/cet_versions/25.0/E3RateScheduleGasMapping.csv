@@ -1,0 +1,97 @@
+PA,Version,GasSector,GasRateSchedule
+PGE,2013,Commercial,Large Commercial
+PGE,2013,Core,Large Commercial
+PGE,2013,Residential,Residential
+PGE,2017,Commercial,Large Commercial
+PGE,2017,Core,Large Commercial
+PGE,2017,Residential,Residential
+PGE,2018,Commercial,Large Commercial
+PGE,2018,Core,Large Commercial
+PGE,2018,Residential,Residential
+PGE,2019,Commercial,Large Commercial
+PGE,2019,Core,Large Commercial
+PGE,2019,Residential,Residential
+PGE,2020,Commercial,Large Commercial
+PGE,2020,Core,Large Commercial
+PGE,2020,Residential,Residential
+PGE,2021,Commercial,Large Commercial
+PGE,2021,Core,Large Commercial
+PGE,2021,Residential,Residential
+PGE,2022,Commercial,Large Commercial
+PGE,2022,Core,Large Commercial
+PGE,2022,Residential,Residential
+PGE,2024,Commercial,Large Commercial
+PGE,2024,Core,Large Commercial
+PGE,2024,Residential,Residential
+PGE,2026,Commercial,Large Commercial
+PGE,2026,Core,Large Commercial
+PGE,2026,Residential,Residential
+RCEA,2020,Commercial,Large Commercial
+RCEA,2020,Core,Large Commercial
+RCEA,2020,Residential,Residential
+RCEA,2021,Commercial,Large Commercial
+RCEA,2021,Core,Large Commercial
+RCEA,2021,Residential,Residential
+RCEA,2022,Commercial,Large Commercial
+RCEA,2022,Core,Large Commercial
+RCEA,2022,Residential,Residential
+SCE,2013,Commercial,System-Commercial
+SCE,2013,Residential,System-Residential
+SCE,2017,Commercial,System-Commercial
+SCE,2017,Residential,System-Residential
+SCE,2018,Commercial,System-Commercial
+SCE,2018,Residential,System-Residential
+SCE,2019,Commercial,System-Commercial
+SCE,2019,Residential,System-Residential
+SCE,2020,Commercial,System-Commercial
+SCE,2020,Residential,System-Residential
+SCE,2021,Commercial,System-Commercial
+SCE,2021,Residential,System-Residential
+SCE,2022,Commercial,System-Commercial
+SCE,2022,Residential,System-Residential
+SCG,2013,Commercial,System-Commercial
+SCG,2013,Residential,System-Residential
+SCG,2017,Commercial,System-Commercial
+SCG,2017,Residential,System-Residential
+SCG,2018,Commercial,System-Commercial
+SCG,2018,Residential,System-Residential
+SCG,2019,Commercial,System-Commercial
+SCG,2019,Residential,System-Residential
+SCG,2020,Commercial,System-Commercial
+SCG,2020,Residential,System-Residential
+SCG,2021,Commercial,System-Commercial
+SCG,2021,Residential,System-Residential
+SCG,2022,Commercial,System-Commercial
+SCG,2022,Residential,System-Residential
+SCG,2024,Commercial,Commercial
+SCG,2024,Core,Commercial
+SCG,2024,Residential,Residential
+SCG,2026,Commercial,Commercial
+SCG,2026,Core,Commercial
+SCG,2026,Residential,Residential
+SDGE,2013,Commercial,Commercial
+SDGE,2013,Residential,Residential
+SDGE,2017,Commercial,Commercial
+SDGE,2017,Residential,Residential
+SDGE,2018,Commercial,Commercial
+SDGE,2018,Residential,Residential
+SDGE,2019,Commercial,Commercial
+SDGE,2019,Residential,Residential
+SDGE,2020,Commercial,Commercial
+SDGE,2020,Residential,Residential
+SDGE,2021,Commercial,Commercial
+SDGE,2021,Residential,Residential
+SDGE,2022,Commercial,Commercial
+SDGE,2022,Residential,Residential
+SDGE,2024,Commercial,Commercial
+SDGE,2024,Core,Commercial
+SDGE,2024,Residential,Residential
+SDGE,2026,Commercial,Commercial
+SDGE,2026,Core,Commercial
+SDGE,2026,Residential,Residential
+SJCE,2021,Commercial,Large Commercial
+SJCE,2021,Core,Large Commercial
+SJCE,2021,Residential,Residential
+SJCE,2022,Commercial,Large Commercial
+SJCE,2022,Core,Large Commercial
+SJCE,2022,Residential,Residential
