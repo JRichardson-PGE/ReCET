@@ -1,0 +1,8 @@
+{
+  "release": "25.1",
+  "version": "2026",
+  "base_year": 2024,
+  "max_qac_elec": 123,
+  "max_qac_gas": 123,
+  "source": "CETbk_25_1_20261007, reference run C4_avc2026_data"
+}

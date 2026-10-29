@@ -30,6 +30,7 @@ Contents
 * [C17 Validation, deliberate differences from CET, and limitations](#c17-validation-deliberate-differences-from-cet-and-limitations)
 * [C18 Worked example](#c18-worked-example)
 * [C19 Savings quantities, discounted savings and levelized values](#c19-savings-quantities-discounted-savings-and-levelized-values)
+* [C20 Prior CET releases (replicas)](#c20-prior-cet-releases-replicas)
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -980,3 +981,62 @@ LevNetBen<t>Elec<v> = ratio(ElecBen - <t>Cost<v> * W, DSe)   LevNetBen<t>Gas<v> 
 The net discounted savings match to 2e-6 (relative) on every measure. The program-cost components match CET's program totals exactly. The levelized and allocation columns, computed
 from CET's own benefit, cost and discounted-savings columns, reproduce CET's on every measure except `LevBenElec` (C17, deliberate difference 9); with ReCET's own benefits they differ from
 CET's as the benefits do (C17).
+
+## C20 Prior CET releases (replicas)
+
+ReCET's own calculation is the one described in C0-C19: hourly, on the ACC, with the corrections of C17. For evaluation and for re-running history,
+`recet cet-version run` (module `recet/cet_versions`) prices a job **exactly as a prior CET release's RunCET does**, on that release's own quarterly
+avoided-cost tables, **CET's errors included** (Jake, 2026-10-29: "exact replicas, labelled"). A replica's outputs are CET's four tables (`SavedCE`,
+`SavedSavings`, `SavedEmissions`, `SavedCost`) with that release's columns in its order, and `run.json` names the release as "CET <release> replica".
+The replica shares no code with ReCET's engine, so nothing in C0-C19 changes when a release is added.
+
+**Releases.** One per CPUC database backup: 21.0 (2020-08-24), 22.1 (2021-12-09), 24.1 (2023-05-16), 24.2 (2023-09-20), 24.3 (2024-08-28), 25.0
+(2025-05-18) and 25.1 (2026-10-07). `recet cet-version list` shows which ACCs each one has (an ACC is named by its year; the release's tables use CET's
+Avoided Cost Version numbers, `versions.CET_VERSION_TO_ACC`). 25.1 lists a Version 2027 with no tables in its backup: Version 2027 was a corrected
+Version 2026 (the 2024 ACC), and the 2026-10-07 backup carries only the corrected tables, under Version 2026 (Jake, 2026-10-29; `Release.version_notes`).
+So a 25.1 replica on the 2024 ACC prices on the corrected tables. Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
+E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does.
+
+**Acceptance.** A replica is accepted only when every output column of every measure equals that release's own RunCET run to 1e-9 (relative; NULL must
+be NULL). `tests/test_cet_versions.py` checks 21 reference runs: for each release a 30-measure synthetic job built to exercise every branch (with and
+without 5% market effects), and for 25.0 and 25.1 also two jobs of 41 and 50 real PG&E records. The runs were made on restored copies of the backups and
+their table slices are in `tests/data/cet_versions/` (CEDARS-Research `poc/cet_version_fixtures.py`).
+
+**What the replica copies from SQL Server.** NULL arithmetic (a NULL term makes the whole expression NULL; `SUM` skips NULLs; a `CASE` takes only a true
+branch), `POWER` of a `decimal(18,6)` discount factor rounded to six places (the societal rates are floats and are not rounded), `1.000 / n` as a
+14-place decimal, `UNION` dropping duplicate rows, text joins that ignore case and trailing spaces (but not a trailing line break), and column lists that
+are matched by position, not by name.
+
+**How the releases differ** (`releases.Release`; each switch names the releases it applies to):
+
+| Area | 21.0 | 22.1 | 24.1 / 24.2 / 24.3 | 25.0 | 25.1 |
+|---|---|---|---|---|---|
+| CalcCE | its own procedure (`calc_ce_2021`): electric and gas benefits only | benefits and supply costs; quarter split guarded | the 22.1 layout with water energy | + tax credits, electric SCT | + gas and water SCT, bill increases |
+| Fuel substitution | none | `MeasImpactType LIKE '%FuelSub'` | `'%FuelSub'` or `'%NC-AE'` | `FuelType` in a list | the list, or `FuelSub` impact type |
+| Sign test for a fuel-substitution benefit | | first-baseline kWh / therms | 24.1, 24.2: the same; 24.3: the priced lifetime sum | priced sum | priced sum |
+| Misc. benefits / costs in OtherBen / OtherCost | | no | 24.3 only | yes | yes |
+| Savings table | 22.1 layout (goal attainment) | 22.1 layout | site / water split | the same | the same |
+| Gas NOx | `E3CombustionType` lookup | lookup | constant 0.0092 | constant | lookup |
+
+**CET errors the replicas keep** (each is marked "CET error kept" in the code):
+
+* 21.0: the gross benefits multiply the first baseline by (1 + market effects) and leave its kW part unadjusted; `TRCCostGross` is the net TRC cost
+  (a CTE column named by position). (21.0 also counts quarters from 1, not 0, and multiplies each benefit by `POWER(Rqf, Qm - 1) / POWER(Rqf, Qm)`;
+  the replica does the same.)
+* 24.1: the dual-baseline net lifecycle kWh are multiplied by EUL a second time.
+* 24.3 and before: the gas rate-schedule mapping's `Commercial` and `Residential` sectors for PG&E, RCEA and SJCE end in a line break, so those measures
+  match no gas rate and get no gas bill reduction. 21.0 on the 2021 ACC: that ACC's electric table has `PG&E` in its Version column, so no measure
+  gets an electric benefit or electric emissions.
+* 25.0: `SaveCost` leaves `LevSCBCostNoAdmin` and `LevSCHCostNoAdmin` out of its insert list, so they are always blank.
+* 25.0 and 25.1: `BenefitsSum`'s column list is out of step with its `SELECT`, so the gross program-cost weight uses the positive tax credits as the
+  electric benefit; two positional lists rotate `LevBenElec`, `LevBenElec_SB` and `LevBenElec_SH`.
+* Every release: the nominal `MarkEffectPlusExcessInc` adds the discounted excess incentive.
+* Every release from 22.1: the net electric benefit multiplies the second-baseline kWh by a lifetime sum without `ISNULL`, so a measure whose life runs
+  past the table (or whose RUL exceeds its EUL) gets no net electric benefit; `GasSupplyCostGross` is the net gas supply cost; the PAC weight adds the
+  measure's own water and other benefits to the program's sums; the fractional-year bill terms are discounted from the table's first year.
+
+**Tables for a real run.** Small tables (`E3Settings`, `CETAvoidedCostVersions`, the rate-schedule mappings, `E3CombustionType` and, before 25.1,
+`E3RateScheduleGas`) ship in `recet/data/cet_versions/<release>/`. The large ones (the avoided-cost tables, `E3Emissions`, `E3RateScheduleElec`) are read
+from the parquet export in the reference data folder, `<folder>/cet_versions/manifest.csv` and `tables/` (CEDARS-Research
+`poc/export_cet_backup_tables.py`); only the job's PAs and end uses are kept in memory.
+
