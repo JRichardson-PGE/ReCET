@@ -20,6 +20,11 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   the retired TOU/SCG quarterly routes, the CET-CO2 comparison option and the research-checkout file fallback were removed. Research scripts in
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
+- The web app (`recet/web`: templates, `static/*.css`, `static/*.js`, the vendored Tabulator and Mermaid as we use them) must meet WCAG 2.2 Level AA
+  (Jake, 2026-10-29; ARCHITECTURE 1.4 and 8.7). Every page change keeps it: a visible label or accessible name on every control, keyboard reach and a
+  visible focus for everything a mouse can do (no hover- or double-click-only actions, no `title` as the only way to learn something), status shown in
+  text and not by colour alone, 4.5:1 text and 3:1 control-border/focus contrast in BOTH colour schemes, `aria-live` for text that updates on its own,
+  targets at least 24 x 24 px, content that reflows at 320 px wide and 200% zoom. Check new colours with a contrast calculator and new pages with axe.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
 - ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. The web pages name a version by
   its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
@@ -90,7 +95,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
-- 0.1.66 (2026-10-29, Jake; WCAG 2.2 AA audit of 0.1.64, all gaps outside the Edit inputs grid; 0.1.65 is the OpenBCA PR): `--control` is the border of
+- 0.1.67 (2026-10-29, Jake; WCAG 2.2 AA audit of 0.1.64, all gaps outside the Edit inputs grid; 0.1.66 is the SCT-off PR): `--control` is the border of
   fields and buttons (3:1 in both schemes; `--line` is decoration only), `color-scheme: light dark`, `:focus-visible` ring, skip link (`main#main`), `.sr-only`.
   Results / Compare filters are sent by an Apply button, never on change (3.2.2; `select[data-view]` drops the unsaved columns when the view changes). Run page
   and runs list announce status changes in `#run-announce` / `#runs-announce` and reload at a run's end only when nothing has the focus (`reloadWhenIdle`).
@@ -98,6 +103,40 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   inputs and rerun is off. Sortable headings hold a `.sort-btn` button; `<p class="alert">` has role=alert and takes the focus on load; Docs `<pre>` / `<table>`
   get tabindex=0 (app.doc), the ARCHITECTURE diagrams `accTitle` / `accDescr`; admin, audit and value-list tables scroll in `.hscroll` at 320 px. Checked with
   axe-core 4.10.2 on every page in both schemes: only the Tabulator grid still fails.
+- 0.1.66 (2026-10-29; 0.1.65 is the OpenBCA PR): the step 0 server checks (CEDARS-Research TIER2_PLAN) found two small things. A run with SCT off
+  logged a pandas PerformanceWarning per part: `run_poc` blanked the societal columns one by one (fragmenting the frame, which `assemble_measure_level`'s
+  reset_index then warned about); now one `assign(...).copy()`. tests/test_run.py and test_water.py pass with `-W error::pandas.errors.PerformanceWarning`.
+  And SCT is about 15% of a run, not "about two thirds" (server, 1M: 392 s with, 334 s without; pricing 190 -> 133 s): New run's label, WEB_GUIDE, jobs.py.
+- 0.1.65 (2026-10-28, Jake; 0.1.58-0.1.64 are the BRD-musts stack, PRs #45 and #47-#52; scope: Claude Doc "OpenBCA module for ReCET: scope"): step 1 of the OpenBCA module.
+  `recet openbca run|compare` (`recet/openbca/run.py`) runs OpenBCA's own engine (its Integrated pathway: the SQLmesh projects on DuckDB, unchanged) on a
+  Program Input + Configuration workbook. ReCET never imports SQLmesh/DuckDB: RECET_OPENBCA_HOME names a pinned checkout (a release tag, `uv sync` done;
+  RECET_OPENBCA_PYTHON overrides its .venv), each run copies its config/core/excel_input_parsing into `<run>/openbca/` with the workbooks under OpenBCA's
+  fixed names, and `openbca/engine.py` runs in OpenBCA's interpreter, exporting OpenBCA's own outputs (results_summary_by_id, jst_ratio, the five
+  validation views) as they stand: nothing recomputed on them (Jake). C1 (v1.0.4 demo, 58 measures): every one of OpenBCA's tables equal to its own
+  `model_runners.py` run; 50.6 s, 1.81 GiB peak. Scale (demo measures copied, 4 cores): 580 measures 207 s, 6.2 GiB, 16 GB of DuckDB spill
+  (final_value_calculations_ts); 1,160+ ran out of ~28 GB disk. So (Jake, 2026-10-28) OpenBCA is tested on the laptop from the command line only: no web
+  page, no server, no performance comparisons (C5 cut); results comparisons only, on a sample (C4 = ~50 measures of the 2028 PG&E job). Step 2 (C2): `openbca/ca_config.py` builds California's
+  jurisdiction tables from an ACC file (hourly total_avoided_cost / 1000 per IOU + climate zone, subset "PG&E CZ12"; TRC = "CA TRC", PAC = "USI";
+  inflation 0, quarterly discounting, line losses 0) and `run --jurisdiction <folder>` stages replacement parser models that read them (a stub
+  Configuration supplies the CUSTOM 1-5 names); `openbca/workbook.py` writes a Program Input. OpenBCA rounds every avoided cost to $0.001/kWh (its
+  `::NUMERIC` cast is DECIMAL(18,3); up to 0.03% on annual sums), left as is; C2 on the 2024 ACC equals the ACC rounded that way within one rounding step.
+  Step 3: `openbca/translate.py` sends a CET job to OpenBCA on ReCET's own pricing inputs (the route's resolved, ACC-aligned 8,760 per load shape; the
+  route's get_acc_series per subset "PGE CZ13", nearest ACC year beyond the file; Unit Quantity x NTG x savings = AC_Net_kWh_ScaledProfile_1st_Baseline;
+  rate = 4 x DiscountRateQtr; incentives = rebate + to-others + DI; measure cost = CET's nominal one; ProgramCost's ten fields -> Program Admin Costs), set
+  up from the run's RunConfig (`jobs.prepare`), and flags each measure's known differences (`VALUE_DIFFERENCES`: fractional_eul, ntg_cost, dual_baseline,
+  excess_incentive, unpriced; plus start_quarter, fractional_units, water, other). `recet openbca compare-recet` (compare_job) runs ReCET and OpenBCA (TRC
+  as "CA TRC", PAC as "USI") and writes compare_<test>.csv and summary.csv. OpenBCA discounts from each measure's own start quarter (CalcCE from Q1 of
+  the First Year) and leaves upfront costs undiscounted, so a measure's benefits and costs are both higher by (1 + r/4)^quarters; compare after that
+  factor. Results 2026-10-28 (2024 ACC, records from the 2028 consolidated job): C3, 20 matched records: electric within 1.7e-4 (the $0.001/kWh
+  rounding), costs equal, jst_ratio 0.119238 / 0.147843 vs ReCET on the same terms 0.119238 / 0.147844; C4, a 50-measure sample: 47 within 5e-5
+  after the start-quarter factor, the other 3 are a fractional EUL (+9.4%), a dual baseline (x2.29) and an excess incentive (TRC cost x0.15).
+  Gas (Jake, same day): each gas profile (gas_savings_profiles.get_shape) goes as a monthly Natural Gas load shape and each (IOU, gas sector, profile)
+  route's get_years_for_measure TRC series (clamped to the gas ACC's years) as stream `ca_config.GAS_STREAM` in $/MMBtu (x10), savings in MMBtu; OpenBCA
+  has one subset per measure, so a gas measure's is "<elec subset> | G<n>"; one NTG per measure (NTGRkWh, NTGRTherm when no kWh), each fuel's savings
+  divided by it so the product is ReCET's priced quantity. C3 gas, 13 matched records (12 dual fuel, PGE/SCE/SCG/SDGE, Annual and Winter Only):
+  gas within 6e-6 per measure, jst_ratio 1.370003 / 1.382122 vs 1.369957 / 1.382075. C4 with gas: 20 of 21 gas measures within 3e-6 after the
+  start-quarter factor (the fractional EUL one x1.058); jst 0.666 / 1.119 vs 0.655 / 1.078 on the same terms (start quarters and the 3 differences).
+  Same PR: run_poc.run_gas_benefit crashed under pandas 3 on a job whose gas profiles are named but none has gas savings (an empty str Series sums to "").
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
   (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow

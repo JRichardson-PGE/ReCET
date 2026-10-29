@@ -62,6 +62,7 @@ CEDARS.
 | Reproducibility | a run can be repeated exactly | `run_settings.json` (every setting, file and version), inputs kept with the run, deterministic arithmetic, no sampling | `jobs.write_settings` |
 | Auditability | every number explained | documents checked by tests against the code (section 10) | `recet/docs`, `tests/` |
 | Security (web) | invitation-only, no account takeover, no cross-user access | argon2 passwords, hashed session and setup tokens, CSRF on every form, login rate limits, per-user run ownership, safe zip extraction (section 8.4) | `web/auth.py`, `web/jobzip.py` |
+| Accessibility (web) | WCAG 2.2 Level AA on every web page | not yet: the 2026-10-29 audit found gaps; 0.1.67 fixed all but the Edit inputs grid's (section 8.7) | Jake, 2026-10-29 |
 | Portability | Windows, macOS, Linux; x86 and ARM | pure Python (numpy, pandas, pyarrow); the web image builds for arm64 and amd64 | `pyproject.toml`, `Dockerfile` |
 | Data hygiene | large files never in git; nothing derived is the only copy | reference data folder with a checksummed manifest; caches rebuildable and deletable | `paths.py`, `datapack.py` |
 
@@ -135,7 +136,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
 | `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
 | `gui_templates.py` | interface | the window's output-template editor: two-list field picker and the default template (over `output_templates.py`) |
-| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data` |
+| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `openbca` |
 | `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
@@ -179,6 +180,11 @@ Every module in the package. Paths are relative to `recet/`.
 | `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
 | `paths.py` | data | where package data, the reference data folder and the cache are |
 | `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
+| `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
+| `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
+| `openbca/workbook.py` | job | writes an OpenBCA Program Input workbook in OpenBCA's template layout |
+| `openbca/translate.py` | job | a CET job as an OpenBCA job priced on ReCET's own electric and gas shapes, avoided costs and discount rates, with every known difference flagged; `compare_job` runs both tools and compares them (C3 / C4) |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
@@ -460,6 +466,16 @@ When a run ends the worker hands it to `web/notify.py` on a thread of its own: i
 page, `user_settings` key `notify_runs`), the owner gets one email with the run's name, status, time taken, headline totals (finished) or status message
 (failed) and the run page's link. Stopped runs and input checks that pass are not emailed; nothing from the inputs or the log is. Each attempt is in the
 audit log; a mail failure never changes the run.
+
+### 8.7 Accessibility
+
+The web pages must meet WCAG 2.2 Level AA (Jake, 2026-10-29), in light and dark colour schemes, with a keyboard alone and with a screen reader. The rules
+for page changes are in the repository's CLAUDE.md. The vendored Tabulator grid (Edit inputs) and Mermaid diagrams (Docs) count as part of the page:
+where they fall short, the page gives an equivalent (a text alternative for a diagram, keyboard commands for the grid). The audit of 2026-10-29
+(0.1.64) found the pages short of it. 0.1.67 fixed every gap outside the Edit inputs grid: a `--control` border colour of at least 3:1 for fields
+and buttons, a visible focus ring and a skip link, Apply buttons instead of filters that reload on change, live regions for run status and row counts,
+help shown on the page instead of only in tooltips, focusable scroll boxes, text alternatives (`accTitle` / `accDescr`) on the diagrams, error messages
+that take the focus, sort buttons in table headings, and tables that scroll inside their box at 320 px. The grid's gaps are fixed separately.
 
 ## 9. Performance and memory design
 

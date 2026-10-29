@@ -87,7 +87,7 @@
     <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed rows are not in ReCET yet.</p>
   </details>
   <div class="checks">
-    <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about two thirds of the run time)</label>
+    <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about 15% of the run time)</label>
     <label><input type="checkbox" name="allocate_statewide" {% if f.get('allocate_statewide') %}checked{% endif %}> Split statewide (SW_) programs across the IOUs</label>
     <label><input type="checkbox" name="components" {% if f.get('components') %}checked{% endif %}> Price each ACC component separately</label>
   </div>
