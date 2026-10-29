@@ -250,6 +250,7 @@ def test_the_run_page_shows_settings_the_input_check_and_headline_numbers(web, t
     assert tiles["Measures"] == "1" and tiles["Total system benefit"].startswith("$") and "TRC" in tiles
     assert "Rerun with different settings" in page and "deleted in 6 days" in page
     assert '<details class="card log-card" >' in page                                                            # a finished run's log is folded
+    assert re.findall(r'<h2 class="sr-only">([^<]+)</h2>', page) == ["Input check", "Sharing", "Files", "Log"]           # each card is a heading for screen readers
 
 
 def test_a_measure_that_cannot_be_priced_is_shown_on_the_run_page(web, tmp_path):
@@ -323,6 +324,7 @@ def test_the_results_page_tiles_chart_sorting_and_column_groups(web, tmp_path):
     page = c.get(f"{P}/runs/{run_id}/results").text
     assert 'class="tile-label">Total system benefit<' in page and 'id="results-table"' in page and "data sortable" in page
     assert '<legend>Ratios</legend>' in page and "Columns…" in page and 'data-filter="results-table"' in page
+    assert '<h2 class="sr-only">Results table</h2>' in page                                                        # heading navigation reaches the table
     levels = re.findall(r'href="\?level=(\w+)', page)
     assert levels[0] == "portfolio" and levels[-1] == "measure" and "year" in levels                               # summary first
     by_year = c.get(f"{P}/runs/{run_id}/results?level=year&years=2028&years=1999").text                           # BR-04.1; an unknown year is ignored
@@ -434,6 +436,7 @@ def test_draft_edit_save_and_checks(web):
     draft = _new_draft(c)
     page = c.get(f"{P}/edit?draft={draft}")
     assert page.status_code == 200 and "tabulator.min.js" in page.text
+    assert 'id="check-announce" class="sr-only" role="status"' in page.text                                       # Validate inputs is spoken
     csrf = re.search(r'data-csrf="([^"]+)"', page.text).group(1)
     d = c.get(f"{P}/edit/api/{draft}").json()
     assert d["name"] == "my job" and d["layout"]["Measure"]["pinned"] == ["CEInputID", "MeasCode", "MeasDescription"]

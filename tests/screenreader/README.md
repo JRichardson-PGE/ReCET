@@ -31,4 +31,5 @@ $env:RECET_PYTHON = "python"   # the Python that has ReCET's web extra, if not t
 npm test
 ```
 
-About 5 minutes. Transcripts go to `results/`.
+About 5 minutes. Transcripts go to `results/` (ignored by git). The PC must be unlocked: on the lock screen no window can come to the front
+and every test fails at its first step.
