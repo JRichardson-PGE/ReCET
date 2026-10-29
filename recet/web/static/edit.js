@@ -201,7 +201,8 @@
     st.grids[t] = g;
   }
 
-  // the help line (a polite live region): the column's description and what it changes, and the cell's problems when it is flagged
+  // the help line: the column's description and what it changes, and the cell's problems when it is flagged. Not a live region: a screen reader
+  // reads the focused cell (its column, value and problem) and NVDA read the whole description before every cell; it is one Shift+Tab away.
   var lastHelp = "";
   function showHelp(t, col, cellEl) {
     var help = document.getElementById("help");
@@ -211,7 +212,7 @@
     var sev = !cellEl ? "" : cellEl.classList.contains("issue-error") ? "Stops the run: " : cellEl.classList.contains("issue-warning") ? "Check: " : "Note: ";
     var text = (issue ? sev + issue.replace(/\n/g, "; ") + "  |  " : "") + col + ": " + (L.help[col] || "no description")
       + (L.tooltips[col] ? "  |  " + L.tooltips[col] : "");
-    if (text === lastHelp) return;                            // moving along a row of one column's cells: say it once
+    if (text === lastHelp) return;                            // moving along one column's cells: leave it
     lastHelp = text;
     help.textContent = text;
   }
