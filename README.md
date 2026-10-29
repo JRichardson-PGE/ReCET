@@ -94,6 +94,11 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
     recet preflight --measures Measure.csv --programcost ProgramCost.csv --acc 2026 --filing-validation budget_filing --filing-year 2028   # before a CEDARS upload
     recet template all --out templates
     recet check acc-electric my_acc.parquet
+    recet cet-version list                                  # the prior CET releases ReCET reproduces, and their ACCs
+    recet cet-version run --release 24.3 --acc 2022 --measures Measure.csv --programcost ProgramCost.csv --me-bens 0.05 --me-cost 0.05 --out cet243
+
+`recet cet-version run` prices a job exactly as that CET release did, on its own quarterly tables and with its errors (CALCULATIONS C20); it needs the
+releases' table export in `<reference data folder>/cet_versions/`. ReCET's own runs are unchanged by it.
 
 ## From Python
 
