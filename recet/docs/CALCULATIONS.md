@@ -1025,7 +1025,7 @@ are matched by position, not by name.
   the replica does the same.)
 * 24.1: the dual-baseline net lifecycle kWh are multiplied by EUL a second time.
 * 24.3 and before: the gas rate-schedule mapping's `Commercial` and `Residential` sectors for PG&E, RCEA and SJCE end in a line break, so those measures
-  match no gas rate and get no gas bill reduction. 21.0 on the 2021 ACC: that ACC's electric table has `PG&E` in its Version column, so no measure
+  match no gas rate and get no gas bill reduction. 21.0 on the 2020 ACC (Version 2021): that table has `PG&E` in its Version column, so no measure
   gets an electric benefit or electric emissions.
 * 25.0: `SaveCost` leaves `LevSCBCostNoAdmin` and `LevSCHCostNoAdmin` out of its insert list, so they are always blank.
 * 25.0 and 25.1: `BenefitsSum`'s column list is out of step with its `SELECT`, so the gross program-cost weight uses the positive tax credits as the
