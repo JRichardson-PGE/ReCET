@@ -62,7 +62,7 @@ CEDARS.
 | Reproducibility | a run can be repeated exactly | `run_settings.json` (every setting, file and version), inputs kept with the run, deterministic arithmetic, no sampling | `jobs.write_settings` |
 | Auditability | every number explained | documents checked by tests against the code (section 10) | `recet/docs`, `tests/` |
 | Security (web) | invitation-only, no account takeover, no cross-user access | argon2 passwords, hashed session and setup tokens, CSRF on every form, login rate limits, per-user run ownership, safe zip extraction (section 8.4) | `web/auth.py`, `web/jobzip.py` |
-| Accessibility (web) | WCAG 2.2 Level AA on every web page | not yet: the 2026-10-29 audit found gaps (section 8.7) | Jake, 2026-10-29 |
+| Accessibility (web) | WCAG 2.2 Level AA on every web page | not yet: the 2026-10-29 audit found gaps; 0.1.67 fixed all but the Edit inputs grid's (section 8.7) | Jake, 2026-10-29 |
 | Portability | Windows, macOS, Linux; x86 and ARM | pure Python (numpy, pandas, pyarrow); the web image builds for arm64 and amd64 | `pyproject.toml`, `Dockerfile` |
 | Data hygiene | large files never in git; nothing derived is the only copy | reference data folder with a checksummed manifest; caches rebuildable and deletable | `paths.py`, `datapack.py` |
 
@@ -77,6 +77,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart LR
+    accTitle: ReCET in its context
+    accDescr: Analysts use the desktop window and command line, invited users the browser. ReCET's interfaces, job layer, pricing core and outputs read the E3 ACC releases, CEDARS data and CET tables, and write result files for each run.
     analysts["Analysts<br/>desktop window, command line"] --> recet
     users["Invited users<br/>browser"] --> recet
     subgraph recet["ReCET"]
@@ -103,6 +105,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: ReCET's layers
+    accDescr: Four layers: the interfaces (window, command line, web) hand a RunConfig to the job layer, which runs the pricing core and writes the outputs; the pricing core reads through the data access layer.
     IF["Interfaces<br/>gui.py, gui_editor.py, gui_results.py, gui_templates.py<br/>cli.py<br/>web/: app, runner, edit_api, eta, jobzip, auth, db"]
     JOB["Job layer<br/>jobs.py: RunConfig, run_job, run_compare<br/>chunked.py: runs in parts; progress.py<br/>preflight.py, filing_rules.py<br/>runtime.py, overrides.py, versions.py<br/>workbook.py, templates.py, programs.py, editor.py"]
     CORE["Pricing core<br/>run_poc.py: every pricing step, in order<br/>pipeline/engine.py: electric, gas, bills,<br/>participant costs<br/>pipeline/cost_tests.py: program costs, cost tests<br/>pipeline/emissions.py, components.py, profile8760.py<br/>pipeline/data_loading.py, statewide_allocation.py,<br/>discount_settings.py, rate_schedules.py"]
@@ -201,6 +205,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: A run, end to end
+    accDescr: A RunConfig is prepared, split into parts when it has more rows than chunk_size, checked by preflight (an error stops the run), loaded, priced measure by measure, given its share of program costs, put through the cost tests, and written.
     cfg(["RunConfig"]) --> prep["prepare<br/>workbook sheets to files<br/>supplied ACC, profile and parameter files<br/>checked and loaded<br/>ACC version resolved (versions.resolve_acc)<br/>pipeline pointed at it (runtime.apply)"]
     prep --> split{"more Measure.csv rows<br/>than chunk_size<br/>(50,000)?"}
     split -->|"yes: split into parts (5.2)"| pre
@@ -230,6 +236,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: A run in parts
+    accDescr: Measure.csv is split into parts and preflighted part by part. Pass 1 prices each part and adds up the program benefit totals; pass 2 shares program costs with those totals, runs the cost tests and appends each part to the outputs, which are then joined.
     m["Measure.csv"] -->|"delimited.split_file; column types from the whole file"| parts["_parts/measures: part_000, part_001, ...<br/>(1,000,000 measures: 20 parts)"]
     parts --> pf["preflight part by part; whole-file checks once"]
     pf --> p1
@@ -264,6 +272,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: Pricing one measure's electric savings
+    accDescr: The measure's 8,760 shape is rotated onto the ACC's weekdays, multiplied hour by hour by the ACC's avoided cost, summed by quarter, phased by baseline and discounted, summed over the measure's life, and scaled by its annual net kWh.
     m["measure"] -->|"AC_Elec_Impact_Profile, IOU, sector, zone (C4.1)"| shape["8,760 shape: shares summing to 1<br/>(or kWh per unit, C4.5)"]
     shape -->|"rotate once onto the ACC's weekdays (C4.2)"| aligned["aligned shape"]
     acc["ACC hourly avoided cost<br/>for (IOU, zone, cost test, year)"] --> mult
@@ -344,6 +354,8 @@ config:
     wrappingWidth: 400
 ---
 flowchart TB
+    accTitle: The web server
+    accDescr: The browser reaches the edge nginx over HTTPS, which forwards to the recet container on an EC2 t4g.small. In the container the web server, a worker thread and a janitor thread share the state volume; the worker starts a run process, which also reads the read-only reference data.
     b["Browser"] -->|HTTPS| nginx["Edge nginx (jakemoto-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
     subgraph HOST["AWS EC2 t4g.small: 2 ARM vCPUs, 2 GiB"]
         nginx -->|"docker network web"| srv
@@ -379,6 +391,8 @@ drafts `RECET_WEB_DRAFT_DAYS` (30).
 
 ```mermaid
 sequenceDiagram
+    accTitle: A web run
+    accDescr: The user starts a run; the web app queues it and shows the expected finish. The worker claims it and starts the run process, which writes its log and progress; the run page polls the web app, which reads them.
     actor U as User
     participant A as Web app
     participant D as Database and<br/>run folder
@@ -458,7 +472,10 @@ audit log; a mail failure never changes the run.
 The web pages must meet WCAG 2.2 Level AA (Jake, 2026-10-29), in light and dark colour schemes, with a keyboard alone and with a screen reader. The rules
 for page changes are in the repository's CLAUDE.md. The vendored Tabulator grid (Edit inputs) and Mermaid diagrams (Docs) count as part of the page:
 where they fall short, the page gives an equivalent (a text alternative for a diagram, keyboard commands for the grid). The audit of 2026-10-29
-(0.1.64) found the pages short of it; the gaps are tracked until fixed.
+(0.1.64) found the pages short of it. 0.1.67 fixed every gap outside the Edit inputs grid: a `--control` border colour of at least 3:1 for fields
+and buttons, a visible focus ring and a skip link, Apply buttons instead of filters that reload on change, live regions for run status and row counts,
+help shown on the page instead of only in tooltips, focusable scroll boxes, text alternatives (`accTitle` / `accDescr`) on the diagrams, error messages
+that take the focus, sort buttons in table headings, and tables that scroll inside their box at 320 px. The grid's gaps are fixed separately.
 
 ## 9. Performance and memory design
 

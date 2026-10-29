@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ run.label or run.id }}{% endblock %}
 {% block content %}
+{% macro tile_help(tiles) %}{% if tiles|selectattr('help')|list %}<details class="tile-help small"><summary>What these numbers are</summary>
+  <dl>{% for t in tiles if t.help %}<dt>{{ t.label }}</dt><dd>{{ t.help }}</dd>{% endfor %}</dl></details>{% endif %}{% endmacro %}
 <div class="head-row">
   <h1>{{ run.label or 'Run ' + run.id }}</h1>
   <span class="status big s-{{ run.status }}" id="run-status">{{ status_text.get(run.status, run.status) }}</span>
@@ -14,9 +16,10 @@
   <progress max="1" value="{{ bar.fraction if bar else 0 }}" aria-label="Run progress"></progress>
   <span class="pct">{{ '{:.0%}'.format(bar.fraction) if bar else '' }}</span> <span class="small muted text">{{ bar.text if bar else '' }}</span>
 </div>
+<p id="run-announce" class="sr-only" role="status"></p>
 <p id="run-position" class="muted">{% if position %}Waiting in the queue: number {{ position }}{% if wait %}; {{ wait }}{% endif %}.{% endif %}</p>
-<p id="run-message" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+<p id="run-message" role="alert" class="alert {% if not run.message or run.status == 'finished' %}hidden{% endif %}">{{ run.message }}</p>
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 
 {% for h in headline %}
 <section class="tiles" aria-label="Portfolio results{{ ' ' + h.name if h.name }}">
@@ -24,6 +27,7 @@
   {% for t in h.tiles %}<div class="tile" title="{{ t.help }}"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.value }}</span></div>{% endfor %}
 </section>
 {% endfor %}
+{% if headline %}{{ tile_help(headline[0].tiles) }}{% endif %}
 
 <div class="actions">
   {% if owner and run.status in ('queued', 'running') %}
@@ -36,8 +40,8 @@
   {% if editable %}
   <form method="post" action="{{ u('/runs/' + run.id + '/edit') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button title="Opens this run's inputs in Edit inputs as a new draft, with this run's settings, to change and run again">Edit inputs and rerun</button></form>
   {% else %}
-  <button type="button" disabled title="The editor is for jobs of up to {{ '{:,}'.format(max_edit_rows) }} measures; this run has {{ '{:,}'.format(n_measures) }}. Use Rerun with different settings, or download inputs.zip below and edit the files in Excel.">Edit inputs and rerun</button>
-  <span class="small muted">The editor takes up to {{ '{:,}'.format(max_edit_rows) }} measures.</span>
+  <button type="button" disabled aria-describedby="edit-off">Edit inputs and rerun</button>
+  <span class="small muted" id="edit-off">The editor takes up to {{ '{:,}'.format(max_edit_rows) }} measures; this run has {{ '{:,}'.format(n_measures) }}. Use Rerun with different settings, or download inputs.zip below and edit the files in Excel.</span>
   {% endif %}
   {% endif %}
   {% if owner and run.status not in ('queued', 'running') %}
@@ -66,7 +70,7 @@
   {% endif %}
   {% if check.stats %}<p class="check-stats">{% for k, v in check.stats.items() %}{{ k.strip() }}: {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
   {% if check.issues %}
-  <ul class="check-issues">
+  <ul class="check-issues" tabindex="0" aria-label="Input check findings">
     {% for i in check.issues %}
     <li class="{{ i.severity }}"><span class="sev">{{ 'stops run' if i.severity == 'error' else i.severity }}</span>
       {{ i.message }}{% if i['count'] %} ({{ '{:,}'.format(i['count']) }}{% if i.impact_text %}; {{ i.impact_text }}{% endif %}){% endif %} <span class="code">{{ i.code }}</span>
@@ -119,7 +123,7 @@
 {% set live = run.status in ('queued', 'running') %}
 <details class="card log-card" {% if live or run.status == 'failed' %}open{% endif %}>
   <summary>Log</summary>
-  <pre id="log" class="log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if live else 0 }}"></pre>
+  <pre id="log" class="log" tabindex="0" role="region" aria-label="Run log" data-url="{{ u('/runs/' + run.id + '/log') }}" data-live="{{ 1 if live else 0 }}"></pre>
 </details>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

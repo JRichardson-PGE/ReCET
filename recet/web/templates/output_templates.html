@@ -5,9 +5,9 @@
 <p>An output template is a list of measure-level columns, in order. A run given one (New run, Outputs) writes only those columns, in that order, to its
   measure-level file; the Results tables, the portfolio summary and the key metrics still use every column. Every run also writes
   <code>field_definitions</code>, the definition and documentation link of each column in its file.</p>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
-{% if saved_ok %}<p class="ok">Saved "{{ saved_ok }}".</p>{% endif %}
-{% if default_ok %}<p class="ok">New runs now start with "{{ default }}".</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+{% if saved_ok %}<p class="ok" role="status">Saved "{{ saved_ok }}".</p>{% endif %}
+{% if default_ok %}<p class="ok" role="status">New runs now start with "{{ default }}".</p>{% endif %}
 <section class="card">
   <h2>Templates</h2>
   <table class="list compact">
@@ -65,7 +65,9 @@
         <button type="button" id="pick-down" title="Move down (Alt+Down)">Down</button>
         <button type="button" id="pick-bottom" title="Move to the bottom">Bottom</button>
       </div>
-      <div class="picker-def" id="pick-def"><span class="muted">Click a field to see its definition.</span></div>
+      <p class="picker-keys small muted">Keyboard: select fields and press Enter to add them, Delete to remove them; Alt+Up / Alt+Down move the selected
+        template columns. Double-clicking a field adds or removes it.</p>
+      <div class="picker-def" id="pick-def" aria-live="polite"><span class="muted">Click a field to see its definition.</span></div>
     </div>
     <details id="pick-text-box" open><summary>Columns as text (one per line; paste a list here)</summary>
       <textarea name="columns" id="template-columns" rows="12">{{ columns|join('\n') }}</textarea></details>
