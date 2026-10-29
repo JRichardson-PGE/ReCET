@@ -194,6 +194,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `cet_versions/calc_emissions.py` | pricing | replica: CalcEmissions |
 | `cet_versions/calc_cost.py` | pricing | replica: CalcCost: participant costs, weighted program costs, discounted savings, levelized values |
 | `cet_versions/sql.py` | pricing | replica: SQL Server's arithmetic as CET meets it: NULLs, decimal POWER rounding, collation keys, 1.000 / n |
+| `cet_versions/job.py` | pricing | the run's engine (D13): a replica run through `jobs.run_job` (New run, `recet run --engine`), its measure-level table in ReCET's layout, the options it refuses |
 | `cet_versions/cli.py` | interface | `recet cet-version list` and `run` |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
 | `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
@@ -529,7 +530,9 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
 * **Prior CET releases are replicas, checked against the releases themselves.** `recet/cet_versions` prices a job exactly as CET 21.0, 22.1, 24.1,
   24.2, 24.3, 25.0 or 25.1 does, errors included (Jake, 2026-10-29; CALCULATIONS C20). It shares no code with ReCET's hourly engine.
   `tests/test_cet_versions.py` requires every output column of every measure to equal that release's own RunCET run to 1e-9, on 19 reference runs
-  made on restored copies of each release's database backup.
+  made on restored copies of each release's database backup. A run's engine is a choice (D13, BRD BR-06.4; `RunConfig.engine`, New run, `recet run
+  --engine`): ReCET's own, or a replica, whose run goes through `jobs.run_job` and writes a measure-level table in ReCET's layout, so the Results and
+  Compare pages read it and two engines can be set side by side. A filing accepts only ReCET's own engine (`cet_versions/job.py` refuses the filing checks).
 * **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
 
 ## 11. Limits and what is not built

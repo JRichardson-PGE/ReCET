@@ -176,7 +176,7 @@ def supplied_path(ctx, draft_id: str, name: str) -> Path | None:
 
 def _run_settings(cfg: dict, label: str, suffix: str = "edited") -> dict:
     """A run's options as New run form values, so a rerun starts from the same settings."""
-    out = {"acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
+    out = {"engine": str(cfg.get("engine") or "recet"), "acc_version": str(cfg.get("acc_version") or ""), "compare_with": str(cfg.get("compare_with") or ""),
            "base_year": str(cfg.get("base_year") or ""), "market_effects": "0.05" if float(cfg.get("market_effects") or 0) > 0 else "0",
            "output_format": {"csv.zip": "csv"}.get(str(cfg.get("output_format") or "csv"), str(cfg.get("output_format") or "csv")),
            "label": (f"{label} ({suffix})" if label else "")[:120],

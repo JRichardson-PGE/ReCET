@@ -348,7 +348,7 @@ def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_pat
     assert [(r["acc"], r["builtin"]) for r in versions.acc_summary()] == [(2021, True), (2022, True), (2024, True), (2026, True), (2028, False)]
     assert page.count('<tr class="dim">') == 1
     run_id = _start_run(c, tmp_path)
-    assert re.search(r'<p class="muted">2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)
+    assert re.search(r'<p class="muted">ReCET [0-9.]+ \(hourly\) · 2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)   # the engine first (D13)
     # claims: the ACC of each program year's final budget filing
     assert [(r.years, r.acc) for r in versions.claims_acc()] == [("2020", 2019), ("2021-2023", 2020), ("2024-2025", 2022), ("2026-2027", 2024),
                                                                   ("2028-2029", 2026), ("2030-2031", 2028), ("2032-2033", 2030), ("2034-2035", 2032)]

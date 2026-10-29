@@ -998,6 +998,13 @@ on the 2024 ACC prices on the corrected tables. 21.0's backup lists a Version 20
 backup's tables for it are an unfinished load (Version labels `2020`, `2016`, `PG&E`). Neither Version is offered (`Release.not_offered`). Statewide programs: CEDARS does not pass statewide program data to CET (PA `SW` has no
 E3Settings row), and statewide allocations began in 2022 (Jake, 2026-10-29); a replica prices the PA records it is given, as RunCET does.
 
+**Engine.** A run's calculation engine is ReCET's own (the default) or one of these replicas (D13, BR-06.4): `RunConfig.engine` "cet-<release>",
+`recet run --engine cet-24.3`, New run's **Calculation engine** (`cet_versions/job.py`). A replica run goes through the ordinary run path and writes the
+release's four tables plus a measure-level file in ReCET's layout (the input columns, then the Saved* columns under ReCET's names, then the program
+columns), so the Results and Compare pages read it and any two engines can be compared. `run_settings.json` records the engine (key, label, release,
+backup date, CET Version). A replica refuses what only ReCET's engine does (supplied ACC or profile files, statewide allocation, components, a combined
+8,760, a second ACC, the CEDARS filing checks and Check inputs only): a filing accepts only ReCET's current release. Its ACC must be one the release has.
+
 **Acceptance.** A replica is accepted only when every output column of every measure equals that release's own RunCET run to 1e-9 (relative; NULL must
 be NULL). `tests/test_cet_versions.py` checks 19 reference runs: for each release a 30-measure synthetic job built to exercise every branch (with and
 without 5% market effects), and for 25.0 and 25.1 also two jobs of 41 and 50 real PG&E records. The runs were made on restored copies of the backups and

@@ -66,8 +66,12 @@
 <section class="card">
   <h2>Pricing</h2>
   <div class="grid2">
+    <label class="wide"><span id="engine-label">Calculation engine</span>
+      <select name="engine" id="engine" aria-labelledby="engine-label" aria-describedby="engine-help">{% for k, t, _have in engines %}<option value="{{ k }}" {% if f.get('engine', 'recet') == k %}selected{% endif %}>{{ t }}{% if not loop.first %} (CET's errors kept){% endif %}</option>{% endfor %}</select>
+      <span class="small muted" id="engine-help">ReCET's own hourly pricing, or an exact replica of a CET release on that release's own tables, for evaluation and history. Filings accept only ReCET's own engine.</span></label>
     <label>ACC version
-      <select name="acc_version" id="acc-version" aria-describedby="acc-help-title">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
+      <select name="acc_version" id="acc-version" aria-describedby="acc-help-title">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}{% if replica_accs %}
+        <optgroup label="CET replicas only">{% for a in replica_accs %}<option value="{{ a }}" {% if f.get('acc_version') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}</option>{% endfor %}</optgroup>{% endif %}</select></label>
     <label>Compare with
       <select name="compare_with" id="compare-with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
     <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
@@ -85,6 +89,17 @@
         <td class="nowrap">{{ r.acc }}{% if not r.builtin %} <span class="small">(not in ReCET yet)</span>{% endif %}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
     </table>
     <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed rows are not in ReCET yet.</p>
+  </details>
+  <details class="info-box" id="engine-accs">
+    <summary>Which ACCs each engine has</summary>
+    <table class="list compact">
+      <thead><tr><th>Engine</th><th>ACCs</th></tr></thead>
+      <tbody>{% for k, t, have in engines %}<tr><td class="nowrap">{{ t }}</td><td>{{ have|join(', ') or '–' }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">A CET replica prices what that release priced, on its own quarterly tables: the supplied files, statewide split, ACC components,
+      combined 8,760, comparison and CEDARS filing checks are ReCET options and are refused on a replica, and its SCT and emissions columns are those
+      the release wrote. Its outputs are the release's SavedCE, SavedSavings, SavedEmissions and SavedCost tables, plus the measure-level table the
+      Results and Compare pages read. To set two engines side by side, run the job on each and compare the two runs.</p>
   </details>
   <div class="checks">
     <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about 15% of the run time)</label>
