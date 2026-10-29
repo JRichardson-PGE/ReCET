@@ -78,6 +78,7 @@ until you show them. Queued and running runs update in place. Runs other users s
 **Results** (on the run page) shows the run's outputs as tables.
 
 - **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
+- Change **PA**, **View** or **Program years** and press **Apply** (nothing reloads until you do).
 - **Program years** (a run with more than one claim year) totals every table, the headline numbers and the chart over the years ticked; none ticked, or
   **all years**, is every year (BRD BR-04.1).
 - **Levels:** portfolio, program segment, program sector, program year, program, and measure. Every level above the measure is a sum of its measures; ratios are
@@ -86,6 +87,7 @@ until you show them. Queued and running runs update in place. Runs other users s
 - The **headline numbers** and a **total system benefit by program sector** chart sit above the table.
 - **Columns…** chooses the columns, grouped (ratios, benefits, costs, savings, emissions, societal tests); **Find** narrows the list. **Save view**
   keeps a choice under a name, and **View** switches between your views (Default is built in).
+- **What these numbers are** (under the headline numbers) and **Column definitions** (under the table) define each number shown.
 - Click a column heading to **sort**; **Filter rows** keeps the rows containing some text. **Download this table (CSV)** saves the table as shown.
 - A run that compared two ACCs has a **Comparison** tab and one tab per ACC.
 
