@@ -90,6 +90,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.66 (2026-10-29; 0.1.65 is the OpenBCA PR): the step 0 server checks (CEDARS-Research TIER2_PLAN) found two small things. A run with SCT off
+  logged a pandas PerformanceWarning per part: `run_poc` blanked the societal columns one by one (fragmenting the frame, which `assemble_measure_level`'s
+  reset_index then warned about); now one `assign(...).copy()`. tests/test_run.py and test_water.py pass with `-W error::pandas.errors.PerformanceWarning`.
+  And SCT is about 15% of a run, not "about two thirds" (server, 1M: 392 s with, 334 s without; pricing 190 -> 133 s): New run's label, WEB_GUIDE, jobs.py.
 - 0.1.65 (2026-10-28, Jake; 0.1.58-0.1.64 are the BRD-musts stack, PRs #45 and #47-#52; scope: Claude Doc "OpenBCA module for ReCET: scope"): step 1 of the OpenBCA module.
   `recet openbca run|compare` (`recet/openbca/run.py`) runs OpenBCA's own engine (its Integrated pathway: the SQLmesh projects on DuckDB, unchanged) on a
   Program Input + Configuration workbook. ReCET never imports SQLmesh/DuckDB: RECET_OPENBCA_HOME names a pinned checkout (a release tag, `uv sync` done;
