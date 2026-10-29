@@ -875,7 +875,7 @@ def test_the_default_output_template_is_kept_per_user_and_starts_new_runs(web):
     _user(ctx, "def@example.com")
     _user(ctx, "other@example.com")
     c = _login(app, "def@example.com")
-    chosen = lambda html: re.search(r'<select name="output_template">.*?</select>', html, re.S).group(0)
+    chosen = lambda html: re.search(r'<select name="output_template"[^>]*>.*?</select>', html, re.S).group(0)
     assert "selected" not in chosen(c.get(f"{P}/runs/new").text)                 # no default: All columns
     assert c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Nope", "set_default": "1"}).status_code == 400
     c.post(f"{P}/output-templates", data={"csrf": _csrf(c), "name": "Participant costs", "set_default": "1"})
