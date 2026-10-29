@@ -86,6 +86,7 @@
 {{ tile_help(tiles) }}
 {% endif %}
 {% if chart %}
+<h2 class="sr-only">{{ chart.title }}</h2>
 <details class="card chart-card" open>
   <summary>{{ chart.title }}{{ ' (' + pa + ')' if pa != rv.ALL_PAS }}</summary>
   <div class="bars" role="list">
@@ -110,6 +111,7 @@
 {% if measure_ok is defined and not measure_ok %}<p class="small muted">The measure level is shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures; the measure-level table is in the run's downloads.</p>{% endif %}
 {% if note %}<p class="note">{{ note }}</p>{% endif %}
 {% if table is not none %}
+<h2 class="sr-only">Results table</h2>
 <div class="table-tools">
   <label class="inline small">Filter rows <input type="search" data-filter="results-table" data-count="filter-count" placeholder="program, PA, text…" autocomplete="off"></label>
   <span class="small muted" id="filter-count" role="status"></span>

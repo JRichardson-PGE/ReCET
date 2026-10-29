@@ -242,6 +242,7 @@
   document.querySelectorAll("input[data-filter]").forEach(function (box) {
     var table = document.getElementById(box.dataset.filter), count = document.getElementById(box.dataset.count);
     if (!table) return;
+    var timer = null;
     box.addEventListener("input", function () {
       var q = box.value.trim().toLowerCase(), shown = 0, rows = table.tBodies[0].rows;
       Array.prototype.forEach.call(rows, function (tr) {
@@ -249,7 +250,11 @@
         tr.hidden = !hit;
         if (hit) shown++;
       });
-      if (count) count.textContent = q ? shown.toLocaleString() + " of " + rows.length.toLocaleString() + " rows" : "";
+      // the count is a status line: set it once typing pauses, so a screen reader says it once and not over each typed letter
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (count) count.textContent = q ? shown.toLocaleString() + " of " + rows.length.toLocaleString() + " rows shown" : "";
+      }, 500);
     });
   });
 
@@ -303,8 +308,11 @@
       pager.classList.toggle("hidden", pages < 2);
       pageLabel.textContent = "Page " + (pageNo + 1) + " of " + pages + ", codes " + (matches.length ? first + 1 : 0).toLocaleString() +
         " to " + (first + onPage.length).toLocaleString();
+      var had = document.activeElement;
       prev.disabled = pageNo === 0;
       next.disabled = pageNo >= pages - 1;
+      if (had === prev && prev.disabled) next.focus();          // a disabled button drops the keyboard focus to the page: hand it to the other
+      else if (had === next && next.disabled) prev.focus();
     };
     var restart = function () { pageNo = 0; apply(); };
     find.addEventListener("input", restart);

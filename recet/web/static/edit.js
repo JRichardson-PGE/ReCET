@@ -562,7 +562,7 @@
     chkAcc.value = c.acc_version || def.acc_version;
     chkSw.checked = c.run ? !!c.allocate_statewide : !!def.allocate_statewide;
     chkFiling.value = (c.run ? c.filing_validation : def.filing_validation) || "";
-    chkBtn.disabled = false;
+    chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
     if (c.run) {
       chk.info = c;
       if (c.rev === d.rev) { chk.snap = ridSnapshot(); chk.snapRun = c.run; }   // the page holds the checked revision: its rows are the checked rows
@@ -610,7 +610,11 @@
     remark(touched);
   }
 
+  // The check's state for a screen reader: #check-result is rebuilt on every poll, so it is not a live region; this status line says each new
+  // heading once ("Saving and starting the check…", "Checking the inputs…", then the result).
+  var chkSay = document.getElementById("check-announce");
   function checkHead(text, kind) {
+    if (chkSay && chkSay.textContent !== text) chkSay.textContent = text;
     var head = el("div", "check-head");
     head.appendChild(el("span", "check-title " + (kind || ""), text));
     if (chk.info && chk.info.run_url) {
@@ -733,19 +737,19 @@
           chk.timer = setTimeout(poll, Date.now() - chk.started > 60000 ? 4000 : 1500);
         } else {
           chk.busy = false;
-          chkBtn.disabled = false;
+          chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
         }
       })
       .catch(function () {
         if (Date.now() - chk.started < 600000) chk.timer = setTimeout(poll, 5000);   // a dropped connection: keep trying for a while
-        else { chk.busy = false; chkBtn.disabled = false; }
+        else { chk.busy = false; chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled"); }
       });
   }
 
   function runCheck() {
     if (chk.busy || !st.loaded) return;
     chk.busy = true;
-    chkBtn.disabled = true;
+    chkBtn.setAttribute("aria-disabled", "true");          // not disabled: that would drop the keyboard focus to the page
     chkOut.hidden = false;
     chkOut.textContent = "";
     chkOut.appendChild(checkHead("Saving and starting the check…", "muted"));
@@ -767,11 +771,12 @@
     }).then(function (res) {
       if (!res.ok) {
         chk.busy = false;
-        chkBtn.disabled = false;
+        chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
         chkOut.textContent = "";
         chk.info = null;
         chkOut.appendChild(checkHead(res.status === 401 ? "Signed out: reload the page and sign in again." : "The check did not start.", "bad"));
         chkOut.appendChild(el("p", "small", res.j.error || res.j.detail || ("Error " + res.status)));
+        if (chkSay) chkSay.textContent = "The check did not start. " + (res.j.error || res.j.detail || ("Error " + res.status));   // say why
         return;
       }
       chk.info = res.j;
@@ -780,7 +785,7 @@
       poll(true);
     }).catch(function (e) {
       chk.busy = false;
-      chkBtn.disabled = false;
+      chkBtn.disabled = false; chkBtn.removeAttribute("aria-disabled");
       chkOut.textContent = "";
       chkOut.appendChild(checkHead("The check did not start: " + e.message, "bad"));
     });
