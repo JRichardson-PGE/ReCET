@@ -99,3 +99,10 @@ def test_cli_run_writes_the_tables(tmp_path):
     for name in cet_versions.TABLES.values():
         assert not differences(_read(tmp_path / f"{name}.csv"), _read(run / f"{name}.csv")), name
     assert json.loads((tmp_path / "run.json").read_text())["acc"] == 2022
+
+
+def test_versions_not_offered_are_refused(tmp_path):
+    from recet.cet_versions import QuarterlyTables
+    for release, version in [("21.0", "2021"), ("25.1", "2027")]:
+        with pytest.raises(ValueError, match="not offered"):
+            QuarterlyTables.from_release(release, version, tmp_path)

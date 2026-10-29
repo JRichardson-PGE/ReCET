@@ -82,6 +82,11 @@ class QuarterlyTables:
         from .inputs import version_key
         from .sql import key
 
+        from .releases import get
+        why = dict(get(release).not_offered).get(str(version))
+        if why:
+            raise ValueError(f"CET {release}: Version {version} is not offered ({why})")
+
         if export_dir is None:
             from .. import paths
             ref = paths.reference_dir()
