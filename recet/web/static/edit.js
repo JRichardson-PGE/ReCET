@@ -160,6 +160,13 @@
       clipboardCopyRowRange: "range", clipboardPasteParser: "range", clipboardPasteAction: "range",
       history: true
     });
+    g.on("tableBuilt", function () { fixRoles(t, g); });
+    // keyboard (arrows move the range): the help line follows the active cell, with its problems, so nothing is hover-only (WCAG 2.1.1)
+    g.element.addEventListener("keyup", function (e) {
+      if (!/^(Arrow|Tab|Home|End|Page)/.test(e.key) || e.target.tagName === "INPUT") return;
+      var c = g.element.querySelector(".tabulator-cell.tabulator-range-only-cell-selected") || g.element.querySelector(".tabulator-cell.tabulator-range-selected");
+      if (c) showHelp(t, c.getAttribute("tabulator-field"), c);
+    });
     ["cellEdited", "clipboardPasted", "rowAdded", "rowDeleted", "historyUndo", "historyRedo", "dataChanged"].forEach(function (ev) {
       g.on(ev, function () { changed(t); });
     });
@@ -189,7 +196,7 @@
     // range selection moves focus to the grid on the same click, which would close an editor opened straight away.
     g.on("cellClick", function (e, cell) {
       var col = cell.getField(), elm = cell.getElement();
-      showHelp(t, col);
+      showHelp(t, col, elm);
       if (!col || e.shiftKey || e.ctrlKey || e.metaKey || elm.classList.contains("tabulator-editing")) return;
       setTimeout(function () {
         if (elm.classList.contains("tabulator-editing") || !elm.isConnected) return;
@@ -200,11 +207,30 @@
     st.grids[t] = g;
   }
 
-  function showHelp(t, col) {
+  // the help line (a polite live region): the column's description and what it changes, and the cell's problems when it is flagged
+  var lastHelp = "";
+  function showHelp(t, col, cellEl) {
     var help = document.getElementById("help");
     var L = st.layout[t];
     if (!col || !L) return;
-    help.textContent = col + ": " + (L.help[col] || "no description") + (L.tooltips[col] ? "  |  " + L.tooltips[col] : "");
+    var issue = cellEl && cellEl.getAttribute("title");
+    var sev = !cellEl ? "" : cellEl.classList.contains("issue-error") ? "Stops the run: " : cellEl.classList.contains("issue-warning") ? "Check: " : "Note: ";
+    var text = (issue ? sev + issue.replace(/\n/g, "; ") + "  |  " : "") + col + ": " + (L.help[col] || "no description")
+      + (L.tooltips[col] ? "  |  " + L.tooltips[col] : "");
+    if (text === lastHelp) return;                            // moving along a row of one column's cells: say it once
+    lastHelp = text;
+    help.textContent = text;
+  }
+
+  // Tabulator's grid roles (6.3.1) nest a rowgroup in the header's rowgroup and put an unroled, focusable scroll box between the grid and its rows, so
+  // screen readers cannot read it as a table (WCAG 1.3.1 / 4.1.2). The wrappers become presentation, the scroll box the body's rowgroup.
+  function fixRoles(t, g) {
+    var e = g.element;
+    e.setAttribute("aria-label", t + " table");
+    var hc = e.querySelector(".tabulator-header-contents"), holder = e.querySelector(".tabulator-tableholder"), body = e.querySelector(".tabulator-table");
+    if (hc) hc.setAttribute("role", "presentation");
+    if (holder) { holder.setAttribute("role", "rowgroup"); holder.setAttribute("aria-label", t + " rows"); }
+    if (body) body.setAttribute("role", "presentation");
   }
 
   function updateCounts() {
@@ -335,7 +361,7 @@
     var plural = function (k, one, many) { return k.toLocaleString() + " " + (k === 1 ? one : many); };
     var text, kind;
     if (n.error) {
-      text = plural(n.error, "problem", "problems") + " in the cells would stop the run (outlined in red)" + (n.warning ? "; " + plural(n.warning, "cell", "cells") + " to check" : "") + ".";
+      text = plural(n.error, "problem", "problems") + " in the cells would stop the run (marked \u2715, outlined in red)" + (n.warning ? "; " + plural(n.warning, "cell", "cells") + " to check" : "") + ".";
       kind = "error";
     } else if (v && v.error) {
       text = "Validate inputs found " + plural(v.error, "problem that stops", "problems that stop") + " the run: see below.";
@@ -358,20 +384,26 @@
 
   function goTo(t, rid, col) {
     show(t);
-    var g = st.grids[t];
-    g.scrollToRow(rid, "center", false).then(function () {
-      return g.scrollToColumn(col, "middle", false);
-    }).catch(function () {}).then(function () {
+    var g = st.grids[t], done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
       var row = g.getRow(rid);
       var cell = row && row.getCell(col);
       if (cell) {
         var e = cell.getElement();
         e.classList.add("flash");
         setTimeout(function () { e.classList.remove("flash"); }, 1200);
+        e.focus({ preventScroll: true });                        // "Show this cell" takes the keyboard there too
       }
-      showHelp(t, col);
-    });
+      showHelp(t, col, cell && cell.getElement());
+    };
+    g.scrollToRow(rid, "center", false).then(function () {
+      return g.scrollToColumn(col, "middle", false);
+    }).catch(function () {}).then(finish);
+    setTimeout(finish, 400);                                     // the scroll promises do not always settle (a row already in view)
   }
+
 
   // ------------------------------------------------------------------------------------------------------------ tabs and row buttons
   function show(t) {
@@ -381,6 +413,7 @@
       var tab = document.querySelector('.tab[data-table="' + x + '"]');
       tab.classList.toggle("active", x === t);
       tab.setAttribute("aria-selected", x === t ? "true" : "false");
+      tab.tabIndex = x === t ? 0 : -1;
     });
     st.grids[t].redraw(true);
     fillColumnNames();
@@ -485,6 +518,20 @@
 
   document.querySelectorAll(".tab[data-table]").forEach(function (b) {
     b.addEventListener("click", function () { show(b.dataset.table); });
+    // the ARIA tabs pattern: Left / Right (and Home / End) move between the tabs
+    b.addEventListener("keydown", function (e) {
+      var i = TABLES.indexOf(b.dataset.table), j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: TABLES.length - 1 }[e.key];
+      if (j == null) return;
+      e.preventDefault();
+      var next = TABLES[(j + TABLES.length) % TABLES.length];
+      show(next);
+      var to = document.querySelector('.tab[data-table="' + next + '"]'), grid = document.getElementById("grid-" + next);
+      // the grid's redraw takes the focus (once at once, once a frame or two later): for a moment, give it back to the tab
+      var back = function () { to.focus(); };
+      grid.addEventListener("focusin", back);
+      setTimeout(function () { grid.removeEventListener("focusin", back); }, 500);
+      to.focus();
+    });
   });
   document.querySelectorAll("[data-action]").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -609,7 +656,12 @@
     if (!rep) {
       chkOut.appendChild(checkHead(j.status === "cancelled" ? "The check was stopped." : "The check could not run.", "bad"));
       if (j.message) chkOut.appendChild(el("p", "small", j.message));
-      if (j.log_tail) chkOut.appendChild(el("pre", "check-log", j.log_tail));
+      if (j.log_tail) {
+        var pre = chkOut.appendChild(el("pre", "check-log", j.log_tail));
+        pre.tabIndex = 0;                                        // a scroll box: reachable from the keyboard
+        pre.setAttribute("role", "region");
+        pre.setAttribute("aria-label", "Check log");
+      }
       staleNote();
       return;
     }

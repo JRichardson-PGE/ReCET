@@ -102,9 +102,13 @@ are kept 30 days after their last change.
 - **Start a draft** from the template's example rows, or upload a job workbook or job zip.
 - **Editing.** Click a cell to edit it; a cell with ▾ has a list of CET's values to pick from. Select a block and copy or paste it with Excel. Add,
   duplicate and delete rows; undo and redo. Clicking a cell shows what its column means. Column headings are green when the column changes results and
-  blue when it does not; **Hide no-effect columns** hides the blue ones, and **Go to column** jumps to a column by name.
-- **Checks.** Every change is saved and checked. The line at the top of the panel gives one verdict: problems that would stop the run (outlined in red),
-  cells to check (amber), or ready to run. **Show the list** lists the cells; click one to go to it, or hover a flagged cell to read why.
+  blue, in italics, when it does not; **Hide no-effect columns** hides the blue ones, and **Go to column** jumps to a column by name.
+- **Keyboard.** Tab into the table, move with the arrow keys and press Enter to edit (Escape cancels); Shift+arrows select a block; Ctrl+C / Ctrl+V copy
+  and paste; Ctrl+Z / Ctrl+Y undo and redo. The line above the table follows the cell you are on: its column's meaning, what it changes and any problem in
+  it. Left / Right switch between the Measure and ProgramCost tabs.
+- **Checks.** Every change is saved and checked. The line at the top of the panel gives one verdict: problems that would stop the run (marked ✕, outlined in red),
+  cells to check (marked !, amber), or ready to run. **Show the list** lists the cells; click one to go to it, or click or move to a flagged cell to read why
+  in the line above the table.
   **Validate inputs** adds the full check a run makes before pricing (profiles, programs, ACC years, and CEDARS filing checks if chosen) on the saved
   tables. Its result says when it is out of date (the tables changed since).
 - **Run these inputs** opens New run for the draft. A draft with a problem that would stop the run cannot be run; the page shows the first such cell.
