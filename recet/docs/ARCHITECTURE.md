@@ -479,8 +479,10 @@ that take the focus, sort buttons in table headings, and tables that scroll insi
 problems, symbols on flagged cells, focus rings and ARIA tabs. axe-core finds no violations on any page in either scheme; column widths still change only
 by dragging. 0.1.70 added a screen-reader walk-through (`tests/screenreader`: NVDA driven by Guidepup in Chrome on Windows, recording what NVDA says after
 each key on sign in, Runs, New run, a run, Results and Edit inputs) and fixed what NVDA 2026.2 showed: headings for each card on the Run, Results and
-Compare pages, Validate inputs keeping the focus and announcing its result, and the row-filter count spoken once typing pauses. It is run by hand on a
-Windows machine (unlocked, left alone for about 5 minutes); its transcripts are read against these rules, not asserted.
+Compare pages; Validate inputs keeping the focus; its result and the row-filter count spoken through one page-wide announcer (`#announcer`,
+`recetAnnounce` in app.js); short descriptions on New run's ACC and Priced for fields. The Edit inputs grid reads as a table in NVDA's browse mode; moving
+between cells with the arrow keys needs focus mode (Insert+Space), which the page says, and NVDA keeps Escape for leaving focus mode. The walk-through is
+run by hand on a Windows machine (unlocked, left alone for about 5 minutes); its transcripts are read against these rules, not asserted.
 
 ## 9. Performance and memory design
 

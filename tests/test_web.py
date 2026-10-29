@@ -436,7 +436,7 @@ def test_draft_edit_save_and_checks(web):
     draft = _new_draft(c)
     page = c.get(f"{P}/edit?draft={draft}")
     assert page.status_code == 200 and "tabulator.min.js" in page.text
-    assert 'id="check-announce" class="sr-only" role="status"' in page.text                                       # Validate inputs is spoken
+    assert 'id="announcer" class="sr-only" role="status"' in page.text                                              # Validate inputs is spoken (app.js recetAnnounce)
     csrf = re.search(r'data-csrf="([^"]+)"', page.text).group(1)
     d = c.get(f"{P}/edit/api/{draft}").json()
     assert d["name"] == "my job" and d["layout"]["Measure"]["pinned"] == ["CEInputID", "MeasCode", "MeasDescription"]

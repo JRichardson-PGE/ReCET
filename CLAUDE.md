@@ -100,9 +100,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   NVDA and Chrome through sign in, Runs, New run, a run, Results and Edit inputs and writes what NVDA said after each key to `results/<flow>.json` (ignored
   by git). Guidepup finds the browser with Alt+Esc and failed on a busy desktop; `focusWindow.ps1` raises Chrome by its title first, and the title match
   ignores spaces (NVDA says "Re CET"). A locked PC fails every run. Fixes from NVDA 2026.2's transcripts: Run / Results / Compare cards get a visually
-  hidden h2 each (only the h1 was a heading); Validate inputs keeps the focus while busy (aria-disabled, not disabled) and says each check heading once in
-  `#check-announce` (#check-result is rebuilt every poll, so it is no live region); the row-filter count is set when typing pauses (500 ms); the value-list
-  pager hands the focus over when its button disables itself. Never disable the focused control; announce through a persistent status element.
+  hidden h2 each (only the h1 was a heading); Validate inputs keeps the focus while busy (aria-disabled, not disabled); its result and the row-filter count
+  (500 ms after typing pauses) are spoken through one page-wide `#announcer` (base.html; `window.recetAnnounce` in app.js clears it and sets the text 150 ms
+  later: NVDA spoke neither as a role=status beside the control, nor a result that replaced "Saving…" at once); New run's ACC select is described by the
+  help box's title, not its whole table, and Priced for is named by its label only; Edit inputs says that the grid needs focus mode (NVDA: Insert+Space)
+  and that NVDA keeps Escape. The value-list pager hands the focus over when its button disables itself. Never disable the focused control; announce
+  through `recetAnnounce`, not a new live region.
 - 0.1.68 (2026-10-29, Jake; WCAG 2.2 AA audit rows 1, 2, 15, 16: the Edit inputs grid; 0.1.67 is the rest of the pages): `edit.js fixRoles` repairs
   Tabulator 6.3.1's grid roles on tableBuilt (header contents and body table = presentation, the scroll box = the body rowgroup, grid aria-label); the help
   line (`#help`, aria-live, focusable) follows the active cell on arrow keys as well as clicks and leads with the cell's problems (`showHelp(t, col, cellEl)`,

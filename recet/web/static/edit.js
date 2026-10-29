@@ -610,11 +610,16 @@
     remark(touched);
   }
 
-  // The check's state for a screen reader: #check-result is rebuilt on every poll, so it is not a live region; this status line says each new
-  // heading once ("Saving and starting the check…", "Checking the inputs…", then the result).
-  var chkSay = document.getElementById("check-announce");
+  // The check's state for a screen reader: #check-result is rebuilt on every poll, so it is not a live region; each new heading ("Saving and
+  // starting the check…", "Checking the inputs…", then the result) is said once through the page's announcer (app.js).
+  var chkSaid = "";
+  function chkSay(text) {
+    if (text === chkSaid) return;
+    chkSaid = text;
+    if (window.recetAnnounce) window.recetAnnounce(text);
+  }
   function checkHead(text, kind) {
-    if (chkSay && chkSay.textContent !== text) chkSay.textContent = text;
+    chkSay(text);
     var head = el("div", "check-head");
     head.appendChild(el("span", "check-title " + (kind || ""), text));
     if (chk.info && chk.info.run_url) {
@@ -776,7 +781,7 @@
         chk.info = null;
         chkOut.appendChild(checkHead(res.status === 401 ? "Signed out: reload the page and sign in again." : "The check did not start.", "bad"));
         chkOut.appendChild(el("p", "small", res.j.error || res.j.detail || ("Error " + res.status)));
-        if (chkSay) chkSay.textContent = "The check did not start. " + (res.j.error || res.j.detail || ("Error " + res.status));   // say why
+        chkSay("The check did not start. " + (res.j.error || res.j.detail || ("Error " + res.status)));   // say why, not just that
         return;
       }
       chk.info = res.j;
