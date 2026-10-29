@@ -9,7 +9,7 @@
 with any changes made by ReCET admins on top. This page is built from the lists the editor uses, so it is always current.</p>
 <p>A code is offered for a claim year from its first valid year through its last valid year (blank means no limit). Edit inputs warns about a code that is not
 in the list or not valid for the measure's claim year, because CET would reject that upload. No calculation reads these lists.</p>
-<table class="list">
+<div class="hscroll"><table class="list">
   <thead><tr><th>Field</th><th>Table</th><th>List</th><th>Active codes</th><th>All codes</th><th>Admin changes</th></tr></thead>
   <tbody>
   {% for x in index %}
@@ -20,13 +20,13 @@ in the list or not valid for the measure's claim year, because CET would reject 
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 <h2>Other dropdowns</h2>
-<table class="list">
+<div class="hscroll"><table class="list">
   <thead><tr><th>Field</th><th>Table</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
   {% for x in fixed %}<tr><td>{{ x.field }}</td><td>{{ x.table }}</td><td>{{ x['values']|join(', ') }}</td><td>{{ x.note }}</td></tr>{% endfor %}
   </tbody>
-</table>
+</table></div>
 </article>
 {% endblock %}

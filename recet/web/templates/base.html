@@ -9,6 +9,7 @@
 {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
 <header class="top">
   <a class="brand" href="{{ u('/') }}">ReCET</a>
   {% if user %}
@@ -28,7 +29,7 @@
   </div>
   {% endif %}
 </header>
-<main class="{% block main_class %}page{% endblock %}">
+<main id="main" tabindex="-1" class="{% block main_class %}page{% endblock %}">
 {% block content %}{% endblock %}
 </main>
 <footer class="foot">ReCET {{ version }} · the rebuilt Cost Effectiveness Tool</footer>

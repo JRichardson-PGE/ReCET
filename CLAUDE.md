@@ -90,6 +90,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.66 (2026-10-29, Jake; WCAG 2.2 AA audit of 0.1.64, all gaps outside the Edit inputs grid; 0.1.65 is the OpenBCA PR): `--control` is the border of
+  fields and buttons (3:1 in both schemes; `--line` is decoration only), `color-scheme: light dark`, `:focus-visible` ring, skip link (`main#main`), `.sr-only`.
+  Results / Compare filters are sent by an Apply button, never on change (3.2.2; `select[data-view]` drops the unsaved columns when the view changes). Run page
+  and runs list announce status changes in `#run-announce` / `#runs-announce` and reload at a run's end only when nothing has the focus (`reloadWhenIdle`).
+  Help that was only a tooltip is on the page: "What these numbers are" (`tile_help` macro), "Column definitions", Priced for / Check inputs only / why Edit
+  inputs and rerun is off. Sortable headings hold a `.sort-btn` button; `<p class="alert">` has role=alert and takes the focus on load; Docs `<pre>` / `<table>`
+  get tabindex=0 (app.doc), the ARCHITECTURE diagrams `accTitle` / `accDescr`; admin, audit and value-list tables scroll in `.hscroll` at 320 px. Checked with
+  axe-core 4.10.2 on every page in both schemes: only the Tabulator grid still fails.
 - 0.1.64 (2026-10-28, Jake; BRD review gap 7, BR-08.1): the data dictionary's attributes. `field_docs.table(columns, acc=)` adds
   `recet/field_attributes.py`'s unit, source, version, cost_tests, time_basis, aggregation, rounding, years_in_use to every run's `field_definitions`
   (OUTPUT_FIELDS 2.11). Rules on the column name and the documented "Unit:" text, not a registry; `BENEFIT_OF` / `COST_OF` must follow

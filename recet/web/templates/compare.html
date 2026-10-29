@@ -11,20 +11,22 @@
 
 <form method="get" class="filters">
   <input type="hidden" name="level" value="{{ level }}">
-  <label>B <select name="with" class="autosubmit">
+  <label>B <select name="with">
     <option value="{{ b.id }}" selected>{{ b.label or b.id }}</option>
     {% for c in candidates if c.id != b.id %}<option value="{{ c.id }}">{{ c.label or c.id }} · {{ acc_label(c.acc_version) }} · {{ fmt_time(c.created_at) }}</option>{% endfor %}
   </select></label>
-  <label>View <select name="view" class="autosubmit">
+  <label>View <select name="view" data-view>
     {% if not view %}<option value="" selected>(unsaved columns)</option>{% endif %}
     {% for v in views %}<option {% if v == view %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
   {% if not view %}<input type="hidden" name="columns" value="{{ columns }}">{% endif %}
   {% if all_years|length > 1 %}
-  <fieldset class="years" title="Total both runs over these program years; none ticked = every year">
+  <fieldset class="years" aria-describedby="years-help">
     <legend>Program years</legend>
-    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" class="autosubmit" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+    <span class="small muted" id="years-help">(both runs totalled over the ticked years; none ticked = every year)</span>
   </fieldset>
   {% endif %}
+  <button>Apply</button>
 </form>
 
 <p class="tabs">
@@ -34,7 +36,7 @@
 
 <div class="table-tools">
   <label class="inline small">Filter rows <input type="search" data-filter="compare-table" data-count="filter-count" placeholder="program, text…" autocomplete="off"></label>
-  <span class="small muted" id="filter-count"></span>
+  <span class="small muted" id="filter-count" role="status"></span>
   <a class="button" href="{{ u('/runs/' + a.id + '/compare.csv') }}?{{ {'with': b.id, 'level': level, 'view': view, 'columns': '' if view else columns, 'years': years_param}|urlencode }}">Download this table (CSV)</a>
 </div>
 <div class="scroll"><table class="data sortable" id="compare-table">
@@ -50,6 +52,9 @@
       {% set p = r[k + '__pct'] %}<td class="num" {% if p is number and p == p %}data-v="{{ p }}"{% endif %}>{{ '{:+.1%}'.format(p) if p is number and p == p else '' }}</td>
     {% endfor %}</tr>{% endfor %}</tbody>
 </table></div>
+{% set defs = keys|select('in', catalog)|list %}
+{% if defs %}<details class="small"><summary>Column definitions</summary>
+  <dl class="tile-help">{% for k in defs if catalog[k].help %}<dt>{{ labels[k] if k in labels else k }}</dt><dd>{{ catalog[k].help }}</dd>{% endfor %}</dl></details>{% endif %}
 {% if table|length == 0 %}<p class="muted">Neither run has rows at this level{{ ' for these years' if years }}.</p>{% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

@@ -4,8 +4,8 @@
 {% block content %}
 <h1>Sign in to ReCET</h1>
 <p class="muted">ReCET prices CET-format energy-efficiency inputs hour by hour on the 2024 and 2026 Avoided Cost Calculators. Accounts are by invitation.</p>
-{% if error %}<p class="alert">{{ error }}</p>{% endif %}
-{% if request.query_params.get('expired') %}<p class="alert">The sign-in form expired. Please try again.</p>{% endif %}
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+{% if request.query_params.get('expired') %}<p class="alert" role="alert">The sign-in form expired. Please try again.</p>{% endif %}
 <form method="post" action="{{ u('/login') }}" class="stack">
   <input type="hidden" name="login_csrf" value="{{ login_csrf }}">
   <input type="hidden" name="next" value="{{ next }}">

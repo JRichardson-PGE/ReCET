@@ -1404,6 +1404,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if p.suffix != ".md" or not p.is_file() or p.parent != DOCS_DIR.resolve():
             raise HTTPException(404)
         html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
+        # code blocks and tables scroll sideways (app.css): focusable, so they can be scrolled from the keyboard (WCAG 2.1.1)
+        html = html.replace("<pre>", '<pre tabindex="0">').replace("<table>", '<table tabindex="0">')
         # a ```mermaid block becomes <code class="language-mermaid">; the page then loads the vendored Mermaid (static/docs.js draws it), only when needed
         return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=doc_title(name), current=name, mermaid='class="language-mermaid"' in html)
 

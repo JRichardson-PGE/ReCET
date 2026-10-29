@@ -3,8 +3,8 @@
 {% block content %}
 <h1>Audit log</h1>
 <p class="muted">The latest 500 events: sign-ins, runs and user changes.</p>
-<table class="list">
+<div class="hscroll"><table class="list">
   <thead><tr><th>When</th><th>Who</th><th>Event</th><th>Detail</th><th>From</th></tr></thead>
   <tbody>{% for r in rows %}<tr><td class="nowrap">{{ fmt_time(r.at) }}</td><td>{{ r.email }}</td><td>{{ r.event }}</td><td class="small">{{ r.detail }}</td><td class="small">{{ r.ip }}</td></tr>{% endfor %}</tbody>
-</table>
+</table></div>
 {% endblock %}
