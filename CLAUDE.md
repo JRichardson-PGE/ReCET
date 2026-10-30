@@ -95,6 +95,15 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.77 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 is the record-cap PR): the regression gate. `recet/regress.py`,
+  `recet regress build|check|compare`. build (laptop, full reference data): runs each job under `regress.record()` (wraps AccStore.series and
+  real_impact_profiles._profile_shapes_by_zone; a value is "read" when its key is read or the dict is iterated), `slice_reference` writes only the ACC
+  rows of the (utility, zone) pairs read with every unread value NaN (same years, tests and columns) and the profiles' row groups with only the zones read,
+  then reruns each job on the slice in a new process and stops unless every table equals the full run's to 1e-12. check: runs `tests/data/regression`'s
+  jobs on its `ref/` against `expected/` (TOLERANCE rtol 1e-9, atol 1e-6; `--update` after a deliberate change; tests/test_regression_gate.py in CI).
+  compare: two run folders' tables. Fixture jobs: the C3 and 10k jobs' records in PG&E 13, SCE 9 (5) and SDG&E 7 (6, 8), no System zones (their slice
+  would be most of the ACC). The pricing reads every year of a series it uses, so a pair costs about 7 MB of the 2024 ACC (total_avoided_cost, TRC
+  emission rate). tests/test_regress_tool.py tests the tool on synthetic data.
 - 0.1.75 (2026-10-29, Jake: "CEDARS is always assuming SCE for programs with SW PA in the CET, but SCE is not all of the programs' lead. SCE has
   historically been the largest funder"): a CEDARS upload's statewide ProgramCost rows (PA SW) are costed as SCE's (`cet_versions/job.cet_programs`,
   logged), as CEDARS passes them; a job in CET's input form (Measure PA column) is priced as given. Found by running the two 10k jobs on the published

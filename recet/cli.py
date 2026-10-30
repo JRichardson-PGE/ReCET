@@ -237,6 +237,11 @@ def _cmd_openbca(a) -> int:
     return run.main(a.rest)
 
 
+def _cmd_regress(a) -> int:
+    from . import regress
+    return regress.main(a.rest)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="recet", description="ReCET, the rebuilt CEDARS Cost Effectiveness Tool", formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"recet {__version__}")
@@ -269,6 +274,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("openbca", help="run OpenBCA's own engine on its workbooks (see `recet openbca -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_openbca)
+    p = sub.add_parser("regress", help="the regression gate: build, check or compare real-job fixtures (see `recet regress -h`)", add_help=False)
+    p.add_argument("rest", nargs=argparse.REMAINDER)
+    p.set_defaults(func=_cmd_regress)
     from .cet_versions import cli as cet_cli
     cet_cli.add_parser(sub)
     return ap
