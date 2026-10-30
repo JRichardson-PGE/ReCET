@@ -103,6 +103,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   statewide records). Then CET_UI 122738 (35 records under MCE / BAY / SCR / SDRN / SW / PGE programs): CEDARS passes EVERY record's IOU_AC_Territory as
   its PA (CCA / REN records priced at their IOU's rates) and EVERY non-IOU ProgramCost PA as SCE (`job.IOUS`; PGE kept), so cet_inputs takes the
   territory for all records and cet_programs maps any non-IOU PA. tests/test_engine.py: the C3 upload equals RunCET on the SW -> SCE program table, and RunCET's own outputs off the statewide records.
+  Then (Jake: "every ProgramCost row whose PA doesn't have settings defined is priced as SCE ... if we define discount rates for BayREN etc in the
+  future they will use their own setting"): cet_programs maps a PA to SCE only when it has no E3Settings row at the run's Version (`job.settings_pas`,
+  the PAs `inputs.settings` selects; called after the tables are read, in run_job and `recet cet-version run`), not by a list of IOUs. Same result on
+  25.1's current Versions (IOUs + PAC; all three CET_UI jobs still 180 / 180); on Versions up to 2022 a CCA keeps its PA and own rates.
 - 0.1.74 (2026-10-29, Jake: "make the replicas more memory efficient. Someone could try to run 1M rows thru the replicas too"): a replica prices a job in
   parts, `RunConfig.replica_part_size` (10,000; `--replica-part-size`; 0 = whole; Jake chose a setting of its own rather than `chunk_size`'s 50,000: a
   200k job on 25.1 peaks at 1.2 GB with 10,000, 4.2 GB with 50,000, same time). `cet_versions.price` runs two passes: pass 1 prices each part's benefits and
