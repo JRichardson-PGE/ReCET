@@ -542,7 +542,8 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
   one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
-  managed database. The run path would not change: a worker still runs `recet run --config`.
+  managed database. The run path would not change: a worker still runs `recet run --config`. Until then the server's state (the SQLite database, run and
+  draft folders) is copied to S3 every night and can be restored by `deploy/backup` (its README is the setup and restore runbook).
 * **No API.** Users upload files and download results; nothing else can call ReCET except through Python (`recet.jobs`).
 * **No lifecycle-savings input** (BR-06.15): inputs stay the CET's per-unit annual values.
 * **Multi-file batch upload** (BR-06.3) is not built: one job zip holds one `Measure.csv`.
