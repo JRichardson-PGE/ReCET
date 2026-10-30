@@ -105,6 +105,29 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
 `recet cet-version run` prices a job exactly as that CET release did, on its own quarterly tables and with its errors (CALCULATIONS C20); it needs the
 releases' table export in `<reference data folder>/cet_versions/`. ReCET's own runs are unchanged by it.
 
+## Batch worker: a job spec in, outputs and a receipt out
+
+`recet worker run job.json` is the contract a batch system (the CEDARS platform's Calculations module) calls: it reads a versioned job spec (schema:
+`recet worker schema`, `recet/data/job_spec/job_spec_v1.schema.json`; rules: `recet/jobspec.py`), fetches the inputs from local paths, `file://` or
+`s3://` (`pip install ".[s3]"`; boto3 is imported only for S3), refuses the job when its engine release, a pinned input or reference file, or the
+allocation table differs from what it asks for, runs it, and sends the run folder with `receipt.json` to the spec's outputs URI.
+
+    {"spec_version": 1, "job_id": "2028-claims-pge-0001",
+     "engine": {"release": "0.1.78", "calculation": "recet"},
+     "inputs": {"job_zip": {"uri": "s3://bucket/jobs/0001/job.zip", "sha256": "..."}},
+     "settings": {"acc_version": "2024", "acc_purpose": "claims"},
+     "packs": {"files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},
+     "allocation_version": "statewide_factors_20260918",
+     "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"},
+     "context": {"platform_run_id": 123}}
+
+The receipt names the engine (release, calculation, image and commit from `RECET_IMAGE` / `RECET_COMMIT`, Python and library versions), every input's
+URI, SHA-256, size and row count, the full settings, the ACC and the ACC each record was priced on, every reference file used with its SHA-256 (from the
+reference folder's `manifest.json`, else computed) and the packaged data's hash, the run parameters and statewide factor table, the filing rule set,
+every output file's SHA-256, the totals and notes, and the spec's `context` (the caller's own references) as given. While the job runs, the worker
+sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
+`recet worker validate job.json` checks a spec without running it.
+
 ## From Python
 
     from recet.jobs import RunConfig, run_job
