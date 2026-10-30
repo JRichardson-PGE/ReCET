@@ -55,6 +55,7 @@ class RunConfig:
     acc_version: str = "2024"                # "2024", "2026", or a new label defined by the supplied files
     acc_electric_file: str | None = None     # replaces the built-in electric ACC for acc_version (or defines a new version)
     acc_gas_file: str | None = None
+    acc_draft: bool = False                  # the supplied ACC file is a draft (BR-11.8): analysis runs only, every output labelled draft (apply_draft)
     settings_from: int | None = None         # the ACC version whose run parameters / E3 tables a NEW acc label uses (default: the newest built-in)
     # --- supplied profiles
     profiles_8760_file: str | None = None
@@ -163,7 +164,7 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
         log(chk.text())
         chk.raise_if_bad("supplied gas ACC file")
         gas = overrides.prepare_gas_acc(cfg.acc_gas_file, work)
-    acc = versions.resolve_acc(cfg.acc_version, elec, gas, cfg.settings_from)
+    acc = apply_draft(versions.resolve_acc(cfg.acc_version, elec, gas, cfg.settings_from), cfg, supplied=bool(cfg.acc_electric_file or cfg.acc_gas_file))
     for n in acc.notes:
         log(f"note: {n}")
     log(acc.describe())
@@ -260,7 +261,7 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
         "package_version": __version__, "finished": datetime.now().isoformat(timespec="seconds"), "seconds": round(time.time() - t_start),
         "engine": engine_record(cfg.engine),
         "config": asdict(cfg),
-        "acc": {"key": acc.key, "label": acc.label, "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
+        "acc": {"key": acc.key, "label": acc.label, "draft": acc.label.endswith(DRAFT_LABEL), "avoided_cost_version": acc.avoided_cost_version, "settings_acc_version": acc.settings_acc, "electric": str(acc.electric), "electric_source": acc.electric_source,
                 "electric_size": _size(acc.electric), "gas": str(acc.gas), "gas_source": acc.gas_source, "notes": acc.notes},
         "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source(), "files": ref},
         "supplied_files": {k: {"path": v, "size": _size(v)} for k, v in (("workbook", cfg.workbook), ("profiles_8760", cfg.profiles_8760_file),
@@ -339,6 +340,27 @@ def write_reconciliation(cfg: RunConfig, parts, run_dir: Path, tag: str, excel, 
         result.notes.append(f"statewide allocation: {len(bad) - 20:,} more field total(s) do not reconcile")
 
 
+DRAFT_LABEL = " (draft)"
+
+
+def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
+    """`acc` labelled as a draft ACC (BRD v0.5 BR-11.8) when its electric file is marked draft in the reference folder's manifest (datapack.set_draft), or
+    when `supplied` files are flagged with cfg.acc_draft. A draft is for analysis only: a run asking for CEDARS filing checks or priced for a filing
+    (acc_purpose) is refused (ValueError); any other run carries "(draft)" in the ACC's label, so in Used_ACCVersion and run_settings.json, and a note."""
+    import dataclasses
+    from . import datapack
+    info = datapack.file_info(acc.electric) if acc.electric else None
+    draft = bool(info and info.get("draft")) or (supplied and cfg.acc_draft)
+    if not draft:
+        return acc
+    where = f"pack {info['pack'].get('version')}" if info and info.get("draft") else "supplied file marked draft"
+    if cfg.filing_validation or cfg.acc_purpose:
+        raise ValueError(f"the {acc.label} is a DRAFT ACC ({where}): it is for analysis runs only, so a run with CEDARS filing checks or priced for a "
+                         "filing is refused (BR-11.8). Run it without those options, or use a final ACC.")
+    note = f"the {acc.label} is a DRAFT ACC ({where}): for analysis only, never for a filing; every output names it as a draft"
+    return dataclasses.replace(acc, label=acc.label + DRAFT_LABEL, notes=[*acc.notes, note])
+
+
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     from .cet_versions import job as cet_job
     if cet_job.release_of(cfg.engine) is not None:
@@ -354,6 +376,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     result = RunResult(run_dir=run_dir)
     acc, user_profiles, user_gas = prepare(cfg, run_dir, log)
     tag = f"acc{acc.key}"
+    result.notes += [n for n in acc.notes if "DRAFT ACC" in n]
 
     # ---- a large job is run in parts (chunked.py): split Measure.csv once, here
     from .pipeline import delimited
@@ -441,7 +464,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     # ---- ACC versions: a measure may name its own (ACCVersion column, BRD BR-06.5); blank = this run's version
     from . import runtime, versions
     acc_keys = measures["ACCVersion"].replace("", acc.key)          # the ACC each measure is priced on: its ACCVersion, blank = this run's
-    groups = {k: (acc if k == acc.key else versions.resolve_acc(k)) for k in sorted(acc_keys.unique(), key=lambda k: (k != acc.key, k))}
+    groups = {k: (acc if k == acc.key else apply_draft(versions.resolve_acc(k), cfg)) for k in sorted(acc_keys.unique(), key=lambda k: (k != acc.key, k))}
     if len(groups) > 1:
         log("measures by ACC version: " + ", ".join(f"{g.label} {int((acc_keys == k).sum()):,}" for k, g in groups.items())
             + f"; program costs are discounted at the {acc.label}'s rates")

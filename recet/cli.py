@@ -41,6 +41,8 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--acc", dest="acc_version", help="ACC version: 2021, 2022, 2024, 2026, or a new label defined by the files below")
     g.add_argument("--acc-electric-file", help="electric ACC file: replaces the built-in one for --acc (or defines a new version)")
     g.add_argument("--acc-gas-file", help="gas ACC file: same")
+    g.add_argument("--acc-draft", action="store_true", default=None,
+                   help="the supplied ACC file(s) are a draft ACC: analysis runs only (refused with filing checks or --priced-for), outputs labelled draft")
     g.add_argument("--settings-from", type=int, help="ACC version whose run parameters / E3 tables a NEW ACC label uses (default: the newest built-in)")
     g.add_argument("--run-parameters", dest="run_parameters_file", help="run parameters per PA (discount rates, base year, gas CO2): replace the built-in values")
     g.add_argument("--sw-factors", dest="sw_factors_file", help="statewide allocation factors: replace / extend the built-in table (used with --allocate-statewide)")
@@ -221,8 +223,17 @@ def _cmd_data(a: argparse.Namespace) -> int:
         print(f"saved: {paths.save_config(data_dir=str(Path(a.path).expanduser()))}")
         return 0
     if a.action == "build":
-        datapack.build_reference_folder(a.path, link=a.link)
+        datapack.build_reference_folder(a.path, link=a.link, pack_version=a.pack_version, draft_accs=a.draft)
         return 0
+    if a.action == "draft":
+        datapack.set_draft(a.path, a.dest, draft=not a.final)
+        return 0
+    if a.action == "tie-out":
+        from . import tieout
+        if not a.acc:
+            print("data tie-out needs --acc", file=sys.stderr)
+            return 2
+        return 0 if tieout.run(a.path, a.acc, a.source_totals, a.out)["status"] == "PASS" else 1
     if a.action == "verify":
         return 0 if datapack.verify(a.path, full=a.full) else 1
     if a.action == "pack":
@@ -259,12 +270,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("file")
     p.set_defaults(func=_cmd_check)
     p = sub.add_parser("data", help="manage the reference data folder")
-    p.add_argument("action", choices=["status", "set-dir", "build", "verify", "pack", "unpack", "clear-cache", "build-system-zones"])
+    p.add_argument("action", choices=["status", "set-dir", "build", "verify", "pack", "unpack", "clear-cache", "build-system-zones", "draft", "tie-out"])
     p.add_argument("path", nargs="?", help="folder (set-dir/build/verify/pack), parts folder (unpack), or output folder (build-system-zones; default: the package's own)")
-    p.add_argument("dest", nargs="?", help="output folder (pack/unpack)")
+    p.add_argument("dest", nargs="?", help="output folder (pack/unpack); the ACC version (draft)")
     p.add_argument("--full", action="store_true", help="verify: also check SHA-256")
     p.add_argument("--link", action="store_true", help="build: hard-link instead of copy (same drive)")
     p.add_argument("--part-gb", type=float, default=4.0, help="pack: part size in GB")
+    p.add_argument("--pack-version", help="build: the pack's version (default: today's date)")
+    p.add_argument("--draft", action="append", default=[], metavar="ACC", help="build: this ACC version's electric file is a draft (analysis runs only); repeat for several")
+    p.add_argument("--final", action="store_true", help="draft: mark the ACC final instead of draft")
+    p.add_argument("--acc", help="tie-out: the ACC version to check")
+    p.add_argument("--source-totals", help="tie-out: the source workbook's control totals (CSV) to reconcile the pack against")
+    p.add_argument("--out", help="tie-out: the report folder (default: <folder>/tieout)")
     p.set_defaults(func=_cmd_data)
     p = sub.add_parser("openbca", help="run OpenBCA's own engine on its workbooks (see `recet openbca -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
@@ -279,9 +296,9 @@ def main(argv: list[str] | None = None) -> None:
     a = ap.parse_args(argv)
     if not getattr(a, "func", None):
         a.func = _cmd_gui
-    if getattr(a, "cmd", None) == "data" and a.action in {"set-dir", "build", "verify", "pack", "unpack"} and not a.path:
+    if getattr(a, "cmd", None) == "data" and a.action in {"set-dir", "build", "verify", "pack", "unpack", "draft", "tie-out"} and not a.path:
         ap.error(f"data {a.action} needs a path")
-    if getattr(a, "cmd", None) == "data" and a.action in {"pack", "unpack"} and not a.dest:
+    if getattr(a, "cmd", None) == "data" and a.action in {"pack", "unpack", "draft"} and not a.dest:
         ap.error(f"data {a.action} needs a destination")
     if getattr(a, "cmd", None) == "cet-version":
         from .cet_versions import cli as cet_cli
