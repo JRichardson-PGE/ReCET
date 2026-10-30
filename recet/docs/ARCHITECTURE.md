@@ -181,6 +181,9 @@ Every module in the package. Paths are relative to `recet/`.
 | `paths.py` | data | where package data, the reference data folder and the cache are |
 | `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
 | `regress.py` | job | the regression gate: real-job fixtures on slices of the reference data, checked against their expected outputs; two runs compared |
+| `jobspec.py` | job | the job spec: the versioned JSON a caller hands the worker (inputs by URI, settings, engine release, pinned reference files, allocation version) and its checks |
+| `worker.py` | job | `recet worker run`: one job from a job spec, its outputs and `receipt.json` sent to the spec's outputs URI |
+| `storage.py` | data | where a worker's files come from and go to: local paths, file:// and s3:// (boto3 only when S3 is used) |
 | `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
 | `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
@@ -548,7 +551,8 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
   one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
-  managed database. The run path would not change: a worker still runs `recet run --config`.
+  managed database. The run path would not change: a worker still runs `recet run --config`. Until then the server's state (the SQLite database, run and
+  draft folders) is copied to S3 every night and can be restored by `deploy/backup` (its README is the setup and restore runbook).
 * **No API.** Users upload files and download results; nothing else can call ReCET except through Python (`recet.jobs`).
 * **No lifecycle-savings input** (BR-06.15): inputs stay the CET's per-unit annual values.
 * **Multi-file batch upload** (BR-06.3) is not built: one job zip holds one `Measure.csv`.
