@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JRichardson-PGE/ReCET/recet/data/job_spec/job_spec_v1.schema.json",
+  "title": "ReCET job spec, version 1",
+  "description": "One job for `recet worker run`: its inputs by URI, its settings, the engine release that must run it, the reference data it is pinned to and where its outputs go. recet/jobspec.py checks the same rules (and the settings' types against RunConfig).",
+  "type": "object",
+  "required": ["spec_version", "job_id", "inputs", "outputs"],
+  "additionalProperties": false,
+  "properties": {
+    "spec_version": {"const": 1},
+    "job_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", "description": "Names the run folder and the receipt."},
+    "description": {"type": "string"},
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "release": {"type": "string", "minLength": 1, "description": "The ReCET version (recet --version) that must run the job; a worker of another version refuses it."},
+        "calculation": {"type": "string", "pattern": "^(|recet|cet-.+)$", "description": "RunConfig.engine: ReCET's own engine, or a CET replica such as cet-25.1."}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "job_zip": {"$ref": "#/$defs/input", "description": "A zip holding Measure.csv and optionally ProgramCost.csv, as the web app takes a job."},
+        "measures": {"$ref": "#/$defs/input"},
+        "programcost": {"$ref": "#/$defs/input"},
+        "workbook": {"$ref": "#/$defs/input"},
+        "profiles_8760": {"$ref": "#/$defs/input"},
+        "profiles_gas": {"$ref": "#/$defs/input"},
+        "run_parameters": {"$ref": "#/$defs/input"},
+        "sw_factors": {"$ref": "#/$defs/input"},
+        "programs": {"$ref": "#/$defs/input"},
+        "acc_electric": {"$ref": "#/$defs/input"},
+        "acc_gas": {"$ref": "#/$defs/input"},
+        "cet_outputs": {"$ref": "#/$defs/input"}
+      },
+      "oneOf": [{"required": ["measures"]}, {"required": ["job_zip"]}, {"required": ["workbook"]}],
+      "not": {"required": ["job_zip", "programcost"]}
+    },
+    "settings": {
+      "type": "object",
+      "description": "RunConfig settings (recet/docs/INPUT_FIELDS.md section 3) other than files, folders, names, engine and output format, e.g. {\"acc_version\": \"2024\", \"acc_purpose\": \"claims\", \"allocate_statewide\": true}."
+    },
+    "packs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reference_dir": {"type": "string", "description": "The reference data folder on the worker; default: its RECET_DATA."},
+        "files": {
+          "type": "object",
+          "description": "Reference files the job is pinned to, by their path in the folder (e.g. acc/2024/electric_hourly.parquet). The worker refuses the job when the folder's file differs.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {"sha256": {"$ref": "#/$defs/sha256"}, "version": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "allocation_version": {"type": "string", "minLength": 1, "description": "The statewide factor table the run must use: the built-in table's name (statewide_factors_20260918) or a supplied sw_factors file's SHA-256."},
+    "context": {"type": "object", "description": "The caller's own references (e.g. its run, submission and allocation-version ids); the worker never reads them and echoes them verbatim into receipt.json."},
+    "outputs": {
+      "type": "object",
+      "required": ["uri"],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {"type": "string", "minLength": 1, "description": "The folder the run's files and receipt.json go to: a path, file:// or s3://bucket/prefix/."},
+        "format": {"enum": ["csv", "csv.zip", "parquet", "xlsx"], "default": "csv.zip"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "input": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "object", "required": ["uri"], "additionalProperties": false,
+         "properties": {"uri": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}}
+      ]
+    }
+  }
+}
