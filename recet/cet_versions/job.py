@@ -197,6 +197,16 @@ def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
     return outputs.attach_programs(frame, frame["PrgID"])
 
 
+def _check_record_cap(measures, cap) -> None:
+    """The record cap (BR-06.3) on a replica run, which has no ReCET preflight: a Measure.csv with more rows than `cap` (0 = none) is refused."""
+    from .. import preflight
+    from ..pipeline import delimited
+    if cap and measures and Path(measures).exists():
+        n = delimited.count_rows(measures)
+        if n > int(cap):
+            raise ValueError(preflight.too_many_records_message(n, int(cap)))
+
+
 def run_job(cfg, log=print):
     """Run `cfg` (a jobs.RunConfig whose engine is a replica) end to end; returns a jobs.RunResult. Raises ValueError for `problems`."""
     from .. import jobs, outputs, paths, progress, results_view, versions, workbook
@@ -219,6 +229,7 @@ def run_job(cfg, log=print):
         for fld, f in workbook.extract(cfg.workbook, run_dir / "_prepared_inputs" / "workbook").items():
             if fld in ("measures", "programcost") and not getattr(cfg, fld):
                 setattr(cfg, fld, str(f))
+    _check_record_cap(cfg.measures, cfg.max_records)
     version = cet_version(rel, cfg.acc_version)
     acc = int(cfg.acc_version)
     tag = f"acc{acc}"
