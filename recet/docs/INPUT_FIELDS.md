@@ -212,6 +212,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `run_parameters_file` | Run parameters | `--run-parameters` | none | Run parameters per PA (section 4.5): a listed PA's discount rates, base year and gas CO2 replace the built-in values for this run. |
 | `programs_file` | Program metadata | `--programs` | none | Program metadata in the CEDARS Programs list layout (section 4.8): a `PrgID` replaces the built-in row, a new one is added. |
 | `sw_factors_file` | SW allocation factors | `--sw-factors` | none | Statewide allocation factors (section 4.6): a (`Year`, `ProgramID`) row replaces the built-in row, a new one is added. Used only with `allocate_statewide`. |
+| `sw_factors_replace` | (none) | `--sw-factors-replace` | off | The `sw_factors_file` table is the whole factor table: no built-in row is used, so a (`Year`, `ProgramID`) the file leaves out is not allocated. This is how a caller pins an allocation version (BR-13.8): the CEDARS platform passes the version's full table with this on, and the worker's `receipt.json` records `allocation.mode` "replace" (else "merge"). Needs `sw_factors_file`. |
 | `profiles_8760_file`, `profiles_gas_file` | 8,760 electric profiles, Gas monthly profiles | `--profiles-8760`, `--profiles-gas` | none | Supplied profile files; a match replaces the library profile, a non-match is added. |
 | `normalize_profiles` | (settings file / flag only) | `--no-normalize-profiles` | true | Rescale supplied profiles that do not sum to 1 (false = stop with an error instead). |
 | `reference_dir` | Reference data folder | `--data-dir` | saved default | Folder holding the large reference files (section 5). |
@@ -321,7 +322,7 @@ The built-in run parameters are the RunParameters table (section 6). A supplied 
 ### 4.6 SW allocation factors (CSV, Parquet or xlsx)
 
 The built-in table's layout (section 6); the template (`recet template sw-factors`) is the whole built-in table. A row whose (`Year`, `ProgramID`) is in the built-in
-table replaces it; any other row is added. Factor sums that are not 1 (or 0) are reported in the log.
+table replaces it; any other row is added (with `sw_factors_replace`, the file is the whole table instead). Factor sums that are not 1 (or 0) are reported in the log.
 
 | Column | Type / unit | Required | Description |
 |---|---|---|---|
