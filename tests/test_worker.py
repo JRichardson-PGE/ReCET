@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -211,3 +212,12 @@ def test_the_progress_sender(tmp_path):
     local.write_text(json.dumps({"stage": "writing", "done": 3}))
     s.send(force=True)
     assert s.sends == 3 and json.loads(dest.read_text())["done"] == 3
+
+
+def test_file_uris_round_trip(tmp_path):
+    p = tmp_path / "a folder" / "Measure.csv"
+    assert storage.LocalStorage.path(p.as_uri()) == p                 # on Windows as_uri() is file:///C:/..., which once read as /C:/...
+    assert storage.LocalStorage.path(str(p)) == p
+    assert storage.LocalStorage.path("file://localhost" + p.as_uri()[len("file://"):]) == p
+    if os.name == "nt":
+        assert storage.LocalStorage.path("file://server/share/x.csv") == Path(r"\\server\share\x.csv")
