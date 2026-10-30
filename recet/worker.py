@@ -153,12 +153,14 @@ def package_data_sha256() -> str:
 
 
 def allocation_record(cfg, spec: dict | None = None) -> dict:
-    """The statewide factor table the run used: the built-in one by name, or a supplied file (its URI); its SHA-256; the allocation_version the spec named."""
+    """The statewide factor table the run used: the built-in one by name, or a supplied file (its URI and mode: "replace" = the whole table, "merge" = its
+    rows over the built-in ones); its SHA-256; the allocation_version the spec named."""
     from .pipeline import statewide_allocation
     requested = (spec or {}).get("allocation_version")
     if cfg.sw_factors_file:
         uri = jobspec.input_uri(spec["inputs"]["sw_factors"])[0] if spec and "sw_factors" in spec.get("inputs", {}) else None
-        return {"table": "supplied", "file": uri, "sha256": sha256_file(Path(cfg.sw_factors_file)), "requested": requested, "applied": cfg.allocate_statewide}
+        return {"table": "supplied", "file": uri, "sha256": sha256_file(Path(cfg.sw_factors_file)), "requested": requested, "applied": cfg.allocate_statewide,
+                "mode": "replace" if cfg.sw_factors_replace else "merge"}
     f = statewide_allocation.FACTORS_CSV
     return {"table": f.stem, "sha256": sha256_file(f), "requested": requested, "applied": cfg.allocate_statewide}
 
