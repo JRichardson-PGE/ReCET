@@ -201,8 +201,8 @@ def _zipped(members: dict[str, bytes]) -> bytes:
 
 
 def test_a_cedars_upload_runs_on_a_replica(tmp_path):
-    """A CEDARS Measure.csv (no PA; FuelID for CET's FuelType; statewide records with their IOU_AC_Territory) prices as the reference run's CET
-    input table: each record's PA is its program's, a statewide record's its territory."""
+    """A CEDARS Measure.csv (no PA; FuelID for CET's FuelType) prices as CEDARS hands it to CET: each record's PA is its IOU_AC_Territory and a
+    non-IOU program's ProgramCost rows are SCE's."""
     run = DATA / "25.1" / C3 / "me0"
     m, p = _read(run / "measure.csv"), _read(run / "programcost.csv")
     sw = set(p.loc[p.PA.str.strip().str.upper() == "SW", "PrgID"])
@@ -214,16 +214,44 @@ def test_a_cedars_upload_runs_on_a_replica(tmp_path):
     cfg = _cfg(tmp_path)
     cfg.measures, cfg.programcost = str(tmp_path / "up" / "Measure.csv"), str(tmp_path / "up" / "ProgramCost.csv")
     res = run_job(cfg, log=lambda s: None)
+    # CEDARS passes a statewide program's ProgramCost rows to CET as SCE's (the published CET's own program table of job 122714); the reference run
+    # kept PA SW. So the records of the other programs equal RunCET's, and the job as a whole equals RunCET on the table CEDARS passes
+    from recet import cet_versions
+    from recet.cet_versions import QuarterlyTables
+    want = cet_versions.run(m, p.assign(PA=p.PA.where(p.PA.str.strip().str.upper() != "SW", "SCE")), "25.1",
+                            QuarterlyTables.from_folder(run.parent / "tables"), first_year=2028)
+    sw_ids = set(m.CEInputID[m.PrgID.isin(sw)])
     for name in ("SavedCE", "SavedSavings", "SavedEmissions", "SavedCost"):
-        assert not differences(_read(res.files[name]), _read(run / f"{name}.csv")), name
-    assert any("statewide record" in n for n in res.notes)
+        ours = _read(res.files[name])
+        assert not differences(ours, want.tables()[name].astype(str).replace("nan", "")), name
+        ref = _read(run / f"{name}.csv")
+        assert not differences(ours[~ours.CET_ID.isin(sw_ids)].reset_index(drop=True), ref[~ref.CET_ID.isin(sw_ids)].reset_index(drop=True)), name
+    assert any("on their IOU_AC_Territory" in n for n in res.notes) and any("costed as SCE" in n for n in res.notes)
     frame = pd.read_csv(res.files["measure_level"])
     assert "IOU_AC_Territory" in frame and len(frame) == len(m)
     assert frame["PA"].notna().all()                                                            # the PA each record was priced on (SavedCE)
 
 
 def test_cet_inputs_pa():
-    m = pd.DataFrame({"PrgID": ["PGE_1", "SW_X", "SCE_2", "SW_Y"], "IOU_AC_Territory": ["PGE", "SCE", "SCE", None], "FuelID": [None] * 4})
-    p = pd.DataFrame({"PA": ["PGE", "SW"], "PrgID": ["pge_1 ", "SW_X"]})
+    m = pd.DataFrame({"PrgID": ["PGE_1", "SW_X", "SCE_2", "SW_Y", "MCE01", "PGE_1"], "IOU_AC_Territory": ["PGE", "SCE", "SCE", None, "PGE", ""],
+                      "FuelID": [None] * 6})
+    p = pd.DataFrame({"PA": ["PGE", "SW", "MCE"], "PrgID": ["pge_1 ", "SW_X", "MCE01"]})
     out, n = cet_job.cet_inputs(m, p)
-    assert list(out.PA) == ["PGE", "SCE", "SCE", "SW"] and n == 1 and "FuelType" in out and "FuelID" not in out
+    # the territory whenever there is one (CEDARS, jobs 122714 / 122716 / 122738), else the program's PA, else the PrgID's prefix
+    assert list(out.PA) == ["PGE", "SCE", "SCE", "SW", "PGE", "PGE"] and n == 2 and "FuelType" in out and "FuelID" not in out
+    q, k = cet_job.cet_programs(p.assign(PA=["PGE", " sw ", "BAY"]))
+    assert list(q.PA) == ["PGE", "SCE", "SCE"] and k == 2 and list(p.PA) == ["PGE", "SW", "MCE"]   # no settings given: the IOUs; caller's table kept
+    # keyed on the PAs with settings at the run's Version (Jake): a PA with its own E3Settings row keeps its PA and is costed on its own rates
+    q2, k2 = cet_job.cet_programs(p.assign(PA=["PGE", "SW", "BAY"]), {"PGE ", "sce", "BAY"})
+    assert list(q2.PA) == ["PGE", "SCE", "BAY"] and k2 == 1
+
+
+def test_settings_pas_by_version():
+    """Which PAs have settings depends on the release and Version: 25.1's Version 2026 only the IOUs and PAC; 22.1's Version 2022 the CCAs too."""
+    from recet.cet_versions import QuarterlyTables
+    t = QuarterlyTables.from_folder(DATA / "25.1" / C3 / "tables")
+    assert cet_job.settings_pas(t) == {"pge", "sce", "scg", "sdge", "pac"}
+    t22 = QuarterlyTables.from_folder(DATA / "22.1" / "synthetic_avc2022" / "tables")
+    assert {"mce", "bay", "sjce"} <= cet_job.settings_pas(t22)
+    q, k = cet_job.cet_programs(pd.DataFrame({"PA": ["MCE", "SW"], "PrgID": ["MCE01", "SW_X"]}), cet_job.settings_pas(t22))
+    assert list(q.PA) == ["MCE", "SCE"] and k == 1
