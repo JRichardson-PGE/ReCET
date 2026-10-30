@@ -330,6 +330,11 @@ differences listed in C17.
 Reference data never goes in git. `recet data status | verify | pack | unpack | build` (`datapack.py`) move it between machines; the web server mounts it
 read-only at `/data`.
 
+`manifest.json` (format 2) keys every file by its path relative to the reference folder, with forward slashes (`acc/2024/electric_hourly.parquet`,
+`impact_profiles/hourly.parquet`, ...), the same on every machine. Each entry holds `size`, `sha256`, `type` (the `REF_FILES` key), `required`, and for an
+ACC file `acc_version` and `draft`; the `pack` block holds the pack's `type` and `version`. Those keys are what a job spec's `packs.files` pins (worker.py),
+so a caller such as the CEDARS platform's reference-data service can turn a pack version into pins without knowing the folder's location.
+
 ### 7.2 ACC versions
 
 A run names an ACC version by its year (`2021`, `2022`, `2024`, `2026`). The version selects the electric parquet, the gas table, the run parameters and the
