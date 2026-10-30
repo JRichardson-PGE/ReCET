@@ -238,6 +238,9 @@ def _cmd_openbca(a) -> int:
     return run.main(a.rest)
 
 
+def _cmd_regress(a) -> int:
+    from . import regress
+    return regress.main(a.rest)
 def _cmd_worker(a) -> int:
     from . import worker
     return worker.main(a.rest)
@@ -275,6 +278,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("openbca", help="run OpenBCA's own engine on its workbooks (see `recet openbca -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_openbca)
+    p = sub.add_parser("regress", help="the regression gate: build, check or compare real-job fixtures (see `recet regress -h`)", add_help=False)
+    p.add_argument("rest", nargs=argparse.REMAINDER)
+    p.set_defaults(func=_cmd_regress)
     p = sub.add_parser("worker", help="run one job from a job spec and write its receipt (see `recet worker run -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_worker)
