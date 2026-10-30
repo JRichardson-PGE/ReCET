@@ -164,7 +164,9 @@ def slice_reference(usage: Usage, src: Path, out: Path, log=print) -> dict[str, 
             df.loc[~read, c] = np.nan
         dest = out / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(pa.Table.from_pandas(df, schema=t.schema, preserve_index=False), dest, compression="zstd", compression_level=19)
+        # floats split into byte streams compress about a quarter smaller under zstd (lossless; 28.8 MB for three pairs of the 2024 ACC without it)
+        pq.write_table(pa.Table.from_pandas(df, schema=t.schema, preserve_index=False), dest, compression="zstd", compression_level=19,
+                       use_byte_stream_split=value_cols, use_dictionary=[c for c in t.schema.names if c not in value_cols])
         sizes[str(rel).replace(os.sep, "/")] = dest.stat().st_size
         log(f"  {rel}: {len(df):,} rows of {len(pairs)} (utility, zone) pair(s), {dest.stat().st_size / 1e6:.1f} MB")
     libs = {f for f, _pid in usage.profiles}
