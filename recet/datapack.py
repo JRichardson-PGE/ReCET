@@ -3,11 +3,17 @@
 The big files (the two electric ACC parquets and the CEDARS impact-profile library, ~11 GB together) do not live in the repository. They live in a *reference data
 folder* laid out as described in `recet.paths`, with a `manifest.json` recording each file's size and SHA-256:
 
-  build_reference_folder(dest)         copy the current reference folder's files to a new folder (or hard link, same drive)
+  build_reference_folder(dest)         copy the current reference folder's files to a new folder (or hard link, same drive); the manifest names the pack
+                                       (version, type) and each file (its type, ACC version, draft flag)
+  set_draft(folder, acc, draft)        mark an ACC in a folder's manifest as a draft (BR-11.8) or as final
   verify(folder, full=False)           check the folder against its manifest (sizes; add full=True for the checksums)
   pack(folder, out_dir, part_gb=4)     write the folder as a plain (uncompressed -- parquet is already compressed) tar split into parts <= part_gb, e.g. to fit FAT32
                                        drives or upload limits, plus SHA256SUMS
   unpack(parts_dir, dest)              rebuild the folder from the parts
+
+A DRAFT ACC (BRD v0.5 BR-11.8: a proposed ACC loaded before its release, for analysis) is usable for analysis runs only: a run on it is refused when it
+asks for CEDARS filing checks or is priced for a filing (`acc_purpose`), and every other run labels its ACC "(draft)" in every output (jobs.apply_draft).
+`file_info` finds a file's manifest entry; tieout.py writes the acceptance report a pack (and an engine release) is promoted on (BR-06.21).
 
 Point the program at the folder with `recet data set-dir PATH`, the GUI's "Reference data folder" box, `--data-dir`, or the environment variable RECET_DATA.
 """
@@ -26,6 +32,8 @@ from typing import Callable
 from . import paths
 
 MANIFEST = "manifest.json"
+MANIFEST_FORMAT = 2                     # 2 (0.1.79): the pack block and each file's type, acc_version and draft; format 1 manifests are still read
+PACK_TYPE = "reference"
 Log = Callable[[str], None]
 CHUNK = 16 * 1024 * 1024
 
@@ -43,8 +51,14 @@ def sha256_file(path: Path, log: Log | None = None) -> str:
     return h.hexdigest()
 
 
-def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = print, checksums: bool = True) -> Path:
-    """Copy (or hard-link, same drive only) every file in paths.REF_FILES that exists in the current reference folder into `dest` and write the manifest."""
+def _acc_of(key: str) -> str | None:
+    return key.rsplit("_", 1)[1] if key.startswith("acc_electric_") else None
+
+
+def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = print, checksums: bool = True, pack_version: str | None = None,
+                           draft_accs: tuple[str, ...] | list[str] = ()) -> Path:
+    """Copy (or hard-link, same drive only) every file in paths.REF_FILES that exists in the current reference folder into `dest` and write the manifest.
+    `pack_version` names this pack (default: today's date); `draft_accs` lists the ACC versions whose electric file is a draft (BR-11.8)."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -67,15 +81,71 @@ def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = p
                 os.link(src, target)
             else:
                 shutil.copyfile(src, target)
-        files[rf.rel] = {"size": target.stat().st_size, "what": rf.what, "required": rf.required}
+        files[rf.rel] = {"size": target.stat().st_size, "what": rf.what, "required": rf.required, "type": rf.key}
+        if _acc_of(rf.key):
+            files[rf.rel].update(acc_version=_acc_of(rf.key), draft=_acc_of(rf.key) in {str(a) for a in draft_accs})
     if checksums:
         for rel, info in files.items():
             log(f"  checksum {rel}")
             info["sha256"] = sha256_file(dest / rel, log)
-    manifest = {"format": 1, "created": datetime.now().isoformat(timespec="seconds"), "files": files}
+    unknown = {str(a) for a in draft_accs} - {f.get("acc_version") for f in files.values()}
+    if unknown:
+        raise ValueError(f"draft ACC(s) {sorted(unknown)} are not in the folder")
+    now = datetime.now()
+    manifest = {"format": MANIFEST_FORMAT, "created": now.isoformat(timespec="seconds"),
+                "pack": {"type": PACK_TYPE, "version": pack_version or now.strftime("%Y-%m-%d")}, "files": files}
     (dest / MANIFEST).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    log(f"reference folder ready: {dest}")
+    drafts = [f["acc_version"] for f in files.values() if f.get("draft")]
+    log(f"reference folder ready: {dest} (pack version {manifest['pack']['version']}" + (f"; DRAFT ACC {', '.join(drafts)}" if drafts else "") + ")")
     return dest
+
+
+def read_manifest(folder: str | Path) -> dict | None:
+    mf = Path(folder) / MANIFEST
+    if not mf.exists():
+        return None
+    try:
+        return json.loads(mf.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def set_draft(folder: str | Path, acc: str, draft: bool = True, log: Log = print) -> None:
+    """Mark the ACC version `acc`'s electric file in `folder`'s manifest as a draft (or, draft=False, as final)."""
+    folder = Path(folder)
+    manifest = read_manifest(folder)
+    if manifest is None:
+        raise FileNotFoundError(f"{folder} has no {MANIFEST}; run `recet data build` first")
+    hit = [rel for rel, f in manifest["files"].items() if (f.get("acc_version") or _acc_of(f.get("type", "")) or _acc_of_rel(rel)) == str(acc)]
+    if not hit:
+        raise ValueError(f"no ACC {acc} electric file in {folder}'s manifest")
+    for rel in hit:
+        manifest["files"][rel].update(acc_version=str(acc), draft=bool(draft))
+    manifest["format"] = max(int(manifest.get("format", 1)), MANIFEST_FORMAT)
+    (folder / MANIFEST).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    log(f"{', '.join(hit)}: {'DRAFT (analysis runs only)' if draft else 'final'}")
+
+
+def _acc_of_rel(rel: str) -> str | None:
+    parts = Path(rel).parts
+    return parts[1] if len(parts) == 3 and parts[0] == "acc" and parts[2] == "electric_hourly.parquet" else None
+
+
+def file_info(path: str | Path, folder: str | Path | None = None) -> dict | None:
+    """The manifest entry of `path` in reference folder `folder` (default: the current one), with "rel" and the pack block; None when the folder has no
+    manifest or the manifest does not list the file at its present size."""
+    folder = Path(folder) if folder else paths.reference_dir()
+    if folder is None or path is None:
+        return None
+    try:
+        rel = Path(path).resolve().relative_to(Path(folder).resolve()).as_posix()
+    except ValueError:
+        return None
+    manifest = read_manifest(folder)
+    info = (manifest or {}).get("files", {}).get(rel)
+    if info is None or (Path(path).exists() and info.get("size") not in (None, Path(path).stat().st_size)):
+        return None
+    return {**info, "rel": rel, "pack": manifest.get("pack", {"type": PACK_TYPE, "version": manifest.get("created", "")[:10]})}
 
 
 def verify(folder: str | Path, full: bool = False, log: Log = print) -> bool:
@@ -86,6 +156,9 @@ def verify(folder: str | Path, full: bool = False, log: Log = print) -> bool:
         log(f"{folder} has no {MANIFEST}: not a reference data folder (or not built with `recet data build`)")
         return False
     manifest = json.loads(mf.read_text(encoding="utf-8"))
+    pack = manifest.get("pack")
+    if pack:
+        log(f"pack: {pack.get('type')} version {pack.get('version')} (manifest format {manifest.get('format')})")
     ok = True
     for rel, info in manifest["files"].items():
         p = folder / rel
@@ -99,7 +172,8 @@ def verify(folder: str | Path, full: bool = False, log: Log = print) -> bool:
             log(f"  BAD CHECKSUM {rel}")
             ok = False
         else:
-            log(f"  ok       {rel}  ({info['size'] / 1e9:.2f} GB)" + ("  checksum verified" if full and info.get("sha256") else ""))
+            log(f"  ok       {rel}  ({info['size'] / 1e9:.2f} GB)" + ("  checksum verified" if full and info.get("sha256") else "")
+                + ("  DRAFT ACC: analysis runs only" if info.get("draft") else ""))
     log("reference data folder is complete" if ok else "reference data folder has problems")
     return ok
 

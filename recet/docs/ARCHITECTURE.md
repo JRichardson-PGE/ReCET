@@ -179,7 +179,8 @@ Every module in the package. Paths are relative to `recet/`.
 | `pipeline/delimited.py` | data | reading CET-format files; splitting a large file into parts |
 | `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
 | `paths.py` | data | where package data, the reference data folder and the cache are |
-| `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `datapack.py` | data | building, verifying, packing and unpacking the reference data folder; the pack's version and each file's type and draft flag |
+| `tieout.py` | data | the tie-out report an ACC load and an engine release are accepted on: structure, control totals, reference measures |
 | `regress.py` | job | the regression gate: real-job fixtures on slices of the reference data, checked against their expected outputs; two runs compared |
 | `jobspec.py` | job | the job spec: the versioned JSON a caller hands the worker (inputs by URI, settings, engine release, pinned reference files, allocation version) and its checks |
 | `worker.py` | job | `recet worker run`: one job from a job spec, its outputs and `receipt.json` sent to the spec's outputs URI |
@@ -328,6 +329,11 @@ differences listed in C17.
 
 Reference data never goes in git. `recet data status | verify | pack | unpack | build` (`datapack.py`) move it between machines; the web server mounts it
 read-only at `/data`.
+
+`manifest.json` (format 2) keys every file by its path relative to the reference folder, with forward slashes (`acc/2024/electric_hourly.parquet`,
+`impact_profiles/hourly.parquet`, ...), the same on every machine. Each entry holds `size`, `sha256`, `type` (the `REF_FILES` key), `required`, and for an
+ACC file `acc_version` and `draft`; the `pack` block holds the pack's `type` and `version`. Those keys are what a job spec's `packs.files` pins (worker.py),
+so a caller such as the CEDARS platform's reference-data service can turn a pack version into pins without knowing the folder's location.
 
 ### 7.2 ACC versions
 

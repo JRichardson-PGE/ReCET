@@ -103,6 +103,15 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.80 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.78 worker, 0.1.79 regression gate; first numbered 0.1.79): data-pack
+  acceptance. `datapack` manifest format 2: `pack` {type "reference", version (`--pack-version`, default the date)} and per file `type` (the REF_FILES key),
+  `acc_version`, `draft`; `set_draft` / `recet data draft FOLDER ACC [--final]`; `file_info(path)` finds a file's entry. A draft ACC (BR-11.8; also a supplied
+  file with `RunConfig.acc_draft` / `--acc-draft`): `jobs.apply_draft` refuses a run with filing_validation or acc_purpose, otherwise appends " (draft)" to
+  the ACC label (Used_ACCVersion, run_settings.json acc.label / acc.draft) and adds a note. `recet/tieout.py`, `recet data tie-out FOLDER --acc Y
+  [--source-totals CSV]` (BR-06.21): structure (8,760 hours per block, no NaN, components = total within 1e-6 $/MWh, contiguous years, the cost tests),
+  control totals per (iou, zone, test, year) against the workbook's (1e-9; the workbook-side totals are for the extraction scripts in CEDARS-Research to
+  write), and 6 reference measures (each IOU's first zone, single and dual baseline) priced by run_job and by tests/reference_calc.py.elec_value on the
+  file read with pandas (1e-9). Report tieout_acc<Y>.json/.md with the pack version, SHA-256 and engine release. tests/test_datapack_acceptance.py.
 - 0.1.79 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.78 worker; first numbered 0.1.77): the regression gate. `recet/regress.py`,
   `recet regress build|check|compare`. build (laptop, full reference data): runs each job under `regress.record()` (wraps AccStore.series and
   real_impact_profiles._profile_shapes_by_zone; a value is "read" when its key is read or the dict is iterated), `slice_reference` writes only the ACC
