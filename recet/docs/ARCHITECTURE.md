@@ -179,7 +179,8 @@ Every module in the package. Paths are relative to `recet/`.
 | `pipeline/delimited.py` | data | reading CET-format files; splitting a large file into parts |
 | `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
 | `paths.py` | data | where package data, the reference data folder and the cache are |
-| `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `datapack.py` | data | building, verifying, packing and unpacking the reference data folder; the pack's version and each file's type and draft flag |
+| `tieout.py` | data | the tie-out report an ACC load and an engine release are accepted on: structure, control totals, reference measures |
 | `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
 | `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
