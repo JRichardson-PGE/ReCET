@@ -58,13 +58,15 @@ _FIELD_ALIASES = {"measure": {"PA": "IOU_AC_Territory"}}
 _RULE_TO_COLUMN = {"Electric Factor": "ElectricFactor", "Gas Factor": "GasFactor", "Weighted Factor": "WeightedFactor"}
 
 
-# --- user-supplied factors (recet.overrides.load_sw_factors): a (Year, ProgramID) row replaces the built-in row, a new one is added ---
+# --- user-supplied factors (recet.overrides.load_sw_factors): a (Year, ProgramID) row replaces the built-in row, a new one is added;
+# with replace=True the supplied table is the whole table (a pinned allocation version: no built-in row applies) ---
 _USER = None
+_REPLACE = False
 
 
-def set_user_factors(table: pd.DataFrame | None) -> None:
-    global _USER
-    _USER = table
+def set_user_factors(table: pd.DataFrame | None, replace: bool = False) -> None:
+    global _USER, _REPLACE
+    _USER, _REPLACE = table, bool(replace) and table is not None
 
 
 def user_factors() -> pd.DataFrame | None:
@@ -72,10 +74,13 @@ def user_factors() -> pd.DataFrame | None:
 
 
 def load_factors(path: Path | None = None) -> pd.DataFrame:
-    """The factor table indexed by (Year, ProgramID): the built-in file (or `path`), with any user-supplied rows replacing / extending it."""
+    """The factor table indexed by (Year, ProgramID): the built-in file (or `path`), with any user-supplied rows replacing / extending it (or, set with
+    replace=True, the user-supplied table alone)."""
     df = pd.read_csv(path or FACTORS_CSV)
     df["ProgramID"] = df["ProgramID"].astype(str).str.strip()
-    if _USER is not None and path is None:
+    if _USER is not None and path is None and _REPLACE:
+        df = _USER[[c for c in _USER.columns if c in df.columns or c.endswith("Factor")]].copy()
+    elif _USER is not None and path is None:
         user = _USER.copy()
         keep = ~pd.MultiIndex.from_frame(df[["Year", "ProgramID"]]).isin(pd.MultiIndex.from_frame(user[["Year", "ProgramID"]]))
         df = pd.concat([df[keep], user[[c for c in user.columns if c in df.columns or c.endswith("Factor")]]], ignore_index=True)
