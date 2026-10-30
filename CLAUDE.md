@@ -95,6 +95,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.76 (2026-10-30, phase 0 of the CEDARS platform build plan; BRD v0.5 BR-06.3): the record cap. `RunConfig.max_records` (2,000,000 =
+  `preflight.MAX_RECORDS`; `--max-records`; 0 = no cap): `preflight.check_inputs(max_records=)` counts the rows first and refuses a larger job with the
+  single error `too_many_records` (`too_many_records_message`), nothing else checked; run_job does not split such a job; a CET replica refuses it in
+  `cet_versions/job._check_record_cap` (ValueError, same message). tests/test_record_cap.py.
 - 0.1.75 (2026-10-29, Jake: "CEDARS is always assuming SCE for programs with SW PA in the CET, but SCE is not all of the programs' lead. SCE has
   historically been the largest funder"): a CEDARS upload's statewide ProgramCost rows (PA SW) are costed as SCE's (`cet_versions/job.cet_programs`,
   logged), as CEDARS passes them; a job in CET's input form (Measure PA column) is priced as given. Found by running the two 10k jobs on the published

@@ -232,6 +232,9 @@ part and adds up each program's totals (the benefits its costs are shared by); t
 finishes the cost tests and appends each part's rows to the output files. The files are the same as a whole-job run writes and the values equal to rounding
 (sums are added in a different order). The run log shows one line per part.
 
+**The record cap.** A job with more than 2,000,000 records (the `max_records` setting, `--max-records`; BRD BR-06.3) is refused at the start of preflight
+with the error `too_many_records`, before the file is split: split it into files of at most that many records, or raise the cap. 0 = no cap.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## Common jobs
