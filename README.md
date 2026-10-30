@@ -27,6 +27,11 @@ The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021
     recet data status                       what is there and what is missing
     recet data verify D:\cedars_reference_data --full     check sizes and SHA-256 against manifest.json
     recet data build D:\cedars_reference_data             copy (or --link) the files the tool currently finds into a new folder
+                       [--pack-version 2026-10-30] [--draft 2028]   name the pack; mark an ACC as a draft (analysis runs only, BR-11.8)
+    recet data draft D:\cedars_reference_data 2028 [--final]      mark an ACC in a built folder as draft, or final
+    recet data tie-out D:\cedars_reference_data --acc 2024 [--source-totals totals.csv]
+                                                          the acceptance report (BR-06.21): structure, control totals against the
+                                                          source workbook's, reference measures engine vs tests/reference_calc.py
     recet data pack D:\cedars_reference_data D:\parts     split it into <= 4 GB parts (+ SHA256SUMS) for transfer
     recet data unpack D:\parts E:\cedars_reference_data   rebuild it on the other machine
 
