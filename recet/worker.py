@@ -19,6 +19,7 @@ import platform
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from dataclasses import asdict
@@ -28,6 +29,7 @@ from pathlib import Path
 from . import jobspec, storage
 
 RECEIPT_VERSION = 1
+PROGRESS_SECONDS = 10                               # progress.json is sent to the outputs URI at each stage change and at most this often between
 MAX_UNZIPPED_BYTES = 1024 * 1024 * 1024            # a job zip's Measure.csv + ProgramCost.csv, as the web app's limit (RECET_WEB_MAX_UNZIPPED_MB)
 
 
@@ -150,18 +152,21 @@ def package_data_sha256() -> str:
     return _PACKAGE_DATA
 
 
-def allocation_record(cfg) -> dict:
+def allocation_record(cfg, spec: dict | None = None) -> dict:
+    """The statewide factor table the run used: the built-in one by name, or a supplied file (its URI); its SHA-256; the allocation_version the spec named."""
     from .pipeline import statewide_allocation
+    requested = (spec or {}).get("allocation_version")
     if cfg.sw_factors_file:
-        return {"table": "supplied", "sha256": sha256_file(Path(cfg.sw_factors_file)), "applied": cfg.allocate_statewide}
+        uri = jobspec.input_uri(spec["inputs"]["sw_factors"])[0] if spec and "sw_factors" in spec.get("inputs", {}) else None
+        return {"table": "supplied", "file": uri, "sha256": sha256_file(Path(cfg.sw_factors_file)), "requested": requested, "applied": cfg.allocate_statewide}
     f = statewide_allocation.FACTORS_CSV
-    return {"table": f.stem, "sha256": sha256_file(f), "applied": cfg.allocate_statewide}
+    return {"table": f.stem, "sha256": sha256_file(f), "requested": requested, "applied": cfg.allocate_statewide}
 
 
 def check_allocation(spec: dict, cfg) -> None:
     want = spec.get("allocation_version")
     if want:
-        rec = allocation_record(cfg)
+        rec = allocation_record(cfg, spec)
         if want not in (rec["table"], rec["sha256"]):
             raise SpecRefused(f"allocation_version {want!r}: this run would use {rec['table']} ({rec['sha256'][:12]}...)")
 
@@ -198,6 +203,59 @@ def build_config(spec: dict, files: dict[str, Path], ref: Path | None, out_dir: 
     return cfg
 
 
+class ProgressSender:
+    """While a run runs: point progress.py at `local` (RECET_PROGRESS_FILE) and send it to `uri` whenever its stage changes, and at most every `every`
+    seconds while its parts move (BR-06.2: the caller's run page shows the stage and time left of a batch run). A failed send is skipped, never fatal."""
+
+    def __init__(self, local: Path, uri: str, every: float = PROGRESS_SECONDS, poll: float = 1.0):
+        self.local, self.uri, self.every, self.poll = Path(local), uri, every, poll
+        self._stop = threading.Event()
+        self._sent: tuple[str | None, str | None] = (None, None)          # (stage, text) last sent
+        self._last = 0.0
+        self.sends = 0
+
+    def __enter__(self):
+        from . import progress
+        self._env = os.environ.get(progress.ENV)
+        os.environ[progress.ENV] = str(self.local)
+        progress._T0 = time.time()                                      # the time left counts from this run's start
+        self._thread = threading.Thread(target=self._loop, name="recet-progress", daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        from . import progress
+        self._stop.set()
+        self._thread.join(timeout=30)
+        self.send(force=True)
+        if self._env is None:
+            os.environ.pop(progress.ENV, None)
+        else:
+            os.environ[progress.ENV] = self._env
+        return False
+
+    def _loop(self):
+        while not self._stop.wait(self.poll):
+            self.send()
+
+    def send(self, force: bool = False) -> None:
+        try:
+            text = self.local.read_text(encoding="utf-8")
+            stage = json.loads(text).get("stage")
+        except (OSError, ValueError):
+            return
+        if text == self._sent[1]:
+            return
+        if not (force or stage != self._sent[0] or time.time() - self._last >= self.every):
+            return
+        try:
+            storage.for_uri(self.uri).put(self.local, self.uri)
+        except Exception:                                               # the run goes on; the next change is sent again
+            return
+        self._sent, self._last = (stage, text), time.time()
+        self.sends += 1
+
+
 def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict | None]:
     """Run one job spec; returns (exit code, receipt or None when the spec was refused)."""
     from . import __version__, paths
@@ -229,8 +287,10 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
 
         log(f"recet worker {__version__}: job {spec['job_id']}")
         status, error, result = "succeeded", None, None
+        sender = ProgressSender(work / "progress.json", storage.join(spec["outputs"]["uri"], "progress.json"))
         try:
-            result = run_job(cfg, log=log)
+            with sender:
+                result = run_job(cfg, log=log)
         except Exception as exc:                                       # a failed run still gets a receipt
             status, error = "failed", f"{type(exc).__name__}: {exc}"
             log(traceback.format_exc())
@@ -283,7 +343,7 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
             config[k] = f"<input {Path(config[k]).stem}>"
     config.pop("out_dir", None)
     return {
-        "receipt_version": RECEIPT_VERSION, "job_id": spec["job_id"], "status": status, "error": error,
+        "receipt_version": RECEIPT_VERSION, "job_id": spec["job_id"], "status": status, "error": error, "context": spec.get("context"),
         "started": started, "finished": _now(), "seconds": round(time.time() - t0, 1),
         "engine": engine_record(cfg),
         "spec": {"sha256": spec_sha, "spec_version": spec["spec_version"], "allocation_version": spec.get("allocation_version")},
@@ -294,7 +354,7 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
                 "by_record": (result.acc_check or {}).get("by_acc_and_year") if result is not None else None},
         "packs": {"reference_dir": str(ref or ""), "files": used, "package_data_sha256": package_data_sha256()},
         "run_parameters": run_parameters_record(cfg, acc.get("settings_acc_version")),
-        "allocation": allocation_record(cfg),
+        "allocation": allocation_record(cfg, spec),
         "rule_set": settings.get("filing_validation"),
         "outputs": outputs,
         "totals": result.totals if result is not None else {},
