@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 
 class StorageError(RuntimeError):
@@ -19,7 +20,8 @@ class LocalStorage:
     def path(uri: str) -> Path:
         if uri.startswith("file://"):
             p = urlparse(uri)
-            return Path(unquote((p.netloc + p.path) if p.netloc and p.netloc != "localhost" else p.path))
+            path = p.path if not p.netloc or p.netloc == "localhost" else "//" + p.netloc + p.path   # file://host/share/... is a UNC path
+            return Path(url2pathname(path))       # on Windows /C:/Users/... becomes C:\Users\...; elsewhere only the %-escapes are undone
         return Path(uri)
 
     def fetch(self, uri: str, dest: Path) -> Path:
