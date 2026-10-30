@@ -90,6 +90,7 @@ class RunConfig:
                                              # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
+    max_records: int = 2_000_000             # the record cap (BRD v0.5 BR-06.3): a job with more Measure.csv rows is refused in preflight; 0 = no cap
     replica_part_size: int = 10_000          # a CET replica engine prices this many measures at a time (cet_versions.price); 0 = the whole job at once.
                                              # Smaller than chunk_size: a replica expands each measure to its quarters (a 200k-measure job on CET 25.1
                                              # peaks at 1.2 GB with 10,000, at 4.2 GB with 50,000, in the same time)
@@ -384,7 +385,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     parts_dir = run_dir / "_parts"
     if cfg.chunk_size and cfg.subset_step <= 1 and Path(cfg.measures).exists() and delimited.detect_sep(cfg.measures):
         n_rows = delimited.count_rows(cfg.measures)
-        if n_rows > cfg.chunk_size:
+        if n_rows > cfg.chunk_size and not (cfg.max_records and n_rows > cfg.max_records):    # a job over the cap is refused by preflight, unsplit
             log(f"splitting Measure.csv ({n_rows:,} rows) into parts of {cfg.chunk_size:,} rows")
             progress.report("splitting")
             ts = time.time()
@@ -418,7 +419,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     tp = time.time()
     rep = preflight.check_inputs(cfg.measures, cfg.programcost, acc=acc, allocate_statewide=cfg.allocate_statewide, base_year=cfg.base_year,
                                  apply_exclude_from_ce=cfg.apply_exclude_from_ce, parts=parts, dtypes=dtypes,
-                                 filing_rules=cfg.filing_validation or None, filing_year=cfg.filing_year, acc_purpose=cfg.acc_purpose)
+                                 filing_rules=cfg.filing_validation or None, filing_year=cfg.filing_year, acc_purpose=cfg.acc_purpose,
+                                 max_records=cfg.max_records)
     log(f"checked in {time.time() - tp:.0f}s" + (f" ({len(parts)} parts)" if parts is not None else ""))
     (run_dir / "preflight.txt").write_text(rep.text(), encoding="utf-8")
     (run_dir / "preflight.json").write_text(json.dumps(rep.to_dict()), encoding="utf-8")
