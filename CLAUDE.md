@@ -20,6 +20,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   the retired TOU/SCG quarterly routes, the CET-CO2 comparison option and the research-checkout file fallback were removed. Research scripts in
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
+- The web server's state is backed up nightly to S3 by `deploy/backup/recet-backup.sh` (systemd timer, instance role; README there is the setup and
+  restore runbook, tests/test_backup_scripts.py runs both scripts against a fake aws). A change to what the web app keeps in its state folder (a new
+  database, a folder that must not be mirrored) changes that script and its README too.
 - The web app (`recet/web`: templates, `static/*.css`, `static/*.js`, the vendored Tabulator and Mermaid as we use them) must meet WCAG 2.2 Level AA
   (Jake, 2026-10-29; ARCHITECTURE 1.4 and 8.7). Every page change keeps it: a visible label or accessible name on every control, keyboard reach and a
   visible focus for everything a mouse can do (no hover- or double-click-only actions, no `title` as the only way to learn something), status shown in
