@@ -63,7 +63,7 @@ def cmd_run(a) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    from .job import cet_inputs, cet_programs
+    from .job import cet_inputs, cet_programs, settings_pas
 
     upload = [False]
 
@@ -73,10 +73,11 @@ def cmd_run(a) -> int:
         return cet_inputs(raw, programs)[0]
 
     job = plan(a.measures, PART_SIZE if a.part_size is None else a.part_size, read, out / "_parts")
-    costs = cet_programs(programs)[0] if upload[0] else programs     # an upload's non-IOU programs are costed as SCE's, as CEDARS passes them
     first_year = a.first_year or job.first_claim_year
     version = _cet_version(a) if not a.tables else None
     tables = QuarterlyTables.from_folder(a.tables) if a.tables else QuarterlyTables.from_release(rel.name, version, a.export_dir, job.keys)
+    # an upload's programs whose PA has no settings at this Version are costed as SCE's, as CEDARS passes them
+    costs = cet_programs(programs, settings_pas(tables))[0] if upload[0] else programs
     priced = 0
     for i, (_rows, res) in enumerate(price(lambda: job.frames(read), costs, rel.name, tables, first_year, a.me_bens, a.me_cost)):
         priced += len(res.ce)

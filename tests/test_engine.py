@@ -240,4 +240,18 @@ def test_cet_inputs_pa():
     # the territory whenever there is one (CEDARS, jobs 122714 / 122716 / 122738), else the program's PA, else the PrgID's prefix
     assert list(out.PA) == ["PGE", "SCE", "SCE", "SW", "PGE", "PGE"] and n == 2 and "FuelType" in out and "FuelID" not in out
     q, k = cet_job.cet_programs(p.assign(PA=["PGE", " sw ", "BAY"]))
-    assert list(q.PA) == ["PGE", "SCE", "SCE"] and k == 2 and list(p.PA) == ["PGE", "SW", "MCE"]   # every non-IOU PA; the caller's table not changed
+    assert list(q.PA) == ["PGE", "SCE", "SCE"] and k == 2 and list(p.PA) == ["PGE", "SW", "MCE"]   # no settings given: the IOUs; caller's table kept
+    # keyed on the PAs with settings at the run's Version (Jake): a PA with its own E3Settings row keeps its PA and is costed on its own rates
+    q2, k2 = cet_job.cet_programs(p.assign(PA=["PGE", "SW", "BAY"]), {"PGE ", "sce", "BAY"})
+    assert list(q2.PA) == ["PGE", "SCE", "BAY"] and k2 == 1
+
+
+def test_settings_pas_by_version():
+    """Which PAs have settings depends on the release and Version: 25.1's Version 2026 only the IOUs and PAC; 22.1's Version 2022 the CCAs too."""
+    from recet.cet_versions import QuarterlyTables
+    t = QuarterlyTables.from_folder(DATA / "25.1" / C3 / "tables")
+    assert cet_job.settings_pas(t) == {"pge", "sce", "scg", "sdge", "pac"}
+    t22 = QuarterlyTables.from_folder(DATA / "22.1" / "synthetic_avc2022" / "tables")
+    assert {"mce", "bay", "sjce"} <= cet_job.settings_pas(t22)
+    q, k = cet_job.cet_programs(pd.DataFrame({"PA": ["MCE", "SW"], "PrgID": ["MCE01", "SW_X"]}), cet_job.settings_pas(t22))
+    assert list(q.PA) == ["MCE", "SCE"] and k == 1

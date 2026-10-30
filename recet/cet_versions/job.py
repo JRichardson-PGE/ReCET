@@ -147,16 +147,26 @@ IOUS = ("PGE", "SCE", "SCG", "SDGE")
 STATEWIDE_COST_PA = "SCE"
 
 
-def cet_programs(programs: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-    """A CEDARS upload's ProgramCost rows as CET's input table has them (InputProgramCEDARS): CEDARS gives every row whose PA is not one of the
-    four IOUs PA SCE before CET runs (Jake, 2026-10-29: SCE has historically funded most statewide programs; the published CET 25.1's program
-    tables: job 122714's 72 SW rows, job 122738's SW, MCE, BAY, SCR and SDRN rows all SCE, PGE kept), whatever the program's lead. So their costs
-    are discounted at SCE's rates and shared over the program's records. Only for an upload: a job already in CET's input form (its Measure file
-    has CET's PA column) is priced as given, as RunCET prices it (the reference runs kept PA SW). Returns the table and the number of rows changed."""
+def settings_pas(tables) -> set[str]:
+    """The PAs the release has settings for at the tables' Version (E3Settings rows of that Version, as CET's Settingsvw selects), casefolded."""
+    from .inputs import settings
+    return set(settings(tables.settings, str(tables.version)).PA.astype(str).str.strip().str.casefold())
+
+
+def cet_programs(programs: pd.DataFrame, with_settings: set[str] | None = None) -> tuple[pd.DataFrame, int]:
+    """A CEDARS upload's ProgramCost rows as CET's input table has them (InputProgramCEDARS): a row whose PA has no settings (no E3Settings row
+    for the run's Version: `with_settings`, from `settings_pas`) is costed as SCE's. CEDARS gives every non-IOU program's rows PA SCE before CET
+    runs (Jake, 2026-10-29: SCE has historically funded most statewide programs; the published CET 25.1's program tables: job 122714's 72 SW
+    rows, job 122738's SW, MCE, BAY, SCR and SDRN rows all SCE, PGE kept), whatever the program's lead, and on CET 25.1's current Versions the
+    PAs with settings are the IOUs (and PAC). Keyed on settings rather than on a list of IOUs (Jake): a PA given its own discount rates in a
+    release's E3Settings is costed on them. Without `with_settings`, the four IOUs. Only for an upload: a job already in CET's input form (its
+    Measure file has CET's PA column) is priced as given, as RunCET prices it (the reference runs kept PA SW). Returns the table and the number
+    of rows changed."""
     if "PA" not in programs:
         return programs, 0
+    have = {p.strip().casefold() for p in (with_settings if with_settings is not None else IOUS)}
     pa = programs["PA"].astype("string").str.strip().str.casefold()
-    other = ~pa.isin([i.casefold() for i in IOUS]).fillna(False).astype(bool) & pa.fillna("").ne("")
+    other = ~pa.isin(sorted(have)).fillna(False).astype(bool) & pa.fillna("").ne("")
     if not other.any():
         return programs, 0
     p = programs.copy()
@@ -245,13 +255,6 @@ def run_job(cfg, log=print):
         note = f"{moved:,} record(s) are priced on their IOU_AC_Territory, not their program's PA, as CEDARS passes them to CET"
         result.notes.append(note)
         log(f"note: {note}")
-    # an upload only
-    cet_costs, sw_rows = cet_programs(programs) if upload[0] else (programs, 0)
-    if sw_rows:
-        note = (f"{sw_rows:,} ProgramCost row(s) of non-IOU programs (statewide, CCA, REN) are costed as {STATEWIDE_COST_PA}'s, as CEDARS passes "
-                "them to CET")
-        result.notes.append(note)
-        log(f"note: {note}")
     if job.acc_version_set:
         note = f"the ACCVersion column is a ReCET option: the {rel.label} prices every record on the {versions.acc_short(acc)}"
         result.notes.append(note)
@@ -266,6 +269,13 @@ def run_job(cfg, log=print):
     tables = QuarterlyTables.from_release(rel.name, version, None, job.keys)
     log(f"the release's Version {version} tables read in {time.time() - tl:.0f}s ({len(tables.ac_elec):,} electric and {len(tables.ac_gas):,} gas "
         "avoided-cost rows for this job)")
+    # an upload only: a program whose PA has no settings at this Version is costed as SCE's
+    cet_costs, sw_rows = cet_programs(programs, settings_pas(tables)) if upload[0] else (programs, 0)
+    if sw_rows:
+        note = (f"{sw_rows:,} ProgramCost row(s) of programs whose PA has no settings at Version {version} (statewide, CCA, REN) are costed as "
+                f"{STATEWIDE_COST_PA}'s, as CEDARS passes them to CET")
+        result.notes.append(note)
+        log(f"note: {note}")
 
     log(f"\n== pricing and writing ({rel.label}) ==")
     progress.report("pricing")
