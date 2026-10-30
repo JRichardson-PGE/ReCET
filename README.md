@@ -123,6 +123,13 @@ every output file's SHA-256, the totals and notes, and the spec's `context` (the
 sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
 `recet worker validate job.json` checks a spec without running it.
 
+The worker image (`Dockerfile.worker`: the locked `requirements/worker.txt`, which is the engine plus boto3, and no web app) is published for each
+engine release: push the tag `vX.Y.Z` matching `recet/__init__.py` and `.github/workflows/worker-image.yml` builds it for amd64 and arm64 as
+`ghcr.io/jrichardson-pge/recet-worker:X.Y.Z`, with `RECET_IMAGE` and `RECET_COMMIT` set so every receipt names the image. Mount the reference data
+read-only at `/data`; S3 credentials come from the environment or the instance / task role:
+
+    docker run --rm -v /path/to/reference:/data:ro ghcr.io/jrichardson-pge/recet-worker:0.1.78 run s3://bucket/jobs/0001/job.json
+
 ## From Python
 
     from recet.jobs import RunConfig, run_job

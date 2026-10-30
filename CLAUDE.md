@@ -29,9 +29,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   text and not by colour alone, 4.5:1 text and 3:1 control-border/focus contrast in BOTH colour schemes, `aria-live` for text that updates on its own,
   targets at least 24 x 24 px, content that reflows at 320 px wide and 200% zoom. Check new colours with a contrast calculator and new pages with axe.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
-- Dependencies are locked (phase 0 of the CEDARS platform build plan, 2026-10-30): `requirements/{engine,web,test}.txt`, every platform and Python 3.11+,
+- Dependencies are locked (phase 0 of the CEDARS platform build plan, 2026-10-30): `requirements/{engine,worker,web,test}.txt`, every platform and Python 3.11+,
   with hashes, made by `python requirements/lock.py` (uv) from pyproject.toml. The Dockerfile installs `web.txt` with `--require-hashes`, then ReCET with
-  `--no-deps`; the Lockfile workflow fails when the files no longer match pyproject.toml. Change a dependency in pyproject.toml and re-run lock.py in the
+  `--no-deps`; the Lockfile workflow fails when the files no longer match pyproject.toml. `Dockerfile.worker` installs `worker.txt` (engine + boto3): the batch worker image, published
+  per release tag vX.Y.Z (= `__version__`, checked) to ghcr.io/jrichardson-pge/recet-worker:X.Y.Z by `.github/workflows/worker-image.yml`. Change a dependency in pyproject.toml and re-run lock.py in the
   same PR (`--upgrade` to take newer versions, and run the tests on them).
 - ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. The web pages name a version by
   its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
