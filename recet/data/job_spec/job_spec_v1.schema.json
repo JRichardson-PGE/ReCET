@@ -60,6 +60,7 @@
       }
     },
     "allocation_version": {"type": "string", "minLength": 1, "description": "The statewide factor table the run must use: the built-in table's name (statewide_factors_20260918) or a supplied sw_factors file's SHA-256."},
+    "context": {"type": "object", "description": "The caller's own references (e.g. its run, submission and allocation-version ids); the worker never reads them and echoes them verbatim into receipt.json."},
     "outputs": {
       "type": "object",
       "required": ["uri"],

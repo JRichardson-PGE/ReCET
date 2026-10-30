@@ -113,12 +113,14 @@ allocation table differs from what it asks for, runs it, and sends the run folde
      "settings": {"acc_version": "2024", "acc_purpose": "claims"},
      "packs": {"files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},
      "allocation_version": "statewide_factors_20260918",
-     "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"}}
+     "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"},
+     "context": {"platform_run_id": 123}}
 
 The receipt names the engine (release, calculation, image and commit from `RECET_IMAGE` / `RECET_COMMIT`, Python and library versions), every input's
 URI, SHA-256, size and row count, the full settings, the ACC and the ACC each record was priced on, every reference file used with its SHA-256 (from the
 reference folder's `manifest.json`, else computed) and the packaged data's hash, the run parameters and statewide factor table, the filing rule set,
-every output file's SHA-256, the totals and notes. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
+every output file's SHA-256, the totals and notes, and the spec's `context` (the caller's own references) as given. While the job runs, the worker
+sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
 `recet worker validate job.json` checks a spec without running it.
 
 ## From Python

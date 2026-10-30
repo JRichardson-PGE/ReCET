@@ -182,3 +182,32 @@ def test_cli(job, tmp_path, capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(["worker", "run", str(spec)])
     assert e.value.code == 0 and (tmp_path / "results" / "receipt.json").exists()
+
+
+def test_context_progress_and_a_supplied_allocation_table(job, tmp_path):
+    from recet.pipeline import statewide_allocation
+    sw = tmp_path / "sw_factors_v42.csv"
+    sw.write_bytes(statewide_allocation.FACTORS_CSV.read_bytes())
+    spec = json.loads(_spec(job, tmp_path, context={"platform_run_id": 123, "submission_version": "claims/PGE/2028Q1/v2"},
+                            allocation_version=_sha(sw)).read_text())
+    spec["inputs"]["sw_factors"] = str(sw)
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    assert code == 0 and receipt["context"] == {"platform_run_id": 123, "submission_version": "claims/PGE/2028Q1/v2"}
+    assert receipt["allocation"] == {"table": "supplied", "file": str(sw), "sha256": _sha(sw), "requested": _sha(sw), "applied": False}
+    progress = json.loads((tmp_path / "results" / "progress.json").read_text())
+    assert progress["stage"] == "done" and progress["fraction"] == 1.0
+
+
+def test_the_progress_sender(tmp_path):
+    local, dest = tmp_path / "progress.json", tmp_path / "out" / "progress.json"
+    s = worker.ProgressSender(local, str(dest), every=3600, poll=3600)
+    s.send()
+    assert s.sends == 0 and not dest.exists()                          # nothing reported yet
+    for stage, done, sends in (("pricing", 0, 1), ("pricing", 1, 1), ("writing", 0, 2), ("writing", 0, 2)):
+        local.write_text(json.dumps({"stage": stage, "done": done}))
+        s.send()
+        assert s.sends == sends, (stage, done)                         # a new stage is sent at once; parts within one wait for `every`
+    local.write_text(json.dumps({"stage": "writing", "done": 3}))
+    s.send(force=True)
+    assert s.sends == 3 and json.loads(dest.read_text())["done"] == 3

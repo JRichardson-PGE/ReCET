@@ -15,7 +15,8 @@ library, and tests/test_worker.py keeps the two in step.
       "packs": {"reference_dir": "/data",                      # default: the worker's reference data folder (RECET_DATA)
                 "files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},   # pinned: refused when the folder's file differs
       "allocation_version": "statewide_factors_20260918",      # the statewide factor table the run must use (built-in name, or a supplied file's SHA-256)
-      "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"}
+      "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"},
+      "context": {"platform_run_id": 123}                      # the caller's own references, echoed verbatim into receipt.json
     }
 """
 from __future__ import annotations
@@ -38,7 +39,7 @@ INPUTS = ("job_zip", *FILE_INPUTS)
 # RunConfig fields a spec does not set in `settings`: files (inputs), folders and names (the worker's), the engine and format (their own blocks), test hooks
 NOT_SETTINGS = {*FILE_INPUTS.values(), "out_dir", "run_name", "reference_dir", "engine", "output_format", "subset_step"}
 OUTPUT_FORMATS = ("csv", "csv.zip", "parquet", "xlsx")
-TOP = {"spec_version", "job_id", "engine", "inputs", "settings", "packs", "allocation_version", "outputs", "description"}
+TOP = {"spec_version", "job_id", "engine", "inputs", "settings", "packs", "allocation_version", "outputs", "context", "description"}
 
 
 def settings_fields() -> dict[str, type]:
@@ -127,6 +128,8 @@ def validate(spec) -> list[str]:
                 errors.append(f"packs.files.{rel}.sha256: 64 lower-case hex digits")
     if "allocation_version" in spec and not (isinstance(spec["allocation_version"], str) and spec["allocation_version"].strip()):
         errors.append("allocation_version: the statewide factor table's name or a supplied file's SHA-256")
+    if "context" in spec and not isinstance(spec["context"], dict):
+        errors.append("context: an object (echoed into receipt.json as given)")
     out = spec.get("outputs")
     if not isinstance(out, dict) or not isinstance(out.get("uri"), str) or not out["uri"].strip():
         errors.append("outputs.uri: the folder (path, file:// or s3://) the run's files go to")
