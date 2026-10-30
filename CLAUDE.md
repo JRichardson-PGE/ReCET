@@ -103,6 +103,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.81 (2026-10-30): the impact-profile library re-scraped after CEDARS fixed its duplicate hours (2026-10-29). The old library had, in every zone of
+  19,374 profiles, the spring-forward DST hour twice and the hour before it missing (`shapes_from_frame` deduplicated and interpolated); every zone now has
+  exactly 8,760 hours. 21,859 profiles with hourly data (1,362 new start-year-2028 load shapes; PacifiCorp's 21 are in the catalog with no hourly rows).
+  Reference folder: new `impact_profiles/hourly.parquet` (9.51 GB) and `catalog.parquet`. Rebuilt with it: `data/system_zones` (12 of 81,988 choices flip,
+  all near-ties) and the regression fixtures (k10 per-measure changes up to 0.006%). Four PG&E consolidated 2028-2031 filings: ElecBen +0.0000009%,
+  largest per-measure change 0.009%. Method and diff: CEDARS-Research `poc/impact_profile_rescrape/`, `notes/impact_profile_library.md`.
 - 0.1.80 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.78 worker, 0.1.79 regression gate; first numbered 0.1.79): data-pack
   acceptance. `datapack` manifest format 2: `pack` {type "reference", version (`--pack-version`, default the date)} and per file `type` (the REF_FILES key),
   `acc_version`, `draft`; `set_draft` / `recet data draft FOLDER ACC [--final]`; `file_info(path)` finds a file's entry. A draft ACC (BR-11.8; also a supplied

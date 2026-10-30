@@ -1,11 +1,11 @@
 {
   "fixture_version": 1,
-  "built": "2026-10-29",
-  "built_with": "recet 0.1.77",
+  "built": "2026-10-30",
+  "built_with": "recet 0.1.80",
   "source_reference": {
     "acc/2024/electric_hourly.parquet": "5d52c4d7fc9fd963350aa69f0b9a6982a2cd24dde443bbd0c4cbc3dc0fe6ac29",
-    "impact_profiles/catalog.parquet": "9a59518435f3db9f01648c4d86ff6d17810ed709c41f3937224011b376b64b12",
-    "impact_profiles/hourly.parquet": "f34814dc62ac479083d6c281ae03f9a686379460ed9895c4e80708606dfcd753"
+    "impact_profiles/catalog.parquet": "77710f677bb531050d36806273e35b655996cf2944d5461c48f61be68a6bd160",
+    "impact_profiles/hourly.parquet": "945e69775cc873cbeaf865fd7011b6f2bd78f63144348f33ac630ef02b54630c"
   },
   "tolerance": {
     "rtol": 1e-09,
@@ -17,12 +17,12 @@
       "sha256": "fc61559ed06703d84f6a219d5958baa4be7ddfd3dcee4749ec3900ec2df0dff5"
     },
     "impact_profiles/catalog.parquet": {
-      "bytes": 237503,
-      "sha256": "9a59518435f3db9f01648c4d86ff6d17810ed709c41f3937224011b376b64b12"
+      "bytes": 259039,
+      "sha256": "77710f677bb531050d36806273e35b655996cf2944d5461c48f61be68a6bd160"
     },
     "impact_profiles/hourly.parquet": {
-      "bytes": 2651876,
-      "sha256": "12170c8fc33d4e0c8846e105d2a517a0777dfd2d437f474681964ae5ead4ceb1"
+      "bytes": 2648822,
+      "sha256": "95235fded65fea8bf17e1a622363136013eb1da2816ab757240513d38a15a889"
     }
   },
   "jobs": {
@@ -49,5 +49,5 @@
       ]
     }
   },
-  "bytes": 29826113
+  "bytes": 29844538
 }
