@@ -118,9 +118,10 @@ def _read(path: str) -> pd.DataFrame:
 
 def cet_inputs(measures: pd.DataFrame, programs: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     """A CEDARS upload's Measure rows as CET's input table has them (InputMeasureCEDARS): a CEDARS Measure.csv has no PA and calls the fuel
-    FuelID. Each record's PA is its program's (ProgramCost PA by PrgID, else the PrgID's prefix); a statewide record (PA SW, for which CET has no
-    avoided costs or settings) is priced on its IOU_AC_Territory, as the reference runs were made (CEDARS-Research poc/cet_reference_jobs.py). A
-    file that already has CET's PA column is used as it is. Returns the table and the number of statewide records priced on their territory."""
+    FuelID. CEDARS passes every record's IOU_AC_Territory to CET as its PA, whatever its program's PA (published CET 25.1 jobs 122714, 122716 and
+    122738: all 20,035 records, including statewide, CCA and REN programs' records); a record with no territory takes its program's PA
+    (ProgramCost PA by PrgID, else the PrgID's prefix). A file that already has CET's PA column is used as it is. Returns the table and the number
+    of records whose PA is not their program's."""
     from .sql import key
     m = measures.copy()
     if "FuelType" not in m and "FuelID" in m:
@@ -128,21 +129,49 @@ def cet_inputs(measures: pd.DataFrame, programs: pd.DataFrame) -> tuple[pd.DataF
     if "PA" in m:
         return m, 0
     prg = m["PrgID"].astype("string")
-    pa = pd.Series(pd.NA, index=m.index, dtype="string")
+    own = pd.Series(pd.NA, index=m.index, dtype="string")
     if {"PA", "PrgID"} <= set(programs.columns):
         by_prg = dict(zip(key(programs["PrgID"].astype("string")), programs["PA"].astype("string")))
-        pa = key(prg).map(by_prg).astype("string")
-    pa = pa.fillna(prg.str.split("_").str[0])
-    sw = key(pa).eq(key(pd.Series(["SW"]))[0]).fillna(False).astype(bool)
+        own = key(prg).map(by_prg).astype("string")
+    own = own.fillna(prg.str.split("_").str[0]).str.strip()
+    pa = own
     if "IOU_AC_Territory" in m:
         terr = m["IOU_AC_Territory"].astype("string").str.strip()
-        sw &= terr.fillna("").ne("")
-        pa = pa.where(~sw, terr)
-    else:
-        sw &= False
-    pa = pa.str.strip()
+        pa = own.where(terr.fillna("").eq(""), terr)
+    moved = int((key(pa) != key(own)).fillna(False).sum())
     m.insert(0, "PA", pa.astype(object).where(pa.notna(), None))
-    return m, int(sw.sum())
+    return m, moved
+
+
+IOUS = ("PGE", "SCE", "SCG", "SDGE")
+STATEWIDE_COST_PA = "SCE"
+
+
+def settings_pas(tables) -> set[str]:
+    """The PAs the release has settings for at the tables' Version (E3Settings rows of that Version, as CET's Settingsvw selects), casefolded."""
+    from .inputs import settings
+    return set(settings(tables.settings, str(tables.version)).PA.astype(str).str.strip().str.casefold())
+
+
+def cet_programs(programs: pd.DataFrame, with_settings: set[str] | None = None) -> tuple[pd.DataFrame, int]:
+    """A CEDARS upload's ProgramCost rows as CET's input table has them (InputProgramCEDARS): a row whose PA has no settings (no E3Settings row
+    for the run's Version: `with_settings`, from `settings_pas`) is costed as SCE's. CEDARS gives every non-IOU program's rows PA SCE before CET
+    runs (Jake, 2026-10-29: SCE has historically funded most statewide programs; the published CET 25.1's program tables: job 122714's 72 SW
+    rows, job 122738's SW, MCE, BAY, SCR and SDRN rows all SCE, PGE kept), whatever the program's lead, and on CET 25.1's current Versions the
+    PAs with settings are the IOUs (and PAC). Keyed on settings rather than on a list of IOUs (Jake): a PA given its own discount rates in a
+    release's E3Settings is costed on them. Without `with_settings`, the four IOUs. Only for an upload: a job already in CET's input form (its
+    Measure file has CET's PA column) is priced as given, as RunCET prices it (the reference runs kept PA SW). Returns the table and the number
+    of rows changed."""
+    if "PA" not in programs:
+        return programs, 0
+    have = {p.strip().casefold() for p in (with_settings if with_settings is not None else IOUS)}
+    pa = programs["PA"].astype("string").str.strip().str.casefold()
+    other = ~pa.isin(sorted(have)).fillna(False).astype(bool) & pa.fillna("").ne("")
+    if not other.any():
+        return programs, 0
+    p = programs.copy()
+    p.loc[other, "PA"] = STATEWIDE_COST_PA
+    return p, int(other.sum())
 
 
 def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
@@ -211,18 +240,19 @@ def run_job(cfg, log=print):
     size = PART_SIZE if cfg.replica_part_size is None else int(cfg.replica_part_size)      # RunConfig.replica_part_size; 0 = one part
     work = run_dir / "_parts"
     programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    counted = [0]
+    counted, upload = [0], [False]
 
     def read(f):
-        m, n = cet_inputs(_read(f), programs)
+        raw = _read(f)
+        upload[0] = upload[0] or "PA" not in raw            # a CEDARS upload (CET's input table has a PA column)
+        m, n = cet_inputs(raw, programs)
         counted[0] += n
         return m
 
     job = plan(cfg.measures, size, read, work)
-    on_territory = counted[0]                 # counted while the job was scanned (every row read once)
-    if on_territory:
-        note = (f"{on_territory:,} statewide record(s) are priced on their IOU_AC_Territory (CEDARS does not pass statewide programs to CET, which has "
-                "no avoided costs or settings for PA SW)")
+    moved = counted[0]                        # counted while the job was scanned (every row read once)
+    if moved:
+        note = f"{moved:,} record(s) are priced on their IOU_AC_Territory, not their program's PA, as CEDARS passes them to CET"
         result.notes.append(note)
         log(f"note: {note}")
     if job.acc_version_set:
@@ -239,6 +269,13 @@ def run_job(cfg, log=print):
     tables = QuarterlyTables.from_release(rel.name, version, None, job.keys)
     log(f"the release's Version {version} tables read in {time.time() - tl:.0f}s ({len(tables.ac_elec):,} electric and {len(tables.ac_gas):,} gas "
         "avoided-cost rows for this job)")
+    # an upload only: a program whose PA has no settings at this Version is costed as SCE's
+    cet_costs, sw_rows = cet_programs(programs, settings_pas(tables)) if upload[0] else (programs, 0)
+    if sw_rows:
+        note = (f"{sw_rows:,} ProgramCost row(s) of programs whose PA has no settings at Version {version} (statewide, CCA, REN) are costed as "
+                f"{STATEWIDE_COST_PA}'s, as CEDARS passes them to CET")
+        result.notes.append(note)
+        log(f"note: {note}")
 
     log(f"\n== pricing and writing ({rel.label}) ==")
     progress.report("pricing")
@@ -256,7 +293,7 @@ def run_job(cfg, log=print):
     priced = 0
     frame = None
     texts = job.frames(lambda f: outputs.read_raw(f))
-    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), programs, rel.name, tables, first_year, me, me)):
+    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), cet_costs, rel.name, tables, first_year, me, me)):
         priced += len(res.ce)
         for name, df in res.tables().items():
             if whole:

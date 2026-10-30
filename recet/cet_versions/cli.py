@@ -63,17 +63,23 @@ def cmd_run(a) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
-    from .job import cet_inputs
+    from .job import cet_inputs, cet_programs, settings_pas
+
+    upload = [False]
 
     def read(f):                                  # a CEDARS upload has no PA: each record takes its program's (job.cet_inputs)
-        return cet_inputs(_read(f), programs)[0]
+        raw = _read(f)
+        upload[0] = upload[0] or "PA" not in raw
+        return cet_inputs(raw, programs)[0]
 
     job = plan(a.measures, PART_SIZE if a.part_size is None else a.part_size, read, out / "_parts")
     first_year = a.first_year or job.first_claim_year
     version = _cet_version(a) if not a.tables else None
     tables = QuarterlyTables.from_folder(a.tables) if a.tables else QuarterlyTables.from_release(rel.name, version, a.export_dir, job.keys)
+    # an upload's programs whose PA has no settings at this Version are costed as SCE's, as CEDARS passes them
+    costs = cet_programs(programs, settings_pas(tables))[0] if upload[0] else programs
     priced = 0
-    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), programs, rel.name, tables, first_year, a.me_bens, a.me_cost)):
+    for i, (_rows, res) in enumerate(price(lambda: job.frames(read), costs, rel.name, tables, first_year, a.me_bens, a.me_cost)):
         priced += len(res.ce)
         for name, df in res.tables().items():       # part by part (a large job is never held whole); CET_ID order within a part
             df.to_csv(out / f"{name}.csv", index=False, mode="w" if i == 0 else "a", header=i == 0)
