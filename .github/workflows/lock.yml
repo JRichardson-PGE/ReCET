@@ -1,0 +1,32 @@
+# The locked dependencies (requirements/*.txt) must match pyproject.toml, and the web image's lock must install.
+name: Lockfile
+
+on:
+  pull_request:
+    paths: ["pyproject.toml", "requirements/**", "Dockerfile", ".github/workflows/lock.yml"]
+  push:
+    branches: [main]
+    paths: ["pyproject.toml", "requirements/**", "Dockerfile", ".github/workflows/lock.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lock:
+    name: requirements match pyproject.toml
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: The locks are up to date
+        run: python requirements/lock.py --check
+      - name: The test lock installs with its hashes
+        run: |
+          python -m pip install --require-hashes -r requirements/test.txt
+          python -m pip install --no-deps -e .
+          python -m recet --version

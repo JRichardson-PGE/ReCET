@@ -19,9 +19,12 @@ RUN useradd --create-home --uid 10001 recet \
  && chown recet:recet /var/lib/recet
 
 WORKDIR /app
+# the locked versions first (requirements/README.md), every file checked against its hash; then ReCET itself, which adds no dependency
+COPY requirements/web.txt requirements/web.txt
+RUN pip install --require-hashes -r requirements/web.txt
 COPY pyproject.toml README.md ./
 COPY recet ./recet
-RUN pip install ".[web]" && rm -rf /app/build
+RUN pip install --no-deps . && rm -rf /app/build
 
 USER recet
 EXPOSE 3000
