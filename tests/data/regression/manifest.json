@@ -1,0 +1,53 @@
+{
+  "fixture_version": 1,
+  "built": "2026-10-29",
+  "built_with": "recet 0.1.77",
+  "source_reference": {
+    "acc/2024/electric_hourly.parquet": "5d52c4d7fc9fd963350aa69f0b9a6982a2cd24dde443bbd0c4cbc3dc0fe6ac29",
+    "impact_profiles/catalog.parquet": "9a59518435f3db9f01648c4d86ff6d17810ed709c41f3937224011b376b64b12",
+    "impact_profiles/hourly.parquet": "f34814dc62ac479083d6c281ae03f9a686379460ed9895c4e80708606dfcd753"
+  },
+  "tolerance": {
+    "rtol": 1e-09,
+    "atol": 1e-06
+  },
+  "ref": {
+    "acc/2024/electric_hourly.parquet": {
+      "bytes": 24768870,
+      "sha256": "fc61559ed06703d84f6a219d5958baa4be7ddfd3dcee4749ec3900ec2df0dff5"
+    },
+    "impact_profiles/catalog.parquet": {
+      "bytes": 237503,
+      "sha256": "9a59518435f3db9f01648c4d86ff6d17810ed709c41f3937224011b376b64b12"
+    },
+    "impact_profiles/hourly.parquet": {
+      "bytes": 2651876,
+      "sha256": "12170c8fc33d4e0c8846e105d2a517a0777dfd2d437f474681964ae5ead4ceb1"
+    }
+  },
+  "jobs": {
+    "c3_three_zones": {
+      "settings": {
+        "acc_version": "2024"
+      },
+      "measures": 12,
+      "tables": [
+        "key_metrics",
+        "measure_level",
+        "portfolio_summary"
+      ]
+    },
+    "k10_three_zones": {
+      "settings": {
+        "acc_version": "2024"
+      },
+      "measures": 1270,
+      "tables": [
+        "key_metrics",
+        "measure_level",
+        "portfolio_summary"
+      ]
+    }
+  },
+  "bytes": 29826113
+}
