@@ -9,6 +9,7 @@ Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, wi
 * PrgID alignment between Measure.csv and ProgramCost.csv, and statewide-program rows,
 * the ACC each record is priced on against the ACCs that normally apply to its program year (BR-06.5; `acc_purpose`: any filing, claims, or one budget
   filing; versions.expected_accs): a record outside them is a warning, never a stop,
+* the record cap (`max_records`, BR-06.3): a Measure.csv with more rows than the cap is refused before anything else is read,
 * optionally (`filing_rules`), CEDARS' own upload checks for a claims or a budget filing (filing_rules.py): the records CEDARS would reject or warn on, each
   listed under the rule's ID, and kept on the report (`PreflightReport.filing`) for the run to flag in the measure-level table. They never stop the run.
 
@@ -63,6 +64,7 @@ NEEDED_VALUES = ("NumUnits", "UnitkW1stBaseline", "UnitkWh1stBaseline", "UnitThe
                  "UnitGasInfraBens", "UnitRefrigCosts", "UnitRefrigBens", "UnitMiscCosts", "UnitMiscBens")
 VALID_GAS_SECTORS = {"RESIDENTIAL", "COMMERCIAL", "CORE"}
 MAX_CELLS = 5000          # cells listed per issue (the web editor highlights them)
+MAX_RECORDS = 2_000_000   # the record cap at launch (BRD v0.5 BR-06.3): a larger job is refused; RunConfig.max_records changes it, 0 = no cap
 
 
 @dataclass
@@ -263,7 +265,7 @@ class _Filing:
 def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = None, *, acc=None, allocate_statewide: bool = False,
                  base_year: int | None = None, apply_exclude_from_ce: bool = False, chunk_size: int | None = None,
                  parts: list | None = None, dtypes: dict | None = None, filing_rules: str | None = None,
-                 filing_year: int | None = None, acc_purpose: str = "") -> PreflightReport:
+                 filing_year: int | None = None, acc_purpose: str = "", max_records: int | None = None) -> PreflightReport:
     """`acc` is a versions.ResolvedAcc (for the horizon and E3-version checks); the runtime must already be configured for it (runtime.apply) so that profile
     and TOU coverage reflect this run's user-supplied profiles.
 
@@ -275,10 +277,21 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     `filing_rules` ("claims" or "budget_filing") also applies CEDARS' upload checks for that kind of filing (filing_rules.py); `filing_year` is the filing's
     year for the rules that name it (default: each record's claim year, and the job's earliest claim year for ProgramCost).
 
-    `acc_purpose` says what the run is priced for, for the ACC-for-program-year check (BR-06.5): "" any filing, "claims", or a versions.FILINGS key."""
+    `acc_purpose` says what the run is priced for, for the ACC-for-program-year check (BR-06.5): "" any filing, "claims", or a versions.FILINGS key.
+
+    `max_records` is the record cap (BR-06.3; None = MAX_RECORDS, 0 = no cap): a Measure.csv with more data rows than it is refused with the one
+    `too_many_records` error, before the file is split or parsed."""
     from . import filing_rules as fr
-    filing = _Filing(fr.rule_set(filing_rules), filing_year) if filing_rules else None
+    cap = MAX_RECORDS if max_records is None else int(max_records)
     p = Path(measure_csv)
+    if cap and p.exists() and delimited.detect_sep(p):
+        n = delimited.count_rows(p) if parts is None else sum(rows for _f, _start, rows in parts)
+        if n > cap:
+            rep = PreflightReport()
+            rep.stats["measures"] = f"{n:,}"
+            rep.add("error", "too_many_records", too_many_records_message(n, cap))
+            return rep
+    filing = _Filing(fr.rule_set(filing_rules), filing_year) if filing_rules else None
     if parts is None and chunk_size and p.exists() and delimited.detect_sep(p) and delimited.count_rows(p) > chunk_size:
         import tempfile
         with tempfile.TemporaryDirectory(prefix="recet_preflight_") as tmp:
@@ -294,6 +307,12 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
         _finish_filing(rep, filing)
     _finish_acc_check(rep, acc_purpose)
     return rep
+
+
+def too_many_records_message(n: int, cap: int) -> str:
+    """The record cap's message (BR-06.3), shared by preflight and the CET replica engines."""
+    return (f"Measure.csv has {n:,} records, more than the {cap:,} a run takes (the record cap, BRD BR-06.3). Split the job into files of at most "
+            f"{cap:,} records and run each, or raise the cap (max_records / --max-records) where the system allows it.")
 
 
 def _expected_text(exp: set[int], year: int, purpose: str) -> str:

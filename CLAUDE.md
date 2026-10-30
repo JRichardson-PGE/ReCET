@@ -29,6 +29,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   text and not by colour alone, 4.5:1 text and 3:1 control-border/focus contrast in BOTH colour schemes, `aria-live` for text that updates on its own,
   targets at least 24 x 24 px, content that reflows at 320 px wide and 200% zoom. Check new colours with a contrast calculator and new pages with axe.
 - Tests: `pip install -e ".[test]"` then `pytest` from the repo root; they need no reference data.
+- Dependencies are locked (phase 0 of the CEDARS platform build plan, 2026-10-30): `requirements/{engine,web,test}.txt`, every platform and Python 3.11+,
+  with hashes, made by `python requirements/lock.py` (uv) from pyproject.toml. The Dockerfile installs `web.txt` with `--require-hashes`, then ReCET with
+  `--no-deps`; the Lockfile workflow fails when the files no longer match pyproject.toml. Change a dependency in pyproject.toml and re-run lock.py in the
+  same PR (`--upgrade` to take newer versions, and run the tests on them).
 - ACC versions are keyed by ACC year (2021, 2022, 2024, 2026), and run parameters / E3 tables are picked by ACC version. The web pages name a version by
   its ACC year only, "2026 ACC" (`versions.acc_short`, `web/app.acc_name`; Jake 2026-10-26, with D12 retiring the "Avoided Cost Version" label), and New run
   has a "Which ACC applies to my filing?" table instead: `versions.BUDGET_FILING_ACC` (filing, program years, ACC, basis; CET's resolution table through
@@ -98,6 +102,10 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.76 (2026-10-30, phase 0 of the CEDARS platform build plan; BRD v0.5 BR-06.3): the record cap. `RunConfig.max_records` (2,000,000 =
+  `preflight.MAX_RECORDS`; `--max-records`; 0 = no cap): `preflight.check_inputs(max_records=)` counts the rows first and refuses a larger job with the
+  single error `too_many_records` (`too_many_records_message`), nothing else checked; run_job does not split such a job; a CET replica refuses it in
+  `cet_versions/job._check_record_cap` (ValueError, same message). tests/test_record_cap.py.
 - 0.1.75 (2026-10-29, Jake: "CEDARS is always assuming SCE for programs with SW PA in the CET, but SCE is not all of the programs' lead. SCE has
   historically been the largest funder"): a CEDARS upload's statewide ProgramCost rows (PA SW) are costed as SCE's (`cet_versions/job.cet_programs`,
   logged), as CEDARS passes them; a job in CET's input form (Measure PA column) is priced as given. Found by running the two 10k jobs on the published
