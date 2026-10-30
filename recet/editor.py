@@ -721,7 +721,7 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                 if why:
                     sev, msg = ("info", why[5:]) if why.startswith("INFO:") else ("warning", why)
                     add("Measure", i, "AC_Elec_Impact_Profile", sev, msg)
-        has_kwh2 = rul > 0 and (eul is None or rul < eul) and (vals.get("UnitkWh2ndBaseline") or 0) != 0
+        has_kwh2 = rul is not None and rul > 0 and (eul is None or rul < eul) and (vals.get("UnitkWh2ndBaseline") or 0) != 0
         has_water = any((vals.get(c) or 0) != 0 for c in ("UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"))
         for c, used, what in (("AC_Elec_Impact_Profile_2nd_Baseline", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("AC_Elec_Impact_Profile_Water", has_water, "water energy")):
             if not g(c):
