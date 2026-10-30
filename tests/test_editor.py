@@ -31,6 +31,8 @@ def test_new_job_is_the_template_example_and_has_no_problems():
     ("IOU_AC_Territory", "PG&E", "error"),
     ("NumUnits", "ten", "error"),
     ("EUL_Yrs", "", "error"),
+    ("RUL_Yrs", "", "error"),                    # blank (CET requires a value); the 2nd-baseline profile checks still run
+    ("RUL_Yrs", "x", "error"),
     ("NTGRkWh", "1.6", "warning"),
     ("InstallationRatekWh", "1.2", "warning"),
     ("Sector", "Com", "warning"),                # retired in CET's list after 2018; the claim is 2028
