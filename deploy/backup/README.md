@@ -19,7 +19,7 @@ temporary download zips) and writes `last_backup.json`. `recet-restore.sh` bring
 
 ## One-time setup
 
-These steps change AWS and the server, so Jake runs them. Pick a bucket name (it must be globally unique), e.g. `<bucket>`, and keep the
+These steps change AWS and the server, so Jake runs them. Pick a bucket name (it must be globally unique), e.g. `<you>-recet-backups`, and keep the
 bucket in the server's region (us-east-2).
 
 **1. The bucket** (laptop, PowerShell, with an AWS CLI profile that can create buckets and roles):
@@ -44,7 +44,7 @@ If the instance already has a role, attach the policy to that role and skip the 
 
 **3. The timer on the server** (after a deploy has put `deploy/` in `~/recet`):
 
-    ssh -i <your key file> ec2-user@<server address>
+    ssh -i <your key file> <user>@<server address>
     sudo install -m 755 ~/recet/deploy/backup/recet-backup.sh ~/recet/deploy/backup/recet-restore.sh /usr/local/bin/
     sudo install -m 644 ~/recet/deploy/backup/recet-backup.service ~/recet/deploy/backup/recet-backup.timer /etc/systemd/system/
     echo 'RECET_BACKUP_BUCKET=s3://<bucket>/recet' | sudo tee /etc/recet-backup.env
