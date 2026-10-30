@@ -79,6 +79,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
     g.add_argument("--replica-part-size", type=int, help="with a CET replica engine: measures priced at a time (default 10,000; 0 = the whole job at once)")
     g.add_argument("--chunk-size", type=int, help="run a job with more Measure rows than this in parts of this many, to bound memory (default 50,000; 0 = never)")
+    g.add_argument("--max-records", type=int, help="refuse a job with more Measure rows than this (the record cap, BR-06.3; default 2,000,000; 0 = no cap)")
 
 
 def _config_from_args(a: argparse.Namespace):
