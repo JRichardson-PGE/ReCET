@@ -1,4 +1,4 @@
-"""Regenerate requirements/{engine,web,test}.txt from pyproject.toml with uv (see requirements/README.md). `--check` exits 1 when a file would change."""
+"""Regenerate requirements/{engine,worker,web,test}.txt from pyproject.toml with uv (see requirements/README.md). `--check` exits 1 when a file would change."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +10,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-LOCKS = {"engine": [], "web": ["--extra", "web"], "test": ["--extra", "web", "--extra", "test"]}
+LOCKS = {"engine": [], "worker": ["--extra", "s3"], "web": ["--extra", "web"], "test": ["--extra", "web", "--extra", "test"]}
 PYTHON = "3.11"                         # the oldest Python the lock serves (CI tests 3.11 and 3.12; the laptop runs 3.14)
 
 
