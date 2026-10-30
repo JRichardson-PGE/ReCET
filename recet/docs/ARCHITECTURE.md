@@ -180,6 +180,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `fieldnames.py` | data | ReCET's field names and CET's legacy names, both ways |
 | `paths.py` | data | where package data, the reference data folder and the cache are |
 | `datapack.py` | data | building, verifying, packing and unpacking the reference data folder |
+| `regress.py` | job | the regression gate: real-job fixtures on slices of the reference data, checked against their expected outputs; two runs compared |
 | `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
 | `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
@@ -535,6 +536,11 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   --engine`): ReCET's own, or a replica, whose run goes through `jobs.run_job` and writes a measure-level table in ReCET's layout, so the Results and
   Compare pages read it and two engines can be set side by side. A filing accepts only ReCET's own engine (`cet_versions/job.py` refuses the filing checks).
 * **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
+* **A regression gate on real data.** `tests/data/regression` holds real jobs (records of the C3 test job and the 10k server test job in three
+  (utility, zone) pairs) with exactly the ACC values and profile shapes their pricing reads, sliced from the real reference data by `recet regress build`
+  (`regress.py`; the build stops unless the slice reproduces the full data's results), and their expected outputs. `tests/test_regression_gate.py` runs
+  them in CI and fails when any output moves by more than 1e-9 relative (1e-6 absolute); a deliberate change rewrites them with `recet regress check
+  --update`, and the PR says why. `recet regress compare RUN_A RUN_B` compares two runs of any job (e.g. the full jobs, run by two engine releases).
 
 ## 11. Limits and what is not built
 
