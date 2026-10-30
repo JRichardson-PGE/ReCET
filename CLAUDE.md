@@ -99,6 +99,15 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.78 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.77 regression gate): the job spec and the worker, the contract
+  the platform's Calculations module calls (its job API, run records and S3 layout are the platform's, not ReCET's FastAPI). `recet/jobspec.py` (spec
+  version 1; `validate`, kept in step with `data/job_spec/job_spec_v1.schema.json` by tests/test_worker.py), `recet/storage.py` (local, file://, s3:// via
+  boto3 only when used; extra `.[s3]`), `recet/worker.py` (`recet worker run|validate|schema`): refuses (exit 2) a wrong release, a pinned input / reference
+  file that differs (manifest.json hashes, else computed), an allocation table that differs, an unknown setting; runs `jobs.run_job` in a work folder;
+  writes `receipt.json` (RECEIPT_VERSION 1) even when the run fails (exit 1); sends the run folder to outputs.uri. Settings a spec may set:
+  `jobspec.settings_fields()` (RunConfig minus files, folders, names, engine, format, subset_step). Asked for by the platform thread: `context` (any object,
+  echoed verbatim into the receipt), `progress.json` sent to outputs.uri during the run (`worker.ProgressSender`: each stage change, else at most every 10 s),
+  and the receipt's `allocation` names a supplied table's URI, SHA-256 and the `allocation_version` requested (the platform passes the sha256).
 - 0.1.76 (2026-10-30, phase 0 of the CEDARS platform build plan; BRD v0.5 BR-06.3): the record cap. `RunConfig.max_records` (2,000,000 =
   `preflight.MAX_RECORDS`; `--max-records`; 0 = no cap): `preflight.check_inputs(max_records=)` counts the rows first and refuses a larger job with the
   single error `too_many_records` (`too_many_records_message`), nothing else checked; run_job does not split such a job; a CET replica refuses it in
