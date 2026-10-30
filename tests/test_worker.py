@@ -195,7 +195,7 @@ def test_context_progress_and_a_supplied_allocation_table(job, tmp_path):
     (tmp_path / "job.json").write_text(json.dumps(spec))
     code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
     assert code == 0 and receipt["context"] == {"platform_run_id": 123, "submission_version": "claims/PGE/2028Q1/v2"}
-    assert receipt["allocation"] == {"table": "supplied", "file": str(sw), "sha256": _sha(sw), "requested": _sha(sw), "applied": False}
+    assert receipt["allocation"] == {"table": "supplied", "file": str(sw), "sha256": _sha(sw), "requested": _sha(sw), "applied": False, "mode": "merge"}
     progress = json.loads((tmp_path / "results" / "progress.json").read_text())
     assert progress["stage"] == "done" and progress["fraction"] == 1.0
 
@@ -221,3 +221,16 @@ def test_file_uris_round_trip(tmp_path):
     assert storage.LocalStorage.path("file://localhost" + p.as_uri()[len("file://"):]) == p
     if os.name == "nt":
         assert storage.LocalStorage.path("file://server/share/x.csv") == Path(r"\\server\share\x.csv")
+
+
+def test_a_pinned_allocation_table_replaces_the_builtin_one(job, tmp_path):
+    from recet.pipeline import statewide_allocation
+    sw = tmp_path / "sw_factors_v43.csv"
+    sw.write_bytes(statewide_allocation.FACTORS_CSV.read_bytes())
+    spec = json.loads(_spec(job, tmp_path, allocation_version=_sha(sw)).read_text())
+    spec["inputs"]["sw_factors"] = str(sw)
+    spec["settings"].update(allocate_statewide=True, sw_factors_replace=True)
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    assert code == 0 and receipt["settings"]["sw_factors_replace"] is True
+    assert receipt["allocation"]["mode"] == "replace" and receipt["allocation"]["applied"] is True and receipt["allocation"]["sha256"] == _sha(sw)

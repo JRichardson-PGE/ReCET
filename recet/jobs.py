@@ -61,6 +61,7 @@ class RunConfig:
     profiles_gas_file: str | None = None
     run_parameters_file: str | None = None   # run parameters per PA (discount rates, base year, gas CO2): a listed PA replaces the built-in values
     sw_factors_file: str | None = None       # statewide allocation factors: a (Year, ProgramID) row replaces the built-in row, a new one is added
+    sw_factors_replace: bool = False         # the supplied factors are the whole table (the built-in rows are not used); a pinned allocation version
     programs_file: str | None = None         # program metadata (CEDARS Programs list layout): a PrgID replaces the built-in row, a new one is added
     normalize_profiles: bool = True          # rescale supplied profiles that do not sum to 1 (else it is an error)
     # --- where the big reference files are
@@ -188,10 +189,12 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
         log(f"loaded run parameters for {', '.join(run_params.index)} (these PAs' built-in values are replaced):\n{run_params.to_string()}")
         for n in notes:
             log(f"note: {n}")
+    if cfg.sw_factors_replace and not cfg.sw_factors_file:
+        raise ValueError("sw_factors_replace needs a supplied statewide factors file (sw_factors_file)")
     if cfg.sw_factors_file:
         sw, notes = overrides.load_sw_factors(cfg.sw_factors_file)
         log(f"loaded {len(sw)} statewide allocation factor row(s) ({sw['ProgramID'].nunique()} programs, years {sw['Year'].min()}-{sw['Year'].max()}); "
-            "matching (Year, ProgramID) rows replace the built-in ones")
+            + ("they are the whole table (the built-in rows are not used)" if cfg.sw_factors_replace else "matching (Year, ProgramID) rows replace the built-in ones"))
         if not cfg.allocate_statewide:
             log("note: statewide allocation is off for this run, so the supplied factors are not used")
         for n in notes:
@@ -202,7 +205,7 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
         for n in notes:
             log(f"note: {n}")
     runtime.apply(acc, user_profiles=user_profiles, user_gas_profiles=user_gas, run_parameters=run_params, sw_factors=sw, programs=progs,
-                  reference_dir=cfg.reference_dir)
+                  reference_dir=cfg.reference_dir, sw_factors_replace=cfg.sw_factors_replace)
     return acc, user_profiles, user_gas
 
 

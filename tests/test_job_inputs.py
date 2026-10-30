@@ -90,6 +90,25 @@ def test_sw_factors_replace_and_extend_the_builtin_table(tmp_path):
         statewide_allocation.set_user_factors(None)
 
 
+def test_sw_factors_replace_mode_uses_the_supplied_table_alone(tmp_path):
+    builtin = statewide_allocation.load_factors()
+    user, _ = overrides.load_sw_factors(_sw(tmp_path / "sw.csv"))
+    statewide_allocation.set_user_factors(user, replace=True)
+    try:
+        only = statewide_allocation.load_factors()
+    finally:
+        statewide_allocation.set_user_factors(None)
+    assert list(only.index) == [(2028, "SW_TEST")] and len(builtin) > 1
+    key = next(k for k in builtin.index if k[0] == 2028)                  # a built-in statewide program the supplied table leaves out
+    meas = make_measure_csv(tmp_path / "Measure_sw.csv", PrgID=key[1])
+    sw = str(_sw(tmp_path / "sw.csv"))
+    merged = run_job(_cfg(tmp_path, measures=str(meas), run_name="a", allocate_statewide=True, sw_factors_file=sw), **QUIET).frame
+    pinned = run_job(_cfg(tmp_path, measures=str(meas), run_name="b", allocate_statewide=True, sw_factors_file=sw, sw_factors_replace=True), **QUIET).frame
+    assert len(merged) > 1 and set(pinned["CEInputID"]) == {"T1"}         # allocated on the built-in row vs. not in the pinned table, so not allocated
+    with pytest.raises(ValueError, match="sw_factors_replace needs"):
+        run_job(_cfg(tmp_path, run_name="c", sw_factors_replace=True), **QUIET)
+
+
 def test_sw_factors_validation(tmp_path):
     p = _sw(tmp_path / "sw.csv", pge=0.5, sce=0.3)
     _t, notes = overrides.load_sw_factors(p)

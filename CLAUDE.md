@@ -121,6 +121,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   `jobspec.settings_fields()` (RunConfig minus files, folders, names, engine, format, subset_step). Asked for by the platform thread: `context` (any object,
   echoed verbatim into the receipt), `progress.json` sent to outputs.uri during the run (`worker.ProgressSender`: each stage change, else at most every 10 s),
   and the receipt's `allocation` names a supplied table's URI, SHA-256 and the `allocation_version` requested (the platform passes the sha256).
+  Then (platform thread): `RunConfig.sw_factors_replace` (`--sw-factors-replace`): the supplied factor table is the WHOLE table, no built-in row used
+  (`statewide_allocation.set_user_factors(table, replace=True)`), so a pinned allocation version is exactly that table (BR-13.8); receipt `allocation.mode`
+  replace / merge. A statewide program the pinned table lacks is not allocated (the loader warns).
 - 0.1.76 (2026-10-30, phase 0 of the CEDARS platform build plan; BRD v0.5 BR-06.3): the record cap. `RunConfig.max_records` (2,000,000 =
   `preflight.MAX_RECORDS`; `--max-records`; 0 = no cap): `preflight.check_inputs(max_records=)` counts the rows first and refuses a larger job with the
   single error `too_many_records` (`too_many_records_message`), nothing else checked; run_job does not split such a job; a CET replica refuses it in
