@@ -181,6 +181,10 @@ Every module in the package. Paths are relative to `recet/`.
 | `paths.py` | data | where package data, the reference data folder and the cache are |
 | `datapack.py` | data | building, verifying, packing and unpacking the reference data folder; the pack's version and each file's type and draft flag |
 | `tieout.py` | data | the tie-out report an ACC load and an engine release are accepted on: structure, control totals, reference measures |
+| `regress.py` | job | the regression gate: real-job fixtures on slices of the reference data, checked against their expected outputs; two runs compared |
+| `jobspec.py` | job | the job spec: the versioned JSON a caller hands the worker (inputs by URI, settings, engine release, pinned reference files, allocation version) and its checks |
+| `worker.py` | job | `recet worker run`: one job from a job spec, its outputs and `receipt.json` sent to the spec's outputs URI |
+| `storage.py` | data | where a worker's files come from and go to: local paths, file:// and s3:// (boto3 only when S3 is used) |
 | `openbca/run.py` | job | OpenBCA's own engine on its workbooks: finds a pinned checkout, stages a copy in the run folder, runs `openbca/engine.py`, writes OpenBCA's output tables; comparison C1 |
 | `openbca/engine.py` | job | runs inside OpenBCA's interpreter (never imported by ReCET): the SQLmesh plan, the output export, the table-by-table comparison |
 | `openbca/ca_config.py` | job | California's jurisdiction tables for OpenBCA from an ACC file (hourly electric avoided cost per IOU and climate zone, TRC / PAC cost treatment); comparison C2 |
@@ -536,6 +540,11 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   --engine`): ReCET's own, or a replica, whose run goes through `jobs.run_job` and writes a measure-level table in ReCET's layout, so the Results and
   Compare pages read it and two engines can be set side by side. A filing accepts only ReCET's own engine (`cet_versions/job.py` refuses the filing checks).
 * **No reference data in the tests.** The suite runs on synthetic ACCs and profiles (`pip install -e ".[test]"`, `pytest`), so it runs anywhere.
+* **A regression gate on real data.** `tests/data/regression` holds real jobs (records of the C3 test job and the 10k server test job in three
+  (utility, zone) pairs) with exactly the ACC values and profile shapes their pricing reads, sliced from the real reference data by `recet regress build`
+  (`regress.py`; the build stops unless the slice reproduces the full data's results), and their expected outputs. `tests/test_regression_gate.py` runs
+  them in CI and fails when any output moves by more than 1e-9 relative (1e-6 absolute); a deliberate change rewrites them with `recet regress check
+  --update`, and the PR says why. `recet regress compare RUN_A RUN_B` compares two runs of any job (e.g. the full jobs, run by two engine releases).
 
 ## 11. Limits and what is not built
 
@@ -543,7 +552,8 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
   one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
-  managed database. The run path would not change: a worker still runs `recet run --config`.
+  managed database. The run path would not change: a worker still runs `recet run --config`. Until then the server's state (the SQLite database, run and
+  draft folders) is copied to S3 every night and can be restored by `deploy/backup` (its README is the setup and restore runbook).
 * **No API.** Users upload files and download results; nothing else can call ReCET except through Python (`recet.jobs`).
 * **No lifecycle-savings input** (BR-06.15): inputs stay the CET's per-unit annual values.
 * **Multi-file batch upload** (BR-06.3) is not built: one job zip holds one `Measure.csv`.

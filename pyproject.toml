@@ -32,6 +32,8 @@ web = [
 # faster zipped-CSV output for the command line and the window too: pip install ".[fast]"
 fast = ["isal>=1.6"]
 excel = ["openpyxl>=3.1"]
+# s3:// inputs and outputs for `recet worker run` (recet/storage.py; the engine never imports boto3 otherwise)
+s3 = ["boto3>=1.34"]
 
 [project.scripts]
 recet = "recet.cli:main"
