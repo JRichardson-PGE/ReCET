@@ -8,6 +8,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
 
 ## Rules that keep the tool honest
 
+- The repository is public (MIT, 2026-10-30). Nothing non-public goes into a commit, its message or a PR: no secrets, server addresses, SSH users or key
+  paths, bucket names, personal emails or laptop paths, real PII, or the development vendor's name. Commit under a noreply address. CI's secret scan
+  (`gitleaks.toml`: gitleaks' defaults plus those patterns, over the whole history, and a noreply check on every author) enforces it.
 - The docs in `recet/docs/` are checked by tests. Change a formula and you change `CALCULATIONS.md`, the field's entry in `OUTPUT_FIELDS.md`, and
   `tests/reference_calc.py` (an independent loop implementation) with it. `tests/test_output_docs.py` re-runs the worked examples in `tests/doc_examples.py`.
 - Pricing arithmetic exists twice: the grouped versions (`engine.price_real_hourly`, `price_gas_benefit`) and the per-measure references
