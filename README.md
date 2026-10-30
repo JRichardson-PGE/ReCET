@@ -174,5 +174,9 @@ as `..._per_measure` references that the tests compare them with). The web app's
 
     pip install -e ".[test]"  &&  pytest        # from the repository root; the unit tests need no reference data
 
+or, with the exact versions CI and the Docker image use (`requirements/README.md`; every file checked against its hash):
+
+    pip install --require-hashes -r requirements/test.txt  &&  pip install --no-deps -e .  &&  pytest
+
 Tested on Python 3.14 with pandas 3.0, numpy 2.5, pyarrow 25. The pricing methodology and its validation against real CET runs are in
 `recet/docs/CALCULATIONS.md`; the research behind it (ACC extraction, CEDARS reproduction, CET findings) stays in the CEDARS review research repository.
