@@ -20,6 +20,9 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   the retired TOU/SCG quarterly routes, the CET-CO2 comparison option and the research-checkout file fallback were removed. Research scripts in
   CEDARS-Research import `recet` for the tool's functions and `research_lib` for the rest.
 - The Edit inputs tab is for small jobs (up to 500 measures); larger files are edited offline.
+- The web server's state is backed up nightly to S3 by `deploy/backup/recet-backup.sh` (systemd timer, instance role; README there is the setup and
+  restore runbook, tests/test_backup_scripts.py runs both scripts against a fake aws). A change to what the web app keeps in its state folder (a new
+  database, a folder that must not be mirrored) changes that script and its README too.
 - The web app (`recet/web`: templates, `static/*.css`, `static/*.js`, the vendored Tabulator and Mermaid as we use them) must meet WCAG 2.2 Level AA
   (Jake, 2026-10-29; ARCHITECTURE 1.4 and 8.7). Every page change keeps it: a visible label or accessible name on every control, keyboard reach and a
   visible focus for everything a mouse can do (no hover- or double-click-only actions, no `title` as the only way to learn something), status shown in
@@ -99,7 +102,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
-- 0.1.77 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 is the record-cap PR): the regression gate. `recet/regress.py`,
+- 0.1.79 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.78 worker; first numbered 0.1.77): the regression gate. `recet/regress.py`,
   `recet regress build|check|compare`. build (laptop, full reference data): runs each job under `regress.record()` (wraps AccStore.series and
   real_impact_profiles._profile_shapes_by_zone; a value is "read" when its key is read or the dict is iterated), `slice_reference` writes only the ACC
   rows of the (utility, zone) pairs read with every unread value NaN (same years, tests and columns) and the profiles' row groups with only the zones read,
@@ -108,6 +111,15 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   compare: two run folders' tables. Fixture jobs: the C3 and 10k jobs' records in PG&E 13, SCE 9 (5) and SDG&E 7 (6, 8), no System zones (their slice
   would be most of the ACC). The pricing reads every year of a series it uses, so a pair costs about 7 MB of the 2024 ACC (total_avoided_cost, TRC
   emission rate). tests/test_regress_tool.py tests the tool on synthetic data.
+- 0.1.78 (2026-10-30, phase 0 of the CEDARS platform build plan; 0.1.76 record cap, 0.1.77 regression gate): the job spec and the worker, the contract
+  the platform's Calculations module calls (its job API, run records and S3 layout are the platform's, not ReCET's FastAPI). `recet/jobspec.py` (spec
+  version 1; `validate`, kept in step with `data/job_spec/job_spec_v1.schema.json` by tests/test_worker.py), `recet/storage.py` (local, file://, s3:// via
+  boto3 only when used; extra `.[s3]`), `recet/worker.py` (`recet worker run|validate|schema`): refuses (exit 2) a wrong release, a pinned input / reference
+  file that differs (manifest.json hashes, else computed), an allocation table that differs, an unknown setting; runs `jobs.run_job` in a work folder;
+  writes `receipt.json` (RECEIPT_VERSION 1) even when the run fails (exit 1); sends the run folder to outputs.uri. Settings a spec may set:
+  `jobspec.settings_fields()` (RunConfig minus files, folders, names, engine, format, subset_step). Asked for by the platform thread: `context` (any object,
+  echoed verbatim into the receipt), `progress.json` sent to outputs.uri during the run (`worker.ProgressSender`: each stage change, else at most every 10 s),
+  and the receipt's `allocation` names a supplied table's URI, SHA-256 and the `allocation_version` requested (the platform passes the sha256).
 - 0.1.76 (2026-10-30, phase 0 of the CEDARS platform build plan; BRD v0.5 BR-06.3): the record cap. `RunConfig.max_records` (2,000,000 =
   `preflight.MAX_RECORDS`; `--max-records`; 0 = no cap): `preflight.check_inputs(max_records=)` counts the rows first and refuses a larger job with the
   single error `too_many_records` (`too_many_records_message`), nothing else checked; run_job does not split such a job; a CET replica refuses it in
