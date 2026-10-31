@@ -165,6 +165,16 @@ def allocation_record(cfg, spec: dict | None = None) -> dict:
     return {"table": f.stem, "sha256": sha256_file(f), "requested": requested, "applied": cfg.allocate_statewide}
 
 
+def programs_record(cfg, spec: dict | None = None) -> dict:
+    """The program table the run used: the built-in CEDARS Programs list by name, or a supplied file (its URI, SHA-256 and mode: "replace" = the whole
+    table, "merge" = its rows over the built-in ones)."""
+    from . import programs
+    if cfg.programs_file:
+        uri = jobspec.input_uri(spec["inputs"]["programs"])[0] if spec and "programs" in spec.get("inputs", {}) else None
+        return {"table": "supplied", "file": uri, "sha256": sha256_file(Path(cfg.programs_file)), "mode": "replace" if cfg.programs_replace else "merge"}
+    return {"table": programs.BUILTIN_CSV.stem, "sha256": sha256_file(programs.BUILTIN_CSV)}
+
+
 def check_allocation(spec: dict, cfg) -> None:
     want = spec.get("allocation_version")
     if want:
@@ -357,6 +367,7 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
         "packs": {"reference_dir": str(ref or ""), "files": used, "package_data_sha256": package_data_sha256()},
         "run_parameters": run_parameters_record(cfg, acc.get("settings_acc_version")),
         "allocation": allocation_record(cfg, spec),
+        "programs": programs_record(cfg, spec),
         "rule_set": settings.get("filing_validation"),
         "outputs": outputs,
         "totals": result.totals if result is not None else {},
