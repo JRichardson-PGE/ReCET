@@ -34,6 +34,9 @@ The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021
                                                           source workbook's, reference measures engine vs tests/reference_calc.py
     recet data pack D:\cedars_reference_data D:\parts     split it into <= 4 GB parts (+ SHA256SUMS) for transfer
     recet data unpack D:\parts E:\cedars_reference_data   rebuild it on the other machine
+    recet data consolidate-profiles D:\cedars_reference_data D:\consolidated
+                                                          the profile library with each profile whose every zone's 8,760 is
+                                                          identical stored once, every name kept (BR-06.18); checked name by name
 
 Everything small (the run parameters and CET tables, gas profile library, the four gas ACCs, statewide-allocation factors, the CEDARS Programs list and filing rules) is inside the package.
 

@@ -106,6 +106,19 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.87 (2026-10-31, Jake; BRD v0.5 BR-06.18): the consolidated impact-profile library. Jake's rule: consolidate ONLY profiles that match 100% (the same
+  climate zones, every zone's 8,760 bit for bit the same, rows in the same order) and are drawn on the same calendar (represents_year, blank = 2009); no
+  tolerance merging; a consolidated profile keeps every name, under any Impact Profile Name. Format: `catalog.parquet` stays one row per name (its own `id`)
+  plus `shape_id` = the hourly row group holding its 8,760s (blank = no hourly data; a catalog without the column reads each row's own id); `hourly.parquet`
+  holds one row group per STORED profile, id = the smallest source id of its names. `real_impact_profiles`: `match_profile_id` still returns the name's
+  id; `_profile_shapes_by_zone(id)` reads `_stored_shapes(shape_id_of(id))` (every name of a profile shares one dict and one disk-cache file; never write
+  into it); `_catalog_hourly` = rows whose shape_id has a row group. `recet/profile_library.py` / `recet data consolidate-profiles SRC OUT`: fingerprints
+  every row group (SHA-256 over every column but the id, file order), writes the copy, then checks EVERY name's rows in the new file against its source
+  fingerprint and refuses on any difference; `consolidation_report.json`; the catalog's Parquet metadata `recet.consolidation` records the source hourly
+  file's size, so `system_zones.catalog_usable` accepts a consolidated copy of the library the shipped System-zone catalog was built on
+  (`profile_library.equivalent_hourly_sizes`). `system_zones.build_catalog` iterates names (reading each stored profile once); `regress.record` notes
+  the stored id read. tests/test_profile_library.py: exact copies under other names merge, a one-ulp change / an extra zone / another calendar do not;
+  both regression jobs price bit for bit the same on the consolidated library (every table, signed zeros included), and the System-zone catalog is equal.
 - 0.1.86 (2026-10-31; step 4 of `docs/COST_TESTS.md`): input streams. `recet/pipeline/input_streams.py` prices every `source: input` stream of the
   run's set in `run_poc.price_measure_values(..., cost_tests_set=)` (jobs and chunked pass 1 pass the run's set): `one_time` = Q x (NTG + ME) x the
   per-unit columns (undiscounted), `annual_over_life` = the same per year over the life, discounted at the stream's pricing's annual rate with the first

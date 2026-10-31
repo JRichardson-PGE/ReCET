@@ -85,7 +85,8 @@ class _Seen(dict):
 
 @dataclass
 class Usage:
-    """What a run read: acc[(file, iou, zone, test)] = the value columns read ("td" = transmission + distribution); profiles[(library, id)] = zones read."""
+    """What a run read: acc[(file, iou, zone, test)] = the value columns read ("td" = transmission + distribution); profiles[(library, stored id)] = zones
+    read (the stored id is the catalog's shape_id: the hourly row group read)."""
     acc: dict[tuple[str, str, str, str], set[str]] = field(default_factory=dict)
     profiles: dict[tuple[str, int], set[str]] = field(default_factory=dict)
 
@@ -114,7 +115,8 @@ def record():
 
     def shapes(profile_id):
         out = shapes0(profile_id)
-        zones = usage.profiles.setdefault((str(rip._hourly_path().resolve()), int(profile_id)), set())
+        sid = rip.shape_id_of(profile_id)                    # the row group read: a consolidated profile's names share one (profile_library)
+        zones = usage.profiles.setdefault((str(rip._hourly_path().resolve()), int(profile_id if sid is None else sid)), set())
         return _Seen(out, zones.add)
 
     shapes.cache_clear = shapes0.cache_clear                 # runtime.clear_caches clears every lru_cache of the pipeline modules
