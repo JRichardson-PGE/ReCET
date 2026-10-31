@@ -93,6 +93,19 @@ def _check_file(name: str, path: str) -> tuple[bool, str]:
 FILING_CHOICES = {"none": "", "Quarterly Claims": "claims", "Budget filing": "budget_filing"}
 # what the run is priced for (BR-06.5, versions.acc_purposes): (RunConfig.acc_purpose, window label)
 PURPOSE_CHOICES = versions.acc_purposes()
+# the cost-test set (cost_test_sets.py): (RunConfig.cost_test_set, window label); any other text in the box is a set file's path
+COST_TEST_DEFAULT = "In force for the first program year"
+
+
+def cost_test_choices() -> list[tuple[str, str]]:
+    from . import cost_test_sets
+    return [("", COST_TEST_DEFAULT), *cost_test_sets.catalog()]
+
+
+def cost_test_value(text: str) -> str:
+    """RunConfig.cost_test_set from the window's Cost tests box: a listed set's id, or the typed path of a set file."""
+    text = str(text or "").strip()
+    return {t: k for k, t in cost_test_choices()}.get(text, text)
 
 
 class App:
@@ -296,6 +309,9 @@ class App:
         ttk.Label(f, text="Priced for").grid(row=2, column=0, sticky="w", padx=(12, 8), pady=4)
         ttk.Combobox(f, textvariable=self._var("acc_purpose", tk.StringVar, PURPOSE_CHOICES[0][1]), values=[t for _k, t in PURPOSE_CHOICES], width=60,
                      state="readonly").grid(row=2, column=1, columnspan=2, sticky="w", pady=4)
+        ttk.Label(f, text="Cost tests").grid(row=3, column=0, sticky="w", padx=(12, 8), pady=4)
+        ttk.Combobox(f, textvariable=self._var("cost_test_set", tk.StringVar, COST_TEST_DEFAULT), values=[t for _k, t in cost_test_choices()],
+                     width=60).grid(row=3, column=1, columnspan=2, sticky="w", pady=4)
 
         # --- Edit inputs tab
         self.editor = gui_editor.EditorTab(self, tabs["edit"])
@@ -424,6 +440,7 @@ class App:
             compare_with=(blank(g("compare_with")) if g("compare") else None), output_format=str(g("output_format")) or "csv", preflight_only=bool(g("preflight_only")),
             filing_validation=FILING_CHOICES.get(str(g("filing_validation")), ""), filing_year=int_or_none(g("filing_year")),
             acc_purpose={t: k for k, t in PURPOSE_CHOICES}.get(str(g("acc_purpose")), ""),
+            cost_test_set=cost_test_value(g("cost_test_set")),
             output_template=output_templates.load_saved().get(str(g("output_template")), []),
             output_template_name="" if str(g("output_template")) == output_templates.ALL else str(g("output_template")))
 
@@ -451,6 +468,7 @@ class App:
         s("compare_cet", bool(c.cet_outputs)), s("cet_outputs", c.cet_outputs), s("output_format", c.output_format), s("preflight_only", c.preflight_only)
         s("filing_validation", {v: k for k, v in FILING_CHOICES.items()}.get(c.filing_validation or "", "none")), s("filing_year", c.filing_year)
         s("acc_purpose", dict(PURPOSE_CHOICES).get(c.acc_purpose or "", PURPOSE_CHOICES[0][1]))
+        s("cost_test_set", dict(cost_test_choices()).get(c.cost_test_set or "", c.cost_test_set))
         s("output_template", c.output_template_name if c.output_template and c.output_template_name in output_templates.load_saved() else output_templates.ALL)
 
     # ------------------------------------------------------------------------------------------------------------------ input type

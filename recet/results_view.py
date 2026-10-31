@@ -87,7 +87,7 @@ LABELS = {
 }
 NOT_ADDITIVE = {"WeightedBenefits", "WeightedElecAlloc", "WeightedSavings"}     # WeightedSavings: a run written before 0.1.50
 _INPUTS = set(templates.MEASURE_COLUMNS)
-_DERIVED = {"Used_ACCVersion", *outputs.DERIVED_OUTPUTS}
+_DERIVED = {"Used_ACCVersion", "Used_CostTestSet", *outputs.DERIVED_OUTPUTS}
 
 
 def pa_of(frame: pd.DataFrame) -> pd.Series:

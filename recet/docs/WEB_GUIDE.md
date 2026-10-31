@@ -27,7 +27,9 @@ Open **New run**.
    applies to my filing?** below it is a short table, one row per ACC: the budget filings priced on it and the program years whose claims use it (the ACC
    of the year's final budget filing); ACCs not yet in ReCET are dimmed. **Priced for** says what the run is for (any filing, Quarterly Claims, or one
    budget filing): records priced on an ACC that does not normally apply to their program year are flagged (in the input check and on the run
-   page), never stopped. **Compare with** prices the job on a second ACC as well. **First Year**
+   page), never stopped. **Cost tests** is the cost-test definition set the tests are priced on ([Cost tests as configuration](COST_TESTS.md)): blank
+   takes the set in force for the job's first program year; **Which tests each cost-test set writes** lists the sets. A filing run uses a published set
+   only; a custom set (a YAML file, uploaded under Supplied files as *Cost-test set*) is for analysis runs. **Compare with** prices the job on a second ACC as well. **First Year**
    is the year everything is discounted to (blank: the earliest claim year). **Market effects** is 0% or 5% on benefits and costs together. The
    **Societal Cost Tests** take about 15% of a run's time; turn them off when you need only TRC, PAC and RIM. **Split statewide (SW_) programs**
    shares each statewide program across the IOUs with the allocation factors.
