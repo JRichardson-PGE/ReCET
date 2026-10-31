@@ -64,6 +64,7 @@ class RunConfig:
     sw_factors_file: str | None = None       # statewide allocation factors: a (Year, ProgramID) row replaces the built-in row, a new one is added
     sw_factors_replace: bool = False         # the supplied factors are the whole table (the built-in rows are not used); a pinned allocation version
     programs_file: str | None = None         # program metadata (CEDARS Programs list layout): a PrgID replaces the built-in row, a new one is added
+    programs_replace: bool = False           # the supplied program table is the whole table (the built-in CEDARS Programs list is not used); a program registry
     normalize_profiles: bool = True          # rescale supplied profiles that do not sum to 1 (else it is an error)
     # --- where the big reference files are
     reference_dir: str | None = None
@@ -200,14 +201,25 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
             log("note: statewide allocation is off for this run, so the supplied factors are not used")
         for n in notes:
             log(f"note: {n}")
-    if cfg.programs_file:
-        progs, notes = programs.load_programs(cfg.programs_file)
-        log(f"loaded program metadata for {len(progs):,} program(s); matching PrgIDs replace the built-in rows")
-        for n in notes:
-            log(f"note: {n}")
+    progs = load_programs(cfg, log)
     runtime.apply(acc, user_profiles=user_profiles, user_gas_profiles=user_gas, run_parameters=run_params, sw_factors=sw, programs=progs,
-                  reference_dir=cfg.reference_dir, sw_factors_replace=cfg.sw_factors_replace)
+                  reference_dir=cfg.reference_dir, sw_factors_replace=cfg.sw_factors_replace, programs_replace=cfg.programs_replace)
     return acc, user_profiles, user_gas
+
+
+def load_programs(cfg: RunConfig, log: Log = print):
+    """The supplied program table (programs_file) or None, logged. With programs_replace it is the whole table and may have no rows."""
+    from . import programs
+    if cfg.programs_replace and not cfg.programs_file:
+        raise ValueError("programs_replace needs a supplied program table (programs_file)")
+    if not cfg.programs_file:
+        return None
+    progs, notes = programs.load_programs(cfg.programs_file, allow_empty=cfg.programs_replace)
+    log(f"loaded program metadata for {len(progs):,} program(s); "
+        + ("they are the whole table (the built-in CEDARS Programs list is not used)" if cfg.programs_replace else "matching PrgIDs replace the built-in rows"))
+    for n in notes:
+        log(f"note: {n}")
+    return progs
 
 
 def societal_available(groups: dict, acc, wanted: bool, result: RunResult, log: Log) -> bool:
