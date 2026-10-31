@@ -1,4 +1,4 @@
-# The ReCET web app (jakemoto.com/ReCET). Builds on arm64 (the EC2 t4g box) and amd64.
+# The ReCET web app. Builds on arm64 and amd64.
 #
 #   docker compose up -d --build                     # see docker-compose.yml for volumes and settings
 #   docker compose exec recet recet-web create-admin you@example.com

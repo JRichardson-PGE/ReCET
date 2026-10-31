@@ -6,7 +6,7 @@
     recet-web users                                     list the accounts
     recet-web warm-cache [--acc 2024 2026] [--all]      build the ACC caches before the first run (one ACC at a time, to keep memory low)
 
-Settings come from RECET_WEB_* environment variables (recet/web/config.py). Links are printed with --base-url (default https://jakemoto.com) + the prefix.
+Settings come from RECET_WEB_* environment variables (recet/web/config.py). Links are printed with --base-url (default RECET_WEB_BASE_URL, else http://localhost:3000) + the prefix.
 """
 from __future__ import annotations
 
@@ -19,7 +19,8 @@ from .config import Settings
 WARM_COLUMNS = ["total_avoided_cost", "td", "emission_rate_tonnes_per_kwh"]     # what a standard run reads; --all adds every component
 
 
-def _link(s: Settings, base: str, token: str) -> str:
+def _link(s: Settings, base: str | None, token: str) -> str:
+    base = base or s.base_url or "http://localhost:3000"
     return base.rstrip("/") + s.prefix + "/setup/" + token
 
 
@@ -121,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, help_ in (("create-admin", "add an admin and print a setup link"), ("reset-link", "print a new setup link for an account")):
         p = sub.add_parser(name, help=help_)
         p.add_argument("email")
-        p.add_argument("--base-url", default="https://jakemoto.com")
+        p.add_argument("--base-url", default=None, help="the site's address (default RECET_WEB_BASE_URL, else http://localhost:3000)")
         if name == "create-admin":
             p.add_argument("--name", default="")
     sub.add_parser("users", help="list the accounts")

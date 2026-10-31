@@ -12,7 +12,7 @@ RECET_WEB_MAX_UPLOAD_MB  largest accepted upload, per file (default 150)
 RECET_WEB_MAX_UNZIPPED_MB largest a job zip may unzip to: Measure.csv plus ProgramCost.csv (default 1024; a 1,000,000-row Measure.csv is about 600 MB)
 RECET_WEB_RUN_TIMEOUT    seconds before a run is stopped (default 7200)
 RECET_WEB_RUN_DEFAULTS   JSON merged into every run's RunConfig (tests use it to supply a synthetic ACC; not needed in production)
-RECET_WEB_BASE_URL       the site's address, e.g. https://jakemoto.com, for the links in run emails (default none: the email gives the page's path)
+RECET_WEB_BASE_URL       the site's address, e.g. https://example.org, for the links in run emails (default none: the email gives the page's path)
 RECET_WEB_SMTP_HOST      the SMTP server that sends run emails (notify.py); none (the default) = no emails
 RECET_WEB_SMTP_PORT      its port (default 587)
 RECET_WEB_SMTP_SECURITY  starttls (default), ssl (port 465) or none (a local relay)

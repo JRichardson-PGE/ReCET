@@ -646,7 +646,7 @@ def test_web_cli_create_admin_prints_a_link(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("RECET_WEB_STATE", str(tmp_path / "state"))
     assert cli.main(["create-admin", "jake@example.com", "--name", "Jake"]) == 0
     out = capsys.readouterr().out
-    assert re.search(r"https://jakemoto.com/ReCET/setup/\S+", out)
+    assert re.search(r"http://localhost:3000/ReCET/setup/\S+", out)
     assert cli.main(["users"]) == 0
     assert "jake@example.com" in capsys.readouterr().out
     assert cli.main(["reset-link", "nobody@example.com"]) == 1
