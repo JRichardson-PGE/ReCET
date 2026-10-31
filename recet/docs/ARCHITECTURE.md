@@ -40,7 +40,7 @@ CEDARS.
 | Hourly valuation, load shifting (BR-06.6) | value savings in the hour they occur; a measure that only moves load has value | each measure's 8,760 profile is multiplied by that hour's avoided cost **before** summing (C5.1); kWh-per-unit profiles (C4.5) | met |
 | ACC per measure (BR-06.5) | price records on the ACC that applies to them; flag the ones that are not | optional `ACCVersion` column (C3.5); the "Priced for" check flags records whose ACC does not normally apply to their program year (`versions.expected_accs`) | met |
 | Version labels (BR-11.7) | name each ACC release unambiguously | versions keyed and shown by ACC year ("2026 ACC"); CET's Avoided Cost Version numbers mapped on read (`versions.py`) | met |
-| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test`; every test is code in `pipeline/cost_tests.py` | partly met: the PCT is added, but tests and value streams are not configuration (needs D14) |
+| Participant Cost Test (BR-06.8) | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test`; the tests are written out as a versioned definition set (`data/cost_tests/EE-2026`, `cost_test_sets.py`, COST_TESTS.md) that every run pins, while `pipeline/cost_tests.py` still does the arithmetic | partly met: the PCT is added and the tests are a pinned set; the evaluator that prices from the set and NEB streams are the next steps of COST_TESTS.md (NEBs need D14) |
 | Filing checks (BR-06.3, BR-03.6, BR-03.3) | check a job against CEDARS' upload rules before upload | CEDARS' published claims and budget-filing rule files, shipped unchanged and versioned by effective date (`filing_rules.py`); failing records flagged, never blocked; the rule set used recorded in `run_settings.json` | met; multi-file batch upload dropped for ReCET |
 | Output templates and key metrics (BR-06.10) | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
 | Program costs need not line up (BR-06.16) | calculate measures whose program has no program-cost record | a measure with no `ProgramCost.csv` row is priced with no program costs, and a row with no measures is charged to none; preflight warns about both (`preflight._program_alignment`; C17 item 11) | met |
@@ -165,6 +165,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `profile8760.py` | pricing | the portfolio's combined 8,760-hour savings profile |
 | `pipeline/engine.py` | pricing | the pricing engine: grouped versions and their per-measure references |
 | `pipeline/cost_tests.py` | pricing | program-cost weighting, cost tests, gross and NoAdmin variants, levelized values |
+| `cost_test_sets.py` | job | cost-test definition sets (COST_TESTS.md): load and check a set's YAML, the set in force for a program year, the run's pinned set |
 | `pipeline/emissions.py` | pricing | CO2, NOx and PM10, ported from CET's CalcEmissions |
 | `pipeline/data_loading.py` | pricing | reading `Measure.csv` and deriving the pricing fields (C1) |
 | `pipeline/statewide_allocation.py` | pricing | splitting statewide programs across the IOUs |

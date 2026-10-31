@@ -2,6 +2,7 @@
 
 measure-level table -- one row per measure, column groups left to right:
   Used_ACCVersion                  which ACC version the run priced against
+  Used_CostTestSet                 which cost-test definition set the run priced on (cost_test_sets.py)
   <raw Measure.csv columns>        exactly as in the input file (text preserved)
   Used_Year ... Scaled_Profile_Flag   the few derived values a reader cannot see in the inputs (DERIVED_OUTPUTS): the claim year and quarter used, the annual
                                    net kWh / therms each baseline is priced on (with installation and realization rates), the fuel-substitution flag and
@@ -95,14 +96,17 @@ def _aligned_raw(raw: pd.DataFrame, measures: pd.DataFrame) -> pd.DataFrame:
 
 
 def assemble_measure_level(raw: pd.DataFrame, measures: pd.DataFrame, result: pd.DataFrame, acc_label: str | pd.Series,
-                           credited: pd.Series | None = None) -> pd.DataFrame:
-    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID."""
+                           credited: pd.Series | None = None, cost_test_label: str | None = None) -> pd.DataFrame:
+    """One row per measure, in the loader's order. `raw` may have more rows than `measures` (a subset run); it is aligned on CEInputID.
+    `cost_test_label` (the run's cost-test set, cost_test_sets.CostTestSet.run_label) is written as Used_CostTestSet after Used_ACCVersion."""
     raw = _aligned_raw(raw, measures)
     result = result.set_index("CEInputID").reindex(measures["CEInputID"]).reset_index()
     derived = measures[DERIVED_OUTPUTS].reset_index(drop=True)
     out = result.drop(columns=[c for c in DROP_FROM_RESULT if c in result]).reset_index(drop=True)
     frame = pd.concat([raw.reset_index(drop=True), derived, out], axis=1).copy()   # copy: one block, so the two columns added below do not warn
     frame.insert(0, "Used_ACCVersion", acc_label if isinstance(acc_label, str) else pd.Series(acc_label).to_numpy())   # one label, or one per measure (mixed ACC versions)
+    if cost_test_label is not None:
+        frame.insert(1, "Used_CostTestSet", cost_test_label)
     frame["CreditedPA"] = credited.to_numpy() if credited is not None else ""
     return frame
 

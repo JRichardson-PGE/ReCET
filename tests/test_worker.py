@@ -236,6 +236,31 @@ def test_a_pinned_allocation_table_replaces_the_builtin_one(job, tmp_path):
     assert receipt["allocation"]["mode"] == "replace" and receipt["allocation"]["applied"] is True and receipt["allocation"]["sha256"] == _sha(sw)
 
 
+def test_the_receipt_names_the_cost_test_set(job, tmp_path):
+    """A built-in set by id in settings, or a supplied set file pinned by SHA-256 in inputs.cost_tests; a supplied file on a filing run is refused."""
+    from recet import cost_test_sets
+    code, receipt = worker.run(str(_spec(job, tmp_path, settings={"acc_version": "2026", "emissions": False, "cost_test_set": "EE-2026"})),
+                               log=lambda s: None)
+    assert code == 0 and receipt["cost_tests"]["id"] == "EE-2026" and receipt["cost_tests"]["sha256"] == cost_test_sets.load("EE-2026").sha256
+    assert receipt["settings"]["cost_test_set"] == "EE-2026"                    # a built-in id is not an input file
+    f = tmp_path / "custom.yaml"
+    f.write_text((cost_test_sets.SETS_DIR / "EE-2026" / "definition.yaml").read_text(encoding="utf-8").replace("id: EE-2026", "id: EE-2026-custom"),
+                 encoding="utf-8")
+    spec = json.loads(_spec(job, tmp_path).read_text())
+    spec["inputs"]["cost_tests"] = {"uri": str(f), "sha256": _sha(f)}
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    assert code == 0 and receipt["cost_tests"]["id"] == "EE-2026-custom" and receipt["cost_tests"]["sha256"] == _sha(f)
+    assert receipt["inputs"]["cost_tests"]["sha256"] == _sha(f) and receipt["settings"]["cost_test_set"] == "<input cost_tests>"
+    spec["inputs"]["cost_tests"]["sha256"] = "0" * 64
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    assert worker.run(str(tmp_path / "job.json"), log=lambda s: None) == (2, None)            # the pinned hash differs
+    spec["inputs"]["cost_tests"]["sha256"] = _sha(f)
+    spec["settings"]["acc_purpose"] = "claims"
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    assert worker.run(str(tmp_path / "job.json"), log=lambda s: None) == (2, None)            # a filing run takes a built-in set only
+
+
 def test_a_registry_program_table_replaces_the_builtin_one(job, tmp_path):
     from recet import programs
     progs = tmp_path / "programs.csv"

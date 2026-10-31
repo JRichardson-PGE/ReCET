@@ -79,6 +79,9 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
                         "{\"name\": ..., \"columns\": [...]}); the field_definitions file defines each one")
     g.add_argument("--priced-for", dest="acc_purpose", choices=["claims", *FILINGS], default=None,
                    help="what the run is priced for: flag the records whose ACC does not normally apply to their program year (default: any filing)")
+    g.add_argument("--cost-tests", dest="cost_test_set", metavar="ID_OR_FILE",
+                   help="the cost-test definition set: a built-in id (`recet cost-tests list`) or a set's YAML file for an analysis run (default: the set "
+                        "in force for the job's first program year; a filing run takes a published built-in set only)")
     g.add_argument("--excel-max-rows", type=int, help="with --format xlsx, a job with more measures than this writes every table as --excel-fallback instead (default 50,000)")
     g.add_argument("--excel-fallback", choices=["csv.zip", "csv", "parquet"], help="the format of every table of a job over --excel-max-rows (default csv.zip)")
     g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
@@ -255,6 +258,24 @@ def _cmd_openbca(a) -> int:
 def _cmd_regress(a) -> int:
     from . import regress
     return regress.main(a.rest)
+def _cmd_cost_tests(a) -> int:
+    from . import cost_test_sets
+    try:
+        if a.action == "list":
+            for sid, s in cost_test_sets.builtin().items():
+                print(f"{sid:<16} {s.label}{cost_test_sets.DRAFT_LABEL if s.draft else ''}  ({cost_test_sets.years_text(s)}; tests {', '.join(s.tests)})")
+            return 0
+        if not a.set:
+            print(f"cost-tests {a.action} needs a set id or file", file=sys.stderr)
+            return 2
+        s = cost_test_sets.load(a.set)
+    except cost_test_sets.SetError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    print(cost_test_sets.describe(s) if a.action == "show" else f"{s.run_label}: valid ({len(s.tests)} tests, {len(s.streams)} streams, SHA-256 {s.sha256})")
+    return 0
+
+
 def _cmd_worker(a) -> int:
     from . import worker
     return worker.main(a.rest)
@@ -301,6 +322,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("regress", help="the regression gate: build, check or compare real-job fixtures (see `recet regress -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_regress)
+    p = sub.add_parser("cost-tests", help="list, show or check cost-test definition sets (recet/docs/COST_TESTS.md)")
+    p.add_argument("action", choices=["list", "show", "check"])
+    p.add_argument("set", nargs="?", help="show / check: a built-in set's id or a set's YAML file")
+    p.set_defaults(func=_cmd_cost_tests)
     p = sub.add_parser("worker", help="run one job from a job spec and write its receipt (see `recet worker run -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_worker)

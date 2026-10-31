@@ -150,7 +150,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             res = res.merge(pd.read_parquet(spill / f"emissions_{i:04d}.parquet"), on="CEInputID", how="left")
         frame = outputs.assemble_measure_level(outputs.read_raw(f, cfg.allocate_statewide), measures, res,
                                                measures["Used_ACCVersion_Key"].map(labels) if len(groups) > 1 else acc.label,
-                                               credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
+                                               credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide),
+                                               cost_test_label=result.cost_tests.set.run_label)
         if cfg.components:
             frame = frame.merge(pd.read_parquet(spill / f"components_{i:04d}.parquet"), on="CEInputID", how="left")
             frame = frame[[c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]]
