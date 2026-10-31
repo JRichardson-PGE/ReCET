@@ -118,7 +118,8 @@ def test_program_cost_weights_count_water_benefit():
         d["WaterEnergyBen" + s] = d["WaterEnergyBen"]
         d["WaterEnergyCost" + s] = 0.0
     for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "RebatesandIncentsPV_SCT",
-              "NetParticipantCostPV_SCT", "NetParticipantCostAdjustedPV_SCT", "GrossParticipantCostPV_SCT", "LifecycleBillReducElec", "LifecycleBillReducGas", "LifecycleBillIncrElec", "LifecycleBillIncrGas"):
+              "NetParticipantCostPV_SCT", "NetParticipantCostAdjustedPV_SCT", "GrossParticipantCostPV_SCT", "LifecycleBillReducElec", "LifecycleBillReducGas", "LifecycleBillIncrElec", "LifecycleBillIncrGas",
+              "LifecycleBillReducElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrElecGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV"):
         d[c] = 0.0
     prog = pd.DataFrame({"PrgID": ["P"], "SumCosts": [1000.0], "SumCostsNPV": [1000.0], "SumCostsNPV_SCT": [1000.0]})
     out = cost_tests.compute_cost_tests(d, prog).set_index("CEInputID")
