@@ -396,6 +396,22 @@ def resolve_cost_tests(cfg: RunConfig, rep, result: RunResult, log: Log):
     return r
 
 
+def check_input_columns(result: RunResult, files, log: Log):
+    """The Measure columns the run's cost-test set adds (pipeline/input_streams.py): one the file lacks is priced as 0, with a note; a value in one that
+    is not a number stops the run before pricing (ValueError naming the column, the count and examples)."""
+    from .pipeline import input_streams
+    if not result.cost_tests:
+        return
+    missing, bad = input_streams.check_columns(result.cost_tests.set, files)
+    for c in missing:
+        note = f"the cost-test set reads Measure column {c}, which the file does not have: it is priced as 0"
+        result.notes.append(note)
+        log(f"note: {note}")
+    if bad:
+        raise ValueError("the cost-test set's Measure columns must hold numbers (blank = 0): "
+                         + "; ".join(f"{c}: {n:,} value(s) that are not, e.g. {', '.join(repr(x) for x in ex)}" for c, (n, ex) in bad.items()))
+
+
 def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
     """`acc` labelled as a draft ACC (BRD v0.5 BR-11.8) when its electric file is marked draft in the reference folder's manifest (datapack.set_draft), or
     when `supplied` files are flagged with cfg.acc_draft. A draft is for analysis only: a run asking for CEDARS filing checks or priced for a filing
@@ -462,7 +478,7 @@ def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
 
 def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: Log, t_start: float, parts, dtypes, values) -> RunResult:
     from . import components as comp_mod, outputs, profile8760, preflight, progress, run_poc
-    from .pipeline import emissions
+    from .pipeline import emissions, input_streams
     excel = excel_limit(cfg, result, log)
 
     # ---- preflight
@@ -489,6 +505,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     if not rep.ok:
         raise RuntimeError("preflight found blocking problems (see above); nothing was priced")
     resolve_cost_tests(cfg, rep, result, log)
+    check_input_columns(result, [f for f, _s, _n in parts] if parts is not None else [cfg.measures], log)
     if cfg.preflight_only:
         log("\npreflight only: stopping before pricing")
         return result
@@ -501,7 +518,9 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     # ---- load and price
     log("\n== loading ==")
     progress.report("loading")
-    measures, program = run_poc.load_job(cfg.measures, cfg.programcost, allocate_statewide=cfg.allocate_statewide)
+    cset = result.cost_tests.set if result.cost_tests else None
+    measures, program = run_poc.load_job(cfg.measures, cfg.programcost, allocate_statewide=cfg.allocate_statewide,
+                                         extra_columns=input_streams.extra_columns(cset) if cset else ())
     raw = outputs.read_raw(cfg.measures, cfg.allocate_statewide)
     if cfg.subset_step > 1:
         measures = measures.iloc[::cfg.subset_step].reset_index(drop=True)
@@ -539,7 +558,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
             runtime.switch_acc(g)
             log(f"  pricing {len(sub):,} measure(s) on the {g.label}")
         parts.append(run_poc.price_measure_values(sub, acc_version=g.settings_acc, base_year=base_year, market_effects_bens=meb, market_effects_cost=mec,
-                                                  include_societal=societal))
+                                                  include_societal=societal, cost_tests_set=cset))
         if cfg.emissions:
             em_parts.append(emissions.price_emissions(sub, acc_version=g.settings_acc, market_effects_bens=meb))
         if cfg.components:
@@ -548,7 +567,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
         runtime.switch_acc(acc)
     res = run_poc.apply_program_costs(pd.concat(parts, ignore_index=True), measures, program, acc_version=acc.settings_acc, base_year=base_year,
                                       market_effects_bens=meb, include_societal=societal,
-                                      cost_tests_set=result.cost_tests.set if result.cost_tests else None)
+                                      cost_tests_set=cset)
     log(f"priced in {time.time() - t0:.0f}s")
     if cfg.emissions:
         log("\n== emissions ==")

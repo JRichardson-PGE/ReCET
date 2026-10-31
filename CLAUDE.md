@@ -106,6 +106,18 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.86 (2026-10-31; step 4 of `docs/COST_TESTS.md`): input streams. `recet/pipeline/input_streams.py` prices every `source: input` stream of the
+  run's set in `run_poc.price_measure_values(..., cost_tests_set=)` (jobs and chunked pass 1 pass the run's set): `one_time` = Q x (NTG + ME) x the
+  per-unit columns (undiscounted), `annual_over_life` = the same per year over the life, discounted at the stream's pricing's annual rate with the first
+  year undiscounted and brought back to the First Year at its quarterly rate (discounted_savings' A(n), a2 from `columns_2nd` after the RUL); gross = F 1.
+  EE-2026's OtherBen / OtherCost / TaxCredits equal `engine.price_other_ben_cost` BIT FOR BIT (same arithmetic, same order; tests/test_input_streams.py),
+  which stays the reference, and replace its columns in place (`input_streams.overlay`; inside run_cost_effectiveness too, so TaxCreditsGrossPV follows);
+  a set's new stream columns are appended. A set's own Measure columns (`input_streams.extra_columns`: input columns not in templates.MEASURE_COLUMNS):
+  `load_job(..., extra_columns=)` keeps them as numbers (blank / missing = 0) and allocates them by the Weighted Factor; `jobs.check_input_columns`
+  (after resolve_cost_tests, also on Check inputs only) notes a missing one and raises ValueError on a non-number; `recet template measure --cost-tests
+  SET` adds them; `field_docs.table` takes their (and a custom set's stream / test columns') definitions from `cost_test_sets.column_definitions`.
+  Validation: `columns_2nd` only with annual_over_life; an annual_over_life stream in pricings with different rates needs `naming: suffix`. EE outputs
+  unchanged (regression gate, no --update). A synthetic `EE-2026-neb` set (health NEB + JST) is built in the tests, not shipped.
 - 0.1.85 (2026-10-31; step 3 of `docs/COST_TESTS.md`): consumers from the set. The portfolio summary (`outputs.summarize` / `SummaryParts` /
   `group_ratios` / `row_ratios` take `cset`; ratios = `cost_test_sets.ratio_names`, the summary keeps `summary_ratios`: every test's ratio and the headline
   tests' NoAdmin; a numerator missing from an old table is built from the set's benefits + adders), key metrics (`key_metrics.sum_columns / headlines /

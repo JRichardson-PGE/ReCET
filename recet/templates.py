@@ -221,8 +221,9 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
     return out
 
 
-def write_template(kind: str, out_path: str | Path, acc_key: str = "2026") -> Path:
-    """Write one template file (format chosen by the file extension for tables: .csv or .parquet)."""
+def write_template(kind: str, out_path: str | Path, acc_key: str = "2026", cost_tests: str | None = None) -> Path:
+    """Write one template file (format chosen by the file extension for tables: .csv or .parquet). `cost_tests` (measure only): a cost-test set's id or
+    YAML file, whose own Measure columns (its input streams', pipeline/input_streams.extra_columns) are added after ReCET's."""
     if kind not in KINDS:
         raise ValueError(f"unknown template {kind!r}; choose from {KINDS}")
     out = Path(out_path)
@@ -247,7 +248,12 @@ def write_template(kind: str, out_path: str | Path, acc_key: str = "2026") -> Pa
     elif kind == "workbook":
         return write_workbook_template(out, acc_key)
     else:
-        out.write_text("|".join(MEASURE_COLUMNS) + "\r\n", encoding="utf-8")
+        extra = []
+        if cost_tests:
+            from . import cost_test_sets
+            from .pipeline import input_streams
+            extra = input_streams.extra_columns(cost_test_sets.load(cost_tests))
+        out.write_text("|".join(MEASURE_COLUMNS + extra) + "\r\n", encoding="utf-8")
         return out
     if out.suffix.lower() == ".parquet":
         df.to_parquet(out, index=False)

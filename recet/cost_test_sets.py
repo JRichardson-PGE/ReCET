@@ -314,6 +314,16 @@ def validate(data) -> list[str]:
                 errors.append(f"{where}.ntg: one of {', '.join(NTGS)}")
             if s.get("market_effects") not in MARKET_EFFECTS:
                 errors.append(f"{where}.market_effects: one of {', '.join(MARKET_EFFECTS)}")
+            for k in ("columns", "columns_2nd"):
+                errors += [f"{where}.{k}: {c!r} is not a column name" for c in (s.get(k) or []) if isinstance(c, str) and not NAME.match(c)]
+            if s.get("columns_2nd") and s.get("basis") == "one_time":
+                errors.append(f"{where}.columns_2nd: only for basis annual_over_life (a one_time value has no 2nd-baseline years)")
+            if s.get("basis") == "annual_over_life" and s.get("naming", "none") == "none" and _strs(s.get("pricings")):
+                rates = {(pricings[p].get("discount_rate_quarterly"), pricings[p].get("discount_rate_annual"))
+                         for p in s["pricings"] if isinstance(pricings.get(p), dict)}
+                if len(rates) > 1:
+                    errors.append(f"{where}.naming: an annual_over_life stream is discounted at each pricing's rates, so in pricings with different "
+                                  "rates it needs its own column per pricing (naming: suffix)")
         elif any(k in s for k in ("columns", "columns_2nd", "basis", "ntg", "market_effects")):
             errors.append(f"{where}: columns, basis, ntg and market_effects are for source: input")
         if src == "program" and any(k in s for k in ("pricings", "naming", "gross")):
@@ -639,6 +649,31 @@ def summary_ratios(s: CostTestSet) -> list[str]:
     """The ratios a portfolio summary row carries: every test's, and the NoAdmin ratio of the headline tests (outputs.SUMMARY_RATIOS for EE-2026)."""
     head = set(s.headline_tests())
     return [f"{n}_ratio" for n, t, _b, _c in ratio_names(s) if not n.endswith("_NoAdmin") or t in head]
+
+
+def column_definitions(s: CostTestSet) -> dict[str, str]:
+    """{column: definition} from the set itself, for the columns of a set's own streams, aggregates and tests (the field definitions use it where the
+    docs have no entry: a custom set's NEB stream, its JST columns) and for its own Measure columns."""
+    out: dict[str, str] = {}
+    for st in s.streams.values():
+        if st.source == "program":
+            continue
+        for p in st.pricings:
+            where = f" ({s.pricings[p].label})" if len(st.pricings) > 1 else ""
+            out.setdefault(s.column(st.name, p), (st.definition or st.name) + where)
+            if st.gross is not None and st.gross != "same":
+                out.setdefault(s.column(st.name, p, gross=True), f"{st.name} without its net-to-gross ratio (gross){where}.")
+        for c in (*st.columns, *st.columns_2nd):
+            out.setdefault(c, f"Per-unit value read by the cost-test stream {st.name}" + (" in the 2nd-baseline years" if c in st.columns_2nd else "")
+                           + f" (cost-test set {s.id}); blank = 0.")
+    for a in s.aggregates.values():
+        out.setdefault(a.name, a.definition or a.name)
+        if a.gross:
+            out.setdefault(f"{a.name}Gross", f"{a.name} on gross values.")
+    for t in s.tests.values():
+        for c in t.outputs():
+            out.setdefault(c, f"{t.label} ({t.id}): {c[len(t.id):] if c.startswith(t.id) else c}. " + (t.definition or ""))
+    return {k: v.strip() for k, v in out.items()}
 
 
 def benefit_cost_of(s: CostTestSet) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
