@@ -37,7 +37,7 @@ and the cross-references a schema cannot express (section 3).
 | header | `schema_version` (1), `id`, `workstream`, `version`, `label`, `description`, `draft`, `program_years` (`from`, `to`; null = open) | What the set is and the program years it is in force for. An open `to` ends the year before the next published set of the workstream starts. |
 | `pricings` | `acc_rows` (`trc`, `sct_base`, `sct_high`), `discount_rate_quarterly`, `discount_rate_annual` (run-parameter columns), `suffix`, `participant_suffix` | How a stream is priced for a test, and how its column is named: `ElecBen_SB`, `RebatesandIncentsPV_SCT`. |
 | `streams`, `source: engine` | `kind` (benefit, cost), `fuel` (elec, gas, water, none), `pricings`, `naming` (suffix, participant_suffix, none), `gross` (divide_ntg, same, or the gross column), `internal`, `unit`, `definition` | A column the pricing produces. `fuel` picks the NTG a Gross form divides out (water energy uses the kWh NTG). |
-| `streams`, `source: input` | `columns` (Measure fields; blank = 0), `columns_2nd`, `basis` (`one_time`, `annual_over_life`), `ntg` (kwh, therm, none), `market_effects` (benefits, costs, none), and the engine fields | NumUnits x (NTG + market effects) x the per-unit values. `OtherBen`, `OtherCost` and `TaxCredits` are written this way in EE-2026; a non-energy benefit will be the same kind of entry. |
+| `streams`, `source: input` | `columns` (Measure fields; blank = 0), `columns_2nd`, `basis` (`one_time`, `annual_over_life`), `ntg` (kwh, therm, none), `market_effects` (benefits, costs, none), and the engine fields | NumUnits x (NTG + market effects) x the per-unit values, once (`one_time`) or each year of the measure's life (`annual_over_life`): section 3. `OtherBen`, `OtherCost` and `TaxCredits` are written this way in EE-2026; a non-energy benefit is the same kind of entry. |
 | `streams`, `source: program` | `unit`, `definition` | The ProgramCost.csv costs, discounted annually at the test's pricing rate and shared out by the test's share rule (C11). |
 | `aggregates` | `pricing`, `plus`, `minus`, `gross` | A signed sum written as its own column: `TotalSystemBenefit` (and `TotalSystemBenefitGross`). |
 | `tests` | `label`, `pricing`, `benefits`, `numerator_adders`, `costs`, `program_costs` (`none` or `{share: positive_benefits \| <test>}`), `variants` (NoAdmin, Gross), `lifecycle_net_benefit`, `levelized`, `headline`, `filing`, `definition` | `<T>Ratio = <T>Ben / <T>Cost`; see section 3 for the columns a test writes. |
@@ -56,6 +56,24 @@ OUTPUT_FIELDS.md 1.8 to 1.10.
   must compute its own, in the same pricing). `NoAdmin` leaves the program costs out, so it needs a test with program costs.
 * The Gross variant replaces every stream by its gross form and shares on the gross benefits; every stream of such a test must have a gross form.
 * The portfolio ratio of a test is the sum of its `<T>Ben` over the sum of its `<T>Cost`.
+* An input stream (`pipeline/input_streams.py`) is priced from its Measure columns. With Q = NumUnits, F = NTG + market effects (`ntg` kwh = NTGRkWh,
+  therm = NTGRTherm, none = 1; `market_effects` benefits = MEBens, costs = MECost, none = 0) and a1 / a2 the per-unit sums of `columns` / `columns_2nd`
+  (a2 = a1 without `columns_2nd`):
+
+      one_time            Q x F x a1                                              undiscounted, as CET's OtherBen / OtherCost / TaxCredits (C7)
+      annual_over_life    Q x F x a1 x A(EUL) / Rqf^Qm                            single baseline (RUL 0, or RUL >= EUL)
+                          Q x F x (a1 x A(RUL) + a2 x A(EUL - RUL) / Raf^RUL) / Rqf^Qm      RUL > 0
+                          A(n) = 1 + (1 - Raf^-(n - 1)) / Ra                      n years, the first undiscounted; A(0) = 0; n when Ra = 0
+
+  at the stream's pricing's rates (Ra = its annual rate, Raf = 1 + Ra, Rqf = 1 + its quarterly rate, per PA; Qm = the claim quarter's offset from the
+  First Year): CalcCost's discounting of the savings, so year one is valued at the claim quarter and the whole brought back to the First Year, like every
+  avoided-cost benefit. The gross form is the same with F = 1. An `annual_over_life` stream in pricings with different rates needs `naming: suffix`
+  (one column per pricing); `columns_2nd` is for `annual_over_life` only.
+* A set's Measure columns that are not CET's (or ReCET's optional ones) are its own: the loader keeps them as numbers (blank = 0), `recet template
+  measure --cost-tests SET` adds them to the header, the Edit inputs grid keeps them, statewide allocation takes them by the Weighted Factor (as CET's
+  per-unit benefit and cost fields), a file without one prices it as 0 with a note, and a value that is not a number stops the run before pricing
+  (`jobs.check_input_columns`, also on Check inputs only). The stream's columns (`<name>`, `<name>_SB` ..., their gross forms) are written to the
+  measure-level table after the pricing's own.
 * `headline` marks the tests the run page, key metrics and New run summary show (TRC and PAC in EE-2026); `filing` (default true) marks the tests a filing
   template may require.
 
@@ -105,7 +123,11 @@ replicas stay code.
    its set as `cost_tests.yaml` (OUTPUT_FIELDS 2.9c, `cost_test_sets.for_run`). EE-2026 runs write what they wrote, except a "PCT ratio" row in the
    key metrics. The per-measure TRC / PAC / RIM / SCB / SCH arithmetic the pricing still carried (without program costs, dropped before the tests) is
    gone. Output templates stay column lists: a template naming a test the run's set lacks has that column left out, with a note.
-4. **Input streams**: the `one_time` and `annual_over_life` bases priced from the set, template / editor / preflight support for the Measure columns a set
-   names, and a synthetic set with a non-energy benefit and a jurisdiction-specific test.
+4. **Input streams** (0.1.86): `pipeline/input_streams.py` prices every input stream of the run's set (`one_time` and `annual_over_life`, section 3) in
+   `run_poc.price_measure_values`; EE-2026's OtherBen / OtherCost / TaxCredits come out of it equal bit for bit to the engine's
+   (`engine.price_other_ben_cost`, still the per-measure reference), so EE runs are unchanged (regression gate). A set's own Measure columns are loaded,
+   allocated, checked and templated as section 3 says. tests/test_input_streams.py: the bases against a year-by-year loop, and a synthetic set
+   (`EE-2026-neb`: an annual health NEB from `UnitNEBHealth`, in the primary and SCT Base pricings, and a JST = ElecBen + GasBen + HealthNEB over
+   RebatesandIncentsPV and the TRC share of the program costs) run end to end, in one piece and in parts.
 5. **CEDARS platform**: the reference-data pack kind `cost_tests`, its admin page, the set in the job spec and on the run record, and the filing template's
    required set.

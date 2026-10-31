@@ -143,12 +143,18 @@ def table(columns, base_url: str = "", acc: str = "", cset=None) -> "pd.DataFram
     """One row per column, in order: position, column, definition and link (`base_url` + the document link, e.g. a web app's '/docs/'), then the
     data-dictionary attributes of field_attributes.py (unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use;
     BRD BR-08.1; `acc` names the run's ACC in `version`; `cset`, the run's cost-test set, says which tests a column enters). A column without an
-    entry gets a blank definition."""
+    entry gets the definition the run's set gives it, else a blank one."""
     import pandas as pd
     from .field_attributes import ATTRIBUTE_COLUMNS, attributes
+    from_set = {}
+    if cset is not None:
+        from .cost_test_sets import column_definitions
+        from_set = column_definitions(cset)
     rows = []
     for k, c in enumerate(columns, start=1):
         d = definition(c)
+        if d is None and c in from_set:              # a column of the run's own cost-test set the docs do not describe (a custom NEB, a new test)
+            d = Definition(c, "COST_TESTS.md", "", from_set[c])
         rows.append({"position": k, "column": c, "definition": d.text if d else "", "documentation": f"{base_url}{d.link}" if d else "",
                      **attributes(c, d.text if d else "", acc, cset)})
     return pd.DataFrame(rows, columns=["position", "column", "definition", "documentation", *ATTRIBUTE_COLUMNS])

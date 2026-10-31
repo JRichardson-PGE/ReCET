@@ -12,7 +12,8 @@ import pandas as pd
 from .delimited import read_cet_csv
 
 
-def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False, dtypes: dict | None = None) -> pd.DataFrame:
+def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = False, dtypes: dict | None = None,
+                           extra_columns: tuple[str, ...] | list[str] = ()) -> pd.DataFrame:
     """Generic loader: any real CET Measure.csv (pipe- or comma-delimited) in, derived-fields DataFrame out.
 
     allocate_statewide=True first splits any statewide-program rows across the
@@ -22,15 +23,24 @@ def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = Fa
     untouched.
 
     dtypes: column types to read with instead of inferring them from the file (delimited.part_dtypes): a part of a larger file is read with the types the
-    whole file would get, so it loads exactly as those rows do in the whole file."""
+    whole file would get, so it loads exactly as those rows do in the whole file.
+
+    extra_columns: Measure columns beyond CET's that the run's cost-test set reads (input_streams.extra_columns): kept in the frame as numbers, a blank or a
+    missing column = 0 (jobs.check_input_columns stops the run first on a value that is not a number). With statewide allocation they take the Weighted
+    Factor, as CET's per-unit benefit and cost fields do (UnitMiscBens ...)."""
     df = read_cet_csv(measure_csv_path, low_memory=False, **({"dtype": dtypes} if dtypes else {}))
     from ..templates import with_defaults
     df = with_defaults(df)                          # the minimal input set: a missing descriptive column is read as blank (BR-06.15)
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
-        df, report = allocate_measure_inputs(df)
+        rules = None
+        if extra_columns:
+            from .statewide_allocation import load_field_rules
+            rules = dict(load_field_rules()["measure"])
+            rules.update({c: "Weighted Factor" for c in extra_columns if c not in rules})
+        df, report = allocate_measure_inputs(df, rules=rules)
         warn_unmatched(report, "Measure.csv")
-    return _derive_fields(df)
+    return _derive_fields(df, extra_columns)
 
 
 def acc_versions(col: pd.Series) -> pd.Series:
@@ -64,7 +74,7 @@ COLUMNS = [
 ]
 
 
-def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
+def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] = ()) -> pd.DataFrame:
     """The measure frame the pricing reads: the Measure fields under their own names (text keys stripped, CET-optional blanks read as 0) and the few derived values,
     named for the output field they are written as, or Used_<field> for a value derived from a field.
 
@@ -112,4 +122,7 @@ def _derive_fields(df: pd.DataFrame) -> pd.DataFrame:
     df["Fuel_Sub_Flag"] = fuel_sub_by_fuel_id | fuel_sub_by_impact_type
     # ACCVersion (ReCET-only column, BRD BR-06.5): the ACC this measure is priced on, spelt as a version key ("2024 ACC" -> "2024"). Blank = the run's ACC.
     df["ACCVersion"] = acc_versions(df["ACCVersion"]) if "ACCVersion" in df.columns else ""
-    return df[COLUMNS]
+    extra = [c for c in dict.fromkeys(extra_columns) if c not in COLUMNS]     # a cost-test set's input-stream columns (pipeline/input_streams.py)
+    for c in extra:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0) if c in df.columns else 0.0
+    return df[COLUMNS + extra]
