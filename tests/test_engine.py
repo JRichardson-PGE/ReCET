@@ -65,6 +65,21 @@ def test_a_replica_runs_through_the_ordinary_run_path(tmp_path):
     assert port["Measures"].iloc[0] == 41 and abs(port["TotalSystemBenefit"].iloc[0] - res.totals["TotalSystemBenefit"]) < 1e-3
 
 
+def test_a_replica_attaches_a_whole_supplied_program_table(tmp_path):
+    from recet import programs
+    m = _read(DATA / "25.1" / C3 / "me0" / "measure.csv")
+    first = str(m["PrgID"].iloc[0]).strip()
+    (tmp_path / "programs.csv").write_text(f"PA,PrgID,ProgramName\nPGE,{first},Registry name\n")
+    try:
+        res = run_job(_cfg(tmp_path, programs_file=str(tmp_path / "programs.csv"), programs_replace=True), log=lambda s: None)
+    finally:
+        programs.set_user_programs(None)
+    frame = pd.read_csv(res.files["measure_level"], dtype=str, keep_default_na=False)
+    mine = frame["PrgID"].str.strip() == first
+    assert frame.loc[mine, "Prg_ProgramName"].eq("Registry name").all()
+    assert frame.loc[~mine, "Prg_MatchedOn"].eq("(not found)").all()           # no built-in row on a replica either
+
+
 def test_a_replica_run_in_parts(tmp_path):
     """A job larger than a part is priced part by part (cet_versions.price via parts.plan): the release's tables still equal RunCET's, the
     measure-level table has every measure, and the totals equal a whole-job run's."""

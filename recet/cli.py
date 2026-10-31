@@ -48,6 +48,8 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--sw-factors", dest="sw_factors_file", help="statewide allocation factors: replace / extend the built-in table (used with --allocate-statewide)")
     g.add_argument("--sw-factors-replace", action="store_true", default=None, help="the --sw-factors table is the whole table: no built-in row is used")
     g.add_argument("--programs", dest="programs_file", help="program metadata (CEDARS Programs list layout): replace / extend the built-in table")
+    g.add_argument("--programs-replace", action="store_true", default=None,
+                   help="the --programs table is the whole program table: the built-in CEDARS Programs list is not used")
     g.add_argument("--profiles-8760", dest="profiles_8760_file", help="supplied 8,760 electric profiles (replace matching library profiles)")
     g.add_argument("--profiles-gas", dest="profiles_gas_file", help="supplied gas monthly profiles (replace matching library profiles)")
     g.add_argument("--no-normalize-profiles", dest="normalize_profiles", action="store_false", default=None, help="error instead of rescaling profiles that do not sum to 1")
