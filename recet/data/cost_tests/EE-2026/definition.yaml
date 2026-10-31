@@ -16,7 +16,7 @@ schema_version: 1
 id: EE-2026
 workstream: EE
 version: "2026-10-31"
-label: Energy efficiency cost tests 2026
+label: EE cost tests 2026
 description: >-
   The California energy-efficiency cost tests as CET's CalcCE applies them (Standard Practice Manual; D.19-05-019 for the Societal Cost Test),
   with the four suspected CalcCE errors not copied (CALCULATIONS C17) and the Participant Cost Test, which CET does not calculate.

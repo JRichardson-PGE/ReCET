@@ -202,7 +202,7 @@ for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avo
 
 Which cost-test definition set the run priced the tests on (BRD BR-06.8; [COST_TESTS.md](COST_TESTS.md)). Unit: Text.
 
-**Formula:** the set's id, `EE-2026` for the built-in set; a set supplied as a file is `<id> (<file name>)`, and a draft set ends in ` (draft)`.
+**Formula:** a built-in set's id (`EE-2026`); a set supplied as a file is `custom: <file name>` (its id and SHA-256 are in `run_settings.json`); a draft set ends in ` (draft)`.
 **Inputs:** the "Cost tests" setting (`cost_test_set`, INPUT_FIELDS.md section 3); blank = the set in force for the job's first program year.
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)

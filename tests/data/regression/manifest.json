@@ -38,7 +38,7 @@
       ],
       "cost_tests": {
         "id": "EE-2026",
-        "sha256": "b604edbcac33391011c323df6c30e06fabca811117d8d3f1a12a04ddb486716e"
+        "sha256": "2f685ab63bca47b06b4ca89b1f237065805cb934e9936cf287b95108dc6f3735"
       }
     },
     "k10_three_zones": {
@@ -53,7 +53,7 @@
       ],
       "cost_tests": {
         "id": "EE-2026",
-        "sha256": "b604edbcac33391011c323df6c30e06fabca811117d8d3f1a12a04ddb486716e"
+        "sha256": "2f685ab63bca47b06b4ca89b1f237065805cb934e9936cf287b95108dc6f3735"
       }
     }
   },
