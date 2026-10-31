@@ -421,9 +421,9 @@ PARTICIPANT_EXTRA = ["IncentiveToOthers", "DILaborCost", "DIMaterialCost", "EndU
 def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                            market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
     """
-    Wires up TRCCost/PACCost/TRCRatio/PACRatio (and the ElecBen/
-    ElecSupplyCost, GasBen/GasSupplyCost, OtherBen/OtherCost splits they're
-    built from) on top of pieces this POC already validates independently:
+    Prices the primary (TRC-row) streams the cost tests are built from (the ElecBen/
+    ElecSupplyCost, GasBen/GasSupplyCost, OtherBen/OtherCost splits, the participant
+    PVs and bill impacts; the tests are the cost-test set's, pipeline/test_evaluator.py) on top of pieces this POC already validates independently:
     `run_real_hourly`/`run_gas_benefit` (the ONE lifetime PV number per
     measure, sign-classified into Ben vs SupplyCost exactly like
     price_bill_impact's Reduc/Incr split -- same real "fuel-sub cost gets
@@ -454,9 +454,11 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     out of this function to avoid tripling its already-expensive per-
     measure hourly/monthly runs for callers who only want TRC/PAC/RIM.
 
-    Returns one row per measure: CEInputID, ElecBen, ElecSupplyCost,
-    GasBen, GasSupplyCost, OtherBen, OtherCost, TaxCredits, TRCCost,
-    PACCost, RIMCost, TRCRatio, PACRatio, RIMRatio.
+    Returns one row per measure: CEInputID, the pricing statuses, ElecBen, ElecSupplyCost,
+    GasBen, GasSupplyCost, WaterEnergyBen/Cost, OtherBen, OtherCost, TaxCredits and their gross
+    forms, the participant PVs, the bill impacts and their gross forms, TaxCreditsGrossPV.
+    (Before 0.1.85 it also wrote per-measure TRC/PAC/RIM costs and ratios without program
+    costs, which the cost-test step replaced.)
     """
     if base_year is None:
         base_year = int(measures["Used_Year"].min())
@@ -521,15 +523,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
     df["GasBen"], df["GasSupplyCost"] = _split_ben_supply(df["GasValue"], df["Fuel_Sub_Flag"])
     df["WaterEnergyBen"], df["WaterEnergyCost"] = _split_water(df["WaterEnergyValue"], ids.map(measures_by_id["UnitkWhIOUWater1stBaseline"]))
 
-    supply_and_other_costs = df["ElecSupplyCost"] + df["GasSupplyCost"] + df["WaterEnergyCost"] + df["OtherCost"]
-    df["PACCost"] = df["RebatesandIncentsPV"] + supply_and_other_costs
-    df["TRCCost"] = df["RebatesandIncentsPV"] + df["NetParticipantCostAdjustedPV"] + supply_and_other_costs
-    df["RIMCost"] = df["LifecycleBillReducElec"] + df["LifecycleBillReducGas"] + df["PACCost"]
-
-    total_benefits = df["ElecBen"] + df["GasBen"] + df["WaterEnergyBen"] + df["OtherBen"]
-    df["TRCRatio"] = (total_benefits + df["TaxCredits"]) / df["TRCCost"]
-    df["PACRatio"] = total_benefits / df["PACCost"]
-    df["RIMRatio"] = (total_benefits + df["LifecycleBillIncrElec"] + df["LifecycleBillIncrGas"]) / df["RIMCost"]
+    # the tests themselves are the cost-test set's (pipeline/test_evaluator.py, after the program costs are shared); this prices their streams only
     df = df.merge(participant_cost_test(measures, df, acc_version, base_year), on="CEInputID", how="left")
 
     return df[["CEInputID", "ElecPricingStatus", "ProfileSource", "SystemClimateZone", "SystemZoneSource", "GasPricingStatus", "GasProfileSource", "WaterPricingStatus",
@@ -538,8 +532,7 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
                "GrossParticipantCostPV",
                *PARTICIPANT_EXTRA, "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas",
-               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV",
-               "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
+               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV"]]
 
 
 def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_version: int, base_year: int) -> pd.DataFrame:
@@ -577,7 +570,7 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
 def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
                                     market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
     """
-    Wires up SCBCost/SCHCost/SCBRatio/SCHRatio (the societal cost tests --
+    Prices the streams of SCBCost/SCHCost/SCBRatio/SCHRatio (the societal cost tests --
     "Base" and "High" social-cost-of-carbon scenarios), structurally
     identical to run_cost_effectiveness's TRCCost but with two real
     differences confirmed directly in `CalcCE`'s SQL
@@ -669,21 +662,11 @@ def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2
     df["WaterEnergyBen_SB"], df["WaterEnergyCost_SB"] = _split_water(df["WaterEnergyValue_SB"], unit_kwh_water_1st)
     df["WaterEnergyBen_SH"], df["WaterEnergyCost_SH"] = _split_water(df["WaterEnergyValue_SH"], unit_kwh_water_1st)
 
-    rebates_and_incents_pv_sct = df["RebatesandIncentsPV"]
-    net_participant_cost_adjusted_pv_sct = df["NetParticipantCostAdjustedPV"]          # with the market-effects term, as the TRC cost
-    df["SCBCost"] = (rebates_and_incents_pv_sct + net_participant_cost_adjusted_pv_sct + df["ElecSupplyCost_SB"] + df["GasSupplyCost_SB"]
-                     + df["WaterEnergyCost_SB"] + df["OtherCost"])
-    df["SCHCost"] = (rebates_and_incents_pv_sct + net_participant_cost_adjusted_pv_sct + df["ElecSupplyCost_SH"] + df["GasSupplyCost_SH"]
-                     + df["WaterEnergyCost_SH"] + df["OtherCost"])
-
-    df["SCBRatio"] = (df["ElecBen_SB"] + df["GasBen_SB"] + df["WaterEnergyBen_SB"] + df["OtherBen"]) / df["SCBCost"]
-    df["SCHRatio"] = (df["ElecBen_SH"] + df["GasBen_SH"] + df["WaterEnergyBen_SH"] + df["OtherBen"]) / df["SCHCost"]
-
+    # the societal tests themselves are the cost-test set's (pipeline/test_evaluator.py); this prices their streams only
     return df[["CEInputID", "ElecBen_SB", "ElecBen_SH", "ElecSupplyCost_SB", "ElecSupplyCost_SH",
                "GasBen_SB", "GasBen_SH", "GasSupplyCost_SB", "GasSupplyCost_SH",
                "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
-               "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV",
-               "SCBCost", "SCHCost", "SCBRatio", "SCHRatio"]]
+               "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV"]]
 
 
 SOCIETAL_COLUMN_PATTERN = r"(_SB|_SH)$|^SCB|^SCH|_SCT$"
@@ -826,12 +809,9 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
         sct_values = measures[["CEInputID"]].assign(**{c: 0.0 for c in (
             "ElecBen_SB", "ElecBen_SH", "ElecSupplyCost_SB", "ElecSupplyCost_SH", "GasBen_SB", "GasBen_SH", "GasSupplyCost_SB", "GasSupplyCost_SH",
             "WaterEnergyBen_SB", "WaterEnergyBen_SH", "WaterEnergyCost_SB", "WaterEnergyCost_SH",
-            "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV", "SCBCost", "SCHCost", "SCBRatio",
-            "SCHRatio")})
+            "RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV", "GrossParticipantCostPV")})
     sct_values = sct_values.rename(columns={c: f"{c}_SCT" for c in ("RebatesandIncentsPV", "NetParticipantCostPV", "NetParticipantCostAdjustedPV",
                                                                     "GrossParticipantCostPV")})
-    sct_values = sct_values.drop(columns=["SCBCost", "SCHCost", "SCBRatio", "SCHRatio"])
-    trc_values = trc_values.drop(columns=["TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"])
     measure_values = measures[["CEInputID", "PrgID"]].copy()
     measure_values["NTGRkWh_plus_MEBens"] = measures["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
     measure_values["NTGRTherm_plus_MEBens"] = measures["NTGRTherm"] + market_effects_bens

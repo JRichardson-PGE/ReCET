@@ -249,9 +249,12 @@ class Ctx:
         folder = self.runner.folder(run["id"])
         return eta.size(folder) if (folder / "config.json").exists() else None
 
-    # the run page's headline numbers: (column key, label)
-    HEADLINE = [("TotalSystemBenefit", "Total system benefit"), ("TotalExpenditures", "Budget"), ("TRC_ratio", "TRC"), ("PAC_ratio", "PAC"),
-                ("RIM_ratio", "RIM"), ("SCB_ratio", "SCT Base")]
+    # the run page's headline numbers: (column key, label); the ratio tiles are the run's cost-test set's (cost_test_sets.tile_tests)
+    HEADLINE = [("TotalSystemBenefit", "Total system benefit"), ("TotalExpenditures", "Budget")]
+
+    @staticmethod
+    def headline_keys(cset) -> list[tuple[str, str]]:
+        return Ctx.HEADLINE + [(f"{t}_ratio", cost_test_sets.short_label(t)) for t in cost_test_sets.tile_tests(cset)]
 
     def headline(self, run) -> list[dict]:
         """A finished run's portfolio numbers for its run page: [{"name": "" or "ACC 2024" (a comparison's runs), "tiles": [{label, value, help}]}].
@@ -270,14 +273,15 @@ class Ctx:
             try:
                 res = self.results(source)
                 cat = res.catalog()
-                keys = [k for k, _ in self.HEADLINE if k in cat]
+                headline = self.headline_keys(res.cset)
+                keys = [k for k, _ in headline if k in cat]
                 t = res.table("portfolio", rv.ALL_PAS, keys)
             except Exception:                                    # the run page must open whatever state the results are in
                 continue
             if not len(t):
                 continue
             row = t.iloc[0]
-            labels = dict(self.HEADLINE)
+            labels = dict(headline)
             tiles = [{"label": "Measures", "value": f"{res.n:,}", "help": "measures priced in this run"}]
             tiles += [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys]
             out.append({"name": "" if folder == base else str(folder.relative_to(base)).replace("run_acc", "ACC "), "tiles": tiles})

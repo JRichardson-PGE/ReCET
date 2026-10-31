@@ -133,71 +133,85 @@ def filing_table(filing: pd.DataFrame, rule_set: str) -> pd.DataFrame:
 EXCLUDE_FLAG = "Prg_Exclude_From_CE"
 
 
-SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "PCT_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")
+SUMMARY_RATIOS = ("TRC_ratio", "PAC_ratio", "RIM_ratio", "SCB_ratio", "SCH_ratio", "PCT_ratio", "TRC_NoAdmin_ratio", "PAC_NoAdmin_ratio")   # EE-2026's
+RATIO_TESTS = ("TRC", "PAC", "RIM", "SCB", "SCH")     # EE-2026's tests with a NoAdmin variant (their ratios' numerators are <test>Ben)
 
 
-RATIO_TESTS = ("TRC", "PAC", "RIM", "SCB", "SCH")     # each writes its ratios' numerator as <test>Ben (PCT's is PCTBen, an output of its own)
+def _cset(cset=None):
+    """The cost-test set the summary is taken on: the run's (passed by jobs / chunked / the Results page), else the newest published EE set."""
+    if cset is not None:
+        return cset
+    from .pipeline import cost_tests
+    return cost_tests.default_set()
 
 
-def _numerators(get) -> dict[str, object]:
-    """{test: the numerator of its ratios} for RATIO_TESTS: the total of the measure-level <test>Ben column, or (a table written before 0.1.53, which has no
-    such column) the same sum of benefits built from its parts."""
-    z = lambda x: 0.0 if x is None else x
-
-    def benefits(suffix: str = ""):
-        parts = [get(f"{c}{suffix}") for c in ("ElecBen", "GasBen", "WaterEnergyBen")] + [get("OtherBen")]
-        return None if any(p is None for p in parts) else sum(parts)
-
-    b, b_sb, b_sh = benefits(), benefits("_SB"), benefits("_SH")
-    tax, incr = z(get("TaxCredits")), z(get("LifecycleBillIncrElec")) + z(get("LifecycleBillIncrGas"))
-    plus = lambda x, y: None if x is None else x + y
-    built = {"TRC": plus(b, tax), "PAC": b, "RIM": plus(b, incr), "SCB": b_sb, "SCH": b_sh}
+def _numerators(get, cset=None) -> dict[str, object]:
+    """{test: the numerator of its ratios} for every test of the set: the total of the measure-level <test>Ben column, or (a table written before
+    0.1.53, which has no such column) the same sum built from its benefits and numerator adders (a missing benefit = no numerator; a missing adder = 0)."""
+    s = _cset(cset)
     out = {}
-    for t in RATIO_TESTS:
-        v = get(f"{t}Ben")
-        out[t] = built[t] if v is None else v
+    for t in s.tests.values():
+        v = get(f"{t.id}Ben")
+        if v is None:
+            parts = [get(s.column(x, t.pricing)) for x in t.benefits]
+            if not any(p is None for p in parts):
+                v = sum(parts) + sum(0.0 if (a := get(s.column(x, t.pricing))) is None else a for x in t.numerator_adders)
+        out[t.id] = v
     return out
 
 
-def _ratio_parts(get) -> list[tuple[str, object, object]]:
-    """(ratio name, numerator, denominator) for the cost-test ratios, with `get(column)` returning a total (a number, or a Series for per-row ratios) or None."""
-    n = _numerators(get)
-    return [*((t, n[t], get(f"{t}Cost")) for t in RATIO_TESTS), *((f"{t}_NoAdmin", n[t], get(f"{t}CostNoAdmin")) for t in RATIO_TESTS),
-            ("PCT", get("PCTBen"), get("PCTCost"))]
+def _ratio_parts(get, cset=None) -> list[tuple[str, object, object]]:
+    """(ratio name, numerator, denominator) for the cost-test ratios of the set (cost_test_sets.ratio_names), with `get(column)` returning a total
+    (a number, or a Series for per-row ratios) or None."""
+    from . import cost_test_sets
+    s = _cset(cset)
+    n = _numerators(get, s)
+    return [(name, n[t], get(cost)) for name, t, _ben, cost in cost_test_sets.ratio_names(s)]
 
 
-def group_ratios(g: pd.DataFrame) -> dict[str, float]:
-    """The cost-test ratios of a group of measures, as CET reports them on a run receipt: the summed BENEFITS (supply costs are already in the costs, not netted
-    from the numerator) over the summed cost; TRC adds tax credits and RIM the bill increases to the numerator; PCT is PCTBen over PCTCost. A ratio whose inputs are missing or whose cost is 0
-    is left out. (Until 2026-09-21 the numerator was TotalSystemBenefit, which nets the supply costs out of the numerator as well as counting them in the cost.)
+def group_ratios(g: pd.DataFrame, cset=None) -> dict[str, float]:
+    """The cost-test ratios of a group of measures, as CET reports them on a run receipt: each test's summed <test>Ben (its benefits plus its numerator
+    adders: TRC's tax credits, RIM's bill increases; supply costs are in the costs, not netted from the numerator) over its summed cost, for every test
+    of the run's cost-test set `cset`. A ratio whose inputs are missing or whose cost is 0 is left out. (Until 2026-09-21 the numerator was
+    TotalSystemBenefit, which nets the supply costs out of the numerator as well as counting them in the cost.)
     Used by the portfolio summary and the Results tab's views, so both give the same ratios."""
     get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
-    return {f"{name}_ratio": num / den for name, num, den in _ratio_parts(get) if num is not None and den}
+    return {f"{name}_ratio": num / den for name, num, den in _ratio_parts(get, cset) if num is not None and den}
 
 
-def group_numerators(g: pd.DataFrame) -> dict[str, float]:
-    """The numerators of a group's ratios (group_ratios), under the measure-level names TRCBen ... SCHBen; one whose inputs are missing is left out. So each
+def group_numerators(g: pd.DataFrame, cset=None) -> dict[str, float]:
+    """The numerators of a group's ratios (group_ratios), under the measure-level names <test>Ben; one whose inputs are missing is left out. So each
     <test>_ratio of a summary row is its <test>Ben over its <test>Cost (or <test>CostNoAdmin)."""
     get = lambda c: float(g[c].sum()) if c in g and g[c].notna().any() else None
-    return {f"{t}Ben": v for t, v in _numerators(get).items() if v is not None}
+    return {f"{t}Ben": v for t, v in _numerators(get, cset).items() if v is not None}
 
 
-def row_ratios(df: pd.DataFrame) -> pd.DataFrame:
+def row_ratios(df: pd.DataFrame, cset=None) -> pd.DataFrame:
     """The same ratios for each row on its own (one measure each), vectorised; NaN where the cost is 0 or an input is missing."""
     get = lambda c: df[c].astype(float) if c in df and df[c].notna().any() else None
     out = pd.DataFrame(index=df.index)
-    for name, num, den in _ratio_parts(get):
+    for name, num, den in _ratio_parts(get, cset):
         if num is not None and den is not None:
             out[f"{name}_ratio"] = num / den.where(den != 0)
     return out
 
 
-def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False) -> pd.DataFrame:
+def summary_totals(cset=None) -> list[str]:
+    """The columns a summary row totals: SUMMARY_TOTALS, then any <test>Cost / <test>Ben of the set it does not list (a set beyond EE-2026)."""
+    s = _cset(cset)
+    extra = [c for t in s.tests for c in (f"{t}Cost",) if c not in SUMMARY_TOTALS]
+    return SUMMARY_TOTALS + extra
+
+
+def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False, cset=None) -> pd.DataFrame:
     """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA, by program segment and by program year (the claim year, BRD BR-04.1).
     With `apply_exclude_from_ce`, measures of programs
-    whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`)."""
+    whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`). The tests are those of the
+    run's cost-test set `cset` (None = the newest published EE set)."""
+    cset = _cset(cset)
+
     def block(g: pd.DataFrame, label: str, group: str) -> dict:
-        return _summary_row(g, label, group, len(g))
+        return _summary_row(g, label, group, len(g), cset)
     excluded = None
     if apply_exclude_from_ce and EXCLUDE_FLAG in frame:
         from . import programs
@@ -219,8 +233,9 @@ class SummaryParts:
     GROUPS = (("IOU_AC_Territory", "IOU territory (PA)"), ("CreditedPA", "credited PA"), ("Prg_ProgramSegment", "program segment"), ("Used_Year", "program year"))
     EXCLUDED = ("excluded", "Exclude_From_CE programs (left out of the rows above)")
 
-    def __init__(self, apply_exclude_from_ce: bool = False):
+    def __init__(self, apply_exclude_from_ce: bool = False, cset=None):
         self.apply_exclude = apply_exclude_from_ce
+        self.cset = _cset(cset)
         self.sums: dict[tuple[str, str], pd.DataFrame] = {}      # (group, key) -> one row of column sums (NaN where the column was NaN throughout)
         self.counts: dict[tuple[str, str], int] = {}
         self.present: dict[str, bool] = {}                       # group column -> in the table
@@ -235,7 +250,7 @@ class SummaryParts:
 
     def add(self, frame: pd.DataFrame) -> None:
         if self.cols is None:
-            self.cols = [c for c in frame.columns if c in summary_input_columns()]
+            self.cols = [c for c in frame.columns if c in summary_input_columns(self.cset)]
         excluded = None
         if self.apply_exclude and EXCLUDE_FLAG in frame:
             from . import programs
@@ -261,7 +276,7 @@ class SummaryParts:
     def result(self) -> pd.DataFrame:
         def block(key):
             g = self.sums.get(key, pd.DataFrame(columns=self.cols or []))
-            return _summary_row(g, key[1], key[0], self.counts[key])
+            return _summary_row(g, key[1], key[0], self.counts[key], self.cset)
         rows = [block(("portfolio", "all measures"))]
         for col, group in self.GROUPS:
             if self.present.get(col) and (col == "IOU_AC_Territory" or self.nonblank.get(col)):
@@ -271,25 +286,34 @@ class SummaryParts:
         return pd.DataFrame(rows)
 
 
-def summary_input_columns() -> set[str]:
-    """Every column summarize() reads: the totals and each ratio's parts."""
+def summary_input_columns(cset=None) -> set[str]:
+    """Every column summarize() reads: the totals and each ratio's parts (with the parts a numerator is built from when a table has no <test>Ben)."""
+    return ratio_input_columns(cset) | set(summary_totals(cset))
+
+
+def ratio_input_columns(cset=None) -> set[str]:
+    """Every column the ratios of the set read (group_ratios / row_ratios), the parts a numerator is built from included."""
     used: set[str] = set()
+    s = _cset(cset)
 
     def get(c):
         used.add(c)
-        return 1.0
-    _ratio_parts(get)
-    return used | set(SUMMARY_TOTALS)
+        return None if c.endswith("Ben") and c[:-3] in s.tests else 1.0
+    _ratio_parts(get, s)
+    return used
 
 
-def _summary_row(g: pd.DataFrame, label: str, group: str, n: int) -> dict:
+def _summary_row(g: pd.DataFrame, label: str, group: str, n: int, cset=None) -> dict:
+    from . import cost_test_sets
+    cset = _cset(cset)
     row = {"group": group, "value": label, "measures": n}
-    for c in SUMMARY_TOTALS:
+    for c in summary_totals(cset):
         if c in g and g[c].notna().any():
             row[c] = float(g[c].sum())
-    row.update(group_numerators(g))
-    for name, value in group_ratios(g).items():
-        if name in SUMMARY_RATIOS:
+    row.update(group_numerators(g, cset))
+    wanted = set(cost_test_sets.summary_ratios(cset))
+    for name, value in group_ratios(g, cset).items():
+        if name in wanted:
             row[name] = value
     return row
 
