@@ -36,7 +36,9 @@ The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021
     recet data unpack D:\parts E:\cedars_reference_data   rebuild it on the other machine
     recet data consolidate-profiles D:\cedars_reference_data D:\consolidated
                                                           the profile library with each profile whose every zone's 8,760 is
-                                                          identical stored once, every name kept (BR-06.18); checked name by name
+                                                          identical stored once, every name kept (BR-06.18); checked name by name.
+                                                          Into a reference folder (e.g. a `data build --link` copy) it replaces the two
+                                                          library files and updates that folder's manifest; the linked source is untouched
 
 Everything small (the run parameters and CET tables, gas profile library, the four gas ACCs, statewide-allocation factors, the CEDARS Programs list and filing rules) is inside the package.
 

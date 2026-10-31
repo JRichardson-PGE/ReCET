@@ -4,6 +4,7 @@ library it came from."""
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from recet import paths, profile_library, regress, runtime
+from recet import datapack, paths, profile_library, regress, runtime
 from recet.jobs import run_job
 from recet.pipeline import real_impact_profiles as rip
 
@@ -22,6 +23,8 @@ REF = FIXTURES / "ref"
 
 COPIES = {4: 2, 6: 2, 3: 2, 25: 23, 120: 118}     # id -> the id whose rows it gets: identical, under other Impact Profile Names (3 is unused by the jobs)
 NOT_COPIES = {7: "one value one ulp off", 8: "an extra zone", 122: "same rows, another calendar (2018)"}
+SCRAPED_ENCODINGS = {"compression": "zstd", "use_dictionary": ["climate_zone"],             # as the scraped library is written
+                     "column_encoding": {"impact_profile_id": "DELTA_BINARY_PACKED", "hour_of_year": "DELTA_BINARY_PACKED", "impact": "PLAIN"}}
 
 
 def _rows(lib: pd.DataFrame, pid: int) -> pd.DataFrame:
@@ -41,7 +44,7 @@ def unconsolidated_reference(dest: Path) -> Path:
     groups[7] = off
     groups[8] = pd.concat([_rows(lib, 2), _rows(lib, 2).assign(climate_zone="12")]).assign(impact_profile_id=8)
     groups[122] = _rows(lib, 2).assign(impact_profile_id=122)              # 122's catalog row is drawn on 2018, 2's on 2009 (blank)
-    with pq.ParquetWriter(dest / "impact_profiles" / "hourly.parquet", pf.schema_arrow) as w:
+    with pq.ParquetWriter(dest / "impact_profiles" / "hourly.parquet", pf.schema_arrow, **SCRAPED_ENCODINGS) as w:
         for pid in sorted(groups):
             t = pa.Table.from_pandas(groups[pid], schema=pf.schema_arrow, preserve_index=False)
             w.write_table(t, row_group_size=t.num_rows)
@@ -172,3 +175,54 @@ def test_the_system_zone_catalog_is_the_same_on_both(libraries, tmp_path, monkey
         runtime.clear_caches()
     assert len(built["before"]) > 0
     pd.testing.assert_frame_equal(built["after"], built["before"])
+
+
+def _encodings(path: Path) -> dict:
+    rg = pq.ParquetFile(path).metadata.row_group(0)
+    return {rg.column(i).path_in_schema: (rg.column(i).compression, sorted(rg.column(i).encodings)) for i in range(rg.num_columns)}
+
+
+def test_the_hourly_file_keeps_the_source_encodings_and_shrinks(libraries):
+    before, after, report = libraries
+    src, out = before / "impact_profiles" / "hourly.parquet", after / "impact_profiles" / "hourly.parquet"
+    assert _encodings(out) == _encodings(src)
+    assert _encodings(out)["impact"] == ("ZSTD", ["PLAIN", "RLE"])                         # no dictionary of 8,760 distinct doubles
+    assert out.stat().st_size < src.stat().st_size                                        # 0.1.87 wrote pyarrow's defaults: 40% larger on the real library
+    assert report["hourly_gb_after"] <= report["hourly_gb_before"]
+
+
+def _link_tree(src: Path, dest: Path) -> None:
+    """A reference folder whose every file is a hard link to `src`'s, as `recet data build --link` makes it."""
+    for f in src.rglob("*"):
+        if f.is_file():
+            (dest / f.relative_to(src)).parent.mkdir(parents=True, exist_ok=True)
+            os.link(f, dest / f.relative_to(src))
+
+
+def test_a_linked_reference_folder_gets_its_own_files_and_manifest(libraries, tmp_path):
+    before, _, _ = libraries
+    ref = tmp_path / "ref"
+    shutil.copytree(before, ref)
+    files = {}
+    for rel in ("impact_profiles/catalog.parquet", "impact_profiles/hourly.parquet"):
+        files[rel] = {"size": (ref / rel).stat().st_size, "what": rel, "required": False, "type": rel, "sha256": datapack.sha256_file(ref / rel)}
+    (ref / datapack.MANIFEST).write_text(json.dumps({"format": datapack.MANIFEST_FORMAT, "files": files}, indent=2), encoding="utf-8")
+    linked = tmp_path / "linked"
+    _link_tree(ref, linked)
+    original = {f: f.read_bytes() for f in ref.rglob("*") if f.is_file()}
+
+    profile_library.consolidate(ref, linked / "impact_profiles", log=lambda s: None)
+
+    assert {f: f.read_bytes() for f in ref.rglob("*") if f.is_file()} == original         # the folder it was linked to is untouched
+    for rel in files:
+        assert not os.path.samefile(ref / rel, linked / rel)
+    assert not os.path.samefile(ref / datapack.MANIFEST, linked / datapack.MANIFEST)
+    assert datapack.verify(linked, full=True, log=lambda s: None) and datapack.verify(ref, full=True, log=lambda s: None)
+    m = datapack.read_manifest(linked)["files"]["impact_profiles/hourly.parquet"]
+    assert m["size"] == (linked / "impact_profiles" / "hourly.parquet").stat().st_size and m["type"] == "impact_profiles/hourly.parquet"
+
+
+def test_no_manifest_no_change(libraries, tmp_path):
+    before, _, _ = libraries
+    assert not profile_library.update_manifest(before / "impact_profiles", log=lambda s: None)
+    assert not (before / datapack.MANIFEST).exists()
