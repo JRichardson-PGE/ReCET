@@ -113,7 +113,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   is never edited: a change is a new folder. `RunConfig.cost_test_set` (id or YAML path; `--cost-tests`; New run select + Cost-test set upload; window
   box); blank = the set in force for the job's first program year (Jake), resolved after preflight (`jobs.resolve_cost_tests`); a set outside the job's
   years warns `cost_tests_not_for_program_year`. A filing run (`jobs.is_filing_run`: filing_validation or acc_purpose) takes a PUBLISHED BUILT-IN set only
-  (Jake: filings use the CPUC's set, users may not edit it; standalone runs may use their own); a draft is labelled "(draft)". Recorded: measure-level
+  (Jake: filings use the CPUC's set, users may not edit it; standalone runs may use their own); a draft is labelled "(draft)", a supplied file "custom: <file>". Recorded: measure-level
   `Used_CostTestSet` after Used_ACCVersion, run_settings.json / receipt.json `cost_tests` (id, version, source, SHA-256 ...), job spec `settings.cost_test_set`
   or `inputs.cost_tests` (a pinned file; worker refuses a bad set, exit 2), regression manifest per job (`regress check` fails when the set changed). CET
   replicas refuse it (`fixed_by: CET <release>`). `recet cost-tests list|show|check`. NO arithmetic change: pipeline/cost_tests.py still prices; a test
