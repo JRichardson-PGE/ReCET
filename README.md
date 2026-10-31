@@ -61,7 +61,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 In the package (`recet/docs`, and **Help > Documentation** in the window): `USER_GUIDE.md` (every control, the command line, common jobs), `INPUT_FORMATS.md`, `INPUT_FIELDS.md` (every input field),
 `OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number) and `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
 
-## Web app (jakemoto.com/ReCET)
+## Web app
 
 `recet/web` is the same tool as a password-protected web app: New run (upload a workbook, or the CET files in one .zip: Measure.csv and an optional
 ProgramCost.csv, as CET takes them; a bare CSV is not accepted), Runs (queue, log, results tables,
@@ -82,7 +82,7 @@ Accounts are by invitation only.
     recet-web create-admin you@example.com      # prints a one-time link to choose a password
     recet-web serve                             # http://localhost:3000/ReCET (set RECET_WEB_SECURE_COOKIES=0 for plain http)
 
-On the server it runs in Docker (`Dockerfile`, `docker-compose.yml`) behind the jakemoto.com edge nginx, with the reference data folder mounted
+On the server it runs in Docker (`Dockerfile`, `docker-compose.yml`) behind a reverse proxy (nginx), with the reference data folder mounted
 read-only. Settings are `RECET_WEB_*` environment variables (`recet/web/config.py`). Uploads are capped at 150 MB per file (`RECET_WEB_MAX_UPLOAD_MB`) and a job zip at
 1,024 MB unzipped (`RECET_WEB_MAX_UNZIPPED_MB`); a 1,000,000-row Measure.csv (603 MB) zips to 38 MB. Its CSV outputs
 are zipped too (`<table>.csv.zip`; the 1M measure-level CSV is 3.5 GB, 0.74 GB zipped), and "Download all" and the inputs download are built on disk and streamed, not
@@ -171,7 +171,7 @@ How it came down, all on the same job:
 cached index, reads each route's first measure in one lookup for all routes and shifts each route's profile once. Measured against 0.1.36 in the same sitting:
 pricing 173 -> 105 s, the whole run 298 -> 229 s (3.8 minutes), peak memory unchanged; every output equal to 2.2e-12. With 100,000-row parts pricing's own
 peak falls from 2.11 to 1.20 GB, but writing then peaks at 2.29 GB, so 20,000 stayed the default until 0.1.56 (50,000 since, as the web server ran). Since 0.1.36 the 1M run peaks at 1.65 GB
-because the measure-level parquet is joined into 200,000-row groups (`parquet_row_group`). On the web server (a t4g.small, 2 ARM vCPUs, 0.1.36, 50,000-row
+because the measure-level parquet is joined into 200,000-row groups (`parquet_row_group`). On the web server (2 ARM vCPUs, 2 GiB, 0.1.36, 50,000-row
 groups, zipped CSV) the same job took 13.1 minutes and peaked at 1.05 GiB in its container.
 
 As one piece the run expanded the whole job into about 54 million measure-quarter rows at once, more than the laptop's RAM, so part of it was paged to disk

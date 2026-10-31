@@ -20,12 +20,12 @@ temporary download zips) and writes `last_backup.json`. `recet-restore.sh` bring
 ## One-time setup
 
 These steps change AWS and the server, so Jake runs them. Pick a bucket name (it must be globally unique), e.g. `<you>-recet-backups`, and keep the
-bucket in the server's region (us-east-2).
+bucket in the server's region (`<region>` below).
 
 **1. The bucket** (laptop, PowerShell, with an AWS CLI profile that can create buckets and roles):
 
     $B = "<bucket>"
-    aws s3api create-bucket --bucket $B --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+    aws s3api create-bucket --bucket $B --region <region> --create-bucket-configuration LocationConstraint=<region>
     aws s3api put-public-access-block --bucket $B --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
     aws s3api put-bucket-versioning --bucket $B --versioning-configuration Status=Enabled
     aws s3api put-bucket-encryption --bucket $B --server-side-encryption-configuration '{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":{\"SSEAlgorithm\":\"AES256\"}}]}'
@@ -40,7 +40,7 @@ If the instance already has a role, attach the policy to that role and skip the 
     aws iam put-role-policy --role-name recet-server --policy-name recet-backup --policy-document file://$env:TEMP\recet-backup-policy.json
     aws iam create-instance-profile --instance-profile-name recet-server
     aws iam add-role-to-instance-profile --instance-profile-name recet-server --role-name recet-server
-    aws ec2 associate-iam-instance-profile --region us-east-2 --instance-id <the server's instance id> --iam-instance-profile Name=recet-server
+    aws ec2 associate-iam-instance-profile --region <region> --instance-id <the server's instance id> --iam-instance-profile Name=recet-server
 
 **3. The timer on the server** (after a deploy has put `deploy/` in `~/recet`):
 
