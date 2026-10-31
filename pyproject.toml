@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8", "httpx>=0.27"]
-# the web app (example.org/ReCET): pip install ".[web]"
+# the web app: pip install ".[web]"
 web = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
