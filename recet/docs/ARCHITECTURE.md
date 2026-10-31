@@ -20,7 +20,7 @@ plus summaries. It is a working prototype of the calculation core of a CEDARS re
 |---|---|---|
 | Desktop window | `python -m recet`, `recet-gui` (`gui.py`) | an analyst on their own computer, with the reference data on a local or network drive |
 | Command line and Python | `recet run ...` (`cli.py`), `recet.jobs.run_job` | scripted and batch runs, research scripts, tests |
-| Web app | `recet-web serve` (`web/`), example.org/ReCET | invited users with a browser and nothing installed |
+| Web app | `recet-web serve` (`web/`), served under /ReCET | invited users with a browser and nothing installed |
 
 ### 1.2 Scope
 
@@ -377,9 +377,9 @@ config:
 ---
 flowchart TB
     accTitle: The web server
-    accDescr: The browser reaches the edge nginx over HTTPS, which forwards to the recet container on an EC2 t4g.small. In the container the web server, a worker thread and a janitor thread share the state volume; the worker starts a run process, which also reads the read-only reference data.
-    b["Browser"] -->|HTTPS| nginx["Edge nginx (edge-site)<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
-    subgraph HOST["AWS EC2 t4g.small: 2 ARM vCPUs, 2 GiB"]
+    accDescr: The browser reaches the edge nginx over HTTPS, which forwards to the recet container on a small cloud server. In the container the web server, a worker thread and a janitor thread share the state volume; the worker starts a run process, which also reads the read-only reference data.
+    b["Browser"] -->|HTTPS| nginx["Edge nginx<br/>TLS; /ReCET to recet:3000<br/>uploads up to 150 MB"]
+    subgraph HOST["Cloud server: 2 ARM vCPUs, 2 GiB"]
         nginx -->|"docker network web"| srv
         subgraph C["Container recet (1400m memory limit)"]
             srv["recet-web serve<br/>uvicorn + FastAPI<br/>pages, uploads, downloads"]
@@ -470,7 +470,7 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_MAX_UNZIPPED_MB` | 1024 | largest a job zip may unzip to |
 | `RECET_WEB_RUN_TIMEOUT` | 7200 | seconds before a run is stopped |
 | `RECET_WEB_RUN_DEFAULTS` | none | JSON merged into every run's `RunConfig` (the web server: `{"parquet_row_group": 50000}`, parquet row groups of 50,000) |
-| `RECET_WEB_BASE_URL` | none | the site's address (`https://example.org`), for the links in run emails |
+| `RECET_WEB_BASE_URL` | none | the site's address (e.g. `https://example.org`), for the links in run emails |
 | `RECET_WEB_SMTP_HOST` | none | the SMTP server for run emails; none = no emails (section 8.6) |
 | `RECET_WEB_SMTP_PORT` | 587 | its port |
 | `RECET_WEB_SMTP_SECURITY` | `starttls` | `starttls`, `ssl` (port 465) or `none` (a local relay) |

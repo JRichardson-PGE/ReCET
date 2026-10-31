@@ -85,7 +85,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   zstd instead of snappy would be 71% smaller, not done). Web "Download all" / inputs.zip are built in `<state>/tmp` (`app.zip_to_file`, already-compressed files
   stored) and streamed, never in memory; runner.cleanup removes stale ones.
   Also: a run in parts joins its parquet parts into row groups of `RunConfig.parquet_row_group` (200,000; full groups, remainder carried): the 1M measure-level
-  parquet is 253 MB in 5 groups (was 666 MB in 50 groups of 20,000), peak 1.65 GB. docker-compose takes RECET_MEM_LIMIT (1400m; 3000m on a t4g.medium).
+  parquet is 253 MB in 5 groups (was 666 MB in 50 groups of 20,000), peak 1.65 GB. docker-compose takes RECET_MEM_LIMIT (1400m; 3000m on a 4 GiB server).
   Timing note: the laptop ran about 1.7x slower from mid-afternoon 2026-10-23 (6 s vs 3.5 s per 20,000-row part on the same code), so compare runs only within
   one sitting.
   Also (same PR): CSV is written PARQUET FIRST. TableWriter(csv/csv.zip) joins its parts into parquet, then `write_csv_from_parquet` formats it with pyarrow
