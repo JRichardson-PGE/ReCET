@@ -19,11 +19,14 @@ def test_cost_test_treatment_adds_up_to_each_tests_benefits_and_costs(tmp_path):
     m, pc = _job(tmp_path)
     r = run_job(_cfg(tmp_path, m, pc, chunk_size=0), **QUIET)
     d = outputs.read_table(r.files["measure_level"])
+    benefit_of, cost_of = fa.benefit_of(), fa.cost_of()
     for test in ("TRC", "PAC", "RIM", "SCB", "SCH"):
-        ben = sum(d[c] for c in _members(fa.BENEFIT_OF, test))
-        cost = sum(d[c] for c in _members(fa.COST_OF, test))
+        ben = sum(d[c] for c in _members(benefit_of, test))
+        cost = sum(d[c] for c in _members(cost_of, test))
         np.testing.assert_allclose(ben, d[f"{test}Ben"], rtol=1e-12, atol=1e-9, err_msg=test)
         np.testing.assert_allclose(cost, d[f"{test}CostNoAdmin"], rtol=1e-12, atol=1e-9, err_msg=test)
+    np.testing.assert_allclose(sum(d[c] for c in _members(cost_of, "PCT")), d["PCTCost"], rtol=1e-12, atol=1e-9)   # PCT has no program costs
+    assert "TaxCreditsGrossPV" in _members(benefit_of, "PCT")                      # internal: priced for PCTBen, never written
 
 
 def test_every_column_of_a_run_gets_its_attributes(tmp_path):
@@ -35,6 +38,7 @@ def test_every_column_of_a_run_gets_its_attributes(tmp_path):
     assert t.loc["TRCRatio", "aggregation"].startswith("recomputed") and t.loc["TRCRatio", "cost_tests"] == "TRC result"
     assert t.loc["ElecBen", "unit"].startswith("Dollars (PV") and t.loc["ElecBen", "version"].endswith("2026 ACC")
     assert t.loc["ElecBen", "cost_tests"] == "benefit in TRC, PAC, RIM" and t.loc["ElecBen", "aggregation"] == "summed over the measures"
+    assert t.loc["RebatesandIncentsPV", "cost_tests"] == "benefit in PCT; cost in TRC, PAC, RIM, PCT"
     assert t.loc["NumUnits", "source"] == "input: Measure.csv" and t.loc["NumUnits", "version"] == "as filed (CET input field)"
     assert t.loc["ElecBen_SB", "years_in_use"].startswith("2024 ACC on")
     assert "BillReducElec" in t.loc["LifecycleBillReducElec", "years_in_use"]

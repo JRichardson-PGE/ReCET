@@ -139,15 +139,16 @@ def definition(column: str) -> Definition | None:
     return _input_entries().get(column)
 
 
-def table(columns, base_url: str = "", acc: str = "") -> "pd.DataFrame":
+def table(columns, base_url: str = "", acc: str = "", cset=None) -> "pd.DataFrame":
     """One row per column, in order: position, column, definition and link (`base_url` + the document link, e.g. a web app's '/docs/'), then the
     data-dictionary attributes of field_attributes.py (unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use;
-    BRD BR-08.1; `acc` names the run's ACC in `version`). A column without an entry gets a blank definition."""
+    BRD BR-08.1; `acc` names the run's ACC in `version`; `cset`, the run's cost-test set, says which tests a column enters). A column without an
+    entry gets a blank definition."""
     import pandas as pd
     from .field_attributes import ATTRIBUTE_COLUMNS, attributes
     rows = []
     for k, c in enumerate(columns, start=1):
         d = definition(c)
         rows.append({"position": k, "column": c, "definition": d.text if d else "", "documentation": f"{base_url}{d.link}" if d else "",
-                     **attributes(c, d.text if d else "", acc)})
+                     **attributes(c, d.text if d else "", acc, cset)})
     return pd.DataFrame(rows, columns=["position", "column", "definition", "documentation", *ATTRIBUTE_COLUMNS])

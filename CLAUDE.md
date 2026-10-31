@@ -106,6 +106,16 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.85 (2026-10-31; step 3 of `docs/COST_TESTS.md`): consumers from the set. The portfolio summary (`outputs.summarize` / `SummaryParts` /
+  `group_ratios` / `row_ratios` take `cset`; ratios = `cost_test_sets.ratio_names`, the summary keeps `summary_ratios`: every test's ratio and the headline
+  tests' NoAdmin; a numerator missing from an old table is built from the set's benefits + adders), key metrics (`key_metrics.sum_columns / headlines /
+  columns(cset)`: a ratio row per test, so EE-2026 runs gain a "PCT ratio" row, drivers on the headline tests), field definitions (`field_attributes.
+  benefit_of / cost_of(cset)` from `cost_test_sets.benefit_cost_of`; PCT is now named, e.g. RebatesandIncentsPV "benefit in PCT; cost in TRC, PAC, RIM,
+  PCT"), Results (`results_view.ratio_columns / labels(cset)`, `RunResults(cset=)`, from_file reads the run's set), the run page tiles
+  (`cost_test_sets.tile_tests`) and the run email (headline tests) follow the run's set. Every run keeps its set as `<run>/cost_tests.yaml`
+  (`cost_test_sets.write_to_run` in write_settings, not in RunResult.files; `for_run(run_dir)`: that file, else run_settings' built-in id, else the newest
+  EE set). Pass the run's set (`result.cost_tests.set`) to anything new that summarises tests. run_poc no longer computes per-measure TRC/PAC/RIM/SCB/SCH
+  without program costs (it was dropped before the tests). Regression fixtures: the key_metrics PCT row inserted, nothing else changed.
 - 0.1.84 (2026-10-31; step 2 of `docs/COST_TESTS.md`): the evaluator. `recet/pipeline/test_evaluator.py` prices every aggregate and test of the run's
   cost-test set (Ben = benefits + numerator adders, CostNoAdmin = costs, Cost = share x the pricing's program-cost NPV + costs, Gross on the gross forms and
   gross share, ratios, lifecycle net benefit, levelized; `formulas(cset)` writes it out). `cost_tests.compute_cost_tests(d, prog, totals, cset)` keeps

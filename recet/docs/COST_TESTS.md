@@ -99,8 +99,12 @@ replicas stay code.
    every column (in one piece and in parts, with and without program costs, market effects, zero NTGs). The PCT is the set's (the engine writes only
    its participant streams, `TaxCreditsGrossPV` among them, internal); CALCULATIONS C12 carries `test_evaluator.formulas` of the set in force, checked by a
    test. The measure-level columns now follow the set: the aggregates, the `Weighted*` block, then each test's columns together (OUTPUT_FIELDS 2.1).
-3. **Consumers from the set**: the portfolio summary ratios, Results, key metrics, field attributes and definitions, output templates, allocation default
-   rules and the web pages take their test list from the run's set.
+3. **Consumers from the set** (0.1.85): the portfolio summary's ratios and numerators (`cost_test_sets.ratio_names` / `summary_ratios`), the key
+   metrics (a ratio row per test, the drivers on the headline tests), the field definitions' cost-test attribute (`cost_test_sets.benefit_cost_of`), the
+   Results page's ratio columns and labels, the run page's tiles (`tile_tests`) and the run email take their tests from the run's set; the run keeps
+   its set as `cost_tests.yaml` (OUTPUT_FIELDS 2.9c, `cost_test_sets.for_run`). EE-2026 runs write what they wrote, except a "PCT ratio" row in the
+   key metrics. The per-measure TRC / PAC / RIM / SCB / SCH arithmetic the pricing still carried (without program costs, dropped before the tests) is
+   gone. Output templates stay column lists: a template naming a test the run's set lacks has that column left out, with a note.
 4. **Input streams**: the `one_time` and `annual_over_life` bases priced from the set, template / editor / preflight support for the Measure columns a set
    names, and a synthetic set with a non-energy benefit and a jurisdiction-specific test.
 5. **CEDARS platform**: the reference-data pack kind `cost_tests`, its admin page, the set in the job spec and on the run record, and the filing template's
