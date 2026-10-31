@@ -1809,6 +1809,13 @@ names (0.1.55: the annual quantities say they are net, and the societal particip
 `ProgramCosts`, `WeightedSavings` and the per-record check columns (`FilingValidation`, `FilingRules`, `ACCCheck`) are no longer written. Output templates and saved
 Results views that use an old name still work (the new name is used). CET's own outputs file keeps CET's names; the CET comparison (2.6) reads them as ReCET's.
 
+**Column order (0.1.84).** The cost-test columns are written in the order of the run's cost-test set (COST_TESTS.md): `TotalSystemBenefit` and
+`TotalSystemBenefitGross`, the program-cost weighting (`WeightedBenefits`, `WeightedProgramCost`, the `Wtd*` columns, `WeightedElecAlloc`,
+`TotalExpenditures`), then each test's columns together (`<T>Ben`, `<T>Cost`, `<T>CostNoAdmin`, `<T>CostGross`, `<T>Ratio`, `<T>RatioNoAdmin`,
+`<T>LifecycleNetBen`, its levelized columns; TRC, PAC, RIM, SCB, SCH, PCT in EE-2026), then `LevBenElec` and `LevBenGas`. Before 0.1.84 the PCT columns
+came right after the gross bill impacts and the costs were written before the ratios. Every value is unchanged; a reader that takes columns by name is
+not affected.
+
 | ReCET writes | Before | CET's outputs file |
 |---|---|---|
 | `AC_Net_kWh_1st_Baseline`, `AC_Net_kWh_2nd_Baseline`, `AC_Net_Therms_1st_Baseline`, `AC_Net_Therms_2nd_Baseline` (0.1.55) | `AC_kWh_1st_Baseline`, `AC_kWh_2nd_Baseline`, `AC_Therms_1st_Baseline`, `AC_Therms_2nd_Baseline` (0.1.50-0.1.54) | (none) |
@@ -2296,9 +2303,6 @@ refer to.
 | `LifecycleBillIncrElecGross` | 0 | 25956.1 |
 | `LifecycleBillReducGasGross` | 11297.5 | 14664.7 |
 | `LifecycleBillIncrGasGross` | 0 | 0 |
-| `PCTBen` | 56271.1 | 28892.2 |
-| `PCTCost` | 19255.5 | 86623.6 |
-| `PCTRatio` | 2.92235 | 0.333537 |
 | `ElecBen_SB` | 6688.34 | 0 |
 | `ElecBen_SH` | 7296.37 | 0 |
 | `ElecSupplyCost_SB` | 0 | 4734.01 |
@@ -2353,53 +2357,56 @@ refer to.
 | `WtdCostsRecoveredFromOtherSources` | 0 | 0 |
 | `WeightedElecAlloc` | 0.61579 | 0 |
 | `TotalExpenditures` | 9000 | 15300 |
-| `PACCostNoAdmin` | 5856.64 | 17544.1 |
-| `PACCost` | 8785.49 | 19301.4 |
-| `TRCCostNoAdmin` | 17987.6 | 58514.5 |
-| `TRCCost` | 20916.4 | 60271.8 |
-| `TRCCostGross` | 22284.3 | 67797.1 |
-| `RIMCostNoAdmin` | 46996.8 | 30742.3 |
-| `RIMCost` | 49925.7 | 32499.6 |
-| `SCBCostNoAdmin` | 18220.9 | 58730.3 |
-| `SCBCost` | 21173 | 60501.6 |
-| `SCBCostGross` | 22558.4 | 68086.1 |
-| `SCHCostNoAdmin` | 18220.9 | 59161.4 |
-| `SCHCost` | 21173 | 60932.6 |
-| `SCHCostGross` | 22558.4 | 68624.9 |
 | `TRCBen` | 9886.19 | 8110.56 |
+| `TRCCost` | 20916.4 | 60271.8 |
+| `TRCCostNoAdmin` | 17987.6 | 58514.5 |
+| `TRCCostGross` | 22284.3 | 67797.1 |
 | `TRCRatio` | 0.472652 | 0.134567 |
 | `TRCRatioNoAdmin` | 0.549612 | 0.138608 |
+| `TRCLifecycleNetBen` | -11620.9 | -53281.2 |
+| `LevTRCCost` | 0.171446 | 0 |
+| `LevNetBenTRCElec` | -0.0936904 | 0 |
+| `LevNetBenTRCGas` | -1.28766 | -5.42244 |
+| `LevTRCCostNoAdmin` | 0.147439 | 0 |
+| `LevNetBenTRCElecNoAdmin` | -0.0696835 | 0 |
+| `LevNetBenTRCGasNoAdmin` | -0.971442 | -5.2436 |
 | `PACBen` | 9486.19 | 7310.56 |
+| `PACCost` | 8785.49 | 19301.4 |
+| `PACCostNoAdmin` | 5856.64 | 17544.1 |
 | `PACRatio` | 1.07976 | 0.378758 |
 | `PACRatioNoAdmin` | 1.61973 | 0.416696 |
+| `PACLifecycleNetBen` | 510.036 | -12310.9 |
+| `LevPACCost` | 0.0720122 | 0 |
+| `LevNetBenPACElec` | 0.00574348 | 0 |
+| `LevNetBenPACGas` | 0.0220732 | -1.25288 |
+| `LevPACCostNoAdmin` | 0.0480052 | 0 |
+| `LevNetBenPACElecNoAdmin` | 0.0297504 | 0 |
+| `LevNetBenPACGasNoAdmin` | 0.33829 | -1.07404 |
 | `RIMBen` | 9486.19 | 28075.4 |
+| `RIMCost` | 49925.7 | 32499.6 |
+| `RIMCostNoAdmin` | 46996.8 | 30742.3 |
 | `RIMRatio` | 0.190006 | 0.863869 |
 | `RIMRatioNoAdmin` | 0.201847 | 0.91325 |
+| `LevRIMCost` | 0.409227 | 0 |
+| `LevNetBenRIMElec` | -0.331471 | 0 |
+| `LevNetBenRIMGas` | -4.41968 | -2.59606 |
 | `SCBBen` | 11198.2 | 9147.11 |
+| `SCBCost` | 21173 | 60501.6 |
+| `SCBCostNoAdmin` | 18220.9 | 58730.3 |
+| `SCBCostGross` | 22558.4 | 68086.1 |
 | `SCBRatio` | 0.528891 | 0.151188 |
 | `SCBRatioNoAdmin` | 0.614581 | 0.155748 |
 | `SCHBen` | 12528.9 | 10752 |
+| `SCHCost` | 21173 | 60932.6 |
+| `SCHCostNoAdmin` | 18220.9 | 59161.4 |
+| `SCHCostGross` | 22558.4 | 68624.9 |
 | `SCHRatio` | 0.591741 | 0.176458 |
 | `SCHRatioNoAdmin` | 0.687614 | 0.181741 |
-| `TRCLifecycleNetBen` | -11620.9 | -53281.2 |
-| `PACLifecycleNetBen` | 510.036 | -12310.9 |
+| `PCTBen` | 56271.1 | 28892.2 |
+| `PCTCost` | 19255.5 | 86623.6 |
+| `PCTRatio` | 2.92235 | 0.333537 |
 | `LevBenElec` | 0.0777557 | 0 |
 | `LevBenGas` | 0.970609 | 0.711432 |
-| `LevTRCCost` | 0.171446 | 0 |
-| `LevTRCCostNoAdmin` | 0.147439 | 0 |
-| `LevPACCost` | 0.0720122 | 0 |
-| `LevPACCostNoAdmin` | 0.0480052 | 0 |
-| `LevRIMCost` | 0.409227 | 0 |
-| `LevNetBenTRCElec` | -0.0936904 | 0 |
-| `LevNetBenTRCGas` | -1.28766 | -5.42244 |
-| `LevNetBenTRCElecNoAdmin` | -0.0696835 | 0 |
-| `LevNetBenTRCGasNoAdmin` | -0.971442 | -5.2436 |
-| `LevNetBenPACElec` | 0.00574348 | 0 |
-| `LevNetBenPACGas` | 0.0220732 | -1.25288 |
-| `LevNetBenPACElecNoAdmin` | 0.0297504 | 0 |
-| `LevNetBenPACGasNoAdmin` | 0.33829 | -1.07404 |
-| `LevNetBenRIMElec` | -0.331471 | 0 |
-| `LevNetBenRIMGas` | -4.41968 | -2.59606 |
 | `FirstYearGrossKWh` | 43006.5 | -36054 |
 | `FirstYearGrossKWhSite` | 42750 | -36000 |
 | `FirstYearGrossKWhWater` | 256.5 | -54 |
