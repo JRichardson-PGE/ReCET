@@ -216,7 +216,7 @@ def _check_programs(rep: PreflightReport, measures: pd.DataFrame, programcost_cs
     rep.agg["programs"] = (set(pid), set(pid[missing]))
     rep.stats["programs"] = f"{len(set(pid)):,} ({len(set(pid[missing])):,} not in the program metadata)"
     if missing.any():
-        rep.add("warning", "program_not_in_metadata", "PrgID is not in the program metadata (the built-in CEDARS Programs list or the supplied one): its Prg_ columns are "
+        rep.add("warning", "program_not_in_metadata", "PrgID is not in the program metadata (the built-in CEDARS Programs list or the supplied one, or only the supplied one with programs_replace): its Prg_ columns are "
                 "blank and its measures count as segment '(blank)'", int(missing.sum()), sorted(set(pid[missing])), _cells("Measure", mrows(missing), "PrgID"))
     start = pd.to_numeric(meta.get("Prg_StartYear"), errors="coerce").to_numpy() if "Prg_StartYear" in meta else None
     end = pd.to_numeric(meta.get("Prg_EndYear"), errors="coerce").to_numpy() if "Prg_EndYear" in meta else None

@@ -234,3 +234,21 @@ def test_a_pinned_allocation_table_replaces_the_builtin_one(job, tmp_path):
     code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
     assert code == 0 and receipt["settings"]["sw_factors_replace"] is True
     assert receipt["allocation"]["mode"] == "replace" and receipt["allocation"]["applied"] is True and receipt["allocation"]["sha256"] == _sha(sw)
+
+
+def test_a_registry_program_table_replaces_the_builtin_one(job, tmp_path):
+    from recet import programs
+    progs = tmp_path / "programs.csv"
+    progs.write_text("PA,PrgID,ProgramName\nPGE,REG_1,Registry program\n")
+    spec = json.loads(_spec(job, tmp_path).read_text())
+    spec["inputs"]["programs"] = str(progs)
+    spec["settings"]["programs_replace"] = True
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    try:
+        code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    finally:
+        programs.set_user_programs(None)
+    assert code == 0, receipt["error"]
+    assert receipt["programs"] == {"table": "supplied", "file": str(progs), "sha256": _sha(progs), "mode": "replace"}
+    assert receipt["settings"]["programs_replace"] is True
+
