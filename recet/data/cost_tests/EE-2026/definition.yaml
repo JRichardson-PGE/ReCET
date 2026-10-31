@@ -1,0 +1,320 @@
+# EE-2026: the energy-efficiency cost tests ReCET has priced since 0.1.53, written out as data (recet/docs/COST_TESTS.md).
+#
+# A cost-test definition set names the value streams (the dollar quantities the engine prices, the per-unit input columns, the program costs) and
+# the tests that combine them. ReCET reads its tests from this file; a change is a NEW set (a new folder), never an edit of a published one: the
+# SHA-256 of this file is recorded by every run (run_settings.json, the worker's receipt.json, Used_CostTestSet).
+#
+# Reading rules (COST_TESTS.md section 3):
+#   * a stream named under a test is taken in that test's pricing: ElecBen under SCB is ElecBen_SB, a participant PV under SCB is its _SCT form;
+#     a stream the pricing does not have is an error when the set is loaded, never a silent zero;
+#   * program_costs.share "positive_benefits" = the positive parts of the test's own benefits (not its numerator adders), in its own pricing, over
+#     the program's (1 / the program's measure count when they sum to 0); "share: <test>" reuses that test's share;
+#   * the Gross variant replaces every stream by its gross form and shares on the gross benefits;
+#   * <T>Ratio = <T>Ben / <T>Cost, <T>Ben = benefits + numerator_adders, <T>Cost = costs + share x the program costs at the pricing's annual rate.
+
+schema_version: 1
+id: EE-2026
+workstream: EE
+version: "2026-10-31"
+label: Energy efficiency cost tests 2026
+description: >-
+  The California energy-efficiency cost tests as CET's CalcCE applies them (Standard Practice Manual; D.19-05-019 for the Societal Cost Test),
+  with the four suspected CalcCE errors not copied (CALCULATIONS C17) and the Participant Cost Test, which CET does not calculate.
+draft: false
+# In force for every program year up to the next EE set (from: null = no earlier bound; a later set's `from` ends this one).
+program_years: {from: null, to: null}
+
+pricings:
+  primary:
+    label: TRC avoided costs, primary discount rate
+    acc_rows: trc
+    discount_rate_quarterly: DiscountRateQtr
+    discount_rate_annual: DiscountRateAnnual
+    suffix: ""
+    participant_suffix: ""
+  sct_base:
+    label: SCT Base avoided costs, societal discount rate
+    acc_rows: sct_base
+    discount_rate_quarterly: DiscountRateQtr_SCT
+    discount_rate_annual: DiscountRateAnnual_SCT
+    suffix: _SB
+    participant_suffix: _SCT
+  sct_high:
+    label: SCT High avoided costs, societal discount rate
+    acc_rows: sct_high
+    discount_rate_quarterly: DiscountRateQtr_SCT
+    discount_rate_annual: DiscountRateAnnual_SCT
+    suffix: _SH
+    participant_suffix: _SCT
+
+# naming: suffix = <name><pricing suffix> (ElecBen_SB); participant_suffix = <name><participant suffix> (RebatesandIncentsPV_SCT); none = one column for
+# every pricing (OtherBen). gross: divide_ntg = <name>Gross<suffix>, the net value over the fuel's NTG + market effects (C10); same = the stream is
+# already gross; any other value names the separately priced gross column (its pricing suffix added the same way); omitted = no gross form.
+streams:
+  ElecBen:
+    source: engine
+    kind: benefit
+    fuel: elec
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: Electric avoided-cost benefits over the measure's life (CALCULATIONS C5, C6).
+  GasBen:
+    source: engine
+    kind: benefit
+    fuel: gas
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: Gas avoided-cost benefits over the measure's life (C5, C6).
+  WaterEnergyBen:
+    source: engine
+    kind: benefit
+    fuel: water
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: Avoided costs of the electricity embedded in the water saved (C5.5), on the kWh net-to-gross.
+  ElecSupplyCost:
+    source: engine
+    kind: cost
+    fuel: elec
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: The negative-value part of the electric avoided costs, a cost (C6).
+  GasSupplyCost:
+    source: engine
+    kind: cost
+    fuel: gas
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: The negative-value part of the gas avoided costs, a cost (C6).
+  WaterEnergyCost:
+    source: engine
+    kind: cost
+    fuel: water
+    pricings: [primary, sct_base, sct_high]
+    naming: suffix
+    gross: divide_ntg
+    unit: $ (PV)
+    definition: The negative-value part of the water-energy avoided costs, a cost (C6).
+  OtherBen:
+    source: input
+    kind: benefit
+    columns: [UnitGasInfraBens, UnitRefrigBens, UnitMiscBens]
+    basis: one_time
+    ntg: kwh
+    market_effects: benefits
+    pricings: [primary, sct_base, sct_high]
+    naming: none
+    gross: OtherBenGross
+    unit: $
+    definition: Gas-infrastructure, refrigerant and other benefits, NumUnits x (NTGRkWh + MEB) x the per-unit values, undiscounted (C7).
+  OtherCost:
+    source: input
+    kind: cost
+    columns: [UnitRefrigCosts, UnitMiscCosts]
+    basis: one_time
+    ntg: kwh
+    market_effects: costs
+    pricings: [primary, sct_base, sct_high]
+    naming: none
+    gross: OtherCostGross
+    unit: $
+    definition: Refrigerant and other costs, NumUnits x (NTGRkWh + MEC) x the per-unit values, undiscounted (C7).
+  TaxCredits:
+    source: input
+    kind: benefit
+    columns: [UnitTaxCredits]
+    basis: one_time
+    ntg: kwh
+    market_effects: benefits
+    pricings: [primary]
+    naming: none
+    gross: TaxCreditsGross
+    unit: $
+    definition: Tax credits, NumUnits x (NTGRkWh + MEB) x UnitTaxCredits, undiscounted (C7); a TRC numerator adder only.
+  RebatesandIncentsPV:
+    source: engine
+    kind: cost
+    fuel: none
+    pricings: [primary, sct_base, sct_high]
+    naming: participant_suffix
+    gross: same
+    unit: $ (PV)
+    definition: End-user rebates, incentives to others and direct install, discounted from the claim quarter (C8).
+  NetParticipantCostAdjustedPV:
+    source: engine
+    kind: cost
+    fuel: none
+    pricings: [primary, sct_base, sct_high]
+    naming: participant_suffix
+    gross: GrossParticipantCostPV
+    unit: $ (PV)
+    definition: The net participant cost with excess incentives and the market-effects term (C8).
+  GrossParticipantCostPV:
+    source: engine
+    kind: cost
+    fuel: none
+    pricings: [primary]
+    naming: participant_suffix
+    gross: same
+    unit: $ (PV)
+    definition: The gross measure cost less rebates and incentives, discounted from the claim quarter (C8).
+  LifecycleBillReducElec:
+    source: engine
+    kind: cost
+    fuel: elec
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: Ratepayers' lost electric revenue over the measure's life, at the retail rates (C9).
+  LifecycleBillReducGas:
+    source: engine
+    kind: cost
+    fuel: gas
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: Ratepayers' lost gas revenue over the measure's life (C9).
+  LifecycleBillIncrElec:
+    source: engine
+    kind: benefit
+    fuel: elec
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: Added electric revenue (fuel substitution) over the measure's life (C9).
+  LifecycleBillIncrGas:
+    source: engine
+    kind: benefit
+    fuel: gas
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: Added gas revenue (fuel substitution) over the measure's life (C9).
+  LifecycleBillReducElecGross:
+    source: engine
+    kind: benefit
+    fuel: elec
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: The participant's electric bill savings on gross savings, without market effects (C12, PCT).
+  LifecycleBillReducGasGross:
+    source: engine
+    kind: benefit
+    fuel: gas
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: The participant's gas bill savings on gross savings (C12, PCT).
+  LifecycleBillIncrElecGross:
+    source: engine
+    kind: cost
+    fuel: elec
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: The participant's electric bill increases on gross savings (C12, PCT).
+  LifecycleBillIncrGasGross:
+    source: engine
+    kind: cost
+    fuel: gas
+    pricings: [primary]
+    naming: none
+    unit: $ (PV)
+    definition: The participant's gas bill increases on gross savings (C12, PCT).
+  TaxCreditsGrossPV:
+    source: engine
+    kind: benefit
+    fuel: none
+    pricings: [primary]
+    naming: none
+    internal: true
+    unit: $ (PV)
+    definition: TaxCreditsGross discounted from the claim quarter at the primary quarterly rate (C12, PCT); not written as a column.
+  ProgramCosts:
+    source: program
+    kind: cost
+    unit: $ (PV)
+    definition: >-
+      The program's ProgramCost.csv rows (the ten cost fields of C11.1), each discounted annually from the First Year at the pricing's annual rate,
+      and shared out to the program's measures by the test's share rule (C11.2).
+
+aggregates:
+  TotalSystemBenefit:
+    pricing: primary
+    plus: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    minus: [ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    gross: true
+    unit: $ (PV)
+    definition: Total System Benefit, the benefits less the supply and other costs (C12).
+
+tests:
+  TRC:
+    label: Total Resource Cost
+    pricing: primary
+    benefits: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    numerator_adders: [TaxCredits]
+    costs: [RebatesandIncentsPV, NetParticipantCostAdjustedPV, ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    program_costs: {share: positive_benefits}
+    variants: [NoAdmin, Gross]
+    lifecycle_net_benefit: true
+    levelized: ["", NoAdmin]
+    headline: true
+    definition: The utility's and the participants' costs against the resource benefits (Standard Practice Manual chapter 4).
+  PAC:
+    label: Program Administrator Cost
+    pricing: primary
+    benefits: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    costs: [RebatesandIncentsPV, ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    program_costs: {share: TRC}
+    variants: [NoAdmin]
+    lifecycle_net_benefit: true
+    levelized: ["", NoAdmin]
+    headline: true
+    definition: The program administrator's costs against the resource benefits (Standard Practice Manual chapter 5).
+  RIM:
+    label: Ratepayer Impact Measure
+    pricing: primary
+    benefits: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    numerator_adders: [LifecycleBillIncrElec, LifecycleBillIncrGas]
+    costs: [LifecycleBillReducElec, LifecycleBillReducGas, RebatesandIncentsPV, ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    program_costs: {share: TRC}
+    variants: [NoAdmin]
+    levelized: [""]
+    definition: The effect on rates, lost revenue counted as a cost (Standard Practice Manual chapter 3).
+  SCB:
+    label: Societal Cost Test, Base
+    pricing: sct_base
+    benefits: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    costs: [RebatesandIncentsPV, NetParticipantCostAdjustedPV, ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    program_costs: {share: positive_benefits}
+    variants: [NoAdmin, Gross]
+    definition: The TRC on the ACC's SCT Base avoided costs at the societal discount rate (D.19-05-019).
+  SCH:
+    label: Societal Cost Test, High
+    pricing: sct_high
+    benefits: [ElecBen, GasBen, WaterEnergyBen, OtherBen]
+    costs: [RebatesandIncentsPV, NetParticipantCostAdjustedPV, ElecSupplyCost, GasSupplyCost, WaterEnergyCost, OtherCost]
+    program_costs: {share: positive_benefits}
+    variants: [NoAdmin, Gross]
+    definition: The TRC on the ACC's SCT High avoided costs at the societal discount rate (D.19-05-019).
+  PCT:
+    label: Participant Cost Test
+    pricing: primary
+    benefits: [LifecycleBillReducElecGross, LifecycleBillReducGasGross, RebatesandIncentsPV, TaxCreditsGrossPV]
+    costs: [GrossParticipantCostPV, RebatesandIncentsPV, LifecycleBillIncrElecGross, LifecycleBillIncrGasGross]
+    program_costs: none
+    variants: []
+    definition: >-
+      The participant's bill savings, incentives and tax credits against the measure cost before incentives and bill increases, on gross savings
+      (Standard Practice Manual chapter 2). CET does not calculate it and the CPUC has not published how it will (CALCULATIONS C12).

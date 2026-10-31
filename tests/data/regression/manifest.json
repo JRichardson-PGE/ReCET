@@ -35,7 +35,11 @@
         "key_metrics",
         "measure_level",
         "portfolio_summary"
-      ]
+      ],
+      "cost_tests": {
+        "id": "EE-2026",
+        "sha256": "b604edbcac33391011c323df6c30e06fabca811117d8d3f1a12a04ddb486716e"
+      }
     },
     "k10_three_zones": {
       "settings": {
@@ -46,7 +50,11 @@
         "key_metrics",
         "measure_level",
         "portfolio_summary"
-      ]
+      ],
+      "cost_tests": {
+        "id": "EE-2026",
+        "sha256": "b604edbcac33391011c323df6c30e06fabca811117d8d3f1a12a04ddb486716e"
+      }
     }
   },
   "bytes": 29844538

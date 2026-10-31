@@ -5,7 +5,7 @@ and sends the run folder, with `receipt.json`, to the spec's outputs URI.
 
 receipt.json (RECEIPT_VERSION) says exactly what produced the outputs: the engine (release, calculation, image and commit when the image sets RECET_IMAGE /
 RECET_COMMIT, Python and library versions), each input's URI, SHA-256, size (and Measure rows), the run's full settings, the ACC (version, files) and the
-ACC each record was priced on (by ACC version and program year), every reference file used with its size and SHA-256 (from the reference folder's
+ACC each record was priced on (by ACC version and program year), the cost-test set (id, version, source, SHA-256), every reference file used with its size and SHA-256 (from the reference folder's
 manifest.json, else computed) and the hash of the packaged data, the run parameters and statewide allocation table used, the filing rule set, every output
 file's SHA-256, the totals, notes and timings. A failed run still gets a receipt (status "failed", the error), sent with whatever the run wrote.
 
@@ -173,6 +173,16 @@ def check_allocation(spec: dict, cfg) -> None:
             raise SpecRefused(f"allocation_version {want!r}: this run would use {rec['table']} ({rec['sha256'][:12]}...)")
 
 
+def check_cost_tests(cfg) -> None:
+    """Refuse a cost-test set that cannot be loaded, or a supplied / draft set on a filing run (cost_test_sets.check_for_run)."""
+    from . import cost_test_sets
+    from .jobs import is_filing_run
+    try:
+        cost_test_sets.check_for_run(cfg.cost_test_set, filing=is_filing_run(cfg))
+    except cost_test_sets.SetError as exc:
+        raise SpecRefused(f"cost tests: {exc}") from exc
+
+
 def run_parameters_record(cfg, settings_acc) -> dict:
     """The run parameters (discount rates, base year, gas CO2 per PA) the run used, and the ACC version whose rows were taken."""
     from .pipeline import discount_settings
@@ -283,6 +293,7 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
             check_packs(spec, ref, ref_files)
             cfg = build_config(spec, files, ref, work / "out")
             check_allocation(spec, cfg)
+            check_cost_tests(cfg)
         except (SpecRefused, storage.StorageError, TypeError) as exc:
             print(f"recet worker: job refused: {exc}", file=sys.stderr)
             return 2, None
@@ -340,8 +351,8 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
             outputs[rel] = {"uri": storage.join(spec["outputs"]["uri"], rel), "sha256": sha256_file(p), "bytes": p.stat().st_size}
     from .jobs import RunConfig
     config = asdict(cfg) if isinstance(cfg, RunConfig) else {}
-    for k in jobspec.FILE_INPUTS.values():                              # the work folder's paths say nothing; the inputs block has the URIs
-        if config.get(k):
+    for name, k in jobspec.FILE_INPUTS.items():                         # the work folder's paths say nothing; the inputs block has the URIs
+        if config.get(k) and (name != "cost_tests" or "cost_tests" in spec.get("inputs", {})):   # cost_test_set may be a built-in id instead
             config[k] = f"<input {Path(config[k]).stem}>"
     config.pop("out_dir", None)
     return {
@@ -358,6 +369,7 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
         "run_parameters": run_parameters_record(cfg, acc.get("settings_acc_version")),
         "allocation": allocation_record(cfg, spec),
         "rule_set": settings.get("filing_validation"),
+        "cost_tests": settings.get("cost_tests"),
         "outputs": outputs,
         "totals": result.totals if result is not None else {},
         "notes": result.notes if result is not None else [],

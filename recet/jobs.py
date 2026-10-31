@@ -89,6 +89,8 @@ class RunConfig:
     output_template_name: str = ""           # the template's name, for the record
     acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
                                              # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
+    cost_test_set: str = ""                  # the cost-test definition set (BR-06.8; cost_test_sets.py): a built-in id ("EE-2026") or a YAML file for an analysis
+                                             # run; "" = the set in force for the job's first program year. A filing run takes a published built-in set only
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
     max_records: int = 2_000_000             # the record cap (BRD v0.5 BR-06.3): a job with more Measure.csv rows is refused in preflight; 0 = no cap
@@ -121,6 +123,7 @@ class RunResult:
     frame: pd.DataFrame | None = None
     filing: pd.DataFrame | None = None       # with filing_validation: the failing records (preflight.PreflightReport.filing)
     filing_rules: dict | None = None         # with filing_validation: the rule set used
+    cost_tests: object | None = None         # the cost-test set the run priced on (cost_test_sets.Resolved), once preflight has found the first program year
     acc_check: dict | None = None            # the ACC-for-program-year check (preflight.PreflightReport.acc_check)
 
 
@@ -167,6 +170,8 @@ def prepare(cfg: RunConfig, run_dir: Path, log: Log):
         chk.raise_if_bad("supplied gas ACC file")
         gas = overrides.prepare_gas_acc(cfg.acc_gas_file, work)
     acc = apply_draft(versions.resolve_acc(cfg.acc_version, elec, gas, cfg.settings_from), cfg, supplied=bool(cfg.acc_electric_file or cfg.acc_gas_file))
+    from . import cost_test_sets
+    cost_test_sets.check_for_run(cfg.cost_test_set, filing=is_filing_run(cfg))      # a bad file, or a supplied / draft set on a filing run, stops here
     for n in acc.notes:
         log(f"note: {n}")
     log(acc.describe())
@@ -282,6 +287,8 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
         settings["filing_validation"] = result.filing_rules
     if result.acc_check:
         settings["acc_check"] = result.acc_check
+    if result.cost_tests is not None:
+        settings["cost_tests"] = result.cost_tests.record()
     if result.notes:
         settings["notes"] = result.notes
     (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
@@ -345,6 +352,32 @@ def write_reconciliation(cfg: RunConfig, parts, run_dir: Path, tag: str, excel, 
 
 
 DRAFT_LABEL = " (draft)"
+
+
+def is_filing_run(cfg: RunConfig) -> bool:
+    """A run for a filing: CEDARS filing checks, or priced for a filing (BR-11.8: no draft ACC; COST_TESTS.md: only a published built-in cost-test set)."""
+    return bool(cfg.filing_validation or cfg.acc_purpose)
+
+
+def resolve_cost_tests(cfg: RunConfig, rep, result: RunResult, log: Log):
+    """The cost-test set of the run (cost_test_sets.resolve), from the first program year preflight found; its notes go to the log and its warnings
+    (a draft set, a set outside the job's program years) to the log and RunResult.notes too."""
+    from . import cost_test_sets
+    first = rep.stats.get("First Year (base year) that will be used")
+    span = str(rep.stats.get("claim years", "") or "")
+    years = []
+    if "-" in span:
+        a, b = span.split("-", 1)
+        years = list(range(int(a), int(b) + 1))
+    r = cost_test_sets.resolve(cfg.cost_test_set, int(first) if first is not None else (years[0] if years else None), filing=is_filing_run(cfg),
+                               program_years=years or None)
+    for n in r.notes:
+        log(n)
+    for w in r.warnings:
+        result.notes.append(w)
+        log(f"note: {w}")
+    result.cost_tests = r
+    return r
 
 
 def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
@@ -439,6 +472,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     log(rep.text())
     if not rep.ok:
         raise RuntimeError("preflight found blocking problems (see above); nothing was priced")
+    resolve_cost_tests(cfg, rep, result, log)
     if cfg.preflight_only:
         log("\npreflight only: stopping before pricing")
         return result
@@ -521,7 +555,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     log("\n== writing results ==")
     acc_labels = acc_keys.map({k: g.label for k, g in groups.items()})
     frame = outputs.assemble_measure_level(raw, measures, res, acc_labels if len(groups) > 1 else acc.label,
-                                           credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide))
+                                           credited=outputs.credited_pa(measures, cfg.programcost, cfg.allocate_statewide),
+                                           cost_test_label=result.cost_tests.set.run_label)
     if comps is not None:
         frame = frame.merge(comps, on="CEInputID", how="left")
         cols = [c for c in frame.columns if c != "CreditedPA"] + ["CreditedPA"]

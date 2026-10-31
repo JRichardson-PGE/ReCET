@@ -33,14 +33,15 @@
         "programs": {"$ref": "#/$defs/input"},
         "acc_electric": {"$ref": "#/$defs/input"},
         "acc_gas": {"$ref": "#/$defs/input"},
-        "cet_outputs": {"$ref": "#/$defs/input"}
+        "cet_outputs": {"$ref": "#/$defs/input"},
+        "cost_tests": {"$ref": "#/$defs/input", "description": "A cost-test definition set's YAML file (recet/docs/COST_TESTS.md) for an analysis run; a filing run takes a built-in set by settings.cost_test_set instead."}
       },
       "oneOf": [{"required": ["measures"]}, {"required": ["job_zip"]}, {"required": ["workbook"]}],
       "not": {"required": ["job_zip", "programcost"]}
     },
     "settings": {
       "type": "object",
-      "description": "RunConfig settings (recet/docs/INPUT_FIELDS.md section 3) other than files, folders, names, engine and output format, e.g. {\"acc_version\": \"2024\", \"acc_purpose\": \"claims\", \"allocate_statewide\": true}."
+      "description": "RunConfig settings (recet/docs/INPUT_FIELDS.md section 3) other than files, folders, names, engine and output format, e.g. {\"acc_version\": \"2024\", \"acc_purpose\": \"claims\", \"allocate_statewide\": true, \"cost_test_set\": \"EE-2026\"}."
     },
     "packs": {
       "type": "object",

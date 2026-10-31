@@ -95,6 +95,7 @@ REFUSED = [
     ("compare_with", "a comparison with another ACC"), ("cet_outputs", "a comparison with a CET outputs file"),
     ("filing_validation", "CEDARS filing checks (a filing accepts only ReCET's current release)"),
     ("preflight_only", "Check inputs only (that is ReCET's input check)"),
+    ("cost_test_set", "a cost-test definition set (a replica's tests are its release's own)"),
 ]
 
 
@@ -378,6 +379,7 @@ def write_settings(cfg, rel: Release, version: str, acc: int, run_dir: Path, res
         "acc": {"key": str(acc), "label": versions.acc_short(acc), "cet_version": version, "tables": f"CET {rel.name} backup, Version {version}"},
         "reference_dir": {"path": str(paths.reference_dir() or ""), "source": paths.reference_dir_source()},
         "inputs": {"measures": str(cfg.measures), "programcost": str(cfg.programcost or ""), "measures_priced": priced, "first_year": first_year},
+        "cost_tests": {"fixed_by": f"CET {rel.name}", "used_label": f"CET {rel.name}"},
         "totals": result.totals,
     }
     if result.notes:
