@@ -106,6 +106,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.88 (2026-10-31): the consolidated library on the real data (Jake's laptop, 2026-10-31): 21,859 stored profiles -> 20,954 (410 profiles carry
+  1,315 names, 198 of them under more than one Impact Profile Name), four PG&E filings (21,370 measures) priced bit for bit the same. But 0.1.87 wrote the
+  hourly file with pyarrow's defaults (a dictionary on every column): 9.51 -> 13.31 GB. `profile_library.writer_options` now writes each column as the
+  source's first row group does (codec; dictionary only where the source has one; otherwise its encoding: the scraped file's ids and hours are
+  DELTA_BINARY_PACKED, impacts PLAIN). Every file is written to `<name>.tmp` and `os.replace`d (a `data build --link` copy's hard-linked files and
+  manifest are replaced, never written through to the folder they came from), and `update_manifest` gives a reference folder's manifest.json the new
+  sizes / SHA-256 (a new file), so `recet data verify --full` passes on the copy. tests/test_profile_library.py: the fixture library is written with the
+  scraped encodings; the output keeps them and is smaller; a linked copy leaves its source byte for byte unchanged and both folders verify.
 - 0.1.87 (2026-10-31, Jake; BRD v0.5 BR-06.18): the consolidated impact-profile library. Jake's rule: consolidate ONLY profiles that match 100% (the same
   climate zones, every zone's 8,760 bit for bit the same, rows in the same order) and are drawn on the same calendar (represents_year, blank = 2009); no
   tolerance merging; a consolidated profile keeps every name, under any Impact Profile Name. Format: `catalog.parquet` stays one row per name (its own `id`)
