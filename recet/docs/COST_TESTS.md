@@ -83,7 +83,8 @@ Filings use the CPUC's set, which users cannot edit; anyone running ReCET by its
 
 ## 6. What stays in code
 
-The engine still prices every stream (CALCULATIONS C5 to C9, C14, C19): a set only says how priced streams are added, shared and divided. The
+The engine still prices every stream (CALCULATIONS C5 to C9, C14, C19): a set only says how priced streams are added, shared and divided, and
+`pipeline/test_evaluator.py` is the one place that adds, shares and divides them. The
 program-cost NPV, the share mechanics (positive parts, per-program totals, the 1 / count fallback, totals over the parts of a large job), the
 `Weighted*` / `Wtd*` / `TotalExpenditures` columns (CET's program-cost components, on the headline test's share), the levelized formula and the CET
 replicas stay code.
@@ -93,8 +94,11 @@ replicas stay code.
 1. **Sets and pinning** (0.1.83): this page, the EE-2026 set, the schema, `cost_test_sets.py`, the run option, `Used_CostTestSet`, the run_settings.json
    and receipt block, the job spec, filing-run and draft handling, the program-year warning. The arithmetic is unchanged: `pipeline/cost_tests.py` still
    prices, and a test checks that every column the set names is a column a run writes.
-2. **The evaluator**: a generic evaluator driven by the set replaces `cost_tests.py`'s test arithmetic (which becomes the frozen reference in the tests),
-   equal to it within 1e-9 on every column; PCT priced from the set; CALCULATIONS C12 rendered from the set.
+2. **The evaluator** (0.1.84): `pipeline/test_evaluator.py` prices every aggregate and test of the run's set (`cost_tests.compute_cost_tests(...,
+   cset)`); 0.1.81's arithmetic is kept, frozen, as `tests/reference_cost_tests.py`, and tests/test_test_evaluator.py holds EE-2026 to it within 1e-9 on
+   every column (in one piece and in parts, with and without program costs, market effects, zero NTGs). The PCT is the set's (the engine writes only
+   its participant streams, `TaxCreditsGrossPV` among them, internal); CALCULATIONS C12 carries `test_evaluator.formulas` of the set in force, checked by a
+   test. The measure-level columns now follow the set: the aggregates, the `Weighted*` block, then each test's columns together (OUTPUT_FIELDS 2.1).
 3. **Consumers from the set**: the portfolio summary ratios, Results, key metrics, field attributes and definitions, output templates, allocation default
    rules and the web pages take their test list from the run's set.
 4. **Input streams**: the `one_time` and `annual_over_life` bases priced from the set, template / editor / preflight support for the Measure columns a set

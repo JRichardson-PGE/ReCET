@@ -56,6 +56,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if cfg.acc_electric_file or cfg.acc_gas_file:
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
     societal = jobs.societal_available(groups, acc, cfg.include_societal, result, log)
+    cset = result.cost_tests.set if result.cost_tests else None          # the run's cost-test set (jobs.resolve_cost_tests)
     if societal != cfg.include_societal:
         progress.replan(societal=societal)                       # an ACC with no societal avoided costs: pricing is shorter
     program = cost_tests.load_program_costs(Path(cfg.programcost), allocate_statewide=cfg.allocate_statewide) if cfg.programcost else None
@@ -91,7 +92,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         if len(groups) > 1:
             runtime.switch_acc(acc)
         d = pd.concat(vals, ignore_index=True) if len(vals) > 1 else vals[0]
-        totals = cost_tests.combine_share_totals(totals, run_poc.program_share_totals(d))
+        totals = cost_tests.combine_share_totals(totals, run_poc.program_share_totals(d, cset))
         d.to_parquet(spill / f"values_{i:04d}.parquet", index=False)
         if ems:
             pd.concat(ems, ignore_index=True).to_parquet(spill / f"emissions_{i:04d}.parquet", index=False)
@@ -145,7 +146,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     for i, (f, _start, _n) in enumerate(parts):
         measures = load(f)
         res = run_poc.apply_program_costs(pd.read_parquet(spill / f"values_{i:04d}.parquet"), measures, program, acc_version=acc.settings_acc,
-                                          base_year=base_year, market_effects_bens=meb, include_societal=societal, totals=totals)
+                                          base_year=base_year, market_effects_bens=meb, include_societal=societal, totals=totals,
+                                          cost_tests_set=cset)
         if cfg.emissions:
             res = res.merge(pd.read_parquet(spill / f"emissions_{i:04d}.parquet"), on="CEInputID", how="left")
         frame = outputs.assemble_measure_level(outputs.read_raw(f, cfg.allocate_statewide), measures, res,

@@ -21,6 +21,7 @@ from .pipeline import (
     real_impact_profiles,
     statewide_allocation,
     system_zones,
+    test_evaluator,
 )
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
 from .pipeline.data_loading import FIRST_BASELINE_QUANTITIES, SECOND_BASELINE_QUANTITIES
@@ -537,20 +538,21 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
                "GrossParticipantCostPV",
                *PARTICIPANT_EXTRA, "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas",
-               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "PCTBen", "PCTCost", "PCTRatio",
+               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV",
                "TRCCost", "PACCost", "RIMCost", "TRCRatio", "PACRatio", "RIMRatio"]]
 
 
 def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_version: int, base_year: int) -> pd.DataFrame:
-    """The Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (BRD BR-06.8; on CPUC's CET roadmap). From the
-    participant's side, on GROSS savings (free riders are participants too) and without market effects:
+    """The participant-side streams of the Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (BRD BR-06.8;
+    on CPUC's CET roadmap): the gross (NTG = 1, no market effects; free riders are participants too) lifecycle bill impacts, C9's bill impacts with the same
+    rates, discounting and fuel-substitution split, and TaxCreditsGrossPV = TaxCreditsGross / PVF, PVF being C8's participant-cost discount factor (the
+    claim quarter at the primary rate). The test itself is the cost-test set's (EE-2026's PCT, priced by pipeline/test_evaluator.py):
 
-        PCTBen   = LifecycleBillReducElecGross + LifecycleBillReducGasGross + RebatesandIncentsPV + TaxCreditsGross / PVF       (bill reductions, incentives, tax credits)
-        PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + LifecycleBillIncrElecGross + LifecycleBillIncrGasGross       (the full measure cost, bill increases)
+        PCTBen   = LifecycleBillReducElecGross + LifecycleBillReducGasGross + RebatesandIncentsPV + TaxCreditsGrossPV
+        PCTCost  = GrossParticipantCostPV + RebatesandIncentsPV + LifecycleBillIncrElecGross + LifecycleBillIncrGasGross
         PCTRatio = PCTBen / PCTCost
 
-    The gross bill impacts are C9's bill impacts with NTG = 1 (same rates, discounting and fuel-substitution split). PVF is the participant-cost discount factor
-    of C8 (the claim quarter at the primary rate). Not yet checked against a CPUC specification of the test: CPUC has not published how the CET will define it."""
+    Not yet checked against a CPUC specification of the test: CPUC has not published how the CET will define it."""
     m = measures
     # gross (no NTG) annual quantities, with installation and realization rates, as the net AC_Net_* ones
     gross_quantities = {
@@ -565,14 +567,11 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
     quarters_from_first_year = (m["Used_Year"] - base_year) * 4 + (m["Used_Quarter"] - 1)                                # CalcCE's Qm
     participant_discount_factor = (1.0 + m["IOU_AC_Territory"].map(discount_rate_qtr_by_iou)) ** quarters_from_first_year     # Rqf ^ Qm
     out = m[["CEInputID"]].assign(_participant_discount_factor=participant_discount_factor.to_numpy()).merge(gross_bill_impacts, on="CEInputID", how="left")
-    out = out.merge(priced[["CEInputID", "RebatesandIncentsPV", "GrossParticipantCostPV", "TaxCreditsGross"]], on="CEInputID", how="left")
+    out = out.merge(priced[["CEInputID", "TaxCreditsGross"]], on="CEInputID", how="left")
     gross_cols = ["LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross"]
     out[gross_cols] = out[gross_cols].fillna(0.0)
-    out["PCTBen"] = (out["LifecycleBillReducElecGross"] + out["LifecycleBillReducGasGross"] + out["RebatesandIncentsPV"]
-                     + out["TaxCreditsGross"] / out["_participant_discount_factor"])
-    out["PCTCost"] = out["GrossParticipantCostPV"] + out["RebatesandIncentsPV"] + out["LifecycleBillIncrElecGross"] + out["LifecycleBillIncrGasGross"]
-    out["PCTRatio"] = (out["PCTBen"] / out["PCTCost"].where(out["PCTCost"] != 0)).fillna(0.0)
-    return out[["CEInputID"] + gross_cols + ["PCTBen", "PCTCost", "PCTRatio"]]
+    out["TaxCreditsGrossPV"] = out["TaxCreditsGross"] / out["_participant_discount_factor"]
+    return out[["CEInputID"] + gross_cols + ["TaxCreditsGrossPV"]]
 
 
 def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
@@ -841,23 +840,28 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
             .merge(discounted_savings_values, on="CEInputID", how="left"))
 
 
-def program_share_totals(d: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def program_share_totals(d: pd.DataFrame, cost_tests_set=None) -> dict[str, pd.DataFrame]:
     """Each program's totals of the amounts its program-level shares divide up (the benefits behind WeightedBenefits and the cost tests' program-cost shares),
     over `d` (price_measure_values). A chunked run adds these up over its chunks
-    (cost_tests.combine_share_totals) and passes the sum to apply_program_costs, so every measure gets the share it has in the whole job."""
-    return cost_tests.share_totals(cost_tests.share_inputs(d), d["PrgID"])
+    (cost_tests.combine_share_totals) and passes the sum to apply_program_costs, so every measure gets the share it has in the whole job. `cost_tests_set`:
+    the run's cost-test set (None = cost_tests.default_set()); its shares are the totals' keys."""
+    return cost_tests.share_totals(cost_tests.share_inputs(d, cost_tests_set), d["PrgID"])
 
 
 def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: pd.DataFrame | None, acc_version: int, base_year: int,
-                        market_effects_bens: float = 0.0, include_societal: bool = True, totals: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
+                        market_effects_bens: float = 0.0, include_societal: bool = True, totals: dict[str, pd.DataFrame] | None = None,
+                        cost_tests_set=None) -> pd.DataFrame:
     """The program-level half: share each program's costs over its measures (all of them, whatever ACC version priced them) and finish every cost test.
     Program costs are discounted with the run's own ACC version's rates (`acc_version`). `totals` (program_share_totals over the whole job) is for a run that
-    passes the job in parts; None = `d` is the whole job."""
+    passes the job in parts; None = `d` is the whole job. `cost_tests_set`: the run's cost-test set (cost_test_sets.CostTestSet; None =
+    cost_tests.default_set()), which the tests are priced from (pipeline/test_evaluator.py)."""
+    cost_tests_set = cost_tests_set or cost_tests.default_set()
     prog = cost_tests.program_cost_sums(program_costs, base_year, acc_version)
-    out = cost_tests.compute_cost_tests(d, prog, totals)
+    out = cost_tests.compute_cost_tests(d, prog, totals, cost_tests_set)
     out = out.merge(savings_outputs(measures, market_effects_bens), on="CEInputID", how="left")
     if not include_societal:
         societal = [c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]
+        societal += [c for c in test_evaluator.societal_columns(cost_tests_set, {"trc"}) if c in out and c not in societal]
         out = out.assign(**dict.fromkeys(societal, float("nan"))).copy()   # copy: one block (column-by-column NaNs fragment the frame; pandas warned per part)
     return out
 
