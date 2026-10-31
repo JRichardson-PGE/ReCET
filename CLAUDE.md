@@ -106,6 +106,17 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.84 (2026-10-31; step 2 of `docs/COST_TESTS.md`): the evaluator. `recet/pipeline/test_evaluator.py` prices every aggregate and test of the run's
+  cost-test set (Ben = benefits + numerator adders, CostNoAdmin = costs, Cost = share x the pricing's program-cost NPV + costs, Gross on the gross forms and
+  gross share, ratios, lifecycle net benefit, levelized; `formulas(cset)` writes it out). `cost_tests.compute_cost_tests(d, prog, totals, cset)` keeps
+  the program sums, the shares' mechanics (`_share`, share_totals; share keys are now `<T>` / `<T>Gross` of `test_evaluator.share_bases`) and the
+  Weighted* / Wtd* / WeightedElecAlloc / TotalExpenditures block on the headline test's share, and calls it; `share_inputs(d, cset)`,
+  `run_poc.program_share_totals(d, cset)`, `apply_program_costs(..., cost_tests_set=)` take the run's set (jobs._run, chunked pass 1 and 2; None = the
+  newest published EE set). PCT is the set's: `run_poc.participant_cost_test` returns the gross bills and `TaxCreditsGrossPV` (internal: never written).
+  0.1.81's arithmetic is frozen in `tests/reference_cost_tests.py`; tests/test_test_evaluator.py holds EE-2026 to it at 1e-9 on every column (one piece,
+  parts, no program costs, ME 5%, zero NTG) and CALCULATIONS C12's generated block (between `<!-- cost-test-set ... -->` markers) to `formulas`. Column
+  order changed (values identical; OUTPUT_FIELDS 2.1): aggregates, the Weighted block, each test's columns together, LevBenElec / LevBenGas; the
+  regression fixtures' expected measure_level tables were reordered only. Never write test arithmetic outside the evaluator: a new test is a new set.
 - 0.1.83 (2026-10-31, Jake; step 1 of `docs/COST_TESTS.md`, first numbered 0.1.82; design in the "Cost tests and value streams as configuration" doc): cost-test definition sets.
   `recet/data/cost_tests/<id>/definition.yaml` (+ CHANGES.md; `cost_test_set.schema.json` beside them, kept in step with `cost_test_sets.validate` by
   tests/test_cost_test_sets.py), `recet/cost_test_sets.py` (load / validate / builtin / in_force / years / resolve / describe). Ids `<workstream>-<first

@@ -543,7 +543,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     if len(groups) > 1:
         runtime.switch_acc(acc)
     res = run_poc.apply_program_costs(pd.concat(parts, ignore_index=True), measures, program, acc_version=acc.settings_acc, base_year=base_year,
-                                      market_effects_bens=meb, include_societal=societal)
+                                      market_effects_bens=meb, include_societal=societal,
+                                      cost_tests_set=result.cost_tests.set if result.cost_tests else None)
     log(f"priced in {time.time() - t0:.0f}s")
     if cfg.emissions:
         log("\n== emissions ==")
