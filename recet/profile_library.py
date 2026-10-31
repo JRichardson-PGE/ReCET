@@ -22,12 +22,17 @@ The library's format (reference folder `impact_profiles/`):
 the source (an exact check, not a sample). The catalog keeps every source column and row; its Parquet metadata (`recet.consolidation`) records the
 source hourly file's size and the new one's, so a System-zone catalog built on the source still applies (system_zones.catalog_usable): the shapes it was
 built from are proven identical. CLI: `recet data consolidate-profiles SRC OUT`.
+
+The hourly file is written with the source's codecs and encodings (`writer_options`), every file goes to a temporary name and is moved into place (a file
+hard-linked to another folder's, as `recet data build --link` makes them, is replaced, never written through), and when `out` is a reference folder's
+impact_profiles/ its manifest.json gets the new sizes and checksums (`update_manifest`, also a new file), so `recet data verify` passes on the copy.
 """
 from __future__ import annotations
 
 import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -151,8 +156,9 @@ def consolidate(src, out, *, log=print) -> dict:
 
     # 3. the hourly file: one row group per stored profile, rows copied from its first source row group with the id set
     hourly_out, cat_out = out / "hourly.parquet", out / "catalog.parquet"
+    hourly_tmp = out / "hourly.parquet.tmp"
     schema = pf.schema_arrow.remove_metadata()
-    with pq.ParquetWriter(str(hourly_out), schema, compression="zstd") as w:
+    with pq.ParquetWriter(str(hourly_tmp), schema, **writer_options(pf)) as w:
         for n, (new_id, first) in enumerate(sorted(stored.values())):
             t = pf.read_row_group(groups[first]).cast(schema)
             ids = pa.array(np.full(t.num_rows, new_id), type=schema.field(id_col).type)
@@ -161,12 +167,14 @@ def consolidate(src, out, *, log=print) -> dict:
                 log(f"  written {n + 1:,} / {len(stored):,}")
 
     # 4. the check: every name's rows in the new file have the fingerprint of its rows in the source
-    pf_out = pq.ParquetFile(str(hourly_out))
+    pf_out = pq.ParquetFile(str(hourly_tmp))
     groups_out = _row_groups(pf_out)
     prints_out = {sid: fingerprint(pf_out.read_row_group(g), id_col) for sid, g in groups_out.items()}
     bad = [int(cat["id"].iloc[i]) for i in key_of if prints_out.get(int(new_shape[i])) != prints[int(src_shape[i])]]
     if bad or len(groups_out) != len(stored):
         raise RuntimeError(f"consolidated library check failed: {len(bad)} name(s) read different rows (ids {bad[:10]}); nothing should be used from {out}")
+    del pf_out
+    _replace(hourly_tmp, hourly_out)
 
     # 5. the catalog: every source row and column, shape_id set, and the provenance
     cat_new = cat_table.drop_columns([c for c in ("shape_id",) if c in cat_table.column_names])
@@ -184,15 +192,78 @@ def consolidate(src, out, *, log=print) -> dict:
     }
     md = dict(cat_new.schema.metadata or {})
     md[METADATA_KEY] = json.dumps(provenance).encode()
-    pq.write_table(cat_new.replace_schema_metadata(md), str(cat_out), compression="zstd")
+    cat_tmp = out / "catalog.parquet.tmp"
+    pq.write_table(cat_new.replace_schema_metadata(md), str(cat_tmp), compression="zstd")
+    _replace(cat_tmp, cat_out)
 
     report = _report(cat, has_data, src_shape, new_shape, groups, stored, zones, hourly_src, hourly_out, provenance)
-    (out / REPORT_NAME).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (out / (REPORT_NAME + ".tmp")).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    _replace(out / (REPORT_NAME + ".tmp"), out / REPORT_NAME)
     log(f"consolidated: {report['stored_profiles_before']:,} -> {report['stored_profiles_after']:,} stored profiles, "
         f"{report['zone_8760s_before']:,} -> {report['zone_8760s_after']:,} zone 8,760s, {report['hourly_gb_before']} -> {report['hourly_gb_after']} GB; "
         f"{report['profiles_with_several_names']:,} profiles carry {report['names_on_shared_profiles']:,} names "
         f"({report['profiles_with_different_impact_profile_names']:,} under more than one Impact Profile Name); checked: every name reads identical rows")
+    update_manifest(out, log=log)
     return report
+
+
+ENCODINGS = ("DELTA_BINARY_PACKED", "DELTA_LENGTH_BYTE_ARRAY", "DELTA_BYTE_ARRAY", "BYTE_STREAM_SPLIT", "PLAIN")
+
+
+def writer_options(pf: pq.ParquetFile) -> dict:
+    """ParquetWriter options that write each column as the source file's first row group does: its codec, dictionary encoding only where the source
+    used it, otherwise the source's encoding. pyarrow's defaults (dictionary on every column) made the real library 40% larger (9.51 -> 13.31 GB): the
+    scraped file has its ids and hours DELTA_BINARY_PACKED and the impacts PLAIN, which a dictionary of 8,760 distinct doubles per zone only inflates."""
+    if pf.metadata.num_row_groups == 0:
+        return {"compression": "zstd"}
+    rg = pf.metadata.row_group(0)
+    compression, dictionary, encoding = {}, [], {}
+    for i in range(rg.num_columns):
+        c = rg.column(i)
+        name = c.path_in_schema
+        compression[name] = c.compression.lower() if c.compression.upper() != "UNCOMPRESSED" else "none"
+        if any(e.endswith("_DICTIONARY") for e in c.encodings):
+            dictionary.append(name)
+        else:
+            encoding[name] = next((e for e in ENCODINGS if e in c.encodings), "PLAIN")
+    opts = {"compression": compression, "use_dictionary": dictionary}
+    if encoding:
+        opts["column_encoding"] = encoding
+    return opts
+
+
+def _replace(tmp: Path, dest: Path) -> None:
+    """Move a finished file into place with a new directory entry: a destination hard-linked to another reference folder's file is left untouched there."""
+    os.replace(tmp, dest)
+
+
+def update_manifest(library, *, log=print) -> bool:
+    """When `library` is a reference folder's impact_profiles/ whose manifest.json lists the library's files, record their new sizes and SHA-256 (a
+    checksum is recomputed only for an entry that had one). The manifest is written as a new file, never in place: a reference folder built with
+    `recet data build --link` shares its manifest's inode with the folder it came from. Returns True when the manifest was updated."""
+    from . import datapack
+    folder = Path(library).parent
+    manifest = datapack.read_manifest(folder)
+    if manifest is None:
+        return False
+    changed = []
+    for name in ("catalog.parquet", "hourly.parquet"):
+        rel = f"{Path(library).name}/{name}"
+        entry = manifest.get("files", {}).get(rel)
+        if entry is None:
+            continue
+        p = folder / rel
+        entry["size"] = p.stat().st_size
+        if entry.get("sha256"):
+            entry["sha256"] = datapack.sha256_file(p, log)
+        changed.append(rel)
+    if not changed:
+        return False
+    tmp = folder / (datapack.MANIFEST + ".tmp")
+    tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    _replace(tmp, folder / datapack.MANIFEST)
+    log(f"{folder / datapack.MANIFEST}: updated {', '.join(changed)}")
+    return True
 
 
 def _report(cat, has_data, src_shape, new_shape, groups, stored, zones, hourly_src, hourly_out, provenance) -> dict:
