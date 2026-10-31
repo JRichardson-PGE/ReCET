@@ -16,6 +16,7 @@ from .pipeline import (
     discount_settings,
     gas_avoided_cost,
     gas_savings_profiles,
+    input_streams,
     rate_schedules,
     real_avoided_cost_v2,
     real_impact_profiles,
@@ -419,7 +420,7 @@ PARTICIPANT_EXTRA = ["IncentiveToOthers", "DILaborCost", "DIMaterialCost", "EndU
 
 
 def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,
-                           market_effects_bens: float = 0.0, market_effects_cost: float = 0.0):
+                           market_effects_bens: float = 0.0, market_effects_cost: float = 0.0, input_values: pd.DataFrame | None = None):
     """
     Prices the primary (TRC-row) streams the cost tests are built from (the ElecBen/
     ElecSupplyCost, GasBen/GasSupplyCost, OtherBen/OtherCost splits, the participant
@@ -472,6 +473,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
 
     participant_costs = run_participant_cost(measures, acc_version=acc_version, base_year=base_year, market_effects_cost=market_effects_cost)
     other_bens_costs = price_other_ben_cost(measures, market_effects_bens, market_effects_cost)
+    if input_values is not None:      # the cost-test set's input streams (input_streams.price) in place of the engine's OtherBen / OtherCost / TaxCredits
+        other_bens_costs = input_streams.overlay(other_bens_costs, input_values, only_existing=True)
     # Bill impacts take market effects too: CalcCE prices them on Qty x (NTGRkWh + MEBens) / (NTGRThm + MEBens) (:15885-15974). Confirmed on CET jobs 121842 /
     # 121841: every BillReduc rises by (NTG + 0.05) / NTG. (Until 2026-10-08 the POC left them unscaled.)
     bill_impacts = run_bill_impact(measures, acc_version=acc_version, market_effects_bens=market_effects_bens)
@@ -796,12 +799,16 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
 
 
 def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0, market_effects_cost: float = 0.0,
-                         include_societal: bool = True) -> pd.DataFrame:
+                         include_societal: bool = True, cost_tests_set=None) -> pd.DataFrame:
     """The measure-level half of run_full_cost_effectiveness: every value that depends on the ACC (benefits, supply costs, participant PVs, bill impacts, the
     societal variants), one row per measure, before program costs are shared out. Measures priced on different ACC versions (BRD BR-06.5) are priced here
-    one group at a time, each under its own ACC, and the groups are joined before apply_program_costs."""
+    one group at a time, each under its own ACC, and the groups are joined before apply_program_costs. `cost_tests_set`: the run's set (None =
+    cost_tests.default_set()), whose input streams (pipeline/input_streams.py) are priced here: they replace the engine's OtherBen / OtherCost /
+    TaxCredits (equal on EE-2026) and add any stream the set defines."""
+    cset = cost_tests_set or cost_tests.default_set()
+    streams = input_streams.price(measures, cset, acc_version, base_year, market_effects_bens, market_effects_cost)
     trc_values = run_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
-                                        market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
+                                        market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost, input_values=streams)
     if include_societal:
         sct_values = run_societal_cost_effectiveness(measures, acc_version=acc_version, base_year=base_year,
                                                      market_effects_bens=market_effects_bens, market_effects_cost=market_effects_cost)
@@ -816,8 +823,9 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     measure_values["NTGRkWh_plus_MEBens"] = measures["NTGRkWh"] + market_effects_bens          # the Gross columns undo the NTG that the benefit was scaled by
     measure_values["NTGRTherm_plus_MEBens"] = measures["NTGRTherm"] + market_effects_bens
     discounted_savings_values = discounted_savings(measures, acc_version, base_year, market_effects_bens)   # the levelized columns' denominators, at this ACC's rates
-    return (measure_values.merge(trc_values, on="CEInputID").merge(sct_values, on="CEInputID")
-            .merge(discounted_savings_values, on="CEInputID", how="left"))
+    out = (measure_values.merge(trc_values, on="CEInputID").merge(sct_values, on="CEInputID")
+           .merge(discounted_savings_values, on="CEInputID", how="left"))
+    return input_streams.overlay(out, streams)
 
 
 def program_share_totals(d: pd.DataFrame, cost_tests_set=None) -> dict[str, pd.DataFrame]:
@@ -893,7 +901,7 @@ def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd
     return m
 
 
-def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = False, dtypes: dict | None = None):
+def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = False, dtypes: dict | None = None, extra_columns=()):
     """Load one CET job's inputs, optionally splitting its statewide (SW_) programs across the IOUs -- BOTH files together.
 
     allocate_statewide=True (pipeline/statewide_allocation.py, the inputs route): each SW program's measures are split by the per-fuel
@@ -904,9 +912,11 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     a measure with no ProgramCost row gets no program costs, and a ProgramCost row with no measures is charged to none.
 
     dtypes: the Measure.csv column types to read with (a part of a larger file: see data_loading.load_measures_from_csv).
+    extra_columns: the run's cost-test set's own Measure columns (input_streams.extra_columns), kept as numbers.
 
     Returns (measures, program_costs or None)."""
-    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes),
+    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes,
+                                                                           extra_columns=extra_columns),
                                      allocated=allocate_statewide)
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
     return measures, program

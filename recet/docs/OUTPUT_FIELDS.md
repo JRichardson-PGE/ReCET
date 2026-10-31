@@ -1816,6 +1816,11 @@ Results views that use an old name still work (the new name is used). CET's own 
 came right after the gross bill impacts and the costs were written before the ratios. Every value is unchanged; a reader that takes columns by name is
 not affected.
 
+**A set's own streams (0.1.86).** A cost-test set that adds an input stream (COST_TESTS.md section 3: a non-energy benefit from a Measure column of its
+own, say `HealthNEB` from a health-benefit column the set names) writes it per pricing (`HealthNEB`, `HealthNEB_SB` ...) and its gross form (`HealthNEBGross` ...) after the
+pricing's own columns, before `TotalSystemBenefit`; the Measure column itself is echoed with the inputs. `field_definitions` takes their definitions
+from the set. EE-2026's input streams are `OtherBen`, `OtherCost` and `TaxCredits` (C7), which stay where they were.
+
 | ReCET writes | Before | CET's outputs file |
 |---|---|---|
 | `AC_Net_kWh_1st_Baseline`, `AC_Net_kWh_2nd_Baseline`, `AC_Net_Therms_1st_Baseline`, `AC_Net_Therms_2nd_Baseline` (0.1.55) | `AC_kWh_1st_Baseline`, `AC_kWh_2nd_Baseline`, `AC_Therms_1st_Baseline`, `AC_Therms_2nd_Baseline` (0.1.50-0.1.54) | (none) |

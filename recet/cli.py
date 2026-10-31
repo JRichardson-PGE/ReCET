@@ -149,7 +149,7 @@ def _cmd_template(a: argparse.Namespace) -> int:
             return 2
         print(templates.export_library_profile(a.end_use, a.pa, a.sector, a.out))
     else:
-        print(templates.write_template(a.kind, a.out, a.acc))
+        print(templates.write_template(a.kind, a.out, a.acc, cost_tests=a.cost_tests))
     return 0
 
 
@@ -297,6 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--acc", default="2026", help="which built-in ACC the ACC templates are sliced from")
     p.add_argument("--data-dir", help="reference data folder (ACC templates are real slices when it is available)")
     p.add_argument("--end-use"), p.add_argument("--pa"), p.add_argument("--sector")
+    p.add_argument("--cost-tests", metavar="SET", help="measure: add the Measure columns this cost-test set (id or YAML file) reads beyond CET's")
     p.set_defaults(func=_cmd_template)
     p = sub.add_parser("check", help="validate a supplied file")
     p.add_argument("what", choices=["acc-electric", "acc-gas", "profiles-8760", "profiles-gas", "run-parameters", "sw-factors", "programs"])

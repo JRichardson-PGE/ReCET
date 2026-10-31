@@ -40,7 +40,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     """Price and write the job in `parts` (see the module docstring). `values`: the distinct ClaimYearQuarter and ACCVersion values of the whole file
     (delimited.part_dtypes). Fills and returns `result`."""
     from . import components as comp_mod, jobs, outputs, profile8760, progress, results_view, run_poc, runtime
-    from .pipeline import cost_tests, emissions
+    from .pipeline import cost_tests, emissions, input_streams
 
     tag = f"acc{acc.key}"
     excel = jobs.excel_limit(cfg, result, log)
@@ -57,13 +57,14 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             log(f"note: the supplied ACC file(s) replace the {acc.label} only; measures on other versions use those versions' built-in files")
     societal = jobs.societal_available(groups, acc, cfg.include_societal, result, log)
     cset = result.cost_tests.set if result.cost_tests else None          # the run's cost-test set (jobs.resolve_cost_tests)
+    extra = input_streams.extra_columns(cset) if cset else ()           # its own Measure columns (pipeline/input_streams.py)
     if societal != cfg.include_societal:
         progress.replan(societal=societal)                       # an ACC with no societal avoided costs: pricing is shorter
     program = cost_tests.load_program_costs(Path(cfg.programcost), allocate_statewide=cfg.allocate_statewide) if cfg.programcost else None
     years = (cfg.profile_years or [base_year]) if cfg.portfolio_8760 else []
 
     def load(f):
-        measures, _ = run_poc.load_job(f, None, allocate_statewide=cfg.allocate_statewide, dtypes=dtypes)
+        measures, _ = run_poc.load_job(f, None, allocate_statewide=cfg.allocate_statewide, dtypes=dtypes, extra_columns=extra)
         measures["Used_ACCVersion_Key"] = measures["ACCVersion"].replace("", acc.key)    # the ACC each measure is priced on (blank = this run's)
         return measures
 
@@ -84,7 +85,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             if g is not acc:
                 runtime.switch_acc(g)
             vals.append(run_poc.price_measure_values(sub, acc_version=g.settings_acc, base_year=base_year, market_effects_bens=meb, market_effects_cost=meb,
-                                                     include_societal=societal))
+                                                     include_societal=societal, cost_tests_set=cset))
             if cfg.emissions:
                 ems.append(emissions.price_emissions(sub, acc_version=g.settings_acc, market_effects_bens=meb))
             if cfg.components:

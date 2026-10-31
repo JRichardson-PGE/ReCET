@@ -166,6 +166,11 @@ Dollars per unit, undiscounted (C7). All but `UnitTaxCredits` are required (blan
 | `UnitMiscCosts` | Dollars (per unit) | required | The unit cost in dollars that is not captured in other cost fields. |
 | `UnitTaxCredits` | Dollars (per unit) | required | Inflation Reduction Act tax incentives for energy, per unit. The CET sums `UnitTaxCredits` with other benefits in the TRC calculation where IRA-eligible measures apply. **In ReCET:** Summed into the TRC ratio's numerator (`TaxCredits`); not part of any cost or of `TotalSystemBenefit`. |
 
+**A cost-test set's own columns.** A cost-test set (`cost_test_set`, section 3) may read Measure columns beyond these, for a non-energy benefit say
+([COST_TESTS.md](COST_TESTS.md) section 3, input streams): numbers per unit, blank = 0, after the columns above (`recet template measure --cost-tests SET`
+writes the header with them). A file without such a column prices it as 0, with a note; a value that is not a number stops the run before pricing. With
+statewide allocation they take the Weighted Factor.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## 2. `ProgramCost.csv`
