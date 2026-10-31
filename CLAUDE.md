@@ -106,6 +106,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.82 (2026-10-31, Jake: "Recet should not have its own program set within the platform at all now that we have the programs on the platform itself"):
+  `RunConfig.programs_replace` (`--programs-replace`): the supplied `programs_file` is the WHOLE program table (`programs.set_user_programs(table, replace=True)`;
+  `programs.table()` then holds only it, reindexed to every built-in column so the Prg_ columns do not change), so a PrgID it leaves out is "(not found)";
+  with it the file may have no rows (`load_programs(allow_empty=)`). `jobs.load_programs(cfg, log)` reads the table for ReCET's engine and for a CET replica
+  (which now attaches the supplied programs too; it used the built-in table whatever was supplied). Receipt `programs` {table, file, sha256, mode}.
+  The platform passes its registry with this on (CEDARS-Platform). tests/test_programs.py, tests/test_worker.py.
 - 0.1.81 (2026-10-30): the impact-profile library re-scraped after CEDARS fixed its duplicate hours (2026-10-29). The old library had, in every zone of
   19,374 profiles, the spring-forward DST hour twice and the hour before it missing (`shapes_from_frame` deduplicated and interpolated); every zone now has
   exactly 8,760 hours. 21,859 profiles with hourly data (1,362 new start-year-2028 load shapes; PacifiCorp's 21 are in the catalog with no hourly rows).
