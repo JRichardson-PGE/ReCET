@@ -127,16 +127,20 @@ def scaled_profile(shape_key: str, iou: str, target_sector: str, climate_zone: s
 
 @lru_cache(maxsize=1)
 def _catalog() -> pd.DataFrame:
+    """The catalog: one row per name a profile is filed under (end_use_name, iou_ac_territory, target_sector). `shape_id` names the hourly row group that
+    holds the row's 8,760s: in a consolidated library (recet/profile_library.py, BR-06.18) every name of a profile points at the one stored copy; a
+    library without the column stores each row's own (shape_id = id); a blank shape_id has no hourly data."""
     df = pd.read_parquet(_catalog_path())
     df["_sector_key"] = df["target_sector"].astype(str).str.upper()
     df["is_deer"] = df["end_use_name"].str.startswith("DEER:")
     df["represents_year"] = df["year_represented"].fillna(DEFAULT_REPRESENTS_YEAR).astype(int)
+    df["shape_id"] = df["id"].astype("Int64") if "shape_id" not in df.columns else df["shape_id"].astype("Int64")
     return df
 
 
 @lru_cache(maxsize=1)
 def _row_group_index() -> dict[int, int]:
-    """profile_id -> row-group index in the hourly parquet. Built entirely
+    """stored profile id (the catalog's shape_id) -> row-group index in the hourly parquet. Built entirely
     from parquet metadata (min==max per row group, since
     poc/consolidate_profiles.py / poc/repair_merged_hourly_rowgroups.py
     write exactly one row group per profile) -- no data is read, ~0.2s for
@@ -192,7 +196,20 @@ def _catalog_hourly() -> pd.DataFrame:
     -- see _row_group_index()'s docstring for why this exclusion matters."""
     cat = _catalog()
     hourly_ids = frozenset(_row_group_index().keys())
-    return cat[cat["id"].isin(hourly_ids)]
+    return cat[cat["shape_id"].isin(hourly_ids).fillna(False).astype(bool)]
+
+
+@lru_cache(maxsize=1)
+def _shape_id_index() -> dict[int, int | None]:
+    """profile id -> the id of the row group holding its 8,760s (None: no hourly data). Rows sharing an id (a platform export's territory rows) share it."""
+    cat = _catalog().drop_duplicates("id", keep="first")
+    return {int(i): (None if pd.isna(s) else int(s)) for i, s in zip(cat["id"].tolist(), cat["shape_id"].tolist())}
+
+
+def shape_id_of(profile_id: int) -> int | None:
+    """The stored profile a name's id reads its 8,760s from (the id itself when the catalog does not say: a library without shape_id, or an id the catalog
+    does not hold)."""
+    return _shape_id_index().get(int(profile_id), int(profile_id))
 
 
 @lru_cache(maxsize=1)
@@ -223,8 +240,16 @@ MAX_REPAIRABLE_GAP_HOURS = 5  # see module docstring's "MERGE-PIPELINE DATA CORR
 
 @lru_cache(maxsize=4096)
 def _profile_shapes_by_zone(profile_id: int) -> dict[str, np.ndarray]:
-    """All climate zones' normalized 8760-length shapes for one real
-    profile, read from its single row group. Cached per profile_id since
+    """All climate zones' normalized 8,760 shapes of the profile named by `profile_id` (a catalog id): those of its stored copy (shape_id_of). Every name of
+    a consolidated profile gets the same dict, read once (_stored_shapes); never write into it."""
+    sid = shape_id_of(profile_id)
+    return {} if sid is None else _stored_shapes(sid)
+
+
+@lru_cache(maxsize=4096)
+def _stored_shapes(shape_id: int) -> dict[str, np.ndarray]:
+    """All climate zones' normalized 8760-length shapes for one stored
+    profile, read from its single row group. Cached per shape_id since
     the same profile is commonly reused across many measures (e.g. many
     measures sharing one climate zone + end use).
 
@@ -237,15 +262,15 @@ def _profile_shapes_by_zone(profile_id: int) -> dict[str, np.ndarray]:
     short by more than that after dedup is genuinely excluded, same as
     before -- this repairs a known small defect, it doesn't paper over an
     arbitrarily broken row group."""
-    cached = _read_cached_shapes(profile_id)
+    cached = _read_cached_shapes(shape_id)
     if cached is not None:
         return cached
-    gi = _row_group_index().get(profile_id)
+    gi = _row_group_index().get(shape_id)
     if gi is None:
         return {}
     pf = pq.ParquetFile(str(_hourly_path()))
     out = shapes_from_frame(pf.read_row_group(gi).to_pandas())
-    _write_cached_shapes(profile_id, out)
+    _write_cached_shapes(shape_id, out)
     return out
 
 
@@ -267,7 +292,7 @@ def shapes_from_frame(df: pd.DataFrame) -> dict[str, np.ndarray]:
 
 
 # --- on-disk cache of the shapes a job has needed (paths.cache_dir()): reading a profile means decompressing one row group of the 9 GB library (~0.15 s), and every
-# process starts cold. One small .npz per profile, keyed by the library file's path, size and modification time, written atomically; the values are the repaired
+# process starts cold. One small .npz per stored profile (shape_id), keyed by the library file's path, size and modification time, written atomically; the values are the repaired
 # shapes exactly as computed below, so a cache hit is bit-identical to a miss.
 @lru_cache(maxsize=1)
 def _shape_cache_dir() -> Path | None:
