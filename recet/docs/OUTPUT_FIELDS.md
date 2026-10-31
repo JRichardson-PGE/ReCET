@@ -1837,6 +1837,10 @@ then one per program segment (`group` = `program segment`, from `Prg_ProgramSegm
 then one per program year (`group` = `program year`, from `Used_Year`, the claim year; BRD BR-04.1, so a multi-year filing's tests and TSB are given year by year).
 Every number is computed over the measures of the row's group.
 
+The tests are those of the run's cost-test set ([COST_TESTS.md](COST_TESTS.md); the run keeps it as `cost_tests.yaml`, 2.9c). The table below is
+EE-2026's. A set with another test `<T>` adds `<T>Ben`, `<T>Cost` and `<T>_ratio` (`<T>Ben / <T>Cost`), and `<T>_NoAdmin_ratio` when `<T>` is a headline
+test with a NoAdmin variant; the ratios come in the set's order, the tests with a NoAdmin variant first (`cost_test_sets.summary_ratios`).
+
 With **Leave Exclude_From_CE programs out of the portfolio summary** (`apply_exclude_from_ce`), the measures whose `Prg_Exclude_From_CE` is `True` are left out of every one
 of those rows and summed in one last row (`group` = `excluded`, `value` = `Exclude_From_CE programs (left out of the rows above)`), so nothing disappears unseen. Without
 it they are counted like every other measure.
@@ -2047,6 +2051,13 @@ the last filing, or claims after 2035) or the version is a label that names no A
 preflight.txt, and each record in the Cells sheet of `preflight_findings.xlsx`), and `run_settings.json` counts them by ACC and program year (`acc_check`, 2.9).
 (Before 0.1.50 the measure-level table also carried an `ACCCheck` column.)
 
+### 2.9c `cost_tests.yaml`
+
+The cost-test definition set the run priced on ([COST_TESTS.md](COST_TESTS.md)), copied byte for byte (its SHA-256 is run_settings.json's
+`cost_tests.sha256`), built-in or supplied. The portfolio summary, key metrics, field definitions, the Results page and the run page take their tests
+from it, so a run on a custom set reads the same months later. A run written before 0.1.85 has none and is read as EE-2026, which every earlier release
+priced.
+
 ### 2.10 `filing_validation_acc<version>` (with CEDARS filing checks)
 
 With **CEDARS filing checks** set to *Quarterly Claims* or *Budget filing* (`filing_validation`), preflight applies CEDARS' own upload checks for that filing to
@@ -2085,7 +2096,7 @@ input column, from INPUT_FIELDS.md. With an output template it lists exactly the
 | `unit` | The unit its entry gives ("Dollars (PV)", "kWh", "Metric Tons"); blank when the entry names none (inputs, labels). |
 | `source` | Where the value comes from: `input: Measure.csv`, the CEDARS Programs list (`Prg_` columns), or a ReCET calculation and what it works on (ACC avoided costs, emission factors, retail rates, `ProgramCost.csv` totals). |
 | `version` | `as filed (CET input field)` for an input; else the ReCET version, plus the run's ACC ("2026 ACC") for a value priced on it. A record with its own `ACCVersion` is priced on that ACC. |
-| `cost_tests` | How the cost tests use it (section 1.9): `benefit in TRC, PAC, RIM`, `cost in RIM`, a test's numerator, denominator or result, or `not used in a cost test`. The benefits and costs listed for a test add up to its `<test>Ben` and `<test>CostNoAdmin`. |
+| `cost_tests` | How the tests of the run's cost-test set use it (section 1.9): `benefit in TRC, PAC, RIM`, `cost in RIM`, both (`benefit in PCT; cost in TRC, PAC, RIM, PCT` for `RebatesandIncentsPV`), a test's numerator, denominator or result, or `not used in a cost test`. The benefits and costs listed for a test add up to its `<test>Ben` and `<test>CostNoAdmin` (`<test>Cost` for a test without program costs, PCT; PCT's `TaxCreditsGrossPV` is priced but not written). |
 | `time_basis` | First year, average year, lifecycle undiscounted, lifecycle present value to the run's First Year, nominal dollars, a ratio of present values, or levelized. |
 | `aggregation` | How a group total (portfolio summary, Results levels) combines it: summed; recomputed from the summed numerator and denominator (ratios and levelized values); or not combined (inputs, labels, per-measure shares). |
 | `rounding` | Always "not rounded": ReCET writes full precision; the Results pages and Excel formats only change how numbers are shown. |
@@ -2103,10 +2114,10 @@ The key-metrics summary (BRD BR-06.10): the headline results and the main driver
 | `section` | `Portfolio` (the headline metrics), `Top programs`, `Top program sectors` (the program's `PrimarySector`, 1.14) or `Top end uses` (the measure's `UseCategory`). |
 | `item` | The metric's name, or the program (`PrgID` - program name), sector or end use. Up to 10 per driver section, largest share of total system benefit first (by size: a negative share counts too). |
 | `measures` | The number of measures it covers. |
-| `value` | Portfolio rows: the metric (total system benefit, budget, TRC / PAC / RIM / SCT Base / SCT High ratios recomputed from the portfolio sums, TRC and PAC cost, first-year net kWh / kW / therms, lifecycle CO2). A ratio whose cost is 0 is blank, as in the portfolio summary. |
+| `value` | Portfolio rows: the metric (total system benefit, budget, the ratio of each test of the run's cost-test set recomputed from the portfolio sums (EE-2026: TRC, PAC, RIM, SCT Base, SCT High and, since 0.1.85, PCT), the headline tests' costs (TRC and PAC), first-year net kWh / kW / therms, lifecycle CO2). A ratio whose cost is 0 is blank, as in the portfolio summary. |
 | `TotalSystemBenefit`, `share_of_TSB` | Driver rows: the item's total system benefit and its share of the portfolio's. |
-| `TRCCost`, `share_of_TRC_cost` | Driver rows: the item's TRC cost and its share of the portfolio's. |
-| `TRC_ratio`, `PAC_ratio` | Driver rows: the item's ratios, recomputed from its sums. |
+| `TRCCost`, `share_of_TRC_cost` | Driver rows: the item's cost in the set's first headline test (TRC in EE-2026; the columns are named for it) and its share of the portfolio's. |
+| `TRC_ratio`, `PAC_ratio` | Driver rows: the item's ratios in the set's headline tests (TRC and PAC in EE-2026), recomputed from its sums. |
 | `definition`, `documentation` | Portfolio rows: the metric's definition and its entry in this document, as in 2.11. |
 
 ### 2.13 `statewide_reconciliation_acc<version>` (with statewide allocation)

@@ -301,6 +301,8 @@ def write_settings(cfg: RunConfig, acc, run_dir: Path, result: RunResult, t_star
         settings["acc_check"] = result.acc_check
     if result.cost_tests is not None:
         settings["cost_tests"] = result.cost_tests.record()
+        from . import cost_test_sets
+        cost_test_sets.write_to_run(result.cost_tests.set, run_dir)      # the set itself (cost_tests.yaml), so the run's Results are rebuilt from the run alone
     if result.notes:
         settings["notes"] = result.notes
     (run_dir / "run_settings.json").write_text(json.dumps(settings, indent=2, default=str), encoding="utf-8")
@@ -322,8 +324,10 @@ def write_template_files(cfg: RunConfig, writer, km_totals, run_dir: Path, tag: 
                 f"{', '.join(writer.left_out)}, so the measure-level file leaves them out")
         result.notes.append(note)
         log(f"note: {note}")
-    result.files["field_definitions"] = outputs.write_table(field_docs.table(writer.output_columns, acc=_acc_text(cfg)), run_dir / f"field_definitions_{tag}", cfg.output_format, excel)
-    result.files["key_metrics"] = outputs.write_table(key_metrics.build(km_totals), run_dir / f"key_metrics_{tag}", cfg.output_format, excel)
+    cset = result.cost_tests.set if result.cost_tests else None
+    result.files["field_definitions"] = outputs.write_table(field_docs.table(writer.output_columns, acc=_acc_text(cfg), cset=cset),
+                                                            run_dir / f"field_definitions_{tag}", cfg.output_format, excel)
+    result.files["key_metrics"] = outputs.write_table(key_metrics.build(km_totals, cset=cset), run_dir / f"key_metrics_{tag}", cfg.output_format, excel)
 
 
 def write_findings(rep, cfg: RunConfig, run_dir: Path) -> Path | None:
@@ -582,8 +586,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     writer.write(frame)
     result.files["measure_level"] = writer.close()                   # csv / csv.zip: parquet first (kept for the Results tables), then CSV
     from . import key_metrics
-    write_template_files(cfg, writer, key_metrics.sums(frame), run_dir, tag, excel, result, log)
-    summary = outputs.summarize(frame, cfg.apply_exclude_from_ce)
+    write_template_files(cfg, writer, key_metrics.sums(frame, result.cost_tests.set if result.cost_tests else None), run_dir, tag, excel, result, log)
+    summary = outputs.summarize(frame, cfg.apply_exclude_from_ce, result.cost_tests.set if result.cost_tests else None)
     result.files["portfolio_summary"] = outputs.write_table(summary, run_dir / f"portfolio_summary_{tag}", cfg.output_format, excel)
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
 

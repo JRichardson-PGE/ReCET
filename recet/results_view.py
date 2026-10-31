@@ -55,19 +55,45 @@ class Column:
     help: str = ""
 
 
-RATIOS = [
-    Column("TRC_ratio", "TRC", "ratio", "ratio", help="Total Resource Cost ratio: (benefits + tax credits) / TRC cost"),
-    Column("PAC_ratio", "PAC", "ratio", "ratio", help="Program Administrator Cost ratio: benefits / PAC cost"),
-    Column("RIM_ratio", "RIM", "ratio", "ratio", help="Ratepayer Impact Measure ratio: (benefits + bill increases) / RIM cost"),
-    Column("SCB_ratio", "SCT Base", "ratio", "ratio", help="Societal Cost Test, base social cost of carbon: SB benefits / SCB cost"),
-    Column("SCH_ratio", "SCT High", "ratio", "ratio", help="Societal Cost Test, high social cost of carbon: SH benefits / SCH cost"),
-    Column("PCT_ratio", "PCT", "ratio", "ratio", help="Participant Cost Test ratio (gross): (bill reductions + incentives + tax credits) / (measure cost + bill increases)"),
-    Column("TRC_NoAdmin_ratio", "TRC (no admin)", "ratio", "ratio", help="TRC ratio without program-level costs"),
-    Column("PAC_NoAdmin_ratio", "PAC (no admin)", "ratio", "ratio", help="PAC ratio without program-level costs"),
-    Column("RIM_NoAdmin_ratio", "RIM (no admin)", "ratio", "ratio", help="RIM ratio without program-level costs"),
-    Column("SCB_NoAdmin_ratio", "SCT Base (no admin)", "ratio", "ratio", help="SCT Base ratio without program-level costs"),
-    Column("SCH_NoAdmin_ratio", "SCT High (no admin)", "ratio", "ratio", help="SCT High ratio without program-level costs"),
-]
+# the help texts the Results page has always given EE-2026's ratios; a ratio of another set's test is described from the set (ratio_columns)
+RATIO_HELP = {
+    "TRC_ratio": "Total Resource Cost ratio: (benefits + tax credits) / TRC cost", "PAC_ratio": "Program Administrator Cost ratio: benefits / PAC cost",
+    "RIM_ratio": "Ratepayer Impact Measure ratio: (benefits + bill increases) / RIM cost",
+    "SCB_ratio": "Societal Cost Test, base social cost of carbon: SB benefits / SCB cost",
+    "SCH_ratio": "Societal Cost Test, high social cost of carbon: SH benefits / SCH cost",
+    "PCT_ratio": "Participant Cost Test ratio (gross): (bill reductions + incentives + tax credits) / (measure cost + bill increases)",
+    "TRC_NoAdmin_ratio": "TRC ratio without program-level costs", "PAC_NoAdmin_ratio": "PAC ratio without program-level costs",
+    "RIM_NoAdmin_ratio": "RIM ratio without program-level costs", "SCB_NoAdmin_ratio": "SCT Base ratio without program-level costs",
+    "SCH_NoAdmin_ratio": "SCT High ratio without program-level costs",
+}
+
+
+def _set(cset=None):
+    return outputs._cset(cset)
+
+
+def ratio_columns(cset=None) -> list[Column]:
+    """The ratio columns a view can show for a run on `cset`: every test's ratio in the set's order, then the NoAdmin ratio of each test that has one."""
+    from .cost_test_sets import short_label
+    s = _set(cset)
+    out = [Column(f"{t.id}_ratio", short_label(t.id), "ratio", "ratio", help=RATIO_HELP.get(f"{t.id}_ratio", f"{t.label} ratio: {t.id}Ben / {t.id}Cost"))
+           for t in s.tests.values()]
+    out += [Column(f"{t.id}_NoAdmin_ratio", f"{short_label(t.id)} (no admin)", "ratio", "ratio",
+                   help=RATIO_HELP.get(f"{t.id}_NoAdmin_ratio", f"{short_label(t.id)} ratio without program-level costs"))
+            for t in s.tests.values() if "NoAdmin" in t.variants]
+    return out
+
+
+def labels(cset=None) -> dict[str, tuple[str, str]]:
+    """LABELS, with a label for each test's Ben and Cost columns the set adds."""
+    from .cost_test_sets import short_label
+    out = dict(LABELS)
+    for t in _set(cset).tests:
+        out.setdefault(f"{t}Ben", (f"{short_label(t)} benefits ($)", "usd"))
+        out.setdefault(f"{t}Cost", (f"{short_label(t)} cost ($)", "usd"))
+    return out
+
+
 DERIVED = [
     Column("TotalCO2Lifecycle", "CO2 avoided, lifecycle (t)", "derived", "tonnes", ("LifecycleNetElecCO2", "LifecycleNetGasCO2"),
            "Net electric + net gas CO2 avoided over the measures' lives, metric tons"),
@@ -111,16 +137,18 @@ def _summable(c: str) -> bool:
     return not (c in _INPUTS or c in _DERIVED or c.startswith(("poc_", "Prg_", "_")) or c in NOT_ADDITIVE or _is_ratio_column(c))
 
 
-def catalog(frame: pd.DataFrame) -> dict[str, Column]:
-    """Every column a view can show for this run, in a stable order: the default view's columns first, then ratios, derived sums, and the other additive outputs."""
+def catalog(frame: pd.DataFrame, cset=None) -> dict[str, Column]:
+    """Every column a view can show for this run, in a stable order: the default view's columns first, then ratios (those of the run's cost-test set),
+    derived sums, and the other additive outputs."""
     sums: dict[str, Column] = {}
+    names = labels(cset)
     for c in frame.columns:
         if not _summable(c) or not pd.api.types.is_numeric_dtype(frame[c]):
             continue
-        label, fmt = LABELS.get(c, (c, _guess_fmt(c)))
+        label, fmt = names.get(c, (c, _guess_fmt(c)))
         sums[c] = Column(c, label, "sum", fmt)
     cols: dict[str, Column] = {}
-    ratio_ok = {r.key: r for r in RATIOS}
+    ratio_ok = {r.key: r for r in ratio_columns(cset)}
     derived = {d.key: d for d in DERIVED if all(p in frame for p in d.parts)}
     for key in DEFAULT_VIEW:
         col = sums.get(key) or ratio_ok.get(key) or derived.get(key)
@@ -237,13 +265,13 @@ def _group_key(frame: pd.DataFrame, level: str) -> pd.Series | None:
     return frame[col].fillna("").astype(str).str.strip().replace("", "(blank)")
 
 
-def _values(g: pd.DataFrame, cols: list[Column]) -> dict:
+def _values(g: pd.DataFrame, cols: list[Column], cset=None) -> dict:
     ratios = None
     row = {}
     for c in cols:
         if c.kind == "ratio":
             if ratios is None:
-                ratios = outputs.group_ratios(g)
+                ratios = outputs.group_ratios(g, cset)
             row[c.key] = ratios.get(c.key, math.nan)
         elif c.kind == "derived":
             row[c.key] = float(sum(g[p].sum() for p in c.parts)) if all(p in g for p in c.parts) else math.nan
@@ -252,10 +280,10 @@ def _values(g: pd.DataFrame, cols: list[Column]) -> dict:
     return row
 
 
-def _row_values(f: pd.DataFrame, cols: list[Column]) -> pd.DataFrame:
+def _row_values(f: pd.DataFrame, cols: list[Column], cset=None) -> pd.DataFrame:
     """Measure level: each measure's own values (vectorised); ratios from the same definition as the groups (outputs.row_ratios)."""
     out = pd.DataFrame(index=f.index)
-    ratios = outputs.row_ratios(f) if any(c.kind == "ratio" for c in cols) else None
+    ratios = outputs.row_ratios(f, cset) if any(c.kind == "ratio" for c in cols) else None
     for c in cols:
         if c.kind == "ratio":
             out[c.key] = ratios[c.key] if c.key in ratios else math.nan
@@ -373,10 +401,9 @@ def keep_group_sums(run_dir: Path, frame: pd.DataFrame | None = None, sums: pd.D
     _keep(sums, _kept_path(source)) if sums is not None else group_sums_for(source)
 
 
-RATIO_INPUTS = {"ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
-                "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin",
-                "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin", "PCTBen", "PCTCost",
-                "TRCBen", "PACBen", "RIMBen", "SCBBen", "SCHBen"}     # every column outputs._ratio_parts reads
+def ratio_inputs(cset=None) -> set[str]:
+    """Every column the ratios read (outputs.ratio_input_columns): what a measure-level table reads from the file for its ratio columns."""
+    return outputs.ratio_input_columns(cset)
 
 
 # ----------------------------------------------------------------------------------------------------------------------------- a run's results
@@ -384,20 +411,26 @@ class RunResults:
     """A run's Results tables: the group sums (every level above the measure, the PA list, the catalog) and, for the measure level, either the measure rows
     in memory (`from_frame`) or the results file they are read from (`from_file`). See the module docstring."""
 
-    def __init__(self, sums: pd.DataFrame, frame: pd.DataFrame | None = None, path: Path | None = None):
+    def __init__(self, sums: pd.DataFrame, frame: pd.DataFrame | None = None, path: Path | None = None, cset=None):
         self.sums, self.frame, self.path = sums, frame, path
+        self.cset = _set(cset)                       # the run's cost-test set: its tests are the ratio columns
         self.n = int(sums[COUNT].sum()) if len(sums) else 0
 
     @classmethod
-    def from_frame(cls, frame: pd.DataFrame) -> "RunResults":
-        return cls(group_sums(frame), frame=frame)
+    def from_frame(cls, frame: pd.DataFrame, cset=None) -> "RunResults":
+        return cls(group_sums(frame), frame=frame, cset=cset)
 
     @classmethod
-    def from_file(cls, path: Path) -> "RunResults":
-        return cls(group_sums_for(path), path=Path(path))
+    def from_file(cls, path: Path, cset=None) -> "RunResults":
+        """A run's results file; `cset` defaults to the set of the run it belongs to (cost_test_sets.for_run on its run folder)."""
+        path = Path(path)
+        if cset is None:
+            from .cost_test_sets import for_run
+            cset = for_run(path.parent.parent if path.parent.name == outputs.RESULTS_DIR else path.parent)
+        return cls(group_sums_for(path), path=path, cset=cset)
 
     def catalog(self) -> dict[str, Column]:
-        return catalog(self.sums)
+        return catalog(self.sums, self.cset)
 
     def pas(self) -> list[str]:
         return [ALL_PAS] + sorted(self.sums["_pa"].unique()) if len(self.sums) else [ALL_PAS]
@@ -431,14 +464,14 @@ class RunResults:
         if level == "measure":
             if not self.measure_level_allowed(pa, years):
                 raise ValueError(f"the measure level is off for this run ({self.count(pa, years):,} measures)")
-            return _measure_table(self._measure_rows(pa, cols, years), cols)
+            return _measure_table(self._measure_rows(pa, cols, years), cols, self.cset)
         s = self._of(pa, years)
         if level == "portfolio":
             label = "All PAs" if pa in (None, "", ALL_PAS) else pa
             row = {"Portfolio": label}
             if years:
                 row["Program years"] = ", ".join(str(y) for y in sorted(years))
-            return pd.DataFrame([{**row, "Measures": int(s[COUNT].sum()) if len(s) else 0, **_values(s, cols)}])
+            return pd.DataFrame([{**row, "Measures": int(s[COUNT].sum()) if len(s) else 0, **_values(s, cols, self.cset)}])
         key = {"program": "_prg", "year": "_year", "sector": "_sector", "segment": "_segment"}[level]
         name = {"program": "PrgID", "year": "Program year", "sector": "Program sector", "segment": "Program segment"}[level]
         rows = []
@@ -449,7 +482,7 @@ class RunResults:
                     row["Program name"] = str(g["_prgname"].iloc[0]) if "_prgname" in g else ""
                     row["PA"] = ", ".join(sorted(g["_pa"].unique()))
                 row["Measures"] = int(g[COUNT].sum())
-                row.update(_values(g, cols))
+                row.update(_values(g, cols, self.cset))
                 rows.append(row)
         return pd.DataFrame(rows)
 
@@ -464,25 +497,25 @@ class RunResults:
         want = {"CEInputID", "MeasDescription", "PrgID", *(KEY_SOURCES & {"CreditedPA", "CreditedIOU", "Prg_PA", "IOU_AC_Territory", "poc_PA", *YEAR_COLUMNS,
                                                                         "ClaimYearQuarter"})}
         for c in cols:
-            want |= set(c.parts) if c.kind == "derived" else (RATIO_INPUTS if c.kind == "ratio" else {c.key})
+            want |= set(c.parts) if c.kind == "derived" else (ratio_inputs(self.cset) if c.kind == "ratio" else {c.key})
         names = [n for n in pf.schema_arrow.names if n in want]
         out = [filter_pa(b.to_pandas(), pa, years) for b in pf.iter_batches(batch_size=BATCH_ROWS, columns=names, use_threads=False)]
         return pd.concat(out, ignore_index=True) if out else pf.schema_arrow.empty_table().select(names).to_pandas()
 
 
-def _measure_table(f: pd.DataFrame, cols: list[Column]) -> pd.DataFrame:
+def _measure_table(f: pd.DataFrame, cols: list[Column], cset=None) -> pd.DataFrame:
     ids = pd.DataFrame({"CEInputID": f.get("CEInputID", pd.Series(index=f.index, dtype=object)),
                         "Description": f.get("MeasDescription", pd.Series("", index=f.index)), "PrgID": f.get("PrgID", pd.Series("", index=f.index)),
                         "PA": pa_of(f), "Program year": year_of(f)})
-    return pd.concat([ids, _row_values(f, cols)], axis=1).reset_index(drop=True)
+    return pd.concat([ids, _row_values(f, cols, cset)], axis=1).reset_index(drop=True)
 
 
-def table(frame: pd.DataFrame, level: str, pa: str, keys: list[str], years=None) -> pd.DataFrame:
+def table(frame: pd.DataFrame, level: str, pa: str, keys: list[str], years=None, cset=None) -> pd.DataFrame:
     """RunResults.from_frame(frame).table(...), without the measure-level size limits (a caller holding the whole frame decides that itself)."""
     if level == "measure":
-        cat = catalog(frame)
-        return _measure_table(filter_pa(frame, pa, years), [cat[k] for k in keys if k in cat])
-    return RunResults.from_frame(frame).table(level, pa, keys, years)
+        cat = catalog(frame, cset)
+        return _measure_table(filter_pa(frame, pa, years), [cat[k] for k in keys if k in cat], cset)
+    return RunResults.from_frame(frame, cset).table(level, pa, keys, years)
 
 
 def measure_level_allowed(frame: pd.DataFrame, pa: str, years=None) -> bool:

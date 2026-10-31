@@ -48,18 +48,10 @@ def test_ee_2026_is_todays_tests():
     s = cts.load("EE-2026")
     assert list(s.tests) == ["TRC", "PAC", "RIM", "SCB", "SCH", "PCT"] and s.headline_tests() == ["TRC", "PAC"]
     assert s.workstream == "EE" and not s.draft and cts.years(s) == (None, None)
-    # the set says what the hand-written data-dictionary maps say (field_attributes, checked there against compute_cost_tests): which test each
-    # benefit / cost column enters (PCT, on gross streams, is not in those maps)
+    # the data dictionary's cost-test attribute is read from the set (field_attributes.benefit_of / cost_of)
     from recet import field_attributes
-    for attr, parts in ((field_attributes.BENEFIT_OF, ("benefits", "numerator_adders")), (field_attributes.COST_OF, ("costs",))):
-        got: dict[str, list[str]] = {}
-        for t in s.tests.values():
-            if t.id == "PCT":
-                continue
-            for part in parts:
-                for name in getattr(t, part):
-                    got.setdefault(s.column(name, t.pricing), []).append(t.id)
-        assert {c: ", ".join(v) for c, v in got.items()} == attr
+    assert field_attributes.benefit_of(s)["ElecBen_SB"] == "SCB" and field_attributes.benefit_of(s)["OtherBen"] == "TRC, PAC, RIM, SCB, SCH"
+    assert field_attributes.cost_of(s)["RebatesandIncentsPV_SCT"] == "SCB, SCH" and field_attributes.cost_of(s)["LifecycleBillReducElec"] == "RIM"
     assert s.column("ElecBen", "sct_base") == "ElecBen_SB" and s.column("ElecBen", "sct_high", gross=True) == "ElecBenGross_SH"
     assert s.column("RebatesandIncentsPV", "sct_base") == "RebatesandIncentsPV_SCT" and s.column("OtherBen", "sct_high") == "OtherBen"
     assert s.column("NetParticipantCostAdjustedPV", "sct_base", gross=True) == "GrossParticipantCostPV_SCT"
