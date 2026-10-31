@@ -5,11 +5,12 @@ program sectors and end uses that carry the most total system benefit and cost.
     build(totals)    the key_metrics table a run writes
 
 Rows of the table (`section`):
-  Portfolio        one row per headline metric (TSB, budget, the cost-test ratios, first-year savings, lifecycle CO2): `value`, its `definition` and the
+  Portfolio        one row per headline metric (TSB, budget, the ratio of each test of the run's cost-test set, the headline tests' costs, first-year
+                   savings, lifecycle CO2): `value`, its `definition` and the
                    `documentation` entry it comes from (field_docs).
   Top programs / Top program sectors / Top end uses
-                   up to TOP_N rows each, largest share of total system benefit first: the item's total system benefit and TRC cost, their shares of the
-                   portfolio's, and its TRC and PAC ratios (recomputed from its sums, outputs.group_ratios). A program is its PrgID and name; a program sector
+                   up to TOP_N rows each, largest share of total system benefit first: the item's total system benefit and its first headline test's
+                   cost (TRC), their shares of the portfolio's, and its headline tests' ratios (TRC and PAC; recomputed from its sums, outputs.group_ratios). A program is its PrgID and name; a program sector
                    the program's PrimarySector (Programs list); an end use the measure's UseCategory. Shares are of the portfolio total, so a negative item
                    (a load-increasing fuel substitution, say) shows a negative share; items are ordered by the size of their share.
 """
@@ -19,27 +20,48 @@ import pandas as pd
 
 TOP_N = 10
 DIMENSIONS = {"Top programs": ("PrgID", "Prg_ProgramName"), "Top program sectors": ("Prg_PrimarySector",), "Top end uses": ("UseCategory",)}
-# the columns summed: what TSB, the TRC / PAC ratios (outputs.group_ratios) and the headline metrics need
-SUM_COLUMNS = ["TotalSystemBenefit", "TotalExpenditures", "ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TaxCredits", "LifecycleBillIncrElec", "LifecycleBillIncrGas",
-               "ElecBen_SB", "GasBen_SB", "WaterEnergyBen_SB", "ElecBen_SH", "GasBen_SH", "WaterEnergyBen_SH",
-               "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost", "TRCCostNoAdmin", "PACCostNoAdmin", "RIMCostNoAdmin", "SCBCostNoAdmin", "SCHCostNoAdmin",
-               "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "LifecycleNetElecCO2", "LifecycleNetGasCO2"]
-# the Portfolio rows: (label, column or ratio, documented column the definition comes from)
-HEADLINES = [("Total system benefit ($)", "TotalSystemBenefit", "TotalSystemBenefit"), ("Budget / expenditures ($)", "TotalExpenditures", "TotalExpenditures"),
-             ("TRC ratio", "TRC", "TRCRatio"), ("PAC ratio", "PAC", "PACRatio"), ("RIM ratio", "RIM", "RIMRatio"),
-             ("SCT Base ratio", "SCB", "SCBRatio"), ("SCT High ratio", "SCH", "SCHRatio"),
-             ("TRC cost ($)", "TRCCost", "TRCCost"), ("PAC cost ($)", "PACCost", "PACCost"),
-             ("First-year net kWh", "FirstYearNetKWh", "FirstYearNetKWh"), ("First-year net kW", "FirstYearNetKW", "FirstYearNetKW"),
-             ("First-year net therms", "FirstYearNetThm", "FirstYearNetThm"),
-             ("CO2 avoided, lifecycle (metric tons)", "CO2", "LifecycleNetElecCO2")]
-COLUMNS = ["section", "item", "measures", "value", "TotalSystemBenefit", "share_of_TSB", "TRCCost", "share_of_TRC_cost", "TRC_ratio", "PAC_ratio",
-           "definition", "documentation"]
+# the columns summed besides the tests' (sum_columns adds each test's Ben, Cost and CostNoAdmin): TSB, the budget and the headline metrics
+BASE_SUM_COLUMNS = ["TotalSystemBenefit", "TotalExpenditures"]
+ENERGY_SUM_COLUMNS = ["FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "LifecycleNetElecCO2", "LifecycleNetGasCO2"]
+# the Portfolio rows around the tests' (headlines adds a ratio row per test and a cost row per headline test): (label, column or ratio, documented column)
+FIRST_HEADLINES = [("Total system benefit ($)", "TotalSystemBenefit", "TotalSystemBenefit"), ("Budget / expenditures ($)", "TotalExpenditures", "TotalExpenditures")]
+LAST_HEADLINES = [("First-year net kWh", "FirstYearNetKWh", "FirstYearNetKWh"), ("First-year net kW", "FirstYearNetKW", "FirstYearNetKW"),
+                  ("First-year net therms", "FirstYearNetThm", "FirstYearNetThm"),
+                  ("CO2 avoided, lifecycle (metric tons)", "CO2", "LifecycleNetElecCO2")]
 
 
-def sums(frame: pd.DataFrame) -> pd.DataFrame:
-    """The frame's totals of SUM_COLUMNS for each item of each dimension, plus the whole portfolio (dimension "Portfolio"), with the measure count. Long
-    format: dimension, key, measures, then the sums (a column the run did not write is left out)."""
-    cols = [c for c in SUM_COLUMNS if c in frame.columns]
+def _cset(cset=None):
+    from . import outputs
+    return outputs._cset(cset)
+
+
+def sum_columns(cset=None) -> list[str]:
+    """The columns sums() adds up for the run's cost-test set: TSB, the budget, each test's Ben / Cost / CostNoAdmin, the first-year savings and CO2."""
+    s = _cset(cset)
+    tests = [c for t in s.tests.values() for c in (f"{t.id}Ben", f"{t.id}Cost") + ((f"{t.id}CostNoAdmin",) if "NoAdmin" in t.variants else ())]
+    return BASE_SUM_COLUMNS + tests + ENERGY_SUM_COLUMNS
+
+
+def headlines(cset=None) -> list[tuple[str, str, str]]:
+    """The Portfolio rows: TSB and the budget, a ratio row per test of the set, a cost row per headline test, then the savings and CO2."""
+    from .cost_test_sets import short_label
+    s = _cset(cset)
+    ratios = [(f"{short_label(t)} ratio", t, f"{t}Ratio") for t in s.tests]
+    costs = [(f"{short_label(t)} cost ($)", f"{t}Cost", f"{t}Cost") for t in s.headline_tests()]
+    return FIRST_HEADLINES + ratios + costs + LAST_HEADLINES
+
+
+def columns(cset=None) -> list[str]:
+    """The key_metrics table's columns: the drivers carry the first headline test's cost and share and each headline test's ratio."""
+    head = _cset(cset).headline_tests()
+    return (["section", "item", "measures", "value", "TotalSystemBenefit", "share_of_TSB", f"{head[0]}Cost", f"share_of_{head[0]}_cost"]
+            + [f"{t}_ratio" for t in head] + ["definition", "documentation"])
+
+
+def sums(frame: pd.DataFrame, cset=None) -> pd.DataFrame:
+    """The frame's totals of sum_columns(cset) for each item of each dimension, plus the whole portfolio (dimension "Portfolio"), with the measure count.
+    Long format: dimension, key, measures, then the sums (a column the run did not write is left out)."""
+    cols = [c for c in sum_columns(cset) if c in frame.columns]
     num = frame[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     out = [num.sum().to_frame().T.assign(dimension="Portfolio", key="All measures", measures=len(frame))]
     for dim, keys in DIMENSIONS.items():
@@ -67,17 +89,20 @@ def combine(parts: list[pd.DataFrame]) -> pd.DataFrame:
     return df.groupby(["dimension", "key"], sort=False, as_index=False).sum(numeric_only=True)
 
 
-def build(totals: pd.DataFrame, base_url: str = "") -> pd.DataFrame:
-    """The key_metrics table from `totals` (sums / combine). `base_url` goes before each documentation link (field_docs.Definition.link)."""
+def build(totals: pd.DataFrame, base_url: str = "", cset=None) -> pd.DataFrame:
+    """The key_metrics table from `totals` (sums / combine). `base_url` goes before each documentation link (field_docs.Definition.link). `cset`: the
+    run's cost-test set (its tests are the ratio rows; its headline tests the drivers' cost and ratio columns)."""
     from . import field_docs, outputs
+    cset = _cset(cset)
+    head = cset.headline_tests()
     port = totals[totals["dimension"] == "Portfolio"].iloc[0]
 
     def get_from(row):
         return lambda c: float(row[c]) if c in row.index and pd.notna(row[c]) else None
 
-    pratios = {name: (None if num is None or not den else num / den) for name, num, den in outputs._ratio_parts(get_from(port))}
+    pratios = {name: (None if num is None or not den else num / den) for name, num, den in outputs._ratio_parts(get_from(port), cset)}
     rows = []
-    for label, key, doc_col in HEADLINES:
+    for label, key, doc_col in headlines(cset):
         if key in pratios:
             value = pratios[key]
         elif key == "CO2":
@@ -90,7 +115,8 @@ def build(totals: pd.DataFrame, base_url: str = "") -> pd.DataFrame:
         d = field_docs.definition(doc_col)
         rows.append({"section": "Portfolio", "item": label, "measures": int(port["measures"]), "value": value, "definition": d.text if d else "",
                      "documentation": f"{base_url}{d.link}" if d else ""})
-    tsb, trc = float(port.get("TotalSystemBenefit", 0.0) or 0.0), float(port.get("TRCCost", 0.0) or 0.0)
+    first_cost = f"{head[0]}Cost"
+    tsb, trc = float(port.get("TotalSystemBenefit", 0.0) or 0.0), float(port.get(first_cost, 0.0) or 0.0)
     for dim in DIMENSIONS:
         g = totals[totals["dimension"] == dim].copy()
         if g.empty:
@@ -98,9 +124,10 @@ def build(totals: pd.DataFrame, base_url: str = "") -> pd.DataFrame:
         g["share_of_TSB"] = g["TotalSystemBenefit"] / tsb if tsb else None
         g = g.reindex(g["TotalSystemBenefit"].abs().sort_values(ascending=False, kind="stable").index).head(TOP_N)
         for _, r in g.iterrows():
-            ratios = {name: (None if num is None or not den else num / den) for name, num, den in outputs._ratio_parts(get_from(r))}
+            ratios = {name: (None if num is None or not den else num / den) for name, num, den in outputs._ratio_parts(get_from(r), cset)}
             rows.append({"section": dim, "item": r["key"], "measures": int(r["measures"]), "TotalSystemBenefit": float(r["TotalSystemBenefit"]),
                          "share_of_TSB": (float(r["TotalSystemBenefit"]) / tsb) if tsb else None,
-                         "TRCCost": float(r.get("TRCCost", 0.0) or 0.0), "share_of_TRC_cost": (float(r.get("TRCCost", 0.0) or 0.0) / trc) if trc else None,
-                         "TRC_ratio": ratios.get("TRC"), "PAC_ratio": ratios.get("PAC")})
-    return pd.DataFrame(rows, columns=COLUMNS)
+                         first_cost: float(r.get(first_cost, 0.0) or 0.0),
+                         f"share_of_{head[0]}_cost": (float(r.get(first_cost, 0.0) or 0.0) / trc) if trc else None,
+                         **{f"{t}_ratio": ratios.get(t) for t in head}})
+    return pd.DataFrame(rows, columns=columns(cset))

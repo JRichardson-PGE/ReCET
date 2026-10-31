@@ -134,7 +134,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     tw = time.time()
     writer = outputs.TableWriter(run_dir / f"measure_level_{tag}", cfg.output_format, n_measures, cfg.parquet_row_group, keep_parquet=True, excel=excel,
                                  select=cfg.output_template or None)
-    summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce)
+    summary_parts = outputs.SummaryParts(cfg.apply_exclude_from_ce, cset)
     from . import key_metrics
     km_parts = []                                                   # the key-metrics sums, a few rows a part (key_metrics.py)
     result_sums, result_columns = [], None
@@ -160,7 +160,7 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
         frame = outputs.attach_programs(frame, measures["PrgID"])
         writer.write(frame)
         summary_parts.add(frame)
-        km_parts.append(key_metrics.sums(frame))
+        km_parts.append(key_metrics.sums(frame, cset))
         result_sums.append(results_view.group_sums(frame))           # the Results page's sums, a few hundred rows a part (results_view)
         result_columns = result_columns or list(frame.columns)
         if cet is not None:

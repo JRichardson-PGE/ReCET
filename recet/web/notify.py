@@ -49,6 +49,14 @@ def _totals(s: Settings, row) -> dict:
     return {**(d.get("totals") or {}), "_measures": (d.get("inputs") or {}).get("measures_priced")}
 
 
+def _headline_ratios(s: Settings, row) -> list[tuple[str, str]]:
+    """(summary key, label) of the run's headline tests' ratios (its cost-test set's; TRC and PAC in EE-2026)."""
+    from .. import cost_test_sets
+    folder = s.runs_dir / row["id"] / (row["result_dir"] or "")
+    cset = cost_test_sets.for_run(folder)
+    return [(f"{t}_ratio", f"{cost_test_sets.short_label(t)} ratio") for t in cset.headline_tests()]
+
+
 def _minutes(seconds) -> str:
     if seconds is None:
         return "unknown"
@@ -74,7 +82,7 @@ def message(s: Settings, row, to: str) -> EmailMessage:
             lines.append(f"Measures priced: {int(t['_measures']):,}")
         if t.get("TotalSystemBenefit") is not None:
             lines.append(f"Total system benefit: ${t['TotalSystemBenefit']:,.0f}")
-        for k, label in (("TRC_ratio", "TRC ratio"), ("PAC_ratio", "PAC ratio")):
+        for k, label in _headline_ratios(s, row):
             if t.get(k) is not None:
                 lines.append(f"{label}: {t[k]:,.2f}")
     else:

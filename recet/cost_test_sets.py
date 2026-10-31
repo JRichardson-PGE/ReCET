@@ -591,6 +591,84 @@ def resolve(ref: str, first_year: int | None, filing: bool = False, program_year
     return r
 
 
+RUN_FILE = "cost_tests.yaml"          # the set a run priced on, copied into its run folder byte for byte (write_to_run / for_run)
+
+
+def write_to_run(s: CostTestSet, run_dir: str | Path) -> Path | None:
+    """Copy the set's file into the run folder as RUN_FILE, so the run's Results, summary and receipt can be rebuilt from the run alone."""
+    if s.path is None or not Path(s.path).is_file():
+        return None
+    out = Path(run_dir) / RUN_FILE
+    out.write_bytes(Path(s.path).read_bytes())
+    return out
+
+
+def for_run(run_dir: str | Path) -> CostTestSet:
+    """The set a finished run priced on: its RUN_FILE (labelled as the run labelled it), else the built-in set its run_settings.json names, else (a run
+    written before 0.1.85) the newest published EE set, which is what every earlier ReCET release priced."""
+    import json
+    d = Path(run_dir)
+    rec = {}
+    f = d / "run_settings.json"
+    if f.is_file():
+        try:
+            rec = json.loads(f.read_text(encoding="utf-8")).get("cost_tests") or {}
+        except (ValueError, OSError):
+            rec = {}
+    if (d / RUN_FILE).is_file():
+        try:
+            source = "built-in" if rec.get("source") == "built-in" else str(rec.get("source") or d / RUN_FILE)
+            return read_file(d / RUN_FILE, source=source)
+        except SetError:
+            pass
+    if rec.get("id") in builtin():
+        return builtin()[rec["id"]]
+    return in_force(None)
+
+
+def ratio_names(s: CostTestSet) -> list[tuple[str, str, str, str]]:
+    """(ratio name, test id, numerator column, cost column) of every ratio a group of measures is given (outputs.group_ratios), in the order the portfolio
+    summary has always had: each test with a NoAdmin variant (<T>), their NoAdmin forms (<T>_NoAdmin), then the tests without one."""
+    with_na = [t for t in s.tests.values() if "NoAdmin" in t.variants]
+    rest = [t for t in s.tests.values() if "NoAdmin" not in t.variants]
+    return ([(t.id, t.id, f"{t.id}Ben", f"{t.id}Cost") for t in with_na] + [(f"{t.id}_NoAdmin", t.id, f"{t.id}Ben", f"{t.id}CostNoAdmin") for t in with_na]
+            + [(t.id, t.id, f"{t.id}Ben", f"{t.id}Cost") for t in rest])
+
+
+def summary_ratios(s: CostTestSet) -> list[str]:
+    """The ratios a portfolio summary row carries: every test's, and the NoAdmin ratio of the headline tests (outputs.SUMMARY_RATIOS for EE-2026)."""
+    head = set(s.headline_tests())
+    return [f"{n}_ratio" for n, t, _b, _c in ratio_names(s) if not n.endswith("_NoAdmin") or t in head]
+
+
+def benefit_cost_of(s: CostTestSet) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """({column: the tests it is a benefit of (numerator adders too)}, {column: the tests it is a cost of}), in the set's test order: what
+    field_attributes' cost_tests attribute says about a column."""
+    ben: dict[str, list[str]] = {}
+    cost: dict[str, list[str]] = {}
+    for t in s.tests.values():
+        for name in (*t.benefits, *t.numerator_adders):
+            if s.streams[name].source != "program":
+                ben.setdefault(s.column(name, t.pricing), []).append(t.id)
+        for name in t.costs:
+            if s.streams[name].source != "program":
+                cost.setdefault(s.column(name, t.pricing), []).append(t.id)
+    return ben, cost
+
+
+def tile_tests(s: CostTestSet, limit: int = 4) -> list[str]:
+    """The tests a run page shows a ratio tile for: the headline tests, then the other tests that share program costs, at most `limit`
+    (TRC, PAC, RIM, SCB in EE-2026)."""
+    head = s.headline_tests()
+    rest = [t for t, v in s.tests.items() if t not in head and v.share is not None]
+    return (head + rest)[:limit]
+
+
+def short_label(test_id: str) -> str:
+    """A test's name on the web pages and in the Results columns: its id, except the societal tests, which ReCET has always shown as SCT Base / SCT High."""
+    return {"SCB": "SCT Base", "SCH": "SCT High"}.get(test_id, test_id)
+
+
 def describe(s: CostTestSet) -> str:
     """The set as text: its tests, each written as Ben / Cost / Ratio formulas over the columns they read."""
     lines = [f"{s.id}: {s.label}" + (DRAFT_LABEL if s.draft else ""), f"version {s.version}; {years_text(s)}; SHA-256 {s.sha256}"]
