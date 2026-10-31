@@ -176,6 +176,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `pipeline/acc_store.py` | data | the electric ACC as memory-mapped `(blocks, 8760)` arrays cached on disk |
 | `pipeline/real_avoided_cost_v2.py` | data | hourly price lookups by IOU, zone, cost test and year, including SCG routing |
 | `pipeline/real_impact_profiles.py` | data | the CEDARS impact-profile library: matching, shapes, calendar alignment |
+| `profile_library.py` | data | consolidating the impact-profile library: each profile whose every zone's 8,760 is identical stored once, every name it is filed under pointing at it (`shape_id`); `recet data consolidate-profiles` |
 | `pipeline/system_zones.py` | data | the climate zone a `System` measure is priced in |
 | `pipeline/gas_avoided_cost.py` | data | the monthly gas ACC, by component |
 | `pipeline/gas_savings_profiles.py` | data | the monthly gas profiles |
