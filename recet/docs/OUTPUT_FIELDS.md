@@ -188,7 +188,7 @@ One row per measure, in the order of the input file, column groups left to right
 "Output format" option. The measure-level files delivered for the 2024-versus-2026 comparison have one extra first column, `Job` (the claim year of the consolidated job each row
 came from), added by the export script `poc/tou/export_measure_level.py`, not by the package. The columns renamed in 0.1.50, and those no longer written, are listed in 2.1.
 
-### 1.1 `Used_ACCVersion` and the echoed input columns
+### 1.1 `Used_ACCVersion`, `Used_CostTestSet` and the echoed input columns
 
 #### `Used_ACCVersion`
 
@@ -197,6 +197,13 @@ Which ACC version the row was priced against. Unit: Text.
 **Formula:** the run's ACC label, which names both the ACC (the year the calculator was released) and CET's Avoided Cost Version (the first year it was in effect
 for claims or forecasts): `2021 ACC (Avoided Cost Version 2022)`, `2022 ACC (Avoided Cost Version 2024)`, `2024 ACC (Avoided Cost Version 2026)` or
 `2026 ACC (Avoided Cost Version 2028)` for a built-in version, `Custom ACC '<label>'` for a new version defined by supplied files. **Inputs:** the "ACC version" setting (INPUT_FIELDS.md section 3).
+
+#### `Used_CostTestSet`
+
+Which cost-test definition set the run priced the tests on (BRD BR-06.8; [COST_TESTS.md](COST_TESTS.md)). Unit: Text.
+
+**Formula:** a built-in set's id (`EE-2026`); a set supplied as a file is `custom: <file name>` (its id and SHA-256 are in `run_settings.json`); a draft set ends in ` (draft)`.
+**Inputs:** the "Cost tests" setting (`cost_test_set`, INPUT_FIELDS.md section 3); blank = the set in force for the job's first program year.
 
 #### The 74 `Measure.csv` columns (`CEInputID` ... `Comments`)
 
@@ -2017,6 +2024,7 @@ Everything needed to reproduce the run.
 | `parts` | A run in parts only: `chunk_size` and the number of parts (`count`). |
 | `notes` | Notes on the run, when there are any (for example a TRC-only ACC's blank societal columns, or Excel output written as CSV). |
 | `filing_validation` | With CEDARS filing checks: the rule set used (`rule_set`, `label`, `effective_date`), its number of rules, rejects and warnings, and the CEDARS files it was read from (BRD BR-03.3). |
+| `cost_tests` | The cost-test definition set the run priced on ([COST_TESTS.md](COST_TESTS.md)): `id`, `workstream`, `version`, `label`, `draft`, `source` (`built-in` or the supplied file's path), `sha256` (of the set's file), `program_years` (the years it is in force for), `tests`, `used_label` (what `Used_CostTestSet` says), `chosen` (`run option`, or the program year whose set was taken by default) and any `warnings` (a draft set, a set not in force for the job's program years). |
 | `acc_check` | The ACC check (2.9b, BRD BR-06.5): `purpose` and its `label` (what the run is priced for), the number of `measures`, how many were `flagged` (priced on an ACC that does not normally apply to their program year) and `not_checked`, and `by_acc_and_year`: one row per ACC version and program year with its `measures`, `status` (`ok`, `flagged` or `not checked`) and `expected_accs`. |
 
 ### 2.9b The ACC check (BRD BR-06.5)
@@ -2230,6 +2238,7 @@ refer to.
 | Field | Example A | Example B |
 |---|---|---|
 | `Used_ACCVersion` | 2026 ACC (Avoided Cost Version 2028) | 2026 ACC (Avoided Cost Version 2028) |
+| `Used_CostTestSet` | EE-2026 | EE-2026 |
 | `Used_Year` | 2028 | 2028 |
 | `Used_Quarter` | 3 | 2 |
 | `AC_Net_kWh_1st_Baseline` | 34200 | -27000 |

@@ -27,7 +27,7 @@ DEFAULT_KEY = "default_output_template"
 ALL = "All columns"
 KINDS = ("Input fields", "Program fields", "Output fields")   # the field picker's categories (kind()); each output group can also be picked on its own
 BUILTIN: dict[str, list[str]] = {
-    "Key results": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "IOU_AC_Territory", "Used_ACCVersion", "ElecPricingStatus", "GasPricingStatus",
+    "Key results": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "IOU_AC_Territory", "Used_ACCVersion", "Used_CostTestSet", "ElecPricingStatus", "GasPricingStatus",
                     "TotalSystemBenefit", "ElecBen", "GasBen", "OtherBen", "TRCCost", "PACCost", "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio",
                     "FirstYearNetKWh", "FirstYearNetKW", "FirstYearNetThm", "LifecycleNetElecCO2", "LifecycleNetGasCO2", "CreditedPA"],
     "Participant costs": ["CEInputID", "PrgID", "MeasDescription", "ClaimYearQuarter", "GrossMeasureCost", "GrossMeasCostPV", "ExcessIncentives",
@@ -40,7 +40,7 @@ BUILTIN: dict[str, list[str]] = {
 def catalog() -> list[tuple[str, str, str, str]]:
     """(group, column, definition, documentation link) for every measure-level column, in the order a run writes them: the input columns, then each
     OUTPUT_FIELDS.md section 1 group. Per-component columns (ElecValue_<component>) are not listed: they depend on the ACC."""
-    out = [("Input columns", c, *_def(c)) for c in ["Used_ACCVersion", *templates.MEASURE_COLUMNS]]
+    out = [("Input columns", c, *_def(c)) for c in ["Used_ACCVersion", "Used_CostTestSet", *templates.MEASURE_COLUMNS]]
     text = (field_docs.DOCS / "OUTPUT_FIELDS.md").read_text(encoding="utf-8")
     text = text[text.index("## 1. "):text.index("## 2. ")]
     group, seen = "", {c for _g, c, _d, _l in out}
@@ -54,7 +54,7 @@ def catalog() -> list[tuple[str, str, str, str]]:
         for n in names:
             if n in seen or "<" in n or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", n) or n.startswith(("ElecValue_", "GasValue_")):
                 continue
-            if group.startswith("Used_ACCVersion") or n in templates.MEASURE_COLUMNS:
+            if group.startswith("Used_") or n in templates.MEASURE_COLUMNS:
                 continue
             seen.add(n)
             out.append((group, n, *_def(n)))

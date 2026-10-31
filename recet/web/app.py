@@ -26,7 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import __version__, outputs, progress, versions
+from .. import __version__, cost_test_sets, outputs, progress, versions
 from . import auth, eta, jobzip
 from .config import Settings
 from .db import Database
@@ -36,10 +36,12 @@ HERE = Path(__file__).resolve().parent
 SESSION_COOKIE = "recet_session"
 LOGIN_CSRF_COOKIE = "recet_login_csrf"
 DOCS_DIR = HERE.parent / "docs"
-DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "USER_GUIDE.md", "ARCHITECTURE.md", "README.md"]
+DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "COST_TESTS.md", "USER_GUIDE.md", "ARCHITECTURE.md",
+             "README.md"]
 # what the Docs pages call each document (the file names are for the repository and the desktop window)
 DOC_TITLES = {"WEB_GUIDE.md": "Getting started on the web", "INPUT_FORMATS.md": "Input formats", "INPUT_FIELDS.md": "Input fields",
-              "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "USER_GUIDE.md": "Desktop and command line",
+              "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "COST_TESTS.md": "Cost tests as configuration",
+              "USER_GUIDE.md": "Desktop and command line",
               "ARCHITECTURE.md": "System architecture", "README.md": "About these documents"}
 DOCS_HOME = "WEB_GUIDE.md"
 
@@ -63,6 +65,7 @@ UPLOADS = {
     "sw_factors": ("sw_factors_file", (".csv", ".parquet", ".xlsx"), "Statewide allocation factors"),
     "programs": ("programs_file", (".csv", ".parquet", ".xlsx"), "Program metadata"),
     "cet_outputs": ("cet_outputs", (".csv",), "CET outputs to compare against"),
+    "cost_tests": ("cost_test_set", (".yaml", ".yml"), "Cost-test set (YAML; analysis runs only)"),
 }
 TEMPLATE_FILES = {
     "workbook": ("template_job_workbook.xlsx", "Job workbook (Measure, ProgramCost and the optional sheets)"),
@@ -349,6 +352,9 @@ def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
         parts.append("emissions on" if cfg.get("emissions", True) else "emissions off")
     if cfg.get("acc_purpose"):
         parts.append("priced for " + versions.acc_purpose_label(cfg["acc_purpose"]))
+    if cfg.get("cost_test_set"):
+        cts = str(cfg["cost_test_set"])
+        parts.append("cost tests " + (cts if cts in cost_test_sets.builtin() else f"from {Path(cts).name}"))
     if cfg.get("filing_validation"):
         parts.append(FILING_NAMES.get(cfg["filing_validation"], cfg["filing_validation"]) + (f" ({cfg['filing_year']})" if cfg.get("filing_year") else ""))
     if cfg.get("allocate_statewide"):
@@ -381,6 +387,13 @@ def fmt_duration(seconds: float) -> str:
     if s < 3600:
         return f"{s // 60} min {s % 60} s"
     return f"{s // 3600} h {s % 3600 // 60} min"
+
+
+def cost_set_rows() -> list[dict]:
+    """New run's Cost tests select and its help table: each built-in cost-test set's id, label, program years and tests."""
+    sets = cost_test_sets.builtin()
+    return [{"id": i, "label": t, "years": cost_test_sets.years_text(sets[i]), "tests": [f"{k} ({v.label})" for k, v in sets[i].tests.items()],
+             "draft": sets[i].draft} for i, t in cost_test_sets.catalog()]
 
 
 def engine_acc_table(recet_accs) -> list[tuple[str, str, list[str]]]:
@@ -829,6 +842,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return ctx.render(request, "new_run.html", default_template=ctx.default_template(request.state.user["id"]), status_code=status_code, accs=s.acc_versions,
                           acc_labels={k: acc_name(k) for k in [*s.acc_versions, *replica_only]}, replica_accs=replica_only, engines=engine_accs,
                           acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), output_templates=list(ctx.user_templates(request.state.user["id"])),
+                          cost_sets=cost_set_rows(),
                           uploads=UPLOADS, templates_=TEMPLATE_FILES,
                           max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
                           source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
@@ -914,6 +928,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if purpose not in dict(versions.acc_purposes()):
             return fail("Unknown 'Priced for' choice.")
         cfg["acc_purpose"] = purpose
+        cts = str(form.get("cost_test_set", "")).strip()
+        if cts and cts not in cost_test_sets.builtin():
+            return fail("Unknown cost-test set.")
+        cfg["cost_test_set"] = cts                                     # a supplied set file (the Cost-test set upload) replaces it below
         if cfg["portfolio_8760"]:
             years = str(form.get("profile_years", "")).replace(",", " ").split()
             if not all(y.isdigit() and 2000 <= int(y) <= 2100 for y in years):

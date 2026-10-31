@@ -106,6 +106,19 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.83 (2026-10-31, Jake; step 1 of `docs/COST_TESTS.md`, first numbered 0.1.82; design in the "Cost tests and value streams as configuration" doc): cost-test definition sets.
+  `recet/data/cost_tests/<id>/definition.yaml` (+ CHANGES.md; `cost_test_set.schema.json` beside them, kept in step with `cost_test_sets.validate` by
+  tests/test_cost_test_sets.py), `recet/cost_test_sets.py` (load / validate / builtin / in_force / years / resolve / describe). Ids `<workstream>-<first
+  program year>` (Jake: "EE-2026", so IQP etc. add their own); EE-2026 = today's TRC/PAC/RIM/SCB/SCH/PCT written out (program_years open). A published set
+  is never edited: a change is a new folder. `RunConfig.cost_test_set` (id or YAML path; `--cost-tests`; New run select + Cost-test set upload; window
+  box); blank = the set in force for the job's first program year (Jake), resolved after preflight (`jobs.resolve_cost_tests`); a set outside the job's
+  years warns `cost_tests_not_for_program_year`. A filing run (`jobs.is_filing_run`: filing_validation or acc_purpose) takes a PUBLISHED BUILT-IN set only
+  (Jake: filings use the CPUC's set, users may not edit it; standalone runs may use their own); a draft is labelled "(draft)", a supplied file "custom: <file>". Recorded: measure-level
+  `Used_CostTestSet` after Used_ACCVersion, run_settings.json / receipt.json `cost_tests` (id, version, source, SHA-256 ...), job spec `settings.cost_test_set`
+  or `inputs.cost_tests` (a pinned file; worker refuses a bad set, exit 2), regression manifest per job (`regress check` fails when the set changed). CET
+  replicas refuse it (`fixed_by: CET <release>`). `recet cost-tests list|show|check`. NO arithmetic change: pipeline/cost_tests.py still prices; a test
+  checks every column the set names is one a run writes and that the set says what field_attributes' BENEFIT_OF / COST_OF say. `.gitattributes` keeps the
+  sets' bytes (their SHA-256 is pinned). New dependency pyyaml (engine), jsonschema (test extra). Next: step 2, the evaluator.
 - 0.1.82 (2026-10-31, Jake: "Recet should not have its own program set within the platform at all now that we have the programs on the platform itself"):
   `RunConfig.programs_replace` (`--programs-replace`): the supplied `programs_file` is the WHOLE program table (`programs.set_user_programs(table, replace=True)`;
   `programs.table()` then holds only it, reindexed to every built-in column so the Prg_ columns do not change), so a PrgID it leaves out is "(not found)";

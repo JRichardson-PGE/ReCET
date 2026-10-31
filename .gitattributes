@@ -3,3 +3,5 @@
 *.npy binary
 *.gz binary
 *.xlsx binary
+# the cost-test sets are pinned by their file's SHA-256 (cost_test_sets.py): the same bytes on every checkout
+recet/data/cost_tests/** -text

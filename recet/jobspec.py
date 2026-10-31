@@ -15,6 +15,8 @@ library, and tests/test_worker.py keeps the two in step.
       "packs": {"reference_dir": "/data",                      # default: the worker's reference data folder (RECET_DATA)
                 "files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},   # pinned: refused when the folder's file differs
       "allocation_version": "statewide_factors_20260918",      # the statewide factor table the run must use (built-in name, or a supplied file's SHA-256)
+                                                               # the cost-test set: settings.cost_test_set = a built-in id ("EE-2026"), or
+                                                               # inputs.cost_tests = a set's YAML file pinned by SHA-256 (analysis runs only)
       "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"},
       "context": {"platform_run_id": 123}                      # the caller's own references, echoed verbatim into receipt.json
     }
@@ -34,10 +36,11 @@ SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # job spec input name -> RunConfig field (job_zip is unpacked into measures / programcost)
 FILE_INPUTS = {"measures": "measures", "programcost": "programcost", "workbook": "workbook", "profiles_8760": "profiles_8760_file",
                "profiles_gas": "profiles_gas_file", "run_parameters": "run_parameters_file", "sw_factors": "sw_factors_file", "programs": "programs_file",
-               "acc_electric": "acc_electric_file", "acc_gas": "acc_gas_file", "cet_outputs": "cet_outputs"}
+               "acc_electric": "acc_electric_file", "acc_gas": "acc_gas_file", "cet_outputs": "cet_outputs", "cost_tests": "cost_test_set"}
 INPUTS = ("job_zip", *FILE_INPUTS)
 # RunConfig fields a spec does not set in `settings`: files (inputs), folders and names (the worker's), the engine and format (their own blocks), test hooks
-NOT_SETTINGS = {*FILE_INPUTS.values(), "out_dir", "run_name", "reference_dir", "engine", "output_format", "subset_step"}
+# (cost_test_set is both: a built-in set's id in settings, or a supplied set file in inputs.cost_tests)
+NOT_SETTINGS = {*FILE_INPUTS.values(), "out_dir", "run_name", "reference_dir", "engine", "output_format", "subset_step"} - {"cost_test_set"}
 OUTPUT_FORMATS = ("csv", "csv.zip", "parquet", "xlsx")
 TOP = {"spec_version", "job_id", "engine", "inputs", "settings", "packs", "allocation_version", "outputs", "context", "description"}
 
@@ -100,6 +103,8 @@ def validate(spec) -> list[str]:
             errors.append("inputs: exactly one of measures, job_zip or workbook")
         if "job_zip" in inp and "programcost" in inp:
             errors.append("inputs: a job_zip carries its own ProgramCost.csv; leave programcost out")
+        if "cost_tests" in inp and isinstance(spec.get("settings"), dict) and spec["settings"].get("cost_test_set"):
+            errors.append("inputs.cost_tests and settings.cost_test_set: name the cost-test set once (a built-in id in settings, or a file in inputs)")
     st = spec.get("settings", {})
     if not isinstance(st, dict):
         errors.append("settings: an object of RunConfig settings")

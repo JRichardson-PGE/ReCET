@@ -348,7 +348,7 @@ def build(jobs: list[Job], src_ref: Path, dest: Path, budget_mb: float = 30.0, l
                 shutil.copyfile(f, jd / "expected" / f"{k}.parquet")
             manifest["jobs"][job.name] = {"settings": {"acc_version": "2024", **job.settings},
                                           "measures": delimited.count_rows(local.measures),
-                                          "tables": sorted(tables(sliced))}
+                                          "tables": sorted(tables(sliced)), "cost_tests": cost_tests_used(sliced)}
             log(f"  equal to the full folder's run in all {len(tables(sliced))} tables")
         total = sum(f.stat().st_size for f in stage.rglob("*") if f.is_file())
         manifest["bytes"] = total
@@ -364,6 +364,15 @@ def build(jobs: list[Job], src_ref: Path, dest: Path, budget_mb: float = 30.0, l
         return manifest
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def cost_tests_used(run_dir: Path) -> dict | None:
+    """{id, sha256} of the cost-test set a run priced on (run_settings.json), which the fixtures record: a change of the set fails `check`."""
+    f = Path(run_dir) / "run_settings.json"
+    if not f.exists():
+        return None
+    ct = json.loads(f.read_text(encoding="utf-8")).get("cost_tests") or {}
+    return {"id": ct.get("id"), "sha256": ct.get("sha256")} if ct else None
 
 
 def fixture_jobs(fixtures: Path) -> list[Job]:
@@ -396,14 +405,21 @@ def check(fixtures: Path, out_dir: Path, update: bool = False, log=print) -> dic
             expected.mkdir()
             for k, f in tables(res.run_dir).items():
                 pd.read_parquet(f).to_parquet(expected / f"{k}.parquet", index=False) if f.suffix == ".parquet" else shutil.copyfile(f, expected / f"{k}.parquet")
+            manifest["jobs"][job.name]["cost_tests"] = cost_tests_used(res.run_dir)
             log(f"{job.name}: expected tables rewritten")
             result[job.name] = {}
             continue
         diff = compare_runs(res.run_dir, expected, **tol)
+        want, got = manifest["jobs"][job.name].get("cost_tests"), cost_tests_used(res.run_dir)
+        if want != got:
+            diff["cost_tests"] = [f"the run priced on cost-test set {got}, the fixtures were made on {want}: a changed set needs a CHANGES.md entry "
+                                  "and `recet regress check --update`"]
         result[job.name] = diff
         log(f"{job.name}: " + ("equal to the expected outputs in every table" if not diff else f"{len(diff)} table(s) differ"))
         for k, d in diff.items():
             log(f"  {k}: " + "; ".join(d))
+    if update:
+        (fixtures / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return result
 
 

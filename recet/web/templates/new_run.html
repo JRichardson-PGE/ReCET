@@ -78,6 +78,9 @@
     <label><span id="purpose-label">Priced for</span>
       <select name="acc_purpose" aria-labelledby="purpose-label" aria-describedby="purpose-help">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
       <span class="small muted" id="purpose-help">Records on an ACC that does not normally apply to their program year are flagged, not stopped.</span></label>
+    <label><span id="cost-tests-label">Cost tests</span>
+      <select name="cost_test_set" id="cost-test-set" aria-labelledby="cost-tests-label" aria-describedby="cost-tests-help"><option value="">In force for the first program year</option>{% for c in cost_sets %}<option value="{{ c.id }}" {% if f.get('cost_test_set', '') == c.id %}selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
+      <span class="small muted" id="cost-tests-help">The tests and value streams the run prices. A filing uses a published set; a custom set (a YAML file under Supplied files) is for analysis runs.</span></label>
     <label>Market effects
       <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
   </div>
@@ -89,6 +92,14 @@
         <td class="nowrap">{{ r.acc }}{% if not r.builtin %} <span class="small">(not in ReCET yet)</span>{% endif %}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
     </table>
     <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed rows are not in ReCET yet.</p>
+  </details>
+  <details class="info-box" id="cost-sets-help">
+    <summary>Which tests each cost-test set writes</summary>
+    <table class="list compact">
+      <thead><tr><th>Set</th><th>Program years</th><th>Tests</th></tr></thead>
+      <tbody>{% for c in cost_sets %}<tr><td class="nowrap">{{ c.label }}</td><td>{{ c.years }}</td><td>{{ c.tests|join('; ') }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">Each test writes its benefits, cost and ratio columns (TRCBen, TRCCost, TRCRatio ...). The Docs page "Cost tests as configuration" describes the sets.</p>
   </details>
   <details class="info-box" id="engine-accs">
     <summary>Which ACCs each engine has</summary>
