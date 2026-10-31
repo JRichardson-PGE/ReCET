@@ -90,7 +90,7 @@ replicas stay code.
 
 ## 7. Build steps
 
-1. **Sets and pinning** (0.1.82): this page, the EE-2026 set, the schema, `cost_test_sets.py`, the run option, `Used_CostTestSet`, the run_settings.json
+1. **Sets and pinning** (0.1.83): this page, the EE-2026 set, the schema, `cost_test_sets.py`, the run option, `Used_CostTestSet`, the run_settings.json
    and receipt block, the job spec, filing-run and draft handling, the program-year warning. The arithmetic is unchanged: `pipeline/cost_tests.py` still
    prices, and a test checks that every column the set names is a column a run writes.
 2. **The evaluator**: a generic evaluator driven by the set replaces `cost_tests.py`'s test arithmetic (which becomes the frozen reference in the tests),

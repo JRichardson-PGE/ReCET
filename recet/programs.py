@@ -2,7 +2,8 @@
 
 The built-in table is CEDARS' Programs export of 2026-10-03 (`data/programs/`, 1,416 programs; the `ProgramManager` column, which holds staff names, is left out).
 A supplied table (`programs_file`, the `Programs` workbook sheet) uses the same layout: a supplied PrgID replaces the built-in row, a new one is added, and any
-extra column is carried too.
+extra column is carried too. With `programs_replace` the supplied table is the whole table and the built-in one is not used at all (a caller that keeps its own
+program registry, such as the CEDARS platform: a PrgID it leaves out is not found).
 
 Statewide programs are listed once per funding IOU, with the IOU prepended (`PGE_SW_HVAC_Up`, `SCE_SW_HVAC_Up`, ...), plus a thin `SW_HVAC_Up` row with PA = SW
 (most of its fields are blank). Each measure is matched on its PrgID as priced:
@@ -32,16 +33,24 @@ IOUS = ("PGE", "SCE", "SDGE", "SCG")
 TRUE = {"true", "1", "yes", "y", "t"}
 
 _USER: pd.DataFrame | None = None
+_REPLACE = False
 
 
 class ProgramsError(ValueError):
     pass
 
 
-def set_user_programs(table: pd.DataFrame | None) -> None:
-    global _USER
-    _USER = table
+def set_user_programs(table: pd.DataFrame | None, replace: bool = False) -> None:
+    """The supplied table for this run (None: the built-in one only). replace: it is the whole table, no built-in row is used."""
+    global _USER, _REPLACE
+    if replace and table is None:
+        raise ProgramsError("replacing the program table needs a supplied table")
+    _USER, _REPLACE = table, bool(replace)
     _table_records.cache_clear()
+
+
+def replacing() -> bool:
+    return _REPLACE and _USER is not None
 
 
 def _read(path: str | Path) -> pd.DataFrame:
@@ -65,14 +74,15 @@ def _read(path: str | Path) -> pd.DataFrame:
     return df.fillna("").astype(str).apply(lambda s: s.str.strip())
 
 
-def load_programs(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
-    """A supplied program table: PA and PrgID required (PrgID unique and non-blank), every other column optional. Returns (table, notes)."""
+def load_programs(path: str | Path, allow_empty: bool = False) -> tuple[pd.DataFrame, list[str]]:
+    """A supplied program table: PA and PrgID required (PrgID unique and non-blank), every other column optional. Returns (table, notes).
+    allow_empty: a table with no rows is accepted (a whole table that holds no programs yet, with programs_replace)."""
     df = _read(path)
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         raise ProgramsError(f"program metadata: missing column(s) {missing}; found {list(df.columns)}")
     df = df[df["PrgID"] != ""].copy()
-    if df.empty:
+    if df.empty and not allow_empty:
         raise ProgramsError("program metadata: no rows")
     dup = df["PrgID"][df["PrgID"].duplicated()]
     if len(dup):
@@ -98,7 +108,11 @@ def builtin() -> pd.DataFrame:
 
 
 def table() -> pd.DataFrame:
-    """The built-in table with any supplied rows replacing (same PrgID) or extending it. A replaced row takes the supplied row as a whole."""
+    """The built-in table with any supplied rows replacing (same PrgID) or extending it. A replaced row takes the supplied row as a whole. With replace, the
+    supplied table alone, with every built-in column (blank where the file has none) so the Prg_ columns are the same either way."""
+    if _USER is not None and _REPLACE:
+        user = _USER.copy()
+        return user.reindex(columns=COLUMNS + [c for c in user.columns if c not in COLUMNS]).fillna("")
     base = builtin()
     if _USER is None:
         return base

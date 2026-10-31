@@ -232,6 +232,9 @@ def run_job(cfg, log=print):
             if fld in ("measures", "programcost") and not getattr(cfg, fld):
                 setattr(cfg, fld, str(f))
     _check_record_cap(cfg.measures, cfg.max_records)
+    from .. import programs as programs_mod
+    progs = jobs.load_programs(cfg, log)                    # the Prg_ columns of the measure-level table, as on ReCET's own engine
+    programs_mod.set_user_programs(progs, replace=cfg.programs_replace and progs is not None)
     version = cet_version(rel, cfg.acc_version)
     acc = int(cfg.acc_version)
     tag = f"acc{acc}"

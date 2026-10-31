@@ -212,6 +212,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `settings_from` | Run parameters of ACC version (for a NEW ACC label) | `--settings-from` | `2026` | The ACC version whose built-in run parameters and other E3 tables (discount rates, emissions, rate schedules) a *new* ACC label uses. A built-in version uses its own unless this is set. Saved configurations from before 0.1.17 with `e3_version` (CET's numbering) are converted. |
 | `run_parameters_file` | Run parameters | `--run-parameters` | none | Run parameters per PA (section 4.5): a listed PA's discount rates, base year and gas CO2 replace the built-in values for this run. |
 | `programs_file` | Program metadata | `--programs` | none | Program metadata in the CEDARS Programs list layout (section 4.8): a `PrgID` replaces the built-in row, a new one is added. |
+| `programs_replace` | (none) | `--programs-replace` | off | The `programs_file` table is the whole program table: the built-in CEDARS Programs list is not used, so a `PrgID` the file leaves out is not found (its Prg_ columns are blank and preflight warns `program_not_in_metadata`). The file may then have no rows. This is how a caller with its own program registry runs: the CEDARS platform passes the registry's programs with this on, on ReCET's engine and on a CET replica, and the worker's `receipt.json` records `programs.mode` "replace" (else "merge"). Needs `programs_file`. |
 | `sw_factors_file` | SW allocation factors | `--sw-factors` | none | Statewide allocation factors (section 4.6): a (`Year`, `ProgramID`) row replaces the built-in row, a new one is added. Used only with `allocate_statewide`. |
 | `sw_factors_replace` | (none) | `--sw-factors-replace` | off | The `sw_factors_file` table is the whole factor table: no built-in row is used, so a (`Year`, `ProgramID`) the file leaves out is not allocated. This is how a caller pins an allocation version (BR-13.8): the CEDARS platform passes the version's full table with this on, and the worker's `receipt.json` records `allocation.mode` "replace" (else "merge"). Needs `sw_factors_file`. |
 | `profiles_8760_file`, `profiles_gas_file` | 8,760 electric profiles, Gas monthly profiles | `--profiles-8760`, `--profiles-gas` | none | Supplied profile files; a match replaces the library profile, a non-match is added. |
@@ -357,7 +358,7 @@ The ACC files are not sheets: supply them as separate files.
 ### 4.8 Program metadata (CSV or xlsx)
 
 The CEDARS Programs list layout (the Programs page's download); the template (`recet template programs`) is the whole built-in table. A row whose `PrgID` is in the
-built-in table replaces that row as a whole; any other row is added. Only `PA` and `PrgID` are required; a missing column is blank and an extra column is carried as
+built-in table replaces that row as a whole; any other row is added (with `programs_replace`, the file is the whole table instead). Only `PA` and `PrgID` are required; a missing column is blank and an extra column is carried as
 `Prg_<column>`. Values are text, kept as written; a flag counts as true when it reads `True`, `1`, `Yes`, `Y` or `T` (any case). The metadata changes no priced value
 (OUTPUT_FIELDS 1.14). Statewide programs are listed once per funding IOU (`PGE_SW_...`, `SCE_SW_...`, `SDGE_SW_...`, `SCG_SW_...`) plus an `SW_...` row.
 

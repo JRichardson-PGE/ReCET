@@ -13,7 +13,7 @@ worker's receipt (with the file's SHA-256). A run that names no set uses the set
 outside its program years is a warning, never a stop. A filing run (CEDARS filing checks, or priced for a filing) accepts only a published built-in set:
 a supplied file or a draft set is refused (Jake, 2026-10-31: filings use the CPUC's set, which users cannot edit; standalone runs may use their own).
 
-The arithmetic is still `pipeline/cost_tests.py` (0.1.82 records and checks the set; the evaluator that reads it is the next step of COST_TESTS.md's
+The arithmetic is still `pipeline/cost_tests.py` (0.1.83 records and checks the set; the evaluator that reads it is the next step of COST_TESTS.md's
 build plan)."""
 from __future__ import annotations
 

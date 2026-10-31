@@ -100,3 +100,51 @@ def test_run_attaches_metadata_and_preflight_reports_programs(tmp_path):
         assert code in text, code
     summ = pd.read_csv(res.files["portfolio_summary"])
     assert summ.iloc[0]["measures"] == 0 and summ.iloc[-1]["group"] == "excluded" and summ.iloc[-1]["measures"] == 1
+
+
+def test_a_whole_supplied_table_replaces_the_builtin_one(tmp_path):
+    f = tmp_path / "p.csv"
+    pd.DataFrame([{"PA": "PGE", "PrgID": "NEW1", "ProgramSegment": "equity", "MyTag": "x"}]).to_csv(f, index=False)
+    table, _ = programs.load_programs(f)
+    try:
+        programs.set_user_programs(table, replace=True)
+        m = programs.lookup(["NEW1", "PGE_Ag_001"])
+        assert list(m["Prg_MatchedOn"]) == ["NEW1", "(not found)"]                # no built-in row is used
+        assert list(m["Prg_ProgramSegment"]) == ["equity", ""] and list(m["Prg_MyTag"]) == ["x", ""]
+        assert {f"Prg_{c}" for c in programs.COLUMNS if c != "PrgID"} <= set(m.columns)   # the same Prg_ columns as with the built-in table
+        with pytest.raises(programs.ProgramsError, match="needs a supplied table"):
+            programs.set_user_programs(None, replace=True)
+        f.write_text("PA,PrgID\n")
+        with pytest.raises(programs.ProgramsError, match="no rows"):
+            programs.load_programs(f)
+        empty, _ = programs.load_programs(f, allow_empty=True)                    # a registry that holds no programs yet
+        programs.set_user_programs(empty, replace=True)
+        assert programs.lookup(["PGE_Ag_001"]).iloc[0]["Prg_MatchedOn"] == "(not found)"
+    finally:
+        programs.set_user_programs(None)
+
+
+def test_run_with_programs_replace_uses_only_the_supplied_table(tmp_path):
+    tc.write_measures(tmp_path / "Measure.csv", {"EX1": tc.MEASURES["EX1"]})
+    tc.write_program(tmp_path / "ProgramCost.csv")
+    tc.make_acc(tmp_path / "acc.parquet")
+    tc.make_gas_acc(tmp_path / "gas.csv")
+    tc.make_profiles(tmp_path / "profiles.csv")
+    prg = tc.MEASURES["EX1"]["PrgID"]
+    pd.DataFrame([{"PA": "PGE", "PrgID": prg, "ProgramSegment": "equity"}]).to_csv(tmp_path / "programs.csv", index=False)
+    base = dict(measures=str(tmp_path / "Measure.csv"), programcost=str(tmp_path / "ProgramCost.csv"), out_dir=str(tmp_path / "out"), acc_version="2026",
+                acc_electric_file=str(tmp_path / "acc.parquet"), acc_gas_file=str(tmp_path / "gas.csv"), profiles_8760_file=str(tmp_path / "profiles.csv"))
+    with pytest.raises(ValueError, match="programs_replace needs a supplied program table"):
+        run_job(RunConfig(**base, run_name="r0", programs_replace=True), log=lambda s: None)
+    lines = []
+    try:
+        res = run_job(RunConfig(**base, run_name="r1", programs_file=str(tmp_path / "programs.csv"), programs_replace=True), log=lines.append)
+        assert res.frame.iloc[0]["Prg_ProgramSegment"] == "equity" and "Prg_Sector" in res.frame.columns
+        assert programs.lookup(["PGE_Ag_001"]).iloc[0]["Prg_MatchedOn"] == "(not found)"     # a built-in program is unknown to the run
+        assert any("the built-in CEDARS Programs list is not used" in s for s in lines)
+        pd.DataFrame(columns=["PA", "PrgID"]).to_csv(tmp_path / "programs.csv", index=False)  # an empty registry
+        res = run_job(RunConfig(**base, run_name="r2", programs_file=str(tmp_path / "programs.csv"), programs_replace=True), log=lambda s: None)
+        assert res.frame.iloc[0]["Prg_MatchedOn"] == "(not found)"
+        assert "program_not_in_metadata" in res.files["preflight"].read_text(encoding="utf-8")
+    finally:
+        programs.set_user_programs(None)
