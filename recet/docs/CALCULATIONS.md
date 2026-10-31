@@ -435,6 +435,10 @@ OtherBenGross = Q * (UnitGasInfraBens + UnitRefrigBens + UnitMiscBens)      Othe
 
 `TaxCredits` is added to the numerator of the TRC ratio only; it is not in `TotalSystemBenefit` or any cost.
 
+These three are the EE-2026 cost-test set's *input streams* (`basis: one_time`), priced from the set by `pipeline/input_streams.py` (0.1.86); the
+engine's `price_other_ben_cost` gives the same values bit for bit and is kept as the reference. A set may add input streams of its own (a non-energy
+benefit, say), one-time or annual over the measure's life, from Measure columns CET does not have: COST_TESTS.md section 3 has their formulas.
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## C8 Participant costs and incentives
