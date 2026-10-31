@@ -66,7 +66,7 @@ OUTPUT_FIELDS.md 1.8 to 1.10.
 | Run option | `cost_test_set` (INPUT_FIELDS.md section 3): a built-in id, or the path of a set's YAML file. CLI `--cost-tests`; New run's "Cost tests" select (and a Cost-test set upload under Supplied files); the desktop window's Cost tests box. |
 | Default | Blank = the built-in set in force for the job's first program year (`cost_test_sets.in_force`), so a 2027 claims job and a 2028 one can price on different sets without anyone choosing. |
 | Program years | A set that is not in force for every program year of the job is a warning (`cost_tests_not_for_program_year`, in the log and the run's notes), never a stop, as the ACC check is (BR-06.5). |
-| Measure level | `Used_CostTestSet`, after `Used_ACCVersion`: the id, `<id> (<file name>)` for a supplied set, ` (draft)` at the end for a draft. |
+| Measure level | `Used_CostTestSet`, after `Used_ACCVersion`: the id, `custom: <file name>` for a supplied set, ` (draft)` at the end for a draft. |
 | `run_settings.json` | the `cost_tests` block (OUTPUT_FIELDS 2.9): id, workstream, version, label, draft, source, the file's SHA-256, program years, tests, how it was chosen, warnings. |
 | Worker | a job spec names a built-in set in `settings.cost_test_set`, or supplies a file in `inputs.cost_tests` (pinned by SHA-256 like any input); `receipt.json` has the same `cost_tests` block. A spec whose set cannot be used is refused (exit 2). |
 | CET replicas | a replica's tests are its release's own: it refuses `cost_test_set`, and its run_settings.json says `cost_tests: fixed by CET <release>`. |

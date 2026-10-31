@@ -154,8 +154,8 @@ class CostTestSet:
 
     @property
     def run_label(self) -> str:
-        """What Used_CostTestSet says: the id, with " (draft)" for a draft set and the file name for a supplied one."""
-        own = self.id if self.builtin else f"{self.id} ({Path(self.source).name})"
+        """What Used_CostTestSet says: a built-in set's id ("EE-2026"), "custom: <file name>" for a supplied one; " (draft)" at the end for a draft."""
+        own = self.id if self.builtin else f"custom: {Path(self.source).name}"
         return own + (DRAFT_LABEL if self.draft else "")
 
     def column(self, stream: str, pricing: str, gross: bool = False) -> str:

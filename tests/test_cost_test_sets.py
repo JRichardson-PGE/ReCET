@@ -128,7 +128,7 @@ def test_a_custom_set_with_its_own_test(tmp_path):
     d["tests"]["JST"] = {"label": "Jurisdiction-specific test", "pricing": "primary", "benefits": ["ElecBen", "GasBen"],
                          "costs": ["RebatesandIncentsPV"], "program_costs": {"share": "TRC"}, "variants": ["NoAdmin", "Gross"]}
     s = cts.read_file(_write(tmp_path, d, "jst.yaml"))
-    assert not s.builtin and s.run_label == "EE-2026-jst (jst.yaml)"
+    assert not s.builtin and s.run_label == "custom: jst.yaml"
     assert s.tests["JST"].outputs() == ["JSTBen", "JSTCost", "JSTCostNoAdmin", "JSTCostGross", "JSTRatio", "JSTRatioNoAdmin"]
     assert "JSTBen = ElecBen + GasBen" in cts.describe(s).replace("  ", " ")
 
@@ -184,7 +184,7 @@ def test_a_custom_set_file_is_for_analysis_runs_only(tmp_path):
     d.update(id="EE-2026-custom", label="Custom")
     f = _write(tmp_path, d)
     r = run_job(_cfg(tmp_path, cost_test_set=str(f)), log=lambda s: None)
-    assert (r.frame["Used_CostTestSet"] == "EE-2026-custom (custom.yaml)").all()
+    assert (r.frame["Used_CostTestSet"] == "custom: custom.yaml").all()
     rec = json.loads((r.run_dir / "run_settings.json").read_text())["cost_tests"]
     assert rec["source"] == str(f) and rec["chosen"] == "run option"
     for kw in ({"filing_validation": "claims"}, {"acc_purpose": "claims"}):
