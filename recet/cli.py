@@ -226,6 +226,10 @@ def _cmd_data(a: argparse.Namespace) -> int:
         from .pipeline import system_zones
         system_zones.build_catalog(Path(a.path) if a.path else None)
         return 0
+    if a.action == "consolidate-profiles":
+        from . import profile_library
+        profile_library.consolidate(a.path, a.dest)
+        return 0
     if a.action == "set-dir":
         print(f"saved: {paths.save_config(data_dir=str(Path(a.path).expanduser()))}")
         return 0
@@ -304,9 +308,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("file")
     p.set_defaults(func=_cmd_check)
     p = sub.add_parser("data", help="manage the reference data folder")
-    p.add_argument("action", choices=["status", "set-dir", "build", "verify", "pack", "unpack", "clear-cache", "build-system-zones", "draft", "tie-out"])
-    p.add_argument("path", nargs="?", help="folder (set-dir/build/verify/pack), parts folder (unpack), or output folder (build-system-zones; default: the package's own)")
-    p.add_argument("dest", nargs="?", help="output folder (pack/unpack); the ACC version (draft)")
+    p.add_argument("action", choices=["status", "set-dir", "build", "verify", "pack", "unpack", "clear-cache", "build-system-zones", "draft", "tie-out",
+                                        "consolidate-profiles"])
+    p.add_argument("path", nargs="?", help="folder (set-dir/build/verify/pack), parts folder (unpack), output folder (build-system-zones; default: the package's own), "
+                                           "or the profile library or reference folder to consolidate (consolidate-profiles)")
+    p.add_argument("dest", nargs="?", help="output folder (pack/unpack/consolidate-profiles); the ACC version (draft)")
     p.add_argument("--full", action="store_true", help="verify: also check SHA-256")
     p.add_argument("--link", action="store_true", help="build: hard-link instead of copy (same drive)")
     p.add_argument("--part-gb", type=float, default=4.0, help="pack: part size in GB")
@@ -340,9 +346,9 @@ def main(argv: list[str] | None = None) -> None:
     a = ap.parse_args(argv)
     if not getattr(a, "func", None):
         a.func = _cmd_gui
-    if getattr(a, "cmd", None) == "data" and a.action in {"set-dir", "build", "verify", "pack", "unpack", "draft", "tie-out"} and not a.path:
+    if getattr(a, "cmd", None) == "data" and a.action in {"set-dir", "build", "verify", "pack", "unpack", "draft", "tie-out", "consolidate-profiles"} and not a.path:
         ap.error(f"data {a.action} needs a path")
-    if getattr(a, "cmd", None) == "data" and a.action in {"pack", "unpack", "draft"} and not a.dest:
+    if getattr(a, "cmd", None) == "data" and a.action in {"pack", "unpack", "draft", "consolidate-profiles"} and not a.dest:
         ap.error(f"data {a.action} needs a destination")
     if getattr(a, "cmd", None) == "cet-version":
         from .cet_versions import cli as cet_cli

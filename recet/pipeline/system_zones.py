@@ -146,9 +146,13 @@ def catalog_usable() -> tuple[str | None, str]:
     info = _build_info()
     if not info or key not in info.get("acc", {}):
         return None, "no catalog for this ACC version"
-    lib = paths.ref_path("impact_hourly")
+    lib, cat = paths.ref_path("impact_hourly"), paths.ref_path("impact_catalog")
     acc_file = paths.current_acc_electric()
-    if lib is None or lib.stat().st_size != info.get("library_bytes") or Path(acc_file).stat().st_size != info["acc"][key]["electric_bytes"]:
+    if lib is None or Path(acc_file).stat().st_size != info["acc"][key]["electric_bytes"]:
+        return None, "reference data differs from the catalog's"
+    from .. import profile_library                                  # a consolidated copy of the library the catalog was built on has the same shapes
+    sizes = profile_library.equivalent_hourly_sizes(cat, lib) if cat is not None else {lib.stat().st_size}
+    if info.get("library_bytes") not in sizes:
         return None, "reference data differs from the catalog's"
     return key, ""
 
@@ -227,31 +231,31 @@ def build_catalog(out_dir: Path | None = None, version_keys: tuple[str, ...] | N
         runtime.clear_caches()
 
     import pyarrow.parquet as pq
-    cat = rip._catalog().set_index("id")
+    cat = rip._catalog_hourly().drop_duplicates("id", keep="first")    # one row per profile name; its 8,760s are its stored profile's (shape_id)
     index = rip._row_group_index()
     pf = pq.ParquetFile(str(lib))
     rows = []
-    for n, (pid, gi) in enumerate(sorted(index.items())):
-        if pid not in cat.index:
-            continue
-        meta = cat.loc[pid]
-        pa = str(meta["iou_ac_territory"])
-        if pa not in PAS:
-            continue
-        shapes = rip.shapes_from_frame(pf.read_row_group(gi).to_pandas())
-        ry = int(meta["represents_year"])
-        for k in keys:
-            s = {z: sums[k].get((pa, z)) for z in shapes}
-            totals = zone_totals(pa, shapes, ry, sums=s, acc_year=calendars[k])
-            zone = pick(totals)
-            ranked = sorted(totals, key=lambda z: (totals[z], zone_sort_key(z)))
-            rows.append(dict(acc_version=k, profile_id=int(pid), pa=pa, target_sector=meta["target_sector"], end_use_name=meta["end_use_name"],
-                             represents_year=ry, system_zone=zone, system_zone_total=totals.get(zone, np.nan) if zone else np.nan,
-                             runner_up_zone=ranked[1] if len(ranked) > 1 else None, runner_up_total=totals[ranked[1]] if len(ranked) > 1 else np.nan,
-                             n_options=len(totals), zone_totals=";".join(f"{z}={totals[z]:.10g}" for z in sorted(totals, key=zone_sort_key))))
+    for n, (sid, names) in enumerate(cat.groupby("shape_id", sort=True)):
+        shapes = rip.shapes_from_frame(pf.read_row_group(index[int(sid)]).to_pandas())     # read once for every name of a consolidated profile
+        for meta in names.to_dict("records"):
+            pa, pid = str(meta["iou_ac_territory"]), int(meta["id"])
+            if pa not in PAS:
+                continue
+            ry = int(meta["represents_year"])
+            for k in keys:
+                s = {z: sums[k].get((pa, z)) for z in shapes}
+                totals = zone_totals(pa, shapes, ry, sums=s, acc_year=calendars[k])
+                zone = pick(totals)
+                ranked = sorted(totals, key=lambda z: (totals[z], zone_sort_key(z)))
+                rows.append(dict(acc_version=k, profile_id=pid, pa=pa, target_sector=meta["target_sector"], end_use_name=meta["end_use_name"],
+                                 represents_year=ry, system_zone=zone, system_zone_total=totals.get(zone, np.nan) if zone else np.nan,
+                                 runner_up_zone=ranked[1] if len(ranked) > 1 else None, runner_up_total=totals[ranked[1]] if len(ranked) > 1 else np.nan,
+                                 n_options=len(totals), zone_totals=";".join(f"{z}={totals[z]:.10g}" for z in sorted(totals, key=zone_sort_key))))
         if (n + 1) % 2000 == 0:
-            log(f"  {n + 1:,} / {len(index):,} profiles")
+            log(f"  {n + 1:,} / {len(index):,} stored profiles")
     df = pd.DataFrame(rows)
+    if len(df):                                                      # profile id order, each profile's ACC versions in `keys` order
+        df = df.sort_values("profile_id", kind="stable").reset_index(drop=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_dir / CATALOG_NAME, index=False, float_format="%.10g")
     info["profiles"] = int(df["profile_id"].nunique())
