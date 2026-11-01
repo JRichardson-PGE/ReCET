@@ -498,7 +498,9 @@ def code_status(name: str, value: str, year: int | None) -> str | None:
     whose = "the" if r["source"] == "added" else "CET's"
     if pd.notna(r["end_year"]) and r["end_year"] < year:
         if r["source"] == "retired":
-            return f"retired by a ReCET admin after {int(r['end_year'])}"
+            if r["end_year"] < 1:  # retired before any year: the value list in use leaves the code out (a platform's version without it)
+                return "not in the value list in use"
+            return f"retired by an administrator after {int(r['end_year'])}"
         return f"retired in {whose} value list after {int(r['end_year'])}"
     return f"not valid in {whose} value list before {int(r['start_year'])}"
 

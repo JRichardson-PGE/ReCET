@@ -167,6 +167,21 @@ def test_value_list_years():
     assert "retired" in editor.code_status("sector", "Com", 2028)
 
 
+def test_value_list_admin_retirements_are_worded_for_whoever_runs_the_lists():
+    """An administrator's retirement names no product; a code retired before any year (a platform's value-list version that leaves it
+    out) reads as not in the list in use, never as "retired after 0" (CEDARS platform UAT 2, U07)."""
+    try:
+        editor.set_value_list_changes({"sector": {"Commercial": {"kind": "retired", "end_year": 2026},
+                                                  "Industrial": {"kind": "retired", "end_year": 0}}})
+        assert editor.code_status("sector", "Commercial", 2028) == "retired by an administrator after 2026"
+        assert editor.code_status("sector", "Commercial", 2026) is None
+        assert editor.code_status("sector", "industrial", 2028) == "not in the value list in use"
+        assert editor.code_status("sector", "Industrial", 2015) == "not in the value list in use"
+        assert "Industrial" not in editor.active_codes("sector", 2028)
+    finally:
+        editor.set_value_list_changes({})
+
+
 def test_new_rows_get_unique_ids_and_the_neighbours_keys():
     like = _job().measures.iloc[0].to_dict()
     row = editor.new_measure_row(like, ["NEW_1"])

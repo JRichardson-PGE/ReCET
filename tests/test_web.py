@@ -715,7 +715,7 @@ def test_value_list_pages_and_admin_changes(web):
 
     assert post(boss, act="retire|Commercial", end_year="2026").status_code == 303
     assert "Commercial" not in editor.active_codes("sector", 2028)
-    assert "retired by a ReCET admin after 2026" in editor.code_status("sector", "Commercial", 2028)
+    assert "retired by an administrator after 2026" in editor.code_status("sector", "Commercial", 2028)
     assert post(boss, act="reinstate|Commercial").status_code == 303
     assert "Commercial" in editor.active_codes("sector", 2028)
 
