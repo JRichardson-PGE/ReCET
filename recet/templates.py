@@ -107,7 +107,8 @@ def with_defaults(df):
     return df.assign(**{c: "" for c in missing}) if missing else df
 
 
-RECET_MEASURE_COLUMNS = ["AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "ACCVersion"]
+RECET_MEASURE_COLUMNS = ["AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "ACCVersion", "AC_Elec_Impact_Profile_Parent",
+                         "AC_Elec_Impact_Profile_Parent_2nd_Baseline"]
 MEASURE_COLUMNS = _CET_MEASURE_HEADER + RECET_MEASURE_COLUMNS
 PROGRAMCOST_COLUMNS = _PROGRAMCOST_HEADER
 EXAMPLE_MEASURE = _EXAMPLE_MEASURE
@@ -151,9 +152,10 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         ("Use this workbook instead of separate files: choose it as 'Job workbook' in the window, or run  recet run --workbook FILE.xlsx", False),
         ("", False),
         ("Sheet", True),
-        ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row. The last three columns are optional ReCET-only "
+        ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row. The last five columns are optional ReCET-only "
          "columns (not CET fields; leave blank for the defaults): AC_Elec_Impact_Profile_2nd_Baseline (2nd-baseline shape), AC_Elec_Impact_Profile_Water (water-energy shape), "
-         "ACCVersion (2021, 2022, 2024 or 2026; blank = the run's version).", False),
+         "ACCVersion (2021, 2022, 2024 or 2026; blank = the run's version), AC_Elec_Impact_Profile_Parent and AC_Elec_Impact_Profile_Parent_2nd_Baseline (a "
+         "true-up's parent profiles: the record is also priced on them and the ...Incremental columns give the difference).", False),
         ("ProgramCost    Optional. CET ProgramCost.csv columns. Replace or delete the yellow example row.", False),
         ("RunParameters  Optional. Discount rates, base year and gas CO2 per PA. Filled in with the built-in values for ACC " + acc_key
          + "; a listed PA replaces the built-in row, so edit only the values you want to change. Rates are fractions (0.0766 = 7.66%).", False),
