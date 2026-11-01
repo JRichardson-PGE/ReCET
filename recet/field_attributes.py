@@ -77,6 +77,8 @@ def _cost_tests(column: str, cset=None) -> str:
                 "Cost": "denominator (costs)", "CostNoAdmin": "denominator without program administrative costs",
                 "CostGross": "costs on gross savings (reported, not a ratio's denominator)"}[m.group(2)]
         return f"{m.group(1)} {what}"
+    if re.search(r"Incremental(_SB|_SH)?$", column):
+        return "reported: a true-up's change from its parent's profile (CALCULATIONS C21); not an input of a ratio"
     if column.startswith(("ElecValue_", "GasValue_")):
         return f"a component of {column.split('Value_')[0]}Ben (the ACC component's share); not an input of a ratio on its own"
     if column == "WeightedBenefits":

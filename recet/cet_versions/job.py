@@ -275,6 +275,11 @@ def run_job(cfg, log=print):
         note = f"the ACCVersion column is a ReCET option: the {rel.label} prices every record on the {versions.acc_short(acc)}"
         result.notes.append(note)
         log(f"note: {note}")
+    if job.parent_profile_set:
+        note = (f"the AC_Elec_Impact_Profile_Parent columns are a ReCET option: the {rel.label} prices each record on its own profile only, "
+                "with no incremental columns")
+        result.notes.append(note)
+        log(f"note: {note}")
     first_year = cfg.base_year or job.first_claim_year
     me = float(cfg.market_effects or 0.0)
     log(f"{job.rows:,} measures, First Year {first_year}, market effects {me:.0%} on benefits and costs"

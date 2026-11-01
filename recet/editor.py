@@ -32,7 +32,8 @@ PROGRAMCOST_COLUMNS = list(templates.PROGRAMCOST_COLUMNS)
 PROGRAMCOST_NUMERIC = [c for c in PROGRAMCOST_COLUMNS if c not in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")]
 MEASURE_NUMERIC = preflight.NUMERIC_COLUMNS + ["UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"]
 FLAG_COLUMNS = ("Residential_Flag", "Upstream_Flag")
-END_USE_COLUMNS = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water")   # electric shapes: per-row dropdowns (IOU and target sector)
+END_USE_COLUMNS = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "AC_Elec_Impact_Profile_Parent",
+                   "AC_Elec_Impact_Profile_Parent_2nd_Baseline")   # electric shapes: per-row dropdowns (IOU and target sector)
 CYQ = re.compile(r"^\d{4}Q[1-4]$")
 
 # Measure / ProgramCost column -> CET value-list file in data/value_lists (RUL_ID is not checked: CET's RUL IDs are not a published list)
@@ -59,7 +60,7 @@ NEW_MEASURE_DEFAULTS = {
 MEASURE_FROZEN = ["CEInputID", "MeasCode", "MeasDescription"]
 MEASURE_CALC = [
     "PrgID", "ClaimYearQuarter", "ACCVersion", "IOU_AC_Territory", "AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline",
-    "AC_Elec_Impact_Profile_Water", "AC_Gas_Target_Sector", "AC_Gas_Impact_Profile",
+    "AC_Elec_Impact_Profile_Water", "AC_Elec_Impact_Profile_Parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline", "AC_Gas_Target_Sector", "AC_Gas_Impact_Profile",
     "FuelID", "MeasImpactType", "CombustionType",
     "NumUnits", "UnitkWh1stBaseline", "UnitkWh2ndBaseline", "UnitTherm1stBaseline", "UnitTherm2ndBaseline", "UnitkWhIOUWater1stBaseline",
     "UnitkWhIOUWater2ndBaseline", "EUL_Yrs", "RUL_Yrs",
@@ -151,6 +152,10 @@ EFFECTS = {
                                     "Optional ReCET column (not a CET field): the load shape of the years after RUL_Yrs on an early replacement. Blank = AC_Elec_Impact_Profile."),
         "AC_Elec_Impact_Profile_Water": ("water-energy value, " + _REST,
                                       "Optional ReCET column (not a CET field): the load shape the water energy is spread over. Blank = AC_Elec_Impact_Profile."),
+        "AC_Elec_Impact_Profile_Parent": ("the incremental columns (the record priced on this profile, subtracted from its own value); nothing else",
+                                          "Optional ReCET column (not a CET field): a true-up's parent profile, the load shape of the claim it adjusts. Blank = no parent."),
+        "AC_Elec_Impact_Profile_Parent_2nd_Baseline": ("the incremental columns of an early replacement's 2nd-baseline years; nothing else",
+                                                       "Optional ReCET column (not a CET field): the parent's 2nd-baseline load shape. Blank = AC_Elec_Impact_Profile_Parent."),
         "ACCVersion": ("every avoided-cost value of the measure, its discount rates, bill impacts and emissions, " + _REST,
                        "Optional ReCET column (not a CET field): the ACC version this measure is priced on (2021, 2022, 2024, 2026). Blank = the run's version."),
         "AC_Gas_Target_Sector": (_GAS + ", the gas bill impact, " + _REST, "Picks the gas ACC class (Residential, Commercial, Core) and the gas retail rate schedule."),
@@ -723,7 +728,9 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                     add("Measure", i, "AC_Elec_Impact_Profile", sev, msg)
         has_kwh2 = rul is not None and rul > 0 and (eul is None or rul < eul) and (vals.get("UnitkWh2ndBaseline") or 0) != 0
         has_water = any((vals.get(c) or 0) != 0 for c in ("UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"))
-        for c, used, what in (("AC_Elec_Impact_Profile_2nd_Baseline", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("AC_Elec_Impact_Profile_Water", has_water, "water energy")):
+        for c, used, what in (("AC_Elec_Impact_Profile_2nd_Baseline", has_kwh2, "an early replacement's 2nd-baseline kWh"), ("AC_Elec_Impact_Profile_Water", has_water, "water energy"),
+                              ("AC_Elec_Impact_Profile_Parent", True, "electric savings"),
+                              ("AC_Elec_Impact_Profile_Parent_2nd_Baseline", has_kwh2, "an early replacement's 2nd-baseline kWh")):
             if not g(c):
                 continue
             if not used:

@@ -109,6 +109,9 @@ def test_worked_example_quarter_table_follows_the_formulas(tmp_path):
 def _full_frame(tmp_path):
     """A run with every optional group switched on, on a measure with a blank NTGRCost."""
     tc.write_measures(tmp_path / "Measure.csv", {"EX1": tc.MEASURES["EX1"], "EX3": dict(tc.MEASURES["EX3"], NTGRCost="")})
+    m = pd.read_csv(tmp_path / "Measure.csv", sep="|", dtype=str, keep_default_na=False)
+    m["AC_Elec_Impact_Profile_Parent"], m["AC_Elec_Impact_Profile_Parent_2nd_Baseline"] = [tc.EU_COM, ""], ["", ""]   # EX1 is a true-up (C21)
+    m.to_csv(tmp_path / "Measure.csv", sep="|", index=False)
     tc.write_program(tmp_path / "ProgramCost.csv")
     tc.make_acc(tmp_path / "acc.parquet")
     tc.make_gas_acc(tmp_path / "gas.csv")

@@ -1793,6 +1793,35 @@ Computed from CET's own columns, each reproduces CET's on every measure of CET j
 - Example B, `LevNetBenTRCGas`: (6990.5647 - 60271.7921 * (1 - 0)) / 9826.0534 = **-5.422444**
 - Example B, `LevNetBenRIMGas`: (6990.5647 - 32499.6332 * (1 - 0)) / 9826.0534 = **-2.596065**
 
+### 1.17 A true-up against its parent's profile (`AC_Elec_Impact_Profile_Parent`, `AC_Elec_Impact_Profile_Parent_2nd_Baseline`)
+
+Written only when the Measure file has the ReCET-only parent-profile columns (INPUT_FIELDS 1.3; BRD BR-05.6), after the record's own priced values; the two
+input columns are echoed with the inputs. A record that names a parent is priced a second time as the same record filed on the parent's profiles: the same
+ACC, claim quarter, life, rates and quantities, a blank `AC_Elec_Impact_Profile_Water` following the parent's profile, a kWh-per-unit profile carrying its
+own kWh (C21). Each incremental column is the record's value as filed less that second value. Blank on a record with no parent; the `_SB`, `_SH`, SCB and
+SCH ones are blank when the SCT is off. **They change no other column**: the record's own benefits, costs and ratios are as filed, no cost test or summary
+uses them, and there is no incremental cost or ratio (the costs do not depend on the profile). The worked examples of section 3 have no parent; C21's test
+checks every column against the job priced twice.
+
+```text
+XIncremental<s> = X<s>  -  X<s> priced with AC_Elec_Impact_Profile = AC_Elec_Impact_Profile_Parent
+                                      and AC_Elec_Impact_Profile_2nd_Baseline = AC_Elec_Impact_Profile_Parent_2nd_Baseline (blank = the parent's)
+ElecBenIncremental = V_elec(own shapes) - V_elec(parent's shapes)            (no fuel substitution; with it, each side is split as in C6.1 first)
+<C>Incremental     = <C> - <C> on the parent's profiles                     (<C> = TotalSystemBenefit or a test's <T>Ben of the run's cost-test set)
+```
+
+`V_elec` is section 0.7's lifetime value; both sides use the record's own quantities (`AC_Net_kWh_ScaledProfile_*_Baseline`, each on its side's profiles),
+claim quarter, life, ACC and discount rate.
+
+| Field | Meaning |
+|---|---|
+| `ParentElecPricingStatus` | The electric pricing status of the record priced on its parent's profiles, with the values of `ElecPricingStatus` (1.3); blank on a record with no parent. `UNPRICED: no hourly profile` means the parent's profile matched nothing, so the incremental columns hold the record's whole value (preflight `no_parent_profile`). Unit: Text. |
+| `ElecBenIncremental`, `ElecSupplyCostIncremental` | A true-up's change in `ElecBen` / `ElecSupplyCost` (1.4, TRC rows at the primary rate) from its parent's profile to its own. Unit: Dollars (PV). |
+| `WaterEnergyBenIncremental`, `WaterEnergyCostIncremental` | A true-up's change in `WaterEnergyBen` / `WaterEnergyCost` (1.4) from its parent's profile to its own; 0 when the record's water energy has a profile of its own. Unit: Dollars (PV). |
+| `ElecBenIncremental_SB`, `ElecSupplyCostIncremental_SB`, `WaterEnergyBenIncremental_SB`, `WaterEnergyCostIncremental_SB`, `ElecBenIncremental_SH`, `ElecSupplyCostIncremental_SH`, `WaterEnergyBenIncremental_SH`, `WaterEnergyCostIncremental_SH` | A true-up's change in the SCT Base (`_SB`) or SCT High (`_SH`) electric and water-energy benefits and supply costs (1.6, at the societal rate) from its parent's profile to its own. Unit: Dollars (PV). |
+| `TotalSystemBenefitIncremental` | A true-up's change in `TotalSystemBenefit` (1.8) from its parent's profile to its own. Unit: Dollars (PV). |
+| `TRCBenIncremental`, `PACBenIncremental`, `RIMBenIncremental`, `SCBBenIncremental`, `SCHBenIncremental`, `PCTBenIncremental` | A true-up's change in each cost test's benefits, the ratio numerators `<T>Ben` (1.10), from its parent's profile to its own. Unit: Dollars (PV). |
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 ## 2. Other files in a run folder
@@ -2003,7 +2032,7 @@ The input check that ran before pricing: a header (`PREFLIGHT: no blocking probl
 source, water and gas measure counts, ACC year ranges), then every finding as `ERROR` / `WARNING` / `INFO`, its code, count, the first-year net kWh or therms its records carry (`no_electric_profile`, `loose_profile_match`,
 `no_gas_profile`) and examples (for `loose_profile_match`: end use | IOU | the AC_Elec_Target_Sector given). Finding codes: `file_missing`, `no_delimiter`, `too_many_records` (the job has more records than the record cap, `max_records`, 2,000,000 by default; nothing else is checked), `not_pipe_delimited` (info: the file is comma- or tab-delimited and was read as such), `missing_columns`, `missing_descriptive_column` (warning: `MeasDescription` or `Sector` left out, read as blank),
 `missing_optional_column`, `blank_id`, `duplicate_id`, `bad_claim_year_quarter`, `bad_iou`, `non_numeric`, `blank_required_value` (a numeric field CET requires is blank), `negative_life` (`EUL_Yrs` or `RUL_Yrs` below 0), `rul_above_eul` (`RUL_Yrs` greater than `EUL_Yrs`), `outside_cet_range`, `rul_not_below_eul` (warning: `RUL_Yrs` equals `EUL_Yrs`), `measures_without_program_costs` (warning: measures whose `PrgID` has no `ProgramCost.csv` row, priced with no program costs), `program_costs_without_measures` (warning: `ProgramCost.csv` rows whose `PrgID` has no measures, with the nominal dollars no cost test includes; C17 item 11), `inputs_unreadable`,
-`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
+`no_program_costs`, `statewide_program_costs`, `bad_acc_version`, `acc_version_file_missing`, `no_electric_profile`, `no_electric_profile_2nd`, `no_parent_profile` (a true-up's parent profile matched nothing, C21), `parent_2nd_without_parent`, `loose_profile_match`, `kwh_per_unit_profile` (info: priced on an already-scaled kWh-per-unit profile), `zero_net_profile_water`, `no_profile_library`, `no_water_profile`, `no_gas_profile`, `bad_gas_sector`, `unknown_settings_version`, `before_acc_horizon`,
 `beyond_acc_horizon`, `acc_unreadable`, `program_costs_unreadable` (a job checked in parts could not read `ProgramCost.csv`), and from the program metadata `program_not_in_metadata`, `claim_outside_program_years` (claim year before `StartYear` or after `EndYear`),
 `program_closed` (status `closed` or `closure_pending`), `program_excluded_from_ce` and `program_pa_differs` (the `ProgramCost.csv` `PA` differs from the list's `PA`),
 and with CEDARS filing checks `cet_reject` (warning: the records failing one rule CEDARS rejects on, the message starting with the rule's ID), `cet_warning` (the same for a

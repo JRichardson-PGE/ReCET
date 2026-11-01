@@ -31,6 +31,7 @@ Contents
 * [C18 Worked example](#c18-worked-example)
 * [C19 Savings quantities, discounted savings and levelized values](#c19-savings-quantities-discounted-savings-and-levelized-values)
 * [C20 Prior CET releases (replicas)](#c20-prior-cet-releases-replicas)
+* [C21 A true-up priced against its parent's profile](#c21-a-true-up-priced-against-its-parents-profile)
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
@@ -1121,3 +1122,36 @@ whole job's sums. So a part's measures get the program-cost share and savings we
 added in a different order), and memory stays about that of one part: 1,000,000 measures on CET 25.1 peak at about 1.4 GB. Rows sharing a CEInputID are one
 CET_ID to CET and are priced together, in a last part.
 
+## C21 A true-up priced against its parent's profile
+
+A NMEC true-up adjusts an earlier claim (its parent) to measured savings, and the measurement often changes the load shape: the parent was priced on an
+estimated 8,760 and the true-up has a metered one. BRD BR-05.6 asks that the difference from the original profile be priced. Two optional ReCET Measure
+columns do it (INPUT_FIELDS 1.3):
+
+* `AC_Elec_Impact_Profile_Parent`: the parent's electric profile. Blank = the record has no parent and nothing below applies to it.
+* `AC_Elec_Impact_Profile_Parent_2nd_Baseline`: the parent's profile for the 2nd-baseline years of an early replacement. Blank = `AC_Elec_Impact_Profile_Parent`.
+
+A record that names a parent is priced twice: as filed (every output column, unchanged), and as the same record filed with the parent's profiles in
+`AC_Elec_Impact_Profile` and `AC_Elec_Impact_Profile_2nd_Baseline`, the same ACC (its ACCVersion or the run's), the same claim quarter, life, NTG, rates,
+quantities and First Year. A blank `AC_Elec_Impact_Profile_Water` follows the profile in force, so the water energy is priced on the parent's profile in
+the second pricing too. When a profile is a kWh-per-unit profile (C4, BR-06.6) its own annual kWh is the quantity, in either pricing, exactly as a record
+filed on it would be priced (`run_poc.apply_scaled_profiles`). For each column X of the list below
+
+    XIncremental = X (as filed) - X (on the parent's profiles)                  (ElecBenIncremental, ElecBenIncremental_SB, ...)
+
+* the priced streams that follow the electric profile, in each pricing: `ElecBen`, `ElecSupplyCost`, `WaterEnergyBen`, `WaterEnergyCost` (C5, C6) and
+  their `_SB` / `_SH` forms;
+* the cost-test set's aggregates and each test's benefits, which depend on the priced streams only: `TotalSystemBenefit`, `TRCBen`, `PACBen`, `RIMBen`,
+  `SCBBen`, `SCHBen`, `PCTBen` on EE-2026 (`test_evaluator.benefit_totals`, the arithmetic C12 writes them with).
+
+`ParentElecPricingStatus` is the second pricing's `ElecPricingStatus` (C16). The incremental columns are blank on a record with no parent; a job whose
+Measure file has neither column writes none of them. They are reported values: no cost test, ratio, program-cost share or summary uses them, and the
+record's own costs and ratios are those of the record as filed (the costs do not depend on the profile). With the SCT off the `_SB`, `_SH`, SCB and SCH
+incremental columns are blank like their sources. Emissions, the combined 8,760 and the ACC components are the record's as filed.
+
+`tests/test_true_up_parent_profile.py` holds every incremental column equal, bit for bit, to the same job priced twice (once as filed, once with the
+parents' profiles in the profile columns) and subtracted, in one piece and in parts, and the incremental electric benefit to
+`tests/reference_calc.incremental_elec_value` (the C5.1 loop on each shape). The difference uses the record's own quantities in both pricings, so it is
+the effect of the shape alone; a quantity the true-up changes as well is in the record's own columns, and the platform sets the true-up beside its
+parent's filed values. A parent profile that matches nothing is priced as no electric value (`no_parent_profile` warns, ParentElecPricingStatus is
+UNPRICED), so the incremental columns then hold the record's whole value. A CET replica (C20) prices each record on its own profile only and notes it.

@@ -28,6 +28,7 @@ class Plan:
     first_claim_year: int | None
     duplicated: set = field(default_factory=set)   # CEInputIDs on more than one row (None for a blank one)
     acc_version_set: bool = False              # some row fills ReCET's ACCVersion column (a replica prices every row on one Version)
+    parent_profile_set: bool = False           # some row names a true-up's parent profile (a ReCET option a replica does not price)
 
     @property
     def parts(self) -> int:
@@ -55,11 +56,14 @@ def plan(path: str | Path, size: int, read: Callable[[Path], pd.DataFrame], work
     path = Path(path)
     n = delimited.count_rows(path)
     files = [path] if not size or n <= size else [f for f, _start, _n in delimited.split_file(path, size, Path(work_dir))]
-    keys, years, seen, acc_set = [], [], [], False
+    keys, years, seen, acc_set, parent_set = [], [], [], False, False
     for f in files:
         m = read(f)
         if "ACCVersion" in m:
             acc_set = acc_set or bool(m["ACCVersion"].fillna("").astype(str).str.strip().ne("").any())
+        for c in ("AC_Elec_Impact_Profile_Parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline"):
+            if c in m:
+                parent_set = parent_set or bool(m[c].fillna("").astype(str).str.strip().ne("").any())
         keys.append(m.reindex(columns=KEYS).drop_duplicates())
         y = pd.to_numeric(m["ClaimYearQuarter"].astype("string").str[:4], errors="coerce")
         if y.notna().any():
@@ -70,4 +74,4 @@ def plan(path: str | Path, size: int, read: Callable[[Path], pd.DataFrame], work
     dup = all_ids[all_ids.duplicated(keep=False)]
     duplicated = set(dup.dropna()) | ({None} if dup.isna().any() else set())
     return Plan(files, n, pd.concat(keys, ignore_index=True).drop_duplicates().reset_index(drop=True), min(years) if years else None,
-                duplicated, acc_set)
+                duplicated, acc_set, parent_set)

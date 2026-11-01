@@ -53,7 +53,8 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
 
 - Optional ReCET-only Measure columns (not CET fields; `templates.RECET_MEASURE_COLUMNS`) follow CET's 74: `AC_Elec_Impact_Profile_2nd_Baseline` (2nd-baseline shape,
   priced as a second part, `run_poc.split_by_baseline_shape`), `AC_Elec_Impact_Profile_Water` (water-energy shape) and `ACCVersion` (an ACC version per
-  measure). Blank = the default. Editor CET files include them only when used.
+  measure), then `AC_Elec_Impact_Profile_Parent` / `AC_Elec_Impact_Profile_Parent_2nd_Baseline` (a true-up's parent profiles, 0.1.89). Blank = the default.
+  Editor CET files include them only when used.
 - Seven Measure fields are renamed from their E3-calculator names (Jake, 2026-10-22): `recet/fieldnames.py`. Inputs may use either name (read under the new
   name by `pipeline/delimited.read_cet_csv`); outputs, templates and workbooks use the new names; the editor's CET files use CET's names (`to_cet`).
 - ReCET's copies of CET tables drop CET's E3 prefix (Jake, 2026-10-23): `data/run_parameters.csv` (CET E3Settings) and `data/cet_tables/*.parquet`
@@ -106,6 +107,17 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.89 (2026-11-01, Jake; BRD BR-05.6, gap 19): a true-up priced against its parent's profile. Measure columns `AC_Elec_Impact_Profile_Parent` and
+  `_Parent_2nd_Baseline` (blank = the parent's 1st): a record naming a parent is priced a second time as the same record filed on the parent's profiles
+  (same ACC, timing, quantities, First Year; a blank water profile follows it; a kWh-per-unit profile carries its own kWh). The loader keeps each
+  `run_poc.PROFILE_DEPENDENT` column's parent value as `Parent__<col>` (`load_job`: apply_scaled_profiles on `_on_parent_profiles(loaded)`);
+  `price_measure_values` prices `parent_profile_measures(...)` again and `with_incremental` writes `<X>Incremental` (`incremental_name`: before a _SB/_SH
+  suffix) for `INCREMENTAL_STREAMS` (ElecBen, ElecSupplyCost, WaterEnergyBen, WaterEnergyCost x 3 pricings) and the set's
+  `test_evaluator.benefit_totals` (aggregates + <T>Ben, the arithmetic `evaluate` uses), plus `ParentElecPricingStatus`. Blank where no parent;
+  no column at all when the file has neither column (so every other job, and the regression fixtures, are unchanged). Reported only: no cost test,
+  share or summary reads them. Preflight: stat "true-ups priced against a parent profile", `no_parent_profile`, `parent_2nd_without_parent`; a CET
+  replica notes it ignores them. CALCULATIONS C21, OUTPUT_FIELDS 1.17. tests/test_true_up_parent_profile.py: every incremental column == (job as
+  filed) - (job with the parents' profiles in the profile columns), bit for bit, one piece and in parts; reference_calc.incremental_elec_value.
 - 0.1.88 (2026-10-31): the consolidated library on the real data (Jake's laptop, 2026-10-31): 21,859 stored profiles -> 20,954 (410 profiles carry
   1,315 names, 198 of them under more than one Impact Profile Name), four PG&E filings (21,370 measures) priced bit for bit the same. But 0.1.87 wrote the
   hourly file with pyarrow's defaults (a dictionary on every column): 9.51 -> 13.31 GB. `profile_library.writer_options` now writes each column as the

@@ -767,6 +767,32 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             rep.add("warning", "no_electric_profile_2nd", "measures whose AC_Elec_Impact_Profile_2nd_Baseline has no 8,760 profile: their 2nd-baseline years are NOT priced "
                     "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
 
+    # --- a true-up priced against its parent's profile (AC_Elec_Impact_Profile_Parent, BRD BR-05.6): the parent's profiles must price too
+    if "AC_Elec_Impact_Profile_Parent" in measures.columns:
+        named = measures["AC_Elec_Impact_Profile_Parent"] != ""
+        rep.stats["true-ups priced against a parent profile"] = f"{int(named.sum()):,}"
+        orphan = measures[~named & (measures["AC_Elec_Impact_Profile_Parent_2nd_Baseline"] != "")]
+        if len(orphan):
+            rep.add("warning", "parent_2nd_without_parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline is filled but AC_Elec_Impact_Profile_Parent is blank: "
+                    "the record is not priced against a parent profile (fill in the parent's profile, or clear the column)", len(orphan),
+                    orphan["CEInputID"].head(5).tolist(), _cells("Measure", mrows(orphan), "AC_Elec_Impact_Profile_Parent_2nd_Baseline"))
+        parents = measures[named]
+        early = (parents["RUL_Yrs"] > 0) & (parents["RUL_Yrs"] < parents["EUL_Yrs"])
+        missing_p, eg_p, where_p = 0, [], []
+        for col, rows in (("AC_Elec_Impact_Profile_Parent", parents), ("AC_Elec_Impact_Profile_Parent_2nd_Baseline",
+                                                                        parents[early & (parents["AC_Elec_Impact_Profile_Parent_2nd_Baseline"]
+                                                                                         != parents["AC_Elec_Impact_Profile_Parent"])])):
+            for key, g in rows.groupby([col, "IOU_AC_Territory", "AC_Elec_Target_Sector"]):
+                has_user = user is not None and user.match(*key) is not None
+                has_lib = cat is not None and real_impact_profiles.match_profile_id(*key)[0] is not None
+                if not (has_user or has_lib):
+                    missing_p += len(g)
+                    eg_p.append(" | ".join(map(str, key)))
+                    where_p += _cells("Measure", mrows(g), col)
+        if missing_p:
+            rep.add("warning", "no_parent_profile", "true-ups whose parent profile has no 8,760 profile: the parent is priced as having no electric value, so the "
+                    "incremental columns hold the record's whole value (ParentElecPricingStatus says UNPRICED or PARTLY PRICED)", missing_p, eg_p, where_p)
+
     # --- water energy (priced on the measure's electric profile: a water measure with no electric profile cannot be priced)
     water = measures[(measures["UnitkWhIOUWater1stBaseline"] != 0) | (measures["UnitkWhIOUWater2ndBaseline"] != 0)]
     rep.stats["water-energy measures"] = f"{len(water):,}"
