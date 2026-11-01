@@ -98,21 +98,41 @@ def shares(d: pd.DataFrame, cset, PrgID: pd.Series, totals: dict[str, pd.DataFra
     return {k: _share(sum(_pos(d[c]) for c in cols), PrgID, None if totals is None else totals[k]) for k, cols in share_bases(cset).items()}
 
 
+def _aggregate(d: pd.DataFrame, cset, a, gross: bool = False) -> pd.Series:
+    return (_sum(d, [cset.column(s, a.pricing, gross=gross) for s in a.plus])
+            - _sum(d, [cset.column(s, a.pricing, gross=gross) for s in a.minus]))
+
+
+def _benefits(d: pd.DataFrame, cset, t) -> pd.Series:
+    """<T>Ben: the test's benefits and numerator adders in its pricing."""
+    return _sum(d, [cset.column(s, t.pricing) for s in t.benefits] + [cset.column(s, t.pricing) for s in t.numerator_adders])
+
+
+def benefit_totals_columns(cset) -> list[str]:
+    """The set's columns that depend on the priced streams alone, never on the program costs: each aggregate (not its Gross form) and each test's <T>Ben."""
+    return [a.name for a in cset.aggregates.values()] + [f"{t.id}Ben" for t in cset.tests.values()]
+
+
+def benefit_totals(d: pd.DataFrame, cset) -> dict[str, pd.Series]:
+    """benefit_totals_columns' values over a priced frame (price_measure_values' columns), with the arithmetic `evaluate` writes them with, so a true-up's
+    incremental TotalSystemBenefit and <T>Ben are those columns' differences (run_poc.with_incremental, CALCULATIONS C21)."""
+    return {a.name: _aggregate(d, cset, a) for a in cset.aggregates.values()} | {f"{t.id}Ben": _benefits(d, cset, t) for t in cset.tests.values()}
+
+
 def evaluate(d: pd.DataFrame, cset, share: dict[str, pd.Series], weighted_elec_alloc: pd.Series | None = None) -> dict[str, pd.Series]:
     """Every aggregate and test column of `cset`, in the set's order: {column: values}. `d` holds the priced streams, their gross forms, the program
     sums (`_SumCostsNPV`, `_SumCostsNPV_SCT`) and, for the levelized columns, DiscountedSavingsNetkWh / Thm; `share` is `shares(...)`;
     `weighted_elec_alloc` is CalcCost's WeightedElecAlloc (cost_tests.py)."""
     out: dict[str, pd.Series] = {}
     for a in cset.aggregates.values():
-        out[a.name] = _sum(d, [cset.column(s, a.pricing) for s in a.plus]) - _sum(d, [cset.column(s, a.pricing) for s in a.minus])
+        out[a.name] = _aggregate(d, cset, a)
         if a.gross:
-            out[f"{a.name}Gross"] = (_sum(d, [cset.column(s, a.pricing, gross=True) for s in a.plus])
-                                     - _sum(d, [cset.column(s, a.pricing, gross=True) for s in a.minus]))
+            out[f"{a.name}Gross"] = _aggregate(d, cset, a, gross=True)
     for t in cset.tests.values():
         p = cset.pricings[t.pricing]
         cols = lambda names, gross=False: [cset.column(s, t.pricing, gross=gross) for s in names]
         npv = d[PROGRAM_SUMS[p.discount_rate_annual]] if t.share is not None else None
-        ben = _sum(d, cols(t.benefits) + cols(t.numerator_adders))
+        ben = _benefits(d, cset, t)
         no_admin = _sum(d, cols(t.costs))
         cost = share[share_key(cset, t)] * npv + no_admin if t.share is not None else no_admin
         test_out = {f"{t.id}Ben": ben, f"{t.id}Cost": cost}

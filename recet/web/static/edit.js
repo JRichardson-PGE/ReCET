@@ -11,8 +11,10 @@
   var API = root.dataset.api, END_USES = root.dataset.endUses, CSRF = root.dataset.csrf, RUN = root.dataset.run;
   var TABLES = ["Measure", "ProgramCost"];
   var WIDTHS = { CEInputID: 120, MeasCode: 100, MeasDescription: 230, PrgID: 180, AC_Elec_Impact_Profile: 240, AC_Elec_Impact_Profile_2nd_Baseline: 240,
-                 AC_Elec_Impact_Profile_Water: 240, AC_Gas_Impact_Profile: 200 };
-  var END_USE_COLUMNS = ["AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water"];   // per-row dropdowns (IOU and target sector)
+                 AC_Elec_Impact_Profile_Water: 240, AC_Elec_Impact_Profile_Parent: 240,
+                 AC_Elec_Impact_Profile_Parent_2nd_Baseline: 240, AC_Gas_Impact_Profile: 200 };
+  var END_USE_COLUMNS = ["AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water",
+                         "AC_Elec_Impact_Profile_Parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline"];   // per-row dropdowns (IOU and target sector)
   var st = {
     rev: null, layout: null, columns: {}, choices: {}, issues: { Measure: {}, ProgramCost: {} }, checkMarks: { Measure: {}, ProgramCost: {} }, grids: {}, current: "Measure",
     timer: null, saving: false, pending: false, dirty: false, conflict: false, nextRid: 1, endUses: {}, maxRows: 500, newMeasure: null, pcLike: []

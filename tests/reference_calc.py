@@ -134,6 +134,15 @@ def elec_value(d, shape, represents_year, acc, rate_qtr, first_year, scale_1st, 
     return total
 
 
+def incremental_elec_value(d, shape_1st, shape_2nd, parent_1st, parent_2nd, acc, rate_qtr, first_year, scale_1st, scale_2nd, parent_scale_1st,
+                           parent_scale_2nd, meb=0.0):
+    """C21: a true-up's incremental electric value, the record's lifetime PV on its own profiles less the same on its parent's. Each shape is (array(8760),
+    represents_year); each baseline is priced on its own shape (C5.1 is linear in the two baselines' quantities), with the same ACC, discounting and timing."""
+    def value(s1, s2, q1, q2):
+        return elec_value(d, *s1, acc, rate_qtr, first_year, q1, 0.0, meb) + elec_value(d, *s2, acc, rate_qtr, first_year, 0.0, q2, meb)
+    return value(shape_1st, shape_2nd, scale_1st, scale_2nd) - value(parent_1st, parent_2nd, parent_scale_1st, parent_scale_2nd)
+
+
 def gas_value(d, shape, acc, rate_qtr, first_year, meb=0.0):
     """C5.4: lifetime PV of the gas benefit. `acc`: {year: array(12) in $/therm}."""
     factor = (d["ntg_therm"] + meb) / d["ntg_therm"] if (meb and d["ntg_therm"] > 0) else 1.0

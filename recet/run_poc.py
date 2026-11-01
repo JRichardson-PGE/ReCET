@@ -25,7 +25,7 @@ from .pipeline import (
     test_evaluator,
 )
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
-from .pipeline.data_loading import FIRST_BASELINE_QUANTITIES, SECOND_BASELINE_QUANTITIES
+from .pipeline.data_loading import FIRST_BASELINE_QUANTITIES, PARENT_PROFILE_COLUMNS, PARENT_WATER_PROFILE, SECOND_BASELINE_QUANTITIES
 from .pipeline.engine import (
     HourlyPricingResult,
     price_bill_impact,
@@ -825,7 +825,95 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     discounted_savings_values = discounted_savings(measures, acc_version, base_year, market_effects_bens)   # the levelized columns' denominators, at this ACC's rates
     out = (measure_values.merge(trc_values, on="CEInputID").merge(sct_values, on="CEInputID")
            .merge(discounted_savings_values, on="CEInputID", how="left"))
-    return input_streams.overlay(out, streams)
+    out = input_streams.overlay(out, streams)
+    if has_parent_profiles(measures):      # a true-up named its parent's profile (BR-05.6): the same records priced on it, and the difference (C21)
+        parent = parent_profile_measures(measures)
+        parent_values = price_measure_values(parent, acc_version, base_year, market_effects_bens, market_effects_cost, include_societal, cset) \
+            if len(parent) else None
+        out = with_incremental(out, parent_values, cset)
+    return out
+
+
+# A true-up priced against its parent's profile (BRD BR-05.6, CALCULATIONS C21). The columns of the measure frame that depend on the electric profile: the
+# profiles themselves and, through a kWh-per-unit profile (apply_scaled_profiles), the kWh it is priced on. The loader keeps each one's value on the parent's
+# profile as PARENT_PREFIX + column, so the record can be priced again exactly as the same record filed with the parent's profile would be.
+PROFILE_DEPENDENT = ["AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "Used_UnitkWh1stBaseline",
+                     "Used_UnitkWh2ndBaseline", "AC_Net_kWh_1st_Baseline", "AC_Net_kWh_2nd_Baseline", "AC_Net_kWh_ScaledProfile_1st_Baseline",
+                     "AC_Net_kWh_ScaledProfile_2nd_Baseline", "Scaled_Profile_Flag"]
+PARENT_PREFIX = "Parent__"
+# the engine's priced streams that follow the electric profile, in each pricing (TRC rows; SCT Base and High): their incremental columns
+INCREMENTAL_STREAMS = [f"{s}{p}" for p in ("", "_SB", "_SH") for s in ("ElecBen", "ElecSupplyCost", "WaterEnergyBen", "WaterEnergyCost")]
+PARENT_STATUS = "ParentElecPricingStatus"
+
+
+def incremental_name(column: str) -> str:
+    """The incremental column of a priced column: "Incremental" before a pricing suffix (ElecBenIncremental_SB, as ElecBenGross_SB), else at the end."""
+    m = re.match(r"^(.*?)(_SB|_SH)?$", column)
+    return f"{m.group(1)}Incremental{m.group(2) or ''}"
+
+
+def incremental_columns(cset=None) -> list[str]:
+    """The incremental columns a job with a parent-profile column writes, in order: the priced streams', then each aggregate's and each test's
+    benefits (<T>Ben) of the cost-test set (None = the newest published EE set)."""
+    cset = cset or cost_tests.default_set()
+    return [incremental_name(c) for c in INCREMENTAL_STREAMS + list(test_evaluator.benefit_totals_columns(cset))]
+
+
+def has_parent_profiles(measures: pd.DataFrame) -> bool:
+    """Whether the job's Measure file has a parent-profile column (then every part of it writes the incremental columns, blank where no parent is named)."""
+    return PARENT_PROFILE_COLUMNS[0] in measures.columns
+
+
+def _on_parent_profiles(loaded: pd.DataFrame) -> pd.DataFrame:
+    """The loader's rows that name a parent profile, filed with the parent's profiles instead of their own (before apply_scaled_profiles), without the
+    parent columns: what the loader gives for those rows of the same file with AC_Elec_Impact_Profile = the parent's, AC_Elec_Impact_Profile_2nd_Baseline
+    = the parent's 2nd-baseline profile and a blank AC_Elec_Impact_Profile_Water following AC_Elec_Impact_Profile."""
+    rows = loaded[loaded[PARENT_PROFILE_COLUMNS[0]] != ""].copy()
+    rows["AC_Elec_Impact_Profile"] = rows[PARENT_PROFILE_COLUMNS[0]]
+    rows["AC_Elec_Impact_Profile_2nd_Baseline"] = rows[PARENT_PROFILE_COLUMNS[1]]
+    rows["AC_Elec_Impact_Profile_Water"] = rows[PARENT_WATER_PROFILE]
+    return rows.drop(columns=[*PARENT_PROFILE_COLUMNS, PARENT_WATER_PROFILE])
+
+
+def _attach_parent_profiles(measures: pd.DataFrame, on_parent: pd.DataFrame) -> pd.DataFrame:
+    """`measures` with each PROFILE_DEPENDENT column's value on the parent's profile (`on_parent`, already scaled) as PARENT_PREFIX + column (None on the
+    rows with no parent)."""
+    m = measures.copy()
+    for c in PROFILE_DEPENDENT:
+        m[PARENT_PREFIX + c] = on_parent[c].reindex(m.index).astype(object).where(m.index.isin(on_parent.index), None)
+    return m
+
+
+def parent_profile_measures(measures: pd.DataFrame) -> pd.DataFrame | None:
+    """The measures that name a parent profile, as the same records filed on the parent's profile (every PROFILE_DEPENDENT column replaced by its
+    parent value; no parent columns, so they price as an ordinary job). None when the frame has no parent-profile column."""
+    if not has_parent_profiles(measures):
+        return None
+    rows = measures[measures[PARENT_PROFILE_COLUMNS[0]] != ""]
+    out = rows.drop(columns=[*PARENT_PROFILE_COLUMNS, PARENT_WATER_PROFILE, *(PARENT_PREFIX + c for c in PROFILE_DEPENDENT)])
+    for c in PROFILE_DEPENDENT:
+        out[c] = rows[PARENT_PREFIX + c].astype(measures[c].dtype) if len(rows) else rows[c]
+    return out.reset_index(drop=True)
+
+
+def with_incremental(out: pd.DataFrame, parent_values: pd.DataFrame | None, cset) -> pd.DataFrame:
+    """`out` (price_measure_values' frame) with ParentElecPricingStatus and the incremental columns: each column's value as priced less its value on the
+    parent's profile (`parent_values`: price_measure_values over parent_profile_measures), blank where the record names no parent."""
+    own = dict(out[INCREMENTAL_STREAMS].items()) | test_evaluator.benefit_totals(out, cset)
+    new = {PARENT_STATUS: pd.Series("", index=out.index, dtype=object)}
+    if parent_values is not None and len(parent_values):
+        row = out["CEInputID"].map(pd.Series(np.arange(len(parent_values)), index=parent_values["CEInputID"]))
+        has = row.notna().to_numpy()
+        at = row[has].astype(int).to_numpy()
+        par = dict(parent_values[INCREMENTAL_STREAMS].items()) | test_evaluator.benefit_totals(parent_values, cset)
+        new[PARENT_STATUS] = new[PARENT_STATUS].where(~has, pd.Series(parent_values["ElecPricingStatus"].to_numpy()[at], index=out.index[has]))
+        for c, v in own.items():
+            diff = np.full(len(out), np.nan)
+            diff[has] = v.to_numpy(dtype=np.float64)[has] - par[c].to_numpy(dtype=np.float64)[at]
+            new[incremental_name(c)] = pd.Series(diff, index=out.index)
+    else:
+        new |= {incremental_name(c): pd.Series(np.nan, index=out.index) for c in own}
+    return pd.concat([out, pd.DataFrame(new, index=out.index)], axis=1)
 
 
 def program_share_totals(d: pd.DataFrame, cost_tests_set=None) -> dict[str, pd.DataFrame]:
@@ -850,6 +938,7 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
     if not include_societal:
         societal = [c for c in out.columns if re.search(SOCIETAL_COLUMN_PATTERN, c)]
         societal += [c for c in test_evaluator.societal_columns(cost_tests_set, {"trc"}) if c in out and c not in societal]
+        societal += [incremental_name(c) for c in societal if incremental_name(c) in out and incremental_name(c) not in societal]
         out = out.assign(**dict.fromkeys(societal, float("nan"))).copy()   # copy: one block (column-by-column NaNs fragment the frame; pandas warned per part)
     return out
 
@@ -915,8 +1004,9 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     extra_columns: the run's cost-test set's own Measure columns (input_streams.extra_columns), kept as numbers.
 
     Returns (measures, program_costs or None)."""
-    measures = apply_scaled_profiles(data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes,
-                                                                           extra_columns=extra_columns),
-                                     allocated=allocate_statewide)
+    loaded = data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes, extra_columns=extra_columns)
+    measures = apply_scaled_profiles(loaded, allocated=allocate_statewide)
+    if has_parent_profiles(loaded):        # a true-up's parent profile (BR-05.6): its records as filed on that profile, kept beside them
+        measures = _attach_parent_profiles(measures, apply_scaled_profiles(_on_parent_profiles(loaded), allocated=allocate_statewide))
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
     return measures, program

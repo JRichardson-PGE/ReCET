@@ -72,6 +72,11 @@ COLUMNS = [
     "AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline", "AC_Net_kWh_Water_1st_Baseline", "AC_Net_kWh_Water_2nd_Baseline",
     "Fuel_Sub_Flag", "Scaled_Profile_Flag", "ACCVersion",
 ]
+# ReCET-only columns for a true-up (BRD BR-05.6): the electric profile of the claim it adjusts (its parent), and that claim's 2nd-baseline profile (blank =
+# AC_Elec_Impact_Profile_Parent). A record that names a parent is also priced on the parent's profile, and its incremental columns are the difference
+# (run_poc.parent_profile_measures, CALCULATIONS C21). Kept in the frame only when the file has one of the columns, so a job without them is unchanged.
+PARENT_PROFILE_COLUMNS = ("AC_Elec_Impact_Profile_Parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline")
+PARENT_WATER_PROFILE = "Parent_Used_AC_Elec_Impact_Profile_Water"   # the water-energy profile on the parent's profile: the file's, else the parent's
 
 
 def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] = ()) -> pd.DataFrame:
@@ -91,9 +96,18 @@ def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] 
     for c in ("AC_Climate_Zone", "AC_Elec_Target_Sector", "AC_Elec_Impact_Profile"):
         df[c] = df[c].astype(str)
     # ReCET-only columns: a separate electric profile for the 2nd-baseline years and for the water energy. Blank = the measure's AC_Elec_Impact_Profile.
+    given = {}
     for c in ("AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water"):
-        profile_given = df[c].where(df[c].notna(), "").astype(str).str.strip() if c in df.columns else pd.Series("", index=df.index)
-        df[c] = profile_given.where(profile_given != "", df["AC_Elec_Impact_Profile"])
+        given[c] = _text(df, c)
+        df[c] = given[c].where(given[c] != "", df["AC_Elec_Impact_Profile"])
+    parent_columns = []
+    if any(c in df.columns for c in PARENT_PROFILE_COLUMNS):         # a true-up's parent profile (BR-05.6): blank = no parent
+        parent, parent_2nd = _text(df, PARENT_PROFILE_COLUMNS[0]), _text(df, PARENT_PROFILE_COLUMNS[1])
+        df[PARENT_PROFILE_COLUMNS[0]] = parent
+        df[PARENT_PROFILE_COLUMNS[1]] = parent_2nd.where((parent_2nd != "") | (parent == ""), parent)
+        given_water = given["AC_Elec_Impact_Profile_Water"]
+        df[PARENT_WATER_PROFILE] = given_water.where(given_water != "", parent)
+        parent_columns = [*PARENT_PROFILE_COLUMNS, PARENT_WATER_PROFILE]
     df["CombustionType"] = df["CombustionType"] if "CombustionType" in df.columns else None
     df["EUL_Yrs"] = df["EUL_Yrs"].astype(float)
     df["RUL_Yrs"] = df["RUL_Yrs"].astype(float)
@@ -125,4 +139,9 @@ def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] 
     extra = [c for c in dict.fromkeys(extra_columns) if c not in COLUMNS]     # a cost-test set's input-stream columns (pipeline/input_streams.py)
     for c in extra:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0) if c in df.columns else 0.0
-    return df[COLUMNS + extra]
+    return df[COLUMNS + parent_columns + extra]
+
+
+def _text(df: pd.DataFrame, c: str) -> pd.Series:
+    """A text column stripped, a blank or a missing column as ""."""
+    return df[c].where(df[c].notna(), "").astype(str).str.strip() if c in df.columns else pd.Series("", index=df.index)
