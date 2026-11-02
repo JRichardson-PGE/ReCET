@@ -296,3 +296,21 @@ def test_a_registry_program_table_replaces_the_builtin_one(job, tmp_path):
     assert receipt["programs"] == {"table": "supplied", "file": str(progs), "sha256": _sha(progs), "mode": "replace"}
     assert receipt["settings"]["programs_replace"] is True
 
+
+
+def test_a_comparison_with_another_acc_runs_both_and_compares_them(job, tmp_path):
+    """compare_with: the job is priced on its ACC and on the other, each in run_acc<ACC>/, with the per-measure comparison beside them;
+    the receipt carries the primary ACC's totals."""
+    ref = Path(__file__).parent / "data" / "regression" / "ref"
+    spec = json.loads(_spec(job, tmp_path).read_text())
+    spec["settings"]["compare_with"] = "2024"
+    spec["packs"] = {"reference_dir": str(ref)}
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    assert code == 0, receipt["error"]
+    out = tmp_path / "results"
+    for acc in ("2026", "2024"):
+        assert any((out / f"run_acc{acc}").glob("measure_level_*")) and (out / f"run_acc{acc}" / "preflight.json").exists()
+    assert any(out.glob("comparison_acc2026_vs_acc2024*")) and any(out.glob("comparison_summary_acc2026_vs_acc2024*"))
+    assert receipt["totals"] and receipt["acc"]["version"] == "2026" and receipt["settings"]["compare_with"] == "2024"
+    assert "ACC version 2024" in (out / worker.LOG_NAME).read_text(encoding="utf-8")

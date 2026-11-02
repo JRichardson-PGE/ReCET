@@ -343,11 +343,11 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
                                 log=(work / LOG_NAME, storage.join(spec["outputs"]["uri"], LOG_NAME)))
         try:
             with sender:
-                result = run_job(cfg, log=log)
+                result = _run_compare(cfg, log) if cfg.compare_with and not cfg.preflight_only else run_job(cfg, log=log)
         except Exception as exc:                                       # a failed run still gets a receipt
             status, error = "failed", f"{type(exc).__name__}: {exc}"
             log(traceback.format_exc())
-        run_dir = result.run_dir if result is not None else next((p for p in (work / "out").glob(f"{spec['job_id']}_acc*") if p.is_dir()), None)
+        run_dir = result.run_dir if result is not None else next((p for p in (work / "out").glob(f"{spec['job_id']}*") if p.is_dir()), None)
         if run_dir is None:
             run_dir = work / "out" / f"{spec['job_id']}_failed"
             run_dir.mkdir(parents=True, exist_ok=True)
@@ -363,14 +363,32 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
             shutil.rmtree(work, ignore_errors=True)
 
 
+def _run_compare(cfg, log):
+    """A run with `compare_with`: the job priced on both ACCs, each in its own folder (run_acc<ACC>/, with its own outputs, preflight and
+    Results tables), and the per-measure comparison beside them (jobs.run_compare). The receipt's totals, ACC check and notes are the
+    primary ACC's (the run's acc_version), read from its run_settings.json."""
+    from .jobs import run_compare
+    result = run_compare(cfg, log=log)
+    primary = _primary_settings(result.run_dir, cfg)
+    result.totals = primary.get("totals") or {}
+    result.acc_check = primary.get("acc_check")
+    result.notes = list(primary.get("notes") or []) + result.notes
+    return result
+
+
+def _primary_settings(run_dir: Path, cfg) -> dict:
+    """The run's run_settings.json: its own, or for an ACC comparison its primary ACC's (run_acc<acc_version>/)."""
+    for f in (run_dir / "run_settings.json", run_dir / f"run_acc{cfg.acc_version}" / "run_settings.json"):
+        if f.exists():
+            try:
+                return json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                return {}
+    return {}
+
+
 def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_files, status, error, started, t0) -> dict:
-    settings = {}
-    f = run_dir / "run_settings.json"
-    if f.exists():
-        try:
-            settings = json.loads(f.read_text(encoding="utf-8"))
-        except ValueError:
-            settings = {}
+    settings = _primary_settings(run_dir, cfg)
     acc = settings.get("acc", {})
     used = {}
     for k in ("electric", "gas"):                                     # the ACC files actually read, by their place in the reference folder
