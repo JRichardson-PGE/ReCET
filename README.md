@@ -130,7 +130,8 @@ The receipt names the engine (release, calculation, image and commit from `RECET
 URI, SHA-256, size and row count, the full settings, the ACC and the ACC each record was priced on, every reference file used with its SHA-256 (from the
 reference folder's `manifest.json`, else computed) and the packaged data's hash, the run parameters and statewide factor table, the filing rule set,
 every output file's SHA-256, the totals and notes, and the spec's `context` (the caller's own references) as given. While the job runs, the worker
-sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
+sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s, and `log.txt`
+(what the run printed, each line timed) with it when it has grown; the whole log goes with the outputs at the end and is listed in the receipt. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
 `recet worker validate job.json` checks a spec without running it.
 
 The worker image (`Dockerfile.worker`: the locked `requirements/worker.txt`, which is the engine plus boto3, and no web app) is published for each
