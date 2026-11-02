@@ -107,6 +107,12 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.90 (2026-11-02, Jake: the platform's run page should show the run's log as ReCET's does): the worker keeps the run's log. `worker.run` tees every
+  log line, timed, into `<work>/log.txt` (`worker._tee`, `LOG_NAME`); `ProgressSender(..., log=(local, uri))` sends it beside progress.json with each
+  progress report when it has grown (`send_log`, never fatal); at the end it is copied into the run folder, so it goes with the outputs and the receipt lists
+  it (with the traceback of a failed run). And a job spec's `compare_with` now works on the worker (it was accepted and ignored: `run_job` never
+  compared): `worker._run_compare` runs `jobs.run_compare` (each ACC in `run_acc<ACC>/`, the per-measure comparison beside them) and the receipt's
+  totals, ACC check and notes are the primary ACC's (`_primary_settings`). tests/test_worker.py.
 - 0.1.89 (2026-11-01, Jake; BRD BR-05.6, gap 19): a true-up priced against its parent's profile. Measure columns `AC_Elec_Impact_Profile_Parent` and
   `_Parent_2nd_Baseline` (blank = the parent's 1st): a record naming a parent is priced a second time as the same record filed on the parent's profiles
   (same ACC, timing, quantities, First Year; a blank water profile follows it; a kWh-per-unit profile carries its own kWh). The loader keeps each

@@ -29,6 +29,7 @@ from pathlib import Path
 from . import jobspec, storage
 
 RECEIPT_VERSION = 1
+LOG_NAME = "log.txt"                                # the run's log: sent beside progress.json while it runs and kept with its outputs
 PROGRESS_SECONDS = 10                               # progress.json is sent to the outputs URI at each stage change and at most this often between
 MAX_UNZIPPED_BYTES = 1024 * 1024 * 1024            # a job zip's Measure.csv + ProgramCost.csv, as the web app's limit (RECET_WEB_MAX_UNZIPPED_MB)
 
@@ -229,8 +230,10 @@ class ProgressSender:
     """While a run runs: point progress.py at `local` (RECET_PROGRESS_FILE) and send it to `uri` whenever its stage changes, and at most every `every`
     seconds while its parts move (BR-06.2: the caller's run page shows the stage and time left of a batch run). A failed send is skipped, never fatal."""
 
-    def __init__(self, local: Path, uri: str, every: float = PROGRESS_SECONDS, poll: float = 1.0):
+    def __init__(self, local: Path, uri: str, every: float = PROGRESS_SECONDS, poll: float = 1.0, log: tuple[Path, str] | None = None):
         self.local, self.uri, self.every, self.poll = Path(local), uri, every, poll
+        self.log = (Path(log[0]), log[1]) if log else None                # (the run's local log, its URI): sent with each progress report
+        self._log_size = -1
         self._stop = threading.Event()
         self._sent: tuple[str | None, str | None] = (None, None)          # (stage, text) last sent
         self._last = 0.0
@@ -276,6 +279,31 @@ class ProgressSender:
             return
         self._sent, self._last = (stage, text), time.time()
         self.sends += 1
+        self.send_log()
+
+    def send_log(self) -> None:
+        """Send the run's log when it has grown since it was last sent (the caller's run page shows it while the run runs)."""
+        if self.log is None:
+            return
+        try:
+            size = self.log[0].stat().st_size
+            if size != self._log_size:
+                storage.for_uri(self.log[1]).put(self.log[0], self.log[1])
+                self._log_size = size
+        except Exception:                                               # never fatal: the whole log goes with the outputs at the end
+            return
+
+
+def _tee(log, path: Path):
+    """`log`, also appending each message to `path` with the time (the run's log.txt)."""
+    def out(msg) -> None:
+        log(msg)
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+        except OSError:
+            pass
+    return out
 
 
 def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict | None]:
@@ -308,19 +336,23 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
             print(f"recet worker: job refused: {exc}", file=sys.stderr)
             return 2, None
 
+        log = _tee(log, work / LOG_NAME)
         log(f"recet worker {__version__}: job {spec['job_id']}")
         status, error, result = "succeeded", None, None
-        sender = ProgressSender(work / "progress.json", storage.join(spec["outputs"]["uri"], "progress.json"))
+        sender = ProgressSender(work / "progress.json", storage.join(spec["outputs"]["uri"], "progress.json"),
+                                log=(work / LOG_NAME, storage.join(spec["outputs"]["uri"], LOG_NAME)))
         try:
             with sender:
-                result = run_job(cfg, log=log)
+                result = _run_compare(cfg, log) if cfg.compare_with and not cfg.preflight_only else run_job(cfg, log=log)
         except Exception as exc:                                       # a failed run still gets a receipt
             status, error = "failed", f"{type(exc).__name__}: {exc}"
             log(traceback.format_exc())
-        run_dir = result.run_dir if result is not None else next((p for p in (work / "out").glob(f"{spec['job_id']}_acc*") if p.is_dir()), None)
+        run_dir = result.run_dir if result is not None else next((p for p in (work / "out").glob(f"{spec['job_id']}*") if p.is_dir()), None)
         if run_dir is None:
             run_dir = work / "out" / f"{spec['job_id']}_failed"
             run_dir.mkdir(parents=True, exist_ok=True)
+        if (work / LOG_NAME).is_file() and not (run_dir / LOG_NAME).exists():
+            shutil.copyfile(work / LOG_NAME, run_dir / LOG_NAME)        # the log up to here goes with the outputs, listed in the receipt
         receipt = make_receipt(spec, spec_sha, cfg, result, run_dir, inputs, ref, ref_files, status, error, started, t0)
         (run_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, default=str) + "\n", encoding="utf-8")
         written = storage.put_dir(run_dir, spec["outputs"]["uri"])
@@ -331,14 +363,32 @@ def run(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict |
             shutil.rmtree(work, ignore_errors=True)
 
 
+def _run_compare(cfg, log):
+    """A run with `compare_with`: the job priced on both ACCs, each in its own folder (run_acc<ACC>/, with its own outputs, preflight and
+    Results tables), and the per-measure comparison beside them (jobs.run_compare). The receipt's totals, ACC check and notes are the
+    primary ACC's (the run's acc_version), read from its run_settings.json."""
+    from .jobs import run_compare
+    result = run_compare(cfg, log=log)
+    primary = _primary_settings(result.run_dir, cfg)
+    result.totals = primary.get("totals") or {}
+    result.acc_check = primary.get("acc_check")
+    result.notes = list(primary.get("notes") or []) + result.notes
+    return result
+
+
+def _primary_settings(run_dir: Path, cfg) -> dict:
+    """The run's run_settings.json: its own, or for an ACC comparison its primary ACC's (run_acc<acc_version>/)."""
+    for f in (run_dir / "run_settings.json", run_dir / f"run_acc{cfg.acc_version}" / "run_settings.json"):
+        if f.exists():
+            try:
+                return json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                return {}
+    return {}
+
+
 def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_files, status, error, started, t0) -> dict:
-    settings = {}
-    f = run_dir / "run_settings.json"
-    if f.exists():
-        try:
-            settings = json.loads(f.read_text(encoding="utf-8"))
-        except ValueError:
-            settings = {}
+    settings = _primary_settings(run_dir, cfg)
     acc = settings.get("acc", {})
     used = {}
     for k in ("electric", "gas"):                                     # the ACC files actually read, by their place in the reference folder

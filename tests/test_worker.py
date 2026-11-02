@@ -54,6 +54,8 @@ def test_a_local_job_runs_and_its_receipt_names_everything(job, tmp_path):
     ml = next(k for k in receipt["outputs"] if k.startswith("measure_level"))
     assert receipt["outputs"][ml]["sha256"] == _sha(out / ml) and receipt["outputs"][ml]["uri"] == str(out / ml)
     assert receipt["totals"] and "TotalSystemBenefit" in receipt["totals"]
+    log = (out / worker.LOG_NAME).read_text(encoding="utf-8")                # the run's log goes with its outputs, listed in the receipt
+    assert "recet worker" in log and receipt["outputs"][worker.LOG_NAME]["sha256"] == _sha(out / worker.LOG_NAME)
 
 
 def test_a_job_zip(job, tmp_path):
@@ -152,6 +154,7 @@ def test_a_failed_run_still_gets_a_receipt(job, tmp_path):
     code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
     assert code == 1 and receipt["status"] == "failed" and "blocking problems" in receipt["error"]
     assert (tmp_path / "results" / "receipt.json").exists() and (tmp_path / "results" / "preflight.txt").exists()
+    assert "blocking problems" in (tmp_path / "results" / worker.LOG_NAME).read_text(encoding="utf-8")   # with the traceback
 
 
 def test_validate():
@@ -212,6 +215,22 @@ def test_the_progress_sender(tmp_path):
     local.write_text(json.dumps({"stage": "writing", "done": 3}))
     s.send(force=True)
     assert s.sends == 3 and json.loads(dest.read_text())["done"] == 3
+
+
+def test_the_progress_sender_sends_the_log_with_each_report(tmp_path):
+    local, dest = tmp_path / "progress.json", tmp_path / "out" / "progress.json"
+    log, log_dest = tmp_path / "log.txt", tmp_path / "out" / "log.txt"
+    s = worker.ProgressSender(local, str(dest), every=3600, poll=3600, log=(log, str(log_dest)))
+    log.write_text("one\n")
+    local.write_text(json.dumps({"stage": "pricing", "done": 0}))
+    s.send()
+    assert log_dest.read_text() == "one\n"
+    with open(log, "a") as f:
+        f.write("two\n")
+    s.send(force=True)                                                 # the progress did not change, so nothing is sent
+    local.write_text(json.dumps({"stage": "writing", "done": 0}))
+    s.send()
+    assert log_dest.read_text() == "one\ntwo\n"
 
 
 def test_file_uris_round_trip(tmp_path):
@@ -277,3 +296,21 @@ def test_a_registry_program_table_replaces_the_builtin_one(job, tmp_path):
     assert receipt["programs"] == {"table": "supplied", "file": str(progs), "sha256": _sha(progs), "mode": "replace"}
     assert receipt["settings"]["programs_replace"] is True
 
+
+
+def test_a_comparison_with_another_acc_runs_both_and_compares_them(job, tmp_path):
+    """compare_with: the job is priced on its ACC and on the other, each in run_acc<ACC>/, with the per-measure comparison beside them;
+    the receipt carries the primary ACC's totals."""
+    ref = Path(__file__).parent / "data" / "regression" / "ref"
+    spec = json.loads(_spec(job, tmp_path).read_text())
+    spec["settings"]["compare_with"] = "2024"
+    spec["packs"] = {"reference_dir": str(ref)}
+    (tmp_path / "job.json").write_text(json.dumps(spec))
+    code, receipt = worker.run(str(tmp_path / "job.json"), log=lambda s: None)
+    assert code == 0, receipt["error"]
+    out = tmp_path / "results"
+    for acc in ("2026", "2024"):
+        assert any((out / f"run_acc{acc}").glob("measure_level_*")) and (out / f"run_acc{acc}" / "preflight.json").exists()
+    assert any(out.glob("comparison_acc2026_vs_acc2024*")) and any(out.glob("comparison_summary_acc2026_vs_acc2024*"))
+    assert receipt["totals"] and receipt["acc"]["version"] == "2026" and receipt["settings"]["compare_with"] == "2024"
+    assert "ACC version 2024" in (out / worker.LOG_NAME).read_text(encoding="utf-8")
