@@ -27,6 +27,7 @@ from .pipeline import (
 from .pipeline import data_loading  # noqa: E402 (module-level use in load_job)
 from .pipeline.data_loading import FIRST_BASELINE_QUANTITIES, PARENT_PROFILE_COLUMNS, PARENT_WATER_PROFILE, SECOND_BASELINE_QUANTITIES
 from .pipeline.engine import (
+    BILL_IMPACT_COLUMNS,
     HourlyPricingResult,
     price_bill_impact,
     price_gas_benefit,
@@ -46,6 +47,9 @@ ELEC_PROFILES = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline"
 ELEC_QUANTITIES = ("AC_Net_kWh_ScaledProfile_1st_Baseline", "AC_Net_kWh_ScaledProfile_2nd_Baseline")   # what each baseline's profile is multiplied by
 GAS_QUANTITIES = ("AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline")
 BILL_QUANTITIES = ("AC_Net_kWh_1st_Baseline", "AC_Net_kWh_2nd_Baseline", "AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline")
+# the first billed year's bill change (C9.1), net (NTG + MEB, as the lifecycle bill impacts) and gross (NTG = 1, as the PCT's): reported only, no cost test reads them
+FIRST_YEAR_BILL_COLUMNS = [c for c in BILL_IMPACT_COLUMNS if c.startswith("FirstYear")]
+FIRST_YEAR_BILL_COLUMNS += [f"{c}Gross" for c in FIRST_YEAR_BILL_COLUMNS]
 
 
 def _route_keys(df: pd.DataFrame, cols: list[str]) -> list[tuple]:
@@ -291,7 +295,8 @@ def run_bill_impact(measures: pd.DataFrame, acc_version: int = 2024, market_effe
     Reduc/Incr classification).
 
     Returns a DataFrame with one row per measure: CEInputID, LifecycleBillReducElec,
-    LifecycleBillIncrElec, LifecycleBillReducGas, LifecycleBillIncrGas -- NOT a per-quarter
+    LifecycleBillIncrElec, LifecycleBillReducGas, LifecycleBillIncrGas and the first billed year's
+    FirstYearBillReducElec ... FirstYearBillIncrGas (engine.BILL_IMPACT_COLUMNS) -- NOT a per-quarter
     series like this POC's other run_* functions, since the real quantity
     itself is a single lifetime PV number per measure (see price_bill_impact).
     """
@@ -535,7 +540,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
                "RebatesandIncents", "RebatesandIncentsPV", "NetParticipantCostPV", "MarkEffectPlusExcessIncPV", "NetParticipantCostAdjustedPV",
                "GrossParticipantCostPV",
                *PARTICIPANT_EXTRA, "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas",
-               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV"]]
+               "LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross", "TaxCreditsGrossPV",
+               *FIRST_YEAR_BILL_COLUMNS]]
 
 
 def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_version: int, base_year: int) -> pd.DataFrame:
@@ -558,16 +564,17 @@ def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_vers
         "AC_Gross_Therms_2nd_Baseline": m["NumUnits"] * m["UnitTherm2ndBaseline"] * m["InstallationRateTherm"] * m["RealizationRateTherm"],
     }
     gross_bill_impacts = run_bill_impact(m.assign(**gross_quantities), acc_version=acc_version, quantities=tuple(gross_quantities)).rename(
-        columns={c: f"{c}Gross" for c in ("LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas")})
+        columns={c: f"{c}Gross" for c in BILL_IMPACT_COLUMNS})
     discount_rate_qtr_by_iou = {iou: discount_settings.get_discount_rate_qtr(iou, acc_version) for iou in m["IOU_AC_Territory"].unique()}
     quarters_from_first_year = (m["Used_Year"] - base_year) * 4 + (m["Used_Quarter"] - 1)                                # CalcCE's Qm
     participant_discount_factor = (1.0 + m["IOU_AC_Territory"].map(discount_rate_qtr_by_iou)) ** quarters_from_first_year     # Rqf ^ Qm
     out = m[["CEInputID"]].assign(_participant_discount_factor=participant_discount_factor.to_numpy()).merge(gross_bill_impacts, on="CEInputID", how="left")
     out = out.merge(priced[["CEInputID", "TaxCreditsGross"]], on="CEInputID", how="left")
     gross_cols = ["LifecycleBillReducElecGross", "LifecycleBillIncrElecGross", "LifecycleBillReducGasGross", "LifecycleBillIncrGasGross"]
-    out[gross_cols] = out[gross_cols].fillna(0.0)
+    first_year_gross = [f"{c}Gross" for c in BILL_IMPACT_COLUMNS if c.startswith("FirstYear")]      # reported only: not in the PCT
+    out[gross_cols + first_year_gross] = out[gross_cols + first_year_gross].fillna(0.0)
     out["TaxCreditsGrossPV"] = out["TaxCreditsGross"] / out["_participant_discount_factor"]
-    return out[["CEInputID"] + gross_cols + ["TaxCreditsGrossPV"]]
+    return out[["CEInputID"] + gross_cols + ["TaxCreditsGrossPV"] + first_year_gross]
 
 
 def run_societal_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base_year: int | None = None,

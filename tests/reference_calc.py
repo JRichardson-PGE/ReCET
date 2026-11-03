@@ -293,6 +293,21 @@ def bill_pv(d, s1, s2, rates, rate_annual, base_year):
     return total
 
 
+def first_year_bill(d, s1, s2, rates):
+    """C9.1: the first billed year (the claim year) of C9's stream, in that year's dollars (no discount factor)."""
+    eul, rul = d["eul"], d["rul"]
+    full = int(eul)
+    rem = eul - full
+    n = full + (1 if rem > 1e-9 else 0)
+    if n == 0 or d["Used_Year"] not in rates:
+        return 0.0
+    floor_rul = int(rul) if rul > 0 else full
+    boundary = (rul - floor_rul) if rul > 0 else 1.0
+    w = rem if (n == 1 and rem > 1e-9) else 1.0
+    v = s1 if floor_rul >= 1 else boundary * s1 + (1.0 - boundary) * s2
+    return w * v * rates[d["Used_Year"]]
+
+
 def participant_test(d, part, tax_credits_gross, bills_gross, rate_qtr, first_year):
     """C12: the Participant Cost Test on gross bill impacts (`bills_gross`: the four ...Gross bill columns)."""
     pvf = (1.0 + rate_qtr) ** ((d["Used_Year"] - first_year) * 4 + (d["Used_Quarter"] - 1))

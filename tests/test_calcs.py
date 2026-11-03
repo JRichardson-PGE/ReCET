@@ -208,6 +208,13 @@ def reference_outputs(meb: float, mec: float) -> dict[str, dict]:
         bg = {}
         bg["LifecycleBillReducElecGross"], bg["LifecycleBillIncrElecGross"] = ref.split_ben_supply(gross_e, d["Fuel_Sub_Flag"])
         bg["LifecycleBillReducGasGross"], bg["LifecycleBillIncrGasGross"] = ref.split_ben_supply(gross_g, d["Fuel_Sub_Flag"])
+        for tag, (fe_, ft_), (e1, e2, g1, g2) in (("", (fe, ft), (d["AC_Net_kWh_1st_Baseline"], d["AC_Net_kWh_2nd_Baseline"], d["therms_1st"], d["therms_2nd"])),
+                                                  ("Gross", (1.0, 1.0), (d["qty"] * d["kwh1"] * d["irr_kwh"], d["qty"] * d["kwh2"] * d["irr_kwh"],
+                                                                         d["qty"] * d["th1"] * d["irr_therm"], d["qty"] * d["th2"] * d["irr_therm"]))):
+            fy_e = ref.first_year_bill(d, fe_ * e1, fe_ * e2, rates_e)            # C9.1
+            fy_g = ref.first_year_bill(d, ft_ * g1, ft_ * g2, rates_g)
+            e[f"FirstYearBillReducElec{tag}"], e[f"FirstYearBillIncrElec{tag}"] = ref.split_ben_supply(fy_e, d["Fuel_Sub_Flag"])
+            e[f"FirstYearBillReducGas{tag}"], e[f"FirstYearBillIncrGas{tag}"] = ref.split_ben_supply(fy_g, d["Fuel_Sub_Flag"])
         e.update(ref.participant_test(d, p1, e["TaxCreditsGross"], bg, st["qtr"], first_year))
         e["prg"], e["ntg_kwh"], e["ntg_therm"] = raw["PrgID"], d["ntg_kwh"], d["ntg_therm"]
         nox, pm10 = ref.nox_pm10("PGE", E3_VERSION, raw["AC_Elec_Target_Sector"], raw["AC_Elec_Impact_Profile"], raw["AC_Climate_Zone"])
@@ -305,6 +312,22 @@ def test_bill_impact_of_a_single_baseline_measure_with_a_fractional_life():
     assert run(3.0) == pytest.approx(sum(1000 * 0.2 / raf ** k for k in range(3)))
     assert run(3.5) == pytest.approx(sum(1000 * 0.2 / raf ** k for k in range(3)) + 0.5 * 1000 * 0.2 / raf ** (3 + 4))     # the last year keeps CalcCE's Raf^Qy exponent
     assert run(3.5) > run(3.0)
+
+
+def test_first_year_bill_is_the_claim_years_term_not_discounted():
+    """C9.1: the first billed year of the bill stream in the claim year's dollars: a short life counts its fraction, an RUL under one year blends the baselines,
+    and neither the lifecycle sum's Raf ^ k nor its boundary-year Raf ^ Yr1 is applied."""
+    rates = {y: 0.20 + 0.01 * (y - 2028) for y in range(2024, 2060)}
+    run = lambda eul, rul, s2=0.0, fuel_sub=False: price_bill_impact(_bill_measure(eul, rul, s2=s2).assign(Fuel_Sub_Flag=fuel_sub), lambda m: rates, lambda m: None,
+                                                                      lambda m: 0.07, 2024).iloc[0]
+    assert run(3.5, 0.0)["FirstYearBillReducElec"] == pytest.approx(1000 * 0.20)
+    assert run(3.5, 2.25, s2=400.0)["FirstYearBillReducElec"] == pytest.approx(1000 * 0.20)                     # first year on the 1st baseline
+    assert run(3.5, 0.5, s2=400.0)["FirstYearBillReducElec"] == pytest.approx((0.5 * 1000 + 0.5 * 400) * 0.20)    # the boundary year is the first: no Raf ^ Yr1
+    assert run(0.25, 0.0)["FirstYearBillReducElec"] == pytest.approx(0.25 * 1000 * 0.20)                       # a quarter-year life
+    assert run(0.25, 0.0)["FirstYearBillReducElec"] == pytest.approx(run(0.25, 0.0)["LifecycleBillReducElec"] / 1.07 ** -4)   # the lifecycle term is discounted
+    neg = price_bill_impact(_bill_measure(3.0, 0.0, s1=-1000.0).assign(Fuel_Sub_Flag=True), lambda m: rates, lambda m: None, lambda m: 0.07, 2024).iloc[0]
+    assert (neg["FirstYearBillReducElec"], neg["FirstYearBillIncrElec"]) == (0.0, pytest.approx(200.0))           # fuel substitution: an increase
+    assert run(3.0, 0.0)["FirstYearBillReducGas"] == 0 and run(0.0, 0.0)["FirstYearBillReducElec"] == 0              # no gas rate table; no life
 
 
 def test_market_effects_on_costs_reach_the_participant_cost(tmp_path):
