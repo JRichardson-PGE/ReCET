@@ -13,7 +13,12 @@ worker's receipt (with the file's SHA-256). A run that names no set uses the set
 outside its program years is a warning, never a stop. A filing run (CEDARS filing checks, or priced for a filing) accepts only a published built-in set:
 a supplied file or a draft set is refused (Jake, 2026-10-31: filings use the CPUC's set, which users cannot edit; standalone runs may use their own).
 
-The run's set is what the tests are priced from: `pipeline/test_evaluator.py` (0.1.84) evaluates its aggregates and tests over the priced streams."""
+The run's set is what the tests are priced from: `pipeline/test_evaluator.py` (0.1.84) evaluates its aggregates and tests over the priced streams.
+
+A set's `source: engine` streams come from the engine's own catalog (`engine_streams`, 0.1.92): a set may leave any out, choose the pricings each is
+read in and word its unit and definition, but a name the engine does not price, a changed kind / fuel / naming / gross form, or a pricing whose ACC rows,
+discount rates or suffix the engine does not price that stream at, is refused when the set is checked, not found as a KeyError when a run prices it.
+CEDARS-Platform's set builder reads the same catalog."""
 from __future__ import annotations
 
 import hashlib
@@ -52,6 +57,133 @@ TEST_KEYS = {"label", "pricing", "benefits", "numerator_adders", "costs", "progr
 
 class SetError(ValueError):
     """A cost-test set that cannot be used: every problem found, one per line."""
+
+
+# ---------------------------------------------------------------------------------------------------------------------------- the engine's streams
+# What the engine's pricing writes for each ACC-row choice of a pricing: the column suffix of each naming, and the discount rates it prices those rows at.
+# A `source: engine` stream can be read in a set's pricing only when that pricing matches these (the engine writes ElecBen_SB at the SCT rates; a
+# pricing on the sct_base rows with suffix _X, or at the primary rates, would name a column the engine never wrote, or one priced at other rates).
+ENGINE_ROWS = {
+    "trc": {"suffix": "", "participant_suffix": "", "discount_rate_quarterly": "DiscountRateQtr", "discount_rate_annual": "DiscountRateAnnual"},
+    "sct_base": {"suffix": "_SB", "participant_suffix": "_SCT", "discount_rate_quarterly": "DiscountRateQtr_SCT",
+                 "discount_rate_annual": "DiscountRateAnnual_SCT"},
+    "sct_high": {"suffix": "_SH", "participant_suffix": "_SCT", "discount_rate_quarterly": "DiscountRateQtr_SCT",
+                 "discount_rate_annual": "DiscountRateAnnual_SCT"},
+}
+ENGINE_FIXED = ("kind", "fuel", "naming", "gross", "internal")     # what a set may not change about an engine stream (Jake, 2026-11-03)
+
+
+@dataclass(frozen=True)
+class EngineStream:
+    """A stream the engine prices (CALCULATIONS C5 to C9, C12): its fixed facts, and the unit and definition a set starts from."""
+    name: str
+    kind: str
+    fuel: str
+    acc_rows: tuple[str, ...]               # the ACC rows the engine prices it on (ENGINE_ROWS); naming none = priced on trc only
+    naming: str
+    gross: str | None
+    internal: bool
+    unit: str
+    definition: str
+
+    def column(self, acc_rows: str, gross: bool = False) -> str:
+        """The column the engine writes for these ACC rows (its gross form with `gross`)."""
+        name = self.name
+        if gross:
+            if self.gross is None:
+                raise KeyError(f"engine stream {self.name} has no gross form")
+            name = self.name if self.gross == "same" else f"{self.name}Gross" if self.gross == "divide_ntg" else self.gross
+        return name + ("" if self.naming == "none" else ENGINE_ROWS[acc_rows][self.naming])
+
+    def facts(self) -> dict:
+        """The fixed facts as a set writes them (`gross` and `internal` only when the stream has them)."""
+        out = {"kind": self.kind, "fuel": self.fuel, "naming": self.naming}
+        if self.gross is not None:
+            out["gross"] = self.gross
+        if self.internal:
+            out["internal"] = True
+        return out
+
+
+_ALL_ROWS = tuple(ENGINE_ROWS)
+_ENGINE_STREAMS = (
+    EngineStream("ElecBen", "benefit", "elec", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "Electric avoided-cost benefits over the measure's life (CALCULATIONS C5, C6)."),
+    EngineStream("GasBen", "benefit", "gas", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "Gas avoided-cost benefits over the measure's life (C5, C6)."),
+    EngineStream("WaterEnergyBen", "benefit", "water", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "Avoided costs of the electricity embedded in the water saved (C5.5), on the kWh net-to-gross."),
+    EngineStream("ElecSupplyCost", "cost", "elec", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "The negative-value part of the electric avoided costs, a cost (C6)."),
+    EngineStream("GasSupplyCost", "cost", "gas", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "The negative-value part of the gas avoided costs, a cost (C6)."),
+    EngineStream("WaterEnergyCost", "cost", "water", _ALL_ROWS, "suffix", "divide_ntg", False, "$ (PV)",
+                 "The negative-value part of the water-energy avoided costs, a cost (C6)."),
+    EngineStream("RebatesandIncentsPV", "cost", "none", _ALL_ROWS, "participant_suffix", "same", False, "$ (PV)",
+                 "End-user rebates, incentives to others and direct install, discounted from the claim quarter (C8)."),
+    EngineStream("NetParticipantCostAdjustedPV", "cost", "none", _ALL_ROWS, "participant_suffix", "GrossParticipantCostPV", False, "$ (PV)",
+                 "The net participant cost with excess incentives and the market-effects term (C8)."),
+    EngineStream("NetParticipantCostPV", "cost", "none", _ALL_ROWS, "participant_suffix", None, False, "$ (PV)",
+                 "The net participant cost with excess incentives, without the market-effects term (C8)."),
+    EngineStream("GrossParticipantCostPV", "cost", "none", _ALL_ROWS, "participant_suffix", "same", False, "$ (PV)",
+                 "The gross measure cost less rebates and incentives, discounted from the claim quarter (C8)."),
+    EngineStream("LifecycleBillReducElec", "cost", "elec", ("trc",), "none", None, False, "$ (PV)",
+                 "Ratepayers' lost electric revenue over the measure's life, at the retail rates (C9)."),
+    EngineStream("LifecycleBillReducGas", "cost", "gas", ("trc",), "none", None, False, "$ (PV)",
+                 "Ratepayers' lost gas revenue over the measure's life (C9)."),
+    EngineStream("LifecycleBillIncrElec", "benefit", "elec", ("trc",), "none", None, False, "$ (PV)",
+                 "Added electric revenue (fuel substitution) over the measure's life (C9)."),
+    EngineStream("LifecycleBillIncrGas", "benefit", "gas", ("trc",), "none", None, False, "$ (PV)",
+                 "Added gas revenue (fuel substitution) over the measure's life (C9)."),
+    EngineStream("LifecycleBillReducElecGross", "benefit", "elec", ("trc",), "none", None, False, "$ (PV)",
+                 "The participant's electric bill savings on gross savings, without market effects (C12, PCT)."),
+    EngineStream("LifecycleBillReducGasGross", "benefit", "gas", ("trc",), "none", None, False, "$ (PV)",
+                 "The participant's gas bill savings on gross savings (C12, PCT)."),
+    EngineStream("LifecycleBillIncrElecGross", "cost", "elec", ("trc",), "none", None, False, "$ (PV)",
+                 "The participant's electric bill increases on gross savings (C12, PCT)."),
+    EngineStream("LifecycleBillIncrGasGross", "cost", "gas", ("trc",), "none", None, False, "$ (PV)",
+                 "The participant's gas bill increases on gross savings (C12, PCT)."),
+    EngineStream("TaxCreditsGrossPV", "benefit", "none", ("trc",), "none", None, True, "$ (PV)",
+                 "TaxCreditsGross discounted from the claim quarter at the primary quarterly rate (C12, PCT); not written as a column."),
+)
+
+
+def engine_streams() -> dict[str, EngineStream]:
+    """{name: stream} of every stream the engine prices, in the order a set lists them: the vocabulary of a set's `source: engine` streams. A set may
+    leave any of them out, choose the pricings it reads each in (`engine_pricings`) and word its unit and definition; the name, kind, fuel, naming,
+    gross form and whether it is internal are the engine's. A new engine stream is an engine release that adds a row here (tests/test_cost_test_sets.py
+    prices a job and checks every row's columns are written)."""
+    return {s.name: s for s in _ENGINE_STREAMS}
+
+
+def engine_pricing_problem(stream: str, pricing_id: str, pricing: dict) -> str | None:
+    """Why the engine stream `stream` cannot be read in a set's pricing (its parsed YAML mapping), or None when it can."""
+    e = engine_streams().get(stream)
+    if e is None or not isinstance(pricing, dict):
+        return None
+    rows = pricing.get("acc_rows")
+    if rows not in ENGINE_ROWS:
+        return None                                                     # the pricing's own error says so
+    if rows not in e.acc_rows:
+        return f"the engine prices {stream} on the {', '.join(e.acc_rows)} rows only, and pricing {pricing_id!r} uses the {rows} rows"
+    want = ENGINE_ROWS[rows]
+    rates = (pricing.get("discount_rate_quarterly"), pricing.get("discount_rate_annual"))
+    if rates != (want["discount_rate_quarterly"], want["discount_rate_annual"]):
+        return (f"the engine prices {stream} on the {rows} rows at {want['discount_rate_quarterly']} / {want['discount_rate_annual']}, and pricing "
+                f"{pricing_id!r} names {rates[0]} / {rates[1]}")
+    if e.naming != "none" and pricing.get(e.naming, "") != want[e.naming]:
+        return (f"the engine writes {e.column(rows)} for the {rows} rows, and pricing {pricing_id!r} has {e.naming} {pricing.get(e.naming, '')!r}, "
+                f"so the set would read {stream}{pricing.get(e.naming, '')}")
+    return None
+
+
+def engine_pricings(stream: str, pricings: dict) -> list[str]:
+    """The ids of a set's pricings (its parsed `pricings` mapping) the engine stream `stream` can be read in, in the set's order."""
+    e = engine_streams().get(stream)
+    if e is None:
+        return []
+    return [p for p, v in (pricings or {}).items()
+            if isinstance(v, dict) and v.get("acc_rows") in e.acc_rows and engine_pricing_problem(stream, p, v) is None]
 
 
 @dataclass(frozen=True)
@@ -326,6 +458,22 @@ def validate(data) -> list[str]:
                                   "rates it needs its own column per pricing (naming: suffix)")
         elif any(k in s for k in ("columns", "columns_2nd", "basis", "ntg", "market_effects")):
             errors.append(f"{where}: columns, basis, ntg and market_effects are for source: input")
+        if src == "engine":
+            e = engine_streams().get(name)
+            if e is None:
+                errors.append(f"{where}: the engine prices no stream {name!r} (it prices {', '.join(engine_streams())}); a value of the set's own "
+                              "is an input stream (source: input)")
+            else:
+                defaults = {"fuel": "none", "naming": "none", "gross": None, "internal": False}
+                for k in ENGINE_FIXED:
+                    have, want = s.get(k, defaults.get(k)), getattr(e, k)
+                    if have != want:
+                        errors.append(f"{where}.{k}: the engine's {name} has {k} {want!r}, not {have!r} (a set chooses an engine stream's pricings, "
+                                      "unit and definition only)")
+                for p in (s.get("pricings") if _strs(s.get("pricings")) else []):
+                    why = engine_pricing_problem(name, p, pricings.get(p))
+                    if why:
+                        errors.append(f"{where}.pricings: {why}")
         if src == "program" and any(k in s for k in ("pricings", "naming", "gross")):
             errors.append(f"{where}: a program stream is priced by the test's own pricing (no pricings, naming or gross)")
         if "internal" in s and not isinstance(s["internal"], bool):

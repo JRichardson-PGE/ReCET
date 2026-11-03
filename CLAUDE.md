@@ -107,6 +107,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.92 (2026-11-03, Jake; step 2 of CEDARS-Platform's cost-test set builder): the engine's stream catalog. `cost_test_sets.engine_streams()` (a table
+  in the module, not read from EE-2026, so a set may leave a stream out without losing the vocabulary): every `source: engine` stream with its fixed facts
+  (kind, fuel, naming, gross, internal), the ACC rows the engine prices it on and the unit / definition a set starts from (EE-2026's own text);
+  `ENGINE_ROWS` (per ACC rows: the suffix of each naming and the discount rates the engine prices at), `engine_pricing_problem` / `engine_pricings`
+  (which of a set's pricings an engine stream can be read in). `validate` now refuses an engine stream the engine does not price (it was a KeyError at
+  run time), a changed fixed fact (Jake: a set chooses an engine stream's pricings, unit and definition only), and an engine stream read in a pricing
+  whose ACC rows, rates or suffix the engine does not price it at. `recet cost-tests streams`. EE-2026 unchanged; tests/test_cost_test_sets.py runs a
+  job and checks every catalog column (every row, gross forms, internal) is in the frame the tests are priced from. COST_TESTS section 3.
 - 0.1.91 (2026-11-03, Jake: "are first year bill savings / bill increases in the ReCET outputs yet? If not we still need to add them"): first-year bill
   impacts. The CET has none (its only bill outputs are the lifecycle BillReduc/BillIncr), so they follow its bill calculation (C9) for one year:
   `FY = wt x v(0) x rate(claim year)`, the k = 0 term of the lifecycle sum WITHOUT a discount factor (a boundary year at k = 0, RUL < 1, is discounted by
