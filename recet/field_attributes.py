@@ -59,7 +59,7 @@ def _source(column: str, inputs: set[str]) -> str:
         return "calculated: savings x 8,760 (gas: quarterly) profile x ACC avoided costs"
     if re.search(r"(CO2|NOx|PM10)$", column):
         return "calculated: savings x profile x emission factors (ACC and CET tables)"
-    if column.startswith(("LifecycleBill",)):
+    if column.startswith(("LifecycleBill", "FirstYearBill")):
         return "calculated: savings x retail rates (run parameters)"
     if column.startswith(("Used_", "AC_Net_", "Fuel_Sub", "Scaled_Profile", "Credited")) or column.endswith(("Status", "Source", "ZoneSource")):
         return "calculated from the Measure.csv inputs (how the record was read and priced)"
@@ -96,6 +96,8 @@ def _time_basis(column: str, u: str) -> str:
         return "ratio of lifecycle present values"
     if column.startswith("Lev"):
         return "levelized: lifecycle PV per discounted lifecycle kWh or therm"
+    if column.startswith("FirstYearBill"):
+        return "first billed year (the claim year), nominal dollars, not discounted"
     if column.startswith("FirstYear"):
         return "first year of the measure's life"
     if column.startswith("Annual"):

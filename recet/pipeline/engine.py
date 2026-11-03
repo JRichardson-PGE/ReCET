@@ -517,6 +517,11 @@ def price_gas_benefit(
     return pd.DataFrame({"CEInputID": m["CEInputID"].to_numpy()[priced][has_life], "LifetimeValuePV": value[has_life]})
 
 
+# the columns price_bill_impact / price_bill_impact_per_measure return besides CEInputID: the lifecycle PV (C9) and the first billed year, not discounted (C9.1)
+BILL_IMPACT_COLUMNS = ["LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas",
+                       "FirstYearBillReducElec", "FirstYearBillIncrElec", "FirstYearBillReducGas", "FirstYearBillIncrGas"]
+
+
 def price_bill_impact_per_measure(
     measures: pd.DataFrame,
     get_elec_rate_years: Callable[[pd.Series], dict[int, float] | None],
@@ -625,8 +630,24 @@ def price_bill_impact_per_measure(
                 total += year_weight * quantity_this_year * rate / (annual_discount_factor ** (k + years_from_base_year))
             return total
 
-        elec_bill_pv = bill_pv(float(m["Billed_kWh_1st_Baseline"]), float(m["Billed_kWh_2nd_Baseline"]), get_elec_rate_years(m))
-        gas_bill_pv = bill_pv(float(m["Billed_Therms_1st_Baseline"]), float(m["Billed_Therms_2nd_Baseline"]), get_gas_rate_years(m))
+        def first_year_bill(quantity_1st: float, quantity_2nd: float, retail_rates: dict[int, float] | None) -> float | None:
+            # The first billed year (the claim year) of bill_pv's stream, not discounted: the k = 0 term of the sums above without its Raf factor
+            # (Raf ^ 0 = 1 on a 1st-baseline year; a boundary year at k = 0, RUL < 1, carries Raf ^ Yr1 in the lifecycle sum, which is not applied here)
+            if retail_rates is None:
+                return None
+            rate = retail_rates.get(claim_year)
+            if rate is None or n_billed_years < 1:
+                return 0.0
+            year_weight = last_year_fraction if (n_billed_years == 1 and last_year_fraction > 1e-9) else 1.0
+            share_1st = 1.0 if years_on_1st_baseline >= 1 else boundary_year_share_1st
+            return year_weight * (share_1st * quantity_1st + (1.0 - share_1st) * quantity_2nd) * rate
+
+        elec_quantities = (float(m["Billed_kWh_1st_Baseline"]), float(m["Billed_kWh_2nd_Baseline"]), get_elec_rate_years(m))
+        gas_quantities = (float(m["Billed_Therms_1st_Baseline"]), float(m["Billed_Therms_2nd_Baseline"]), get_gas_rate_years(m))
+        elec_bill_pv = bill_pv(*elec_quantities)
+        gas_bill_pv = bill_pv(*gas_quantities)
+        elec_first_year = first_year_bill(*elec_quantities)
+        gas_first_year = first_year_bill(*gas_quantities)
 
         # Reduc/Incr split (CalcCE 15880-15992): a fuel-substitution measure books a negative value as an INCREASE (Incr, positive);
         # every other measure keeps its signed value in Reduc and has Incr = 0 (`ISNULL(ft.FuelType,0)='0'` branch).
@@ -639,12 +660,18 @@ def price_bill_impact_per_measure(
 
         LifecycleBillReducElec, LifecycleBillIncrElec = split(elec_bill_pv)
         LifecycleBillReducGas, LifecycleBillIncrGas = split(gas_bill_pv)
+        FirstYearBillReducElec, FirstYearBillIncrElec = split(elec_first_year)
+        FirstYearBillReducGas, FirstYearBillIncrGas = split(gas_first_year)
         rows.append({
             "CEInputID": m["CEInputID"],
             "LifecycleBillReducElec": LifecycleBillReducElec,
             "LifecycleBillIncrElec": LifecycleBillIncrElec,
             "LifecycleBillReducGas": LifecycleBillReducGas,
             "LifecycleBillIncrGas": LifecycleBillIncrGas,
+            "FirstYearBillReducElec": FirstYearBillReducElec,
+            "FirstYearBillIncrElec": FirstYearBillIncrElec,
+            "FirstYearBillReducGas": FirstYearBillReducGas,
+            "FirstYearBillIncrGas": FirstYearBillIncrGas,
         })
 
     return pd.DataFrame(rows)
@@ -870,7 +897,7 @@ def price_bill_impact(
     m = measures
     n_rows = len(m)
     if n_rows == 0:
-        return pd.DataFrame(columns=["CEInputID", "LifecycleBillReducElec", "LifecycleBillIncrElec", "LifecycleBillReducGas", "LifecycleBillIncrGas"])
+        return pd.DataFrame(columns=["CEInputID", *BILL_IMPACT_COLUMNS])
     claim_year = m["Used_Year"].astype(int).to_numpy()
     years_from_base_year = claim_year - run_parameters_base_year                                        # CalcCE's Yr1
     annual_discount_factor = 1.0 + np.asarray(_by_key(m, ["IOU_AC_Territory"], get_discount_rate_annual), dtype=float)   # CalcCE's Raf
@@ -911,19 +938,34 @@ def price_bill_impact(
                               year_weight * quantity_this_year * rate / annual_discount_factor ** (k + years_from_base_year), 0.0)
         return total
 
+    def first_year_bill(quantity_1st: np.ndarray, quantity_2nd: np.ndarray, retail_rates: np.ndarray) -> np.ndarray:
+        # the k = 0 term of bill_pv, not discounted (see price_bill_impact_per_measure)
+        year_weight = np.where((n_billed_years == 1) & (last_year_fraction > 1e-9), last_year_fraction, 1.0)
+        share_1st = np.where(years_on_1st_baseline >= 1, 1.0, boundary_year_share_1st)
+        value = year_weight * (share_1st * quantity_1st + (1.0 - share_1st) * quantity_2nd) * retail_rates[:, 0]
+        return np.where(n_billed_years >= 1, value, 0.0)
+
     elec_rates, has_elec_rates = rate_matrix(_by_key(m, ["IOU_AC_Territory", "AC_Elec_Target_Sector"], get_elec_rate_years))
     gas_rates, has_gas_rates = rate_matrix(_by_key(m, ["IOU_AC_Territory", "AC_Gas_Target_Sector"], get_gas_rate_years))
-    elec_bill_pv = np.where(has_elec_rates, bill_pv(_column_or_default(m, "Billed_kWh_1st_Baseline"), _column_or_default(m, "Billed_kWh_2nd_Baseline"),
-                                                    elec_rates), 0.0)
-    gas_bill_pv = np.where(has_gas_rates, bill_pv(_column_or_default(m, "Billed_Therms_1st_Baseline"), _column_or_default(m, "Billed_Therms_2nd_Baseline"),
-                                                  gas_rates), 0.0)
+    elec_quantities = (_column_or_default(m, "Billed_kWh_1st_Baseline"), _column_or_default(m, "Billed_kWh_2nd_Baseline"), elec_rates)
+    gas_quantities = (_column_or_default(m, "Billed_Therms_1st_Baseline"), _column_or_default(m, "Billed_Therms_2nd_Baseline"), gas_rates)
+    elec_bill_pv = np.where(has_elec_rates, bill_pv(*elec_quantities), 0.0)
+    gas_bill_pv = np.where(has_gas_rates, bill_pv(*gas_quantities), 0.0)
+    elec_first_year = np.where(has_elec_rates, first_year_bill(*elec_quantities), 0.0)
+    gas_first_year = np.where(has_gas_rates, first_year_bill(*gas_quantities), 0.0)
     Fuel_Sub_Flag = (m["Fuel_Sub_Flag"].fillna(True).astype(bool).to_numpy() if "Fuel_Sub_Flag" in m.columns else np.ones(n_rows, dtype=bool))
+    reduc = lambda v: np.where(Fuel_Sub_Flag, np.maximum(v, 0.0), v)
+    incr = lambda v: np.where(Fuel_Sub_Flag, np.maximum(-v, 0.0), 0.0)
     return pd.DataFrame({
         "CEInputID": m["CEInputID"].to_numpy(),
-        "LifecycleBillReducElec": np.where(Fuel_Sub_Flag, np.maximum(elec_bill_pv, 0.0), elec_bill_pv),
-        "LifecycleBillIncrElec": np.where(Fuel_Sub_Flag, np.maximum(-elec_bill_pv, 0.0), 0.0),
-        "LifecycleBillReducGas": np.where(Fuel_Sub_Flag, np.maximum(gas_bill_pv, 0.0), gas_bill_pv),
-        "LifecycleBillIncrGas": np.where(Fuel_Sub_Flag, np.maximum(-gas_bill_pv, 0.0), 0.0),
+        "LifecycleBillReducElec": reduc(elec_bill_pv),
+        "LifecycleBillIncrElec": incr(elec_bill_pv),
+        "LifecycleBillReducGas": reduc(gas_bill_pv),
+        "LifecycleBillIncrGas": incr(gas_bill_pv),
+        "FirstYearBillReducElec": reduc(elec_first_year),
+        "FirstYearBillIncrElec": incr(elec_first_year),
+        "FirstYearBillReducGas": reduc(gas_first_year),
+        "FirstYearBillIncrGas": incr(gas_first_year),
     })
 
 

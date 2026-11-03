@@ -107,6 +107,14 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.91 (2026-11-03, Jake: "are first year bill savings / bill increases in the ReCET outputs yet? If not we still need to add them"): first-year bill
+  impacts. The CET has none (its only bill outputs are the lifecycle BillReduc/BillIncr), so they follow its bill calculation (C9) for one year:
+  `FY = wt x v(0) x rate(claim year)`, the k = 0 term of the lifecycle sum WITHOUT a discount factor (a boundary year at k = 0, RUL < 1, is discounted by
+  Raf^Yr1 in the lifecycle sum; not here), a life under one year counting its fraction. Measure-level `FirstYearBillReducElec`, `FirstYearBillIncrElec`,
+  `FirstYearBillReducGas`, `FirstYearBillIncrGas` (net: NTG + MEB, as the lifecycle ones) and the four `...Gross` (no NTG, no MEB), after the lifecycle
+  gross block; the same Fuel_Sub_Flag Reduc / Incr split. `engine.BILL_IMPACT_COLUMNS` (price_bill_impact and its per-measure reference both return
+  them), `run_poc.FIRST_YEAR_BILL_COLUMNS`. Reported only: no cost test reads them. The four net ones are in `outputs.SUMMARY_TOTALS` (portfolio summary,
+  group sums). CALCULATIONS C9.1, OUTPUT_FIELDS 1.5; reference_calc.first_year_bill; regression fixtures gained the columns only (every old column equal).
 - 0.1.90 (2026-11-02, Jake: the platform's run page should show the run's log as ReCET's does): the worker keeps the run's log. `worker.run` tees every
   log line, timed, into `<work>/log.txt` (`worker._tee`, `LOG_NAME`); `ProgressSender(..., log=(local, uri))` sends it beside progress.json with each
   progress report when it has grown (`send_log`, never fatal); at the end it is copied into the run folder, so it goes with the outputs and the receipt lists

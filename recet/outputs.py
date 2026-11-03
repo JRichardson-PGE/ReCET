@@ -40,7 +40,8 @@ DROP_FROM_RESULT = {"CEInputID", "PrgID", "NTGRkWh_plus_MEBens", "NTGRTherm_plus
 KEY_OUTPUTS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "TotalSystemBenefit", "ElecSupplyCost", "WaterEnergyCost", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
                "TRCBen", "PACBen", "RIMBen", "SCBBen", "SCHBen", "TRCRatio", "PACRatio", "RIMRatio", "SCBRatio", "SCHRatio", "PCTBen", "PCTCost", "PCTRatio", "FirstYearNetElecCO2", "FirstYearNetGasCO2", "LifecycleBillReducElec", "LifecycleBillReducGas"]
 SUMMARY_TOTALS = ["ElecBen", "GasBen", "WaterEnergyBen", "OtherBen", "ElecSupplyCost", "GasSupplyCost", "WaterEnergyCost", "TotalSystemBenefit", "TRCCost", "PACCost", "RIMCost", "SCBCost", "SCHCost",
-                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "LifecycleBillReducElec", "LifecycleBillReducGas", "PCTBen", "PCTCost", "FirstYearNetElecCO2", "FirstYearNetGasCO2"]
+                  "TRCCostNoAdmin", "PACCostNoAdmin", "WeightedProgramCost", "LifecycleBillReducElec", "LifecycleBillReducGas", "PCTBen", "PCTCost", "FirstYearNetElecCO2", "FirstYearNetGasCO2",
+                  "FirstYearBillReducElec", "FirstYearBillIncrElec", "FirstYearBillReducGas", "FirstYearBillIncrGas"]
 
 
 def read_raw(measure_csv: str | Path, allocate_statewide: bool = False) -> pd.DataFrame:
