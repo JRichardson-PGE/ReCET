@@ -6,6 +6,7 @@ import copy
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 
@@ -74,6 +75,51 @@ def test_every_column_the_set_names_is_one_a_run_writes(tmp_path):
     assert not missing, missing
 
 
+def test_the_engine_stream_catalog_is_what_a_run_writes(tmp_path, monkeypatch):
+    """Every catalog stream's column, on every ACC row the catalog says the engine prices it on (gross forms too, internal ones included), is in the
+    frame the cost tests are priced from; and EE-2026's engine streams are the catalog's, with the catalog's unit and definition."""
+    from recet.pipeline import cost_tests
+    seen = {}
+    real = cost_tests.compute_cost_tests
+
+    def capture(d, *a, **kw):
+        seen.setdefault("columns", set(d.columns))
+        return real(d, *a, **kw)
+    monkeypatch.setattr(cost_tests, "compute_cost_tests", capture)
+    run_job(_cfg(tmp_path), log=lambda s: None)
+    have = seen["columns"] | set(cost_tests._with_gross(pd.DataFrame(columns=sorted(seen["columns"]))).columns)
+    want = {e.column(r, gross=g) for e in cts.engine_streams().values() for r in e.acc_rows for g in (False, True) if not g or e.gross}
+    assert not sorted(want - have), sorted(want - have)
+    ee = _data()
+    for name, st in ee["streams"].items():
+        if st["source"] != "engine":
+            continue
+        e = cts.engine_streams()[name]
+        assert {k: st[k] for k in e.facts()} == e.facts() and (st["unit"], st["definition"]) == (e.unit, e.definition), name
+        assert cts.engine_pricings(name, ee["pricings"]) == [p for p, v in ee["pricings"].items() if v["acc_rows"] in e.acc_rows]
+    assert cts.engine_pricings("LifecycleBillReducGas", ee["pricings"]) == ["primary"] and cts.engine_pricings("Nope", ee["pricings"]) == []
+
+
+def test_a_set_may_word_and_reprice_an_engine_stream():
+    """Within the catalog a set is free: read a stream in more of the engine's pricings, add one EE-2026 leaves out, change a unit and definition, and add
+    a pricing of its own (other rates, another suffix) for input streams and program costs, as long as no engine stream is read in it."""
+    d = _data()
+    d["streams"]["ElecBen"].update(unit="dollars, PV", definition="Electric benefits.")
+    d["streams"]["GrossParticipantCostPV"]["pricings"] = ["primary", "sct_base"]                 # the engine writes GrossParticipantCostPV_SCT too
+    d["streams"]["NetParticipantCostPV"] = {"source": "engine", "kind": "cost", "fuel": "none", "pricings": ["primary"],
+                                            "naming": "participant_suffix"}
+    d["pricings"]["own"] = {"label": "SCT rates on the TRC rows", "acc_rows": "trc", "discount_rate_quarterly": "DiscountRateQtr_SCT",
+                            "discount_rate_annual": "DiscountRateAnnual_SCT", "suffix": "_OWN"}
+    d["streams"]["OtherBen"]["pricings"].append("own")
+    d["streams"]["OtherCost"]["pricings"].append("own")
+    d["tests"]["OWN"] = {"label": "Own", "pricing": "own", "benefits": ["OtherBen"], "costs": ["OtherCost"],
+                         "program_costs": {"share": "positive_benefits"}}
+    assert cts.validate(d) == []
+    d["streams"]["RebatesandIncentsPV"]["pricings"].append("own")
+    assert ["streams.RebatesandIncentsPV.pricings: the engine prices RebatesandIncentsPV on the trc rows at DiscountRateQtr / DiscountRateAnnual, "
+            "and pricing 'own' names DiscountRateQtr_SCT / DiscountRateAnnual_SCT"] == cts.validate(d)
+
+
 def test_the_schema_matches_the_validator():
     schema = json.loads(cts.SCHEMA_FILE.read_text(encoding="utf-8"))
     assert set(schema["properties"]) == cts.TOP
@@ -105,6 +151,20 @@ def test_the_schema_matches_the_validator():
     (lambda d: d["pricings"]["primary"].update(discount_rate_annual="DiscountRate"), "discount_rate_annual"),
     (lambda d: d.update(program_years={"from": 2030, "to": 2028}), "to is before from"),
     (lambda d: d.update(colour="blue"), "unknown top-level key 'colour'"),
+    # engine streams come from the engine's catalog (0.1.92): an unknown name, a changed fixed fact or a pricing the engine does not price it in
+    (lambda d: d["streams"].update(HealthNEB={"source": "engine", "kind": "benefit", "pricings": ["primary"]}),
+     "the engine prices no stream 'HealthNEB'"),
+    (lambda d: d["streams"]["ElecBen"].update(kind="cost"), "streams.ElecBen.kind: the engine's ElecBen has kind 'benefit', not 'cost'"),
+    (lambda d: d["streams"]["GasBen"].update(fuel="elec"), "streams.GasBen.fuel"),
+    (lambda d: d["streams"]["ElecSupplyCost"].pop("gross"), "streams.ElecSupplyCost.gross"),
+    (lambda d: d["streams"]["RebatesandIncentsPV"].update(naming="suffix"), "streams.RebatesandIncentsPV.naming"),
+    (lambda d: d["streams"]["TaxCreditsGrossPV"].pop("internal"), "streams.TaxCreditsGrossPV.internal"),
+    (lambda d: d["streams"]["LifecycleBillReducElec"].update(pricings=["primary", "sct_base"]),
+     "the engine prices LifecycleBillReducElec on the trc rows only, and pricing 'sct_base' uses the sct_base rows"),
+    (lambda d: d["pricings"]["sct_base"].update(suffix="_X"), "the engine writes ElecBen_SB for the sct_base rows, and pricing 'sct_base' has suffix '_X', so the set would read ElecBen_X"),
+    (lambda d: d["pricings"]["sct_high"].update(participant_suffix=""), "the engine writes RebatesandIncentsPV_SCT for the sct_high rows"),
+    (lambda d: d["pricings"]["sct_base"].update(discount_rate_quarterly="DiscountRateQtr"),
+     "the engine prices ElecBen on the sct_base rows at DiscountRateQtr_SCT / DiscountRateAnnual_SCT"),
 ])
 def test_a_bad_set_is_refused_with_its_problem(tmp_path, change, message):
     d = _data()
@@ -209,6 +269,8 @@ def test_the_cli(tmp_path, capsys):
     from recet import cli
     assert cli._cmd_cost_tests(type("A", (), {"action": "list", "set": None})()) == 0
     assert "EE-2026" in capsys.readouterr().out
+    assert cli._cmd_cost_tests(type("A", (), {"action": "streams", "set": None})()) == 0
+    assert "TaxCreditsGrossPV" in capsys.readouterr().out
     assert cli._cmd_cost_tests(type("A", (), {"action": "show", "set": "EE-2026"})()) == 0
     assert "TRCBen  = ElecBen + GasBen + WaterEnergyBen + OtherBen + TaxCredits" in capsys.readouterr().out
     d = _data()

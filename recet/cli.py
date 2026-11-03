@@ -269,6 +269,11 @@ def _cmd_cost_tests(a) -> int:
             for sid, s in cost_test_sets.builtin().items():
                 print(f"{sid:<16} {s.label}{cost_test_sets.DRAFT_LABEL if s.draft else ''}  ({cost_test_sets.years_text(s)}; tests {', '.join(s.tests)})")
             return 0
+        if a.action == "streams":
+            for e in cost_test_sets.engine_streams().values():
+                print(f"{e.name:<30} {e.kind:<8} {e.fuel:<6} rows {', '.join(e.acc_rows):<24} naming {e.naming:<19} gross {e.gross or '-'}"
+                      + ("  (internal)" if e.internal else ""))
+            return 0
         if not a.set:
             print(f"cost-tests {a.action} needs a set id or file", file=sys.stderr)
             return 2
@@ -329,8 +334,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("regress", help="the regression gate: build, check or compare real-job fixtures (see `recet regress -h`)", add_help=False)
     p.add_argument("rest", nargs=argparse.REMAINDER)
     p.set_defaults(func=_cmd_regress)
-    p = sub.add_parser("cost-tests", help="list, show or check cost-test definition sets (recet/docs/COST_TESTS.md)")
-    p.add_argument("action", choices=["list", "show", "check"])
+    p = sub.add_parser("cost-tests", help="list, show or check cost-test definition sets, or list the streams the engine prices (recet/docs/COST_TESTS.md)")
+    p.add_argument("action", choices=["list", "show", "check", "streams"])
     p.add_argument("set", nargs="?", help="show / check: a built-in set's id or a set's YAML file")
     p.set_defaults(func=_cmd_cost_tests)
     p = sub.add_parser("worker", help="run one job from a job spec and write its receipt (see `recet worker run -h`)", add_help=False)
