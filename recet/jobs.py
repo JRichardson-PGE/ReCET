@@ -71,7 +71,7 @@ class RunConfig:
     # --- modes
     components: bool = False                 # price each ACC component separately
     portfolio_8760: bool = False             # combined 8,760 electric load profile
-    profile_years: list[int] = field(default_factory=list)   # calendar years of the combined profile (default: First Year)
+    profile_years: list[int] = field(default_factory=list)   # calendar years of the combined profile (default: every year the measures cover)
     market_effects: float = 0.0              # CET's Market Effects: 0 or 0.05, applied to benefits AND costs (CET's MEBens and MECost set together)
     include_societal: bool = True            # SCB / SCH (about 15% of the run time)
     emissions: bool = True                   # CO2 / NOx / PM10 columns
@@ -611,8 +611,8 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
     result.totals = {k: float(v) for k, v in summary.iloc[0].items() if isinstance(v, (int, float)) and k != "measures"}
 
     if cfg.portfolio_8760:
-        years = cfg.profile_years or [base_year]
-        log(f"\n== combined 8,760 electric profile, year(s) {years} ==")
+        years = cfg.profile_years or profile8760.covered_years(measures) or [base_year]   # blank: every year the measures cover
+        log(f"\n== combined 8,760 electric profile, year(s) {profile8760.years_text(years)} ==")
         prof, unshaped, psum = profile8760.portfolio_profile(measures, years, log=log)
         result.files["portfolio_8760"] = outputs.write_table(prof, run_dir / f"portfolio_8760_{tag}", cfg.output_format, excel)
         result.files["portfolio_8760_peaks"] = outputs.write_table(profile8760.peaks(prof, years), run_dir / f"portfolio_8760_peaks_{tag}", cfg.output_format, excel)

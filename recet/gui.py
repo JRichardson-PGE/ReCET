@@ -355,7 +355,7 @@ class App:
             return row
 
         check("components", "Calculate ACC components separately", hint="Prices energy, capacity, T&D, GHG ... (and gas market, T&D, CO2 ...) one by one; adds ElecValue_* / GasValue_* columns that sum to the totals.")
-        check("portfolio_8760", "Produce combined 8760 electric load profile", hint="Portfolio net kWh by hour for the years below (default: First Year).")
+        check("portfolio_8760", "Produce combined 8760 electric load profile", hint="Portfolio net kWh by hour for the years below (default: every year the measures cover).")
         row = sub(left, "left")
         ttk.Label(row, text="Year(s):").pack(side="left")
         ttk.Entry(row, textvariable=self._var("profile_years"), width=22).pack(side="left", padx=6)

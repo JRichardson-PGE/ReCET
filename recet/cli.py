@@ -57,7 +57,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g = ap.add_argument_group("modes")
     g.add_argument("--components", action="store_true", default=None, help="price every ACC component separately (ElecValue_*/GasValue_* columns)")
     g.add_argument("--portfolio-8760", action="store_true", default=None, help="write the combined 8,760 electric load profile")
-    g.add_argument("--profile-years", type=int, nargs="+", help="calendar years for the combined profile (default: First Year)")
+    g.add_argument("--profile-years", type=int, nargs="+", help="calendar years for the combined profile (default: every year the measures cover)")
     g.add_argument("--market-effects", type=float, choices=[0.0, 0.05], help="CET Market Effects, applied to benefits and costs: 0 or 0.05")
     g.add_argument("--no-societal", dest="include_societal", action="store_false", default=None, help="skip SCB/SCH (about 3x faster)")
     g.add_argument("--no-emissions", dest="emissions", action="store_false", default=None, help="skip the CO2/NOx/PM10 columns")

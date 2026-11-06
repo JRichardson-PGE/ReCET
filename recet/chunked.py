@@ -61,7 +61,8 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     if societal != cfg.include_societal:
         progress.replan(societal=societal)                       # an ACC with no societal avoided costs: pricing is shorter
     program = cost_tests.load_program_costs(Path(cfg.programcost), allocate_statewide=cfg.allocate_statewide) if cfg.programcost else None
-    years = (cfg.profile_years or [base_year]) if cfg.portfolio_8760 else []
+    years = list(cfg.profile_years) if cfg.portfolio_8760 else []
+    every_year = cfg.portfolio_8760 and not cfg.profile_years       # blank: every year the measures cover, each part's own, joined at the end
 
     def load(f):
         measures, _ = run_poc.load_job(f, None, allocate_statewide=cfg.allocate_statewide, dtypes=dtypes, extra_columns=extra)
@@ -101,7 +102,12 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
             c = pd.concat(comps, ignore_index=True)
             c.to_parquet(spill / f"components_{i:04d}.parquet", index=False)
             comp_checks.append((d[["CEInputID", "ElecBen", "ElecSupplyCost", "GasBen", "GasSupplyCost"]], c))
-        if years:
+        if every_year:
+            own = profile8760.covered_years(measures)
+            years = sorted(set(years) | set(own))
+            # a part with no kWh adds a zero profile for the First Year: combined only if no part has any (years stays empty)
+            profiles.append(profile8760.portfolio_profile(measures, own or [base_year], log=lambda s: None))
+        elif years:
             profiles.append(profile8760.portfolio_profile(measures, years, log=lambda s: None))
         n_measures += len(measures)
         log(f"  part {i + 1}/{len(parts)}: rows {start + 1:,}-{start + n:,}, {len(measures):,} measures, {time.time() - tp:.0f}s")
@@ -187,8 +193,11 @@ def run_parts(cfg, acc, run_dir: Path, result, parts: list, dtypes: dict, values
     result.frame = None
     result.notes.append(f"run in {len(parts)} parts of up to {cfg.chunk_size:,} measures: the measure-level table is in its file only")
 
+    if every_year and not years:                                   # no measure delivers kWh: the First Year's (empty) profile, as before
+        years = [base_year]
     if years:
-        log(f"\n== combined 8,760 electric profile, year(s) {years} ==")
+        years = list(range(years[0], years[-1] + 1)) if every_year else years   # parts' years joined: every year between too
+        log(f"\n== combined 8,760 electric profile, year(s) {profile8760.years_text(years)} ==")
         prof, unshaped, psum = profile8760.combine_profiles(profiles, years)
         if len(unshaped):
             log(f"  {len(unshaped)} measure(s) have no 8,760 shape and are left out of the profile (listed in the unshaped table)")
