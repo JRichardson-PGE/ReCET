@@ -132,7 +132,7 @@
     <label><input type="checkbox" name="emissions" {% if fresh or f.get('emissions') %}checked{% endif %}> Emissions (CO2, NOx, PM10)</label>
     <label><input type="checkbox" name="apply_exclude_from_ce" {% if f.get('apply_exclude_from_ce') %}checked{% endif %}> Leave Exclude_From_CE programs out of the portfolio summary</label>
     <label><input type="checkbox" name="portfolio_8760" {% if f.get('portfolio_8760') %}checked{% endif %}> Combined 8,760 electric load profile for years
-      <input type="text" name="profile_years" class="short" placeholder="First Year" value="{{ f.get('profile_years', '') }}" aria-label="Years of the combined 8,760 profile"></label>
+      <input type="text" name="profile_years" class="short" placeholder="every year covered" value="{{ f.get('profile_years', '') }}" aria-label="Years of the combined 8,760 profile"></label>
   </div>
 </section>
 

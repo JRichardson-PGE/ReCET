@@ -1,6 +1,6 @@
 """Combined 8,760-hour electric load profile of a portfolio ("produce a combined 8760 electric load profile").
 
-For each requested calendar year Y the net electric savings of every measure that is still delivering savings in Y, spread over the year by the measure's
+For each requested calendar year Y (none requested = every year some measure delivers savings, `covered_years`) the net electric savings of every measure that is still delivering savings in Y, spread over the year by the measure's
 8,760 shape, summed over the portfolio:
 
     kWh(h, Y) = sum over measures m of  w_m(Y) * shape_m(h, Y)
@@ -62,6 +62,35 @@ def weights_for_year(m, year: int) -> float:
     else:
         share_1st, share_2nd = _overlap(y0, y1, start, end), 0.0
     return share_1st * float(m.AC_Net_kWh_ScaledProfile_1st_Baseline) + share_2nd * float(m.AC_Net_kWh_ScaledProfile_2nd_Baseline)
+
+
+def years_text(years) -> str:
+    """Years for the log: runs of consecutive years as ranges ("2028-2045"), others listed ("2028, 2030")."""
+    ys, out = sorted({int(y) for y in years}), []
+    for y in ys:
+        if out and y == out[-1][1] + 1:
+            out[-1][1] = y
+        else:
+            out.append([y, y])
+    return ", ".join(f"{a}" if a == b else f"{a}-{b}" for a, b in out)
+
+
+def covered_years(measures: pd.DataFrame) -> list[int]:
+    """Every calendar year in which some measure of `measures` delivers net kWh (the combined profile's years when none are chosen; Jake,
+    2026-11-06): from the earliest claim year to the last year any measure is still in service (claim quarter + EUL, as weights_for_year
+    counts it), every year between included. Measures with no kWh or no life are left out; [] when none is left."""
+    if not len(measures):
+        return []
+    kwh = (pd.to_numeric(measures["AC_Net_kWh_ScaledProfile_1st_Baseline"], errors="coerce").fillna(0).ne(0)
+           | pd.to_numeric(measures["AC_Net_kWh_ScaledProfile_2nd_Baseline"], errors="coerce").fillna(0).ne(0))
+    start = pd.to_numeric(measures["Used_Year"], errors="coerce") + (pd.to_numeric(measures["Used_Quarter"], errors="coerce") - 1.0) / 4.0
+    end = start + pd.to_numeric(measures["EUL_Yrs"], errors="coerce")
+    keep = kwh & start.notna() & end.gt(start)
+    if not keep.any():
+        return []
+    first = int(np.floor(start[keep].min()))
+    last = int(np.ceil(end[keep].max())) - 1
+    return list(range(first, last + 1))
 
 
 def portfolio_profile(measures: pd.DataFrame, years: list[int], log: Callable[[str], None] = print) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
@@ -139,6 +168,9 @@ def combine_profiles(parts: list[tuple[pd.DataFrame, pd.DataFrame, dict]], years
 
     def total(col):
         return sum((p[col].to_numpy() for p, _u, _s in parts if col in p), np.zeros(HOURS))
+
+    def part_sum(s, y, k):  # a part priced on fewer years (its own covered years) adds nothing to the others
+        return s[y][k] if y in s else 0.0
     for y in years:
         by_pa = {pa: total(f"net_kwh_{y}_{pa}") for pa in pas}
         df[f"net_kwh_{y}"] = sum(by_pa[pa] for pa in pas) if pas else np.zeros(HOURS)
@@ -146,11 +178,16 @@ def combine_profiles(parts: list[tuple[pd.DataFrame, pd.DataFrame, dict]], years
             df[f"net_kwh_{y}_{pa}"] = by_pa[pa]
         for z in zones:
             df[f"net_kwh_{y}_{z}"] = total(f"net_kwh_{y}_{z}")
-    summary = {y: {"delivered_net_kwh": sum(s[y]["delivered_net_kwh"] for _p, _u, s in parts), "in_profile_kwh": float(df[f"net_kwh_{y}"].sum()),
-                   "unshaped_kwh": sum(s[y]["unshaped_kwh"] for _p, _u, s in parts), "peak_hour_kwh": float(df[f"net_kwh_{y}"].max()),
+    summary = {y: {"delivered_net_kwh": sum(part_sum(s, y, "delivered_net_kwh") for _p, _u, s in parts), "in_profile_kwh": float(df[f"net_kwh_{y}"].sum()),
+                   "unshaped_kwh": sum(part_sum(s, y, "unshaped_kwh") for _p, _u, s in parts), "peak_hour_kwh": float(df[f"net_kwh_{y}"].max()),
                    "peak_hour_of_year": int(df.loc[df[f"net_kwh_{y}"].idxmax(), "hour_of_year"])} for y in years}
     unshaped = [u for _p, u, _s in parts if len(u)]
-    return df, (pd.concat(unshaped, ignore_index=True) if unshaped else pd.DataFrame()), summary
+    if not unshaped:
+        return df, pd.DataFrame(), summary
+    out = pd.concat(unshaped, ignore_index=True)
+    kwh_cols = [f"kwh_{y}" for y in years]
+    out[kwh_cols] = out.reindex(columns=kwh_cols).fillna(0.0)          # a year a part was not priced on: none of its kWh
+    return df, out[[c for c in out.columns if not c.startswith("kwh_")] + kwh_cols], summary
 
 
 def peaks(profile: pd.DataFrame, years: list[int]) -> pd.DataFrame:

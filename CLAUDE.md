@@ -107,6 +107,13 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   whole run 298 -> 229 s, peak memory unchanged, outputs equal to 2.2e-12. At 100,000-row parts pricing's peak falls 2.11 -> 1.20 GB (run peak still 2.29 GB,
   set by writing). The earlier "about 2x" estimate held for a one-piece run only. Tried and dropped: a cross-part cache of each route's quarterly sums (saved
   ~3 s of 229; once shifted once, U is cheap). Shifting each profile once per run instead of once per pricing call would save at most ~3.5 s (72 ms a part).
+- 0.1.93 (2026-11-06, Jake: "If left blank could it default to all years the measures in the run would cover?"): a blank `profile_years` is every
+  calendar year some measure delivers net kWh in (`profile8760.covered_years`: floor of the earliest claim quarter's start to the last year before the
+  latest claim quarter + EUL, every year between; measures with no kWh or no life left out; the First Year when none is left). It was the First Year.
+  A run in parts prices each part's own covered years and `combine_profiles` joins them (a year a part was not priced on adds nothing; unshaped kWh
+  columns of such a year are 0), so the files equal the one-piece run and a run naming those years (tests/test_profile_zones.py). The log names the
+  years as ranges (`years_text`). The profile is built per measure per year, so a long-lived job's profile step grows with its years. CALCULATIONS
+  C16.2, OUTPUT_FIELDS, INPUT_FIELDS, CLI / window / web hints.
 - 0.1.92 (2026-11-03, Jake; step 2 of CEDARS-Platform's cost-test set builder): the engine's stream catalog. `cost_test_sets.engine_streams()` (a table
   in the module, not read from EE-2026, so a set may leave a stream out without losing the vocabulary): every `source: engine` stream with its fixed facts
   (kind, fuel, naming, gross, internal), the ACC rows the engine prices it on and the unit / definition a set starts from (EE-2026's own text);
