@@ -205,7 +205,7 @@ def summary_totals(cset=None) -> list[str]:
 
 
 def summarize(frame: pd.DataFrame, apply_exclude_from_ce: bool = False, cset=None) -> pd.DataFrame:
-    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA, by program segment and by program year (the claim year, BRD BR-04.1).
+    """Portfolio totals and ratios, overall and by IOU territory (PA), by credited PA, by program segment and by program year (the claim year).
     With `apply_exclude_from_ce`, measures of programs
     whose Exclude_From_CE flag is true are left out of every row and shown in one last row of their own (group `excluded`). The tests are those of the
     run's cost-test set `cset` (None = the newest published EE set)."""
@@ -690,7 +690,7 @@ class TableWriter:
     a 1,000,000-row table in about 30 s, against about 260 s for pandas). `keep_parquet` keeps that parquet in the run's RESULTS_DIR (the Results tables read
     it: results_source); otherwise it is deleted.
 
-    `select` (an output template, BRD BR-06.10) writes only those columns, in that order, to the file; a column the table does not have is left out
+    `select` (an output template) writes only those columns, in that order, to the file; a column the table does not have is left out
     (`left_out`). The table then always goes through parquet, kept in full when `keep_parquet` (so the Results tables still have every column), and the file is
     written from it."""
 

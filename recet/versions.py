@@ -13,7 +13,7 @@ A run names a version key. Files supplied with the run REPLACE the shipped file 
 of the built-in one). A label the package does not have ("2028", "2026-draft" ...) is a NEW version made entirely of the supplied files; any fuel not
 supplied falls back to the newest built-in version's file, with a note.
 
-Two labels name every version (BRD BR-11.7): the ACC version, the year E3's calculator was released (2024 ACC), and CET's Avoided Cost Version, the first year
+Two labels name every version: the ACC version, the year E3's calculator was released (2024 ACC), and CET's Avoided Cost Version, the first year
 that ACC was in effect for claims or forecasts (Avoided Cost Version 2026). Labels read "2024 ACC (Avoided Cost Version 2026)" in the desktop window and the
 outputs; the web pages show "2024 ACC" only (acc_short) with BUDGET_FILING_ACC / claims_acc() saying which ACC applies to which filing.
 
@@ -71,9 +71,9 @@ class FilingAcc:
         return str(self.first) if self.first == self.last else f"{self.first}-{self.last}"
 
 
-# Which ACC prices which budget filing, oldest first (TIER2_PLAN step 2, BR-06.5). Through 2027 these are CET's "Program year assignment to CET avoided
+# Which ACC prices which budget filing, oldest first (TIER2_PLAN step 2). Through 2027 these are CET's "Program year assignment to CET avoided
 # cost version" table (the resolution that adopted each ACC); the rest is the schedule Jake gave on 2026-10-26, the last two rows inferred from its two-year
-# cadence. The web page shows ACC years only (Jake, 2026-10-26: the "Avoided Cost Version" label is being retired, D12).
+# cadence. The web page shows ACC years only (Jake, 2026-10-26: the "Avoided Cost Version" label is being retired).
 BUDGET_FILING_ACC = [
     FilingAcc("2020 filings", 2020, 2020, 2019, "Res. E-5014", short="2020 filings"),
     FilingAcc("2021-2023 filings", 2021, 2023, 2020, "Res. E-5077", short="2021-23 filings"),
@@ -127,7 +127,7 @@ ACC_PURPOSE_CLAIMS = "claims"
 
 
 def acc_purposes() -> list[tuple[str, str]]:
-    """[(key, label)] for the run option 'priced for' (BR-06.5): any filing, Quarterly Claims, or one budget filing."""
+    """[(key, label)] for the run option 'priced for': any filing, Quarterly Claims, or one budget filing."""
     return ([("", "Any filing (the ACCs valid for the program year)"), (ACC_PURPOSE_CLAIMS, "Quarterly Claims")]
             + [(k, f"{f.filing} ({f.years}, {f.acc} ACC)") for k, f in FILINGS.items()])
 
@@ -137,7 +137,7 @@ def acc_purpose_label(purpose: str) -> str:
 
 
 def expected_accs(year: int, purpose: str = "") -> set[int] | None:
-    """The ACC years that normally apply to a program year (TIER2_PLAN step 2, BR-06.5): for a named filing (a FILINGS key) its ACC, or none when the year
+    """The ACC years that normally apply to a program year (TIER2_PLAN step 2): for a named filing (a FILINGS key) its ACC, or none when the year
     is outside the filing's program years; for claims the ACC of the year's final budget filing (claims_acc); with no purpose the ACC of the latest
     application covering the year and of every filing after it that covers the year (2028-2029: 2024 or 2026; 2030-2031: 2024, 2026 or 2028). None =the table says nothing about the year (before the first filing, after the last, or claims after CLAIMS_LAST_YEAR): not checked."""
     year = int(year)

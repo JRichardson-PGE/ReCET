@@ -1,4 +1,4 @@
-"""Data-pack acceptance (BRD v0.5 BR-11.8, BR-06.21): the manifest names the pack and each file's type, ACC version and draft flag; a draft ACC prices
+"""Data-pack acceptance: the manifest names the pack and each file's type, ACC version and draft flag; a draft ACC prices
 analysis runs, labelled draft, and is refused for a filing; the tie-out report checks the ACC's structure, its control totals against the source
 workbook's, and reference measures priced by the engine and by tests/reference_calc.py."""
 from __future__ import annotations

@@ -411,7 +411,7 @@ def engine_acc_table(recet_accs) -> list[tuple[str, str, list[str]]]:
 
 
 def acc_name(key) -> str:
-    """An ACC version as the web pages name it: "2026 ACC" (Jake, 2026-10-26: CET's "Avoided Cost Version" number is being retired, D12; the New run
+    """An ACC version as the web pages name it: "2026 ACC" (Jake, 2026-10-26: CET's "Avoided Cost Version" number is being retired; the New run
     page's table says which ACC applies to which filing instead)."""
     return versions.acc_short(key)
 
@@ -583,7 +583,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx.set_cookie(resp, SESSION_COOKIE, auth.new_session(ctx.db, u["id"], s.session_days), s.session_days * 86400)
         return resp
 
-    # ----------------------------------------------------------------------------------------------------------------- output templates (BR-06.10)
+    # ----------------------------------------------------------------------------------------------------------------- output templates
     def user_templates(uid: int) -> dict[str, list[str]]:
         """The built-in output templates, then the user's saved ones."""
         from .. import output_templates as ot
@@ -1032,7 +1032,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             shutil.rmtree(folder, ignore_errors=True)
             return fail(str(exc))
 
-        if replica is not None:                 # what a replica cannot do (D13: a filing accepts only ReCET's own engine), now that every option and file is known
+        if replica is not None:                 # what a replica cannot do (a filing accepts only ReCET's own engine), now that every option and file is known
             from ..jobs import RunConfig
             bad = cet_job.problems(RunConfig.from_dict(cfg))
             if bad:
@@ -1251,7 +1251,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pas = res.pas()
         pa = pa if pa in pas else rv.ALL_PAS
         all_years = res.years()
-        years = [y for y in rv.parse_years(years) if y in all_years]            # program years to total (BR-04.1); none = every year
+        years = [y for y in rv.parse_years(years) if y in all_years]            # program years to total; none = every year
         if set(years) == set(all_years):
             years = []
         views = user_views(u["id"])
@@ -1397,7 +1397,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/runs/{run_id}/compare", response_class=HTMLResponse)
     async def run_compare(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
                           columns: str = "", years: list[str] = Query(default=[])):
-        """Any two runs the user may see, side by side at one level (BRD BR-06.11): each run's value, the difference (b - a) and the % change."""
+        """Any two runs the user may see, side by side at one level: each run's value, the difference (b - a) and the % change."""
         from .. import results_view as rv
         u = ctx.need_user(request)
         if not other:

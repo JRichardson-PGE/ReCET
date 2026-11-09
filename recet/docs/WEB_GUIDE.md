@@ -69,7 +69,7 @@ The run page opens as soon as the run is queued.
 - **Edit inputs and rerun** copies the run's tables into a new Edit inputs draft (jobs of up to 500 measures).
 - **Compare with another run** (a finished run) puts it beside any other finished run of yours, or one shared with you: each level (portfolio, program
   year, segment, sector, program) with both runs' values, the difference (B - A) and the % change, using your Results views' columns and program-year
-  choice; **Download this table (CSV)** saves it (BRD BR-06.11). A group found in one run only is blank for the other.
+  choice; **Download this table (CSV)** saves it. A group found in one run only is blank for the other.
 - **Sharing** (your own runs) shares the run read-only with another user by their sign-in email. They find it under **Shared with you** on the runs list
   and can open its results and files, compare it and rerun its inputs as their own run; they cannot stop, delete or share it. **Stop sharing** takes it back.
 - **Stop** a queued or running run; **Delete** a finished one. A run and its files are deleted automatically 7 days after it starts (the run page and
@@ -85,7 +85,7 @@ until you show them. Queued and running runs update in place. Runs other users s
 - **PA** limits every table to one program administrator. A measure's PA is its credited PA, else its program's PA, else its IOU territory.
 - Change **PA**, **View** or **Program years** and press **Apply** (nothing reloads until you do).
 - **Program years** (a run with more than one claim year) totals every table, the headline numbers and the chart over the years ticked; none ticked, or
-  **all years**, is every year (BRD BR-04.1).
+  **all years**, is every year.
 - **Levels:** portfolio, program segment, program sector, program year, program, and measure. Every level above the measure is a sum of its measures; ratios are
   recomputed from the summed benefits and costs. The measure level is shown for runs of up to 50,000 measures, and for up to 5,000 measures of the chosen
   PA; a larger run's measure-level table is in its files.

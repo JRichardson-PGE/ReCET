@@ -185,7 +185,7 @@ RECONCILE_TOLERANCE = 1e-9          # relative: an allocated total within this o
 
 
 def reconciliation(measure_files: list, programcost_file=None, factors: pd.DataFrame | None = None) -> pd.DataFrame:
-    """The allocation's reconciliation (BRD BR-06.7): for each statewide program, year and allocated field, the total before allocation, each IOU's
+    """The allocation's reconciliation: for each statewide program, year and allocated field, the total before allocation, each IOU's
     share, their sum and the difference. `measure_files`: the job's Measure.csv, or the parts of a run in parts (their totals are added up).
 
     The check is on the inputs, which is where allocation happens: every quantity and cost is then priced as filed, and pricing is linear in them, so

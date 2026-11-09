@@ -1,4 +1,4 @@
-"""The key-metrics summary (BRD BR-06.10): the portfolio's headline results, each with its definition, and the main drivers of the result -- the programs,
+"""The key-metrics summary: the portfolio's headline results, each with its definition, and the main drivers of the result -- the programs,
 program sectors and end uses that carry the most total system benefit and cost.
 
     sums(frame)      a part's totals by program, sector and end use (a run in parts adds its parts' up: combine)

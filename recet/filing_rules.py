@@ -1,4 +1,4 @@
-"""CET's filing validation rules, as one rule library (BRD BR-06.3 / BR-03.6; it starts BR-03.1 and BR-03.3).
+"""CET's filing validation rules, as one rule library.
 
 CEDARS publishes the checks its upload applies to a Measure.csv / ProgramCost.csv, per kind of filing, in its "source of truth" files: `validation_rules.csv`
 (a record that fails one is rejected), `warning_rules.csv` (a record that fails one gets a warning), and the field constraints of the table spec
@@ -74,7 +74,7 @@ class RuleSet:
         return f"{SETS[self.name]} rules of {self.version}"
 
     def describe(self) -> dict:
-        """For run_settings.json (BR-03.3: the rule set used and its effective date)."""
+        """For run_settings.json (the rule set used and its effective date)."""
         return {"rule_set": self.name, "label": SETS[self.name], "effective_date": self.version, "rules": len(self.rules),
                 "rejects": sum(r.severity == "reject" for r in self.rules), "warnings": sum(r.severity == "warning" for r in self.rules),
                 "files": sorted(p.name for p in self.folder.iterdir() if p.is_file())}

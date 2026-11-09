@@ -1,4 +1,4 @@
-"""Cost-test definition sets (BRD v0.5 BR-06.8, BR-06.14; recet/docs/COST_TESTS.md): the cost tests and value streams as versioned data.
+"""Cost-test definition sets (recet/docs/COST_TESTS.md): the cost tests and value streams as versioned data.
 
 A set is one YAML file, `recet/data/cost_tests/<id>/definition.yaml`, with four parts: pricings (the avoided-cost rows, discount rates and column
 suffixes a stream is priced on), streams (the dollar quantities: engine-priced columns, per-unit input columns, the program costs), aggregates (TSB)

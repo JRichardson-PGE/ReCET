@@ -228,7 +228,7 @@ def build_config(spec: dict, files: dict[str, Path], ref: Path | None, out_dir: 
 
 class ProgressSender:
     """While a run runs: point progress.py at `local` (RECET_PROGRESS_FILE) and send it to `uri` whenever its stage changes, and at most every `every`
-    seconds while its parts move (BR-06.2: the caller's run page shows the stage and time left of a batch run). A failed send is skipped, never fatal."""
+    seconds while its parts move (the caller's run page shows the stage and time left of a batch run). A failed send is skipped, never fatal."""
 
     def __init__(self, local: Path, uri: str, every: float = PROGRESS_SECONDS, poll: float = 1.0, log: tuple[Path, str] | None = None):
         self.local, self.uri, self.every, self.poll = Path(local), uri, every, poll

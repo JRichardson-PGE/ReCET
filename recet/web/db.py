@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, created_at);
 CREATE INDEX IF NOT EXISTS runs_by_status ON runs(status, created_at);
-CREATE TABLE IF NOT EXISTS run_shares (            -- a run its owner shared, read-only, with another user (BRD BR-06.11)
+CREATE TABLE IF NOT EXISTS run_shares (            -- a run its owner shared, read-only, with another user
     run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     shared_by INTEGER NOT NULL REFERENCES users(id),

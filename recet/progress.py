@@ -1,4 +1,4 @@
-"""A run's progress, for the web app's progress bar and time estimate (BRD BR-06.2).
+"""A run's progress, for the web app's progress bar and time estimate.
 
 A run reports the stage it is in and, where a stage goes part by part, how many of its parts are done (`report`). When the environment variable
 RECET_PROGRESS_FILE names a file, each report rewrites that file as JSON and appends the same record, with the seconds since the run started, to

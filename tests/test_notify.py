@@ -1,4 +1,4 @@
-"""Run emails (recet/web/notify.py, BRD BR-06.2): one email to the owner when a run finishes or fails, none for a passing input check or with the
+"""Run emails (recet/web/notify.py): one email to the owner when a run finishes or fails, none for a passing input check or with the
 Account setting off, nothing at all without an SMTP server; and what is handed to the SMTP server."""
 from __future__ import annotations
 

@@ -91,7 +91,7 @@ def _check_file(name: str, path: str) -> tuple[bool, str]:
 
 # the CEDARS filing checks choice (filing_rules.py): window label -> RunConfig.filing_validation
 FILING_CHOICES = {"none": "", "Quarterly Claims": "claims", "Budget filing": "budget_filing"}
-# what the run is priced for (BR-06.5, versions.acc_purposes): (RunConfig.acc_purpose, window label)
+# what the run is priced for (versions.acc_purposes): (RunConfig.acc_purpose, window label)
 PURPOSE_CHOICES = versions.acc_purposes()
 # the cost-test set (cost_test_sets.py): (RunConfig.cost_test_set, window label); any other text in the box is a set file's path
 COST_TEST_DEFAULT = "In force for the first program year"

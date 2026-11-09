@@ -188,7 +188,7 @@ def test_a_run_can_apply_cedars_filing_checks(web, tmp_path):
 
 
 def test_a_run_says_what_it_is_priced_for(web, tmp_path):
-    """BR-06.5: 'Priced for' (any filing, Quarterly Claims, or one budget filing) is a run option, shown in the settings line."""
+    """'Priced for' (any filing, Quarterly Claims, or one budget filing) is a run option, shown in the settings line."""
     from recet.web import app as web_app
     app, ctx = web
     _user(ctx, "pf@example.com")
@@ -327,7 +327,7 @@ def test_the_results_page_tiles_chart_sorting_and_column_groups(web, tmp_path):
     assert '<h2 class="sr-only">Results table</h2>' in page                                                        # heading navigation reaches the table
     levels = re.findall(r'href="\?level=(\w+)', page)
     assert levels[0] == "portfolio" and levels[-1] == "measure" and "year" in levels                               # summary first
-    by_year = c.get(f"{P}/runs/{run_id}/results?level=year&years=2028&years=1999").text                           # BR-04.1; an unknown year is ignored
+    by_year = c.get(f"{P}/runs/{run_id}/results?level=year&years=2028&years=1999").text                           # an unknown year is ignored
     assert ">Program year<" in by_year and ">2028<" in by_year
     assert "Program year" in c.get(f"{P}/runs/{run_id}/results.csv?level=year&years=2028").text
 
@@ -348,7 +348,7 @@ def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_pat
     assert [(r["acc"], r["builtin"]) for r in versions.acc_summary()] == [(2021, True), (2022, True), (2024, True), (2026, True), (2028, False)]
     assert page.count('<tr class="dim">') == 1
     run_id = _start_run(c, tmp_path)
-    assert re.search(r'<p class="muted">ReCET [0-9.]+ \(hourly\) · 2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)   # the engine first (D13)
+    assert re.search(r'<p class="muted">ReCET [0-9.]+ \(hourly\) · 2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)   # the engine first
     # claims: the ACC of each program year's final budget filing
     assert [(r.years, r.acc) for r in versions.claims_acc()] == [("2020", 2019), ("2021-2023", 2020), ("2024-2025", 2022), ("2026-2027", 2024),
                                                                   ("2028-2029", 2026), ("2030-2031", 2028), ("2032-2033", 2030), ("2034-2035", 2032)]
@@ -847,7 +847,7 @@ def test_the_web_pages_show_a_running_runs_bar(web, tmp_path):
 
 
 def test_output_templates_are_saved_per_user_and_shape_a_run(web, tmp_path):
-    """BR-06.10: a user saves an output template (only known columns, in order) and picks it on New run; the run's config carries the columns."""
+    """A user saves an output template (only known columns, in order) and picks it on New run; the run's config carries the columns."""
     app, ctx = web
     _user(ctx, "ot@example.com")
     c = _login(app, "ot@example.com")

@@ -1,4 +1,4 @@
-"""Output templates (BRD BR-06.10): a named list of measure-level columns, in order. A run given one writes only those columns, in that order, to its
+"""Output templates: a named list of measure-level columns, in order. A run given one writes only those columns, in that order, to its
 measure-level file (RunConfig.output_template); the Results tables still read every column (the run keeps the full table in its _results folder).
 
     catalog()                    every column a template can name, grouped as OUTPUT_FIELDS.md groups them, with its definition (field_docs)

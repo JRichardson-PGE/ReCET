@@ -1,4 +1,4 @@
-"""The consolidated impact-profile library (recet/profile_library.py, BR-06.18): only profiles whose every zone's 8,760 is identical (and drawn on the same
+"""The consolidated impact-profile library (recet/profile_library.py): only profiles whose every zone's 8,760 is identical (and drawn on the same
 calendar) are stored once; every name keeps resolving to the same shapes; and real jobs price BIT FOR BIT the same on the consolidated library as on the
 library it came from."""
 from __future__ import annotations

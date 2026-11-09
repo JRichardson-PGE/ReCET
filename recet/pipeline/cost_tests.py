@@ -98,7 +98,7 @@ def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataF
 
 def check_program_alignment(measures: pd.DataFrame, program: pd.DataFrame | None) -> dict:
     """The PrgIDs that do not line up between the measures and the program costs: a program cost row with no measures is never charged, and a
-    measure whose program has no cost row gets none (preflight warns about both, BRD BR-06.16). After statewide allocation both sides carry the
+    measure whose program has no cost row gets none (preflight warns about both). After statewide allocation both sides carry the
     same `<IOU>_` prefix. Returns the two difference sets."""
     m_ids = set(measures["PrgID"].astype(str).str.strip())
     p_ids = set() if program is None else set(program["PrgID"])

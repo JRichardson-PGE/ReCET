@@ -1,4 +1,4 @@
-"""Email when a run ends (BRD BR-06.2, NFR Reliability): the run's owner gets one email when a run finishes or fails.
+"""Email when a run ends: the run's owner gets one email when a run finishes or fails.
 
 Sent through the SMTP server the RECET_WEB_SMTP_* settings name (config.py); with no RECET_WEB_SMTP_HOST nothing is sent and nothing else changes. Each
 user can turn it off on the Account page (user_settings key `notify_runs`, "0" = off; on by default). Not emailed: a run stopped by its owner, and an

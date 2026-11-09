@@ -128,7 +128,7 @@ def scaled_profile(shape_key: str, iou: str, target_sector: str, climate_zone: s
 @lru_cache(maxsize=1)
 def _catalog() -> pd.DataFrame:
     """The catalog: one row per name a profile is filed under (end_use_name, iou_ac_territory, target_sector). `shape_id` names the hourly row group that
-    holds the row's 8,760s: in a consolidated library (recet/profile_library.py, BR-06.18) every name of a profile points at the one stored copy; a
+    holds the row's 8,760s: in a consolidated library (recet/profile_library.py) every name of a profile points at the one stored copy; a
     library without the column stores each row's own (shape_id = id); a blank shape_id has no hourly data."""
     df = pd.read_parquet(_catalog_path())
     df["_sector_key"] = df["target_sector"].astype(str).str.upper()

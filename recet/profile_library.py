@@ -1,4 +1,4 @@
-"""Consolidating the impact-profile library: every profile stored once, with each name it is filed under (BRD v0.5 BR-06.18).
+"""Consolidating the impact-profile library: every profile stored once, with each name it is filed under.
 
 Jake's rule (2026-10-31): consolidate ONLY profiles that match 100%, never within a tolerance. Two library profiles are the same profile when
 

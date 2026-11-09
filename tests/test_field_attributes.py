@@ -1,4 +1,4 @@
-"""The data-dictionary attributes of the field_definitions table (BRD BR-08.1): cost-test treatment checked against the cost tests' own arithmetic."""
+"""The data-dictionary attributes of the field_definitions table: cost-test treatment checked against the cost tests' own arithmetic."""
 from __future__ import annotations
 
 import numpy as np

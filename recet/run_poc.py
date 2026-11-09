@@ -545,8 +545,8 @@ def run_cost_effectiveness(measures: pd.DataFrame, acc_version: int = 2024, base
 
 
 def participant_cost_test(measures: pd.DataFrame, priced: pd.DataFrame, acc_version: int, base_year: int) -> pd.DataFrame:
-    """The participant-side streams of the Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (BRD BR-06.8;
-    on CPUC's CET roadmap): the gross (NTG = 1, no market effects; free riders are participants too) lifecycle bill impacts, C9's bill impacts with the same
+    """The participant-side streams of the Participant Cost Test (CA Standard Practice Manual, Chapter 2), which the CET does not calculate (on
+    CPUC's CET roadmap): the gross (NTG = 1, no market effects; free riders are participants too) lifecycle bill impacts, C9's bill impacts with the same
     rates, discounting and fuel-substitution split, and TaxCreditsGrossPV = TaxCreditsGross / PVF, PVF being C8's participant-cost discount factor (the
     claim quarter at the primary rate). The test itself is the cost-test set's (EE-2026's PCT, priced by pipeline/test_evaluator.py):
 
@@ -808,7 +808,7 @@ def run_full_cost_effectiveness(measures: pd.DataFrame, program_costs: pd.DataFr
 def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: int, market_effects_bens: float = 0.0, market_effects_cost: float = 0.0,
                          include_societal: bool = True, cost_tests_set=None) -> pd.DataFrame:
     """The measure-level half of run_full_cost_effectiveness: every value that depends on the ACC (benefits, supply costs, participant PVs, bill impacts, the
-    societal variants), one row per measure, before program costs are shared out. Measures priced on different ACC versions (BRD BR-06.5) are priced here
+    societal variants), one row per measure, before program costs are shared out. Measures priced on different ACC versions are priced here
     one group at a time, each under its own ACC, and the groups are joined before apply_program_costs. `cost_tests_set`: the run's set (None =
     cost_tests.default_set()), whose input streams (pipeline/input_streams.py) are priced here: they replace the engine's OtherBen / OtherCost /
     TaxCredits (equal on EE-2026) and add any stream the set defines."""
@@ -833,7 +833,7 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     out = (measure_values.merge(trc_values, on="CEInputID").merge(sct_values, on="CEInputID")
            .merge(discounted_savings_values, on="CEInputID", how="left"))
     out = input_streams.overlay(out, streams)
-    if has_parent_profiles(measures):      # a true-up named its parent's profile (BR-05.6): the same records priced on it, and the difference (C21)
+    if has_parent_profiles(measures):      # a true-up named its parent's profile: the same records priced on it, and the difference (C21)
         parent = parent_profile_measures(measures)
         parent_values = price_measure_values(parent, acc_version, base_year, market_effects_bens, market_effects_cost, include_societal, cset) \
             if len(parent) else None
@@ -841,7 +841,7 @@ def price_measure_values(measures: pd.DataFrame, acc_version: int, base_year: in
     return out
 
 
-# A true-up priced against its parent's profile (BRD BR-05.6, CALCULATIONS C21). The columns of the measure frame that depend on the electric profile: the
+# A true-up priced against its parent's profile (CALCULATIONS C21). The columns of the measure frame that depend on the electric profile: the
 # profiles themselves and, through a kWh-per-unit profile (apply_scaled_profiles), the kWh it is priced on. The loader keeps each one's value on the parent's
 # profile as PARENT_PREFIX + column, so the record can be priced again exactly as the same record filed with the parent's profile would be.
 PROFILE_DEPENDENT = ["AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "Used_UnitkWh1stBaseline",
@@ -951,7 +951,7 @@ def apply_program_costs(d: pd.DataFrame, measures: pd.DataFrame, program_costs: 
 
 
 def apply_scaled_profiles(measures: pd.DataFrame, allocated: bool = False) -> pd.DataFrame:
-    """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit` (BRD BR-06.6). Such a profile is the
+    """Measures priced on a user 8,760 profile that is already scaled -- kWh per unit per hour, `profile_basis = kwh_per_unit`. Such a profile is the
     unadjusted gross kWh per unit, so it is priced with NumUnits x NTG x IR x RR: for a baseline priced on it
 
         AC_Net_kWh_ScaledProfile(_1st/_2nd)_Baseline = NumUnits x NTGRkWh x InstallationRatekWh x RealizationRatekWh       (the profile itself carries the kWh)
@@ -1004,7 +1004,7 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     factors (kWh by the electric factor, therms by the gas factor, ...) and its ProgramCost rows by the per-field rules, with `<IOU>_`
     prepended to CEInputID and PrgID and PA set to the IOU on program-cost rows. Program costs then discount at each IOU's own rate
     and are shared only among that IOU's own measures. Allocating only one of the two files would leave the PrgIDs unmatched, so this
-    is the single entry point. PrgIDs that do not line up between the two files are not an error (BRD BR-06.16; preflight warns, with the costs left out):
+    is the single entry point. PrgIDs that do not line up between the two files are not an error (preflight warns, with the costs left out):
     a measure with no ProgramCost row gets no program costs, and a ProgramCost row with no measures is charged to none.
 
     dtypes: the Measure.csv column types to read with (a part of a larger file: see data_loading.load_measures_from_csv).
@@ -1013,7 +1013,7 @@ def load_job(measure_csv, program_cost_csv=None, allocate_statewide: bool = Fals
     Returns (measures, program_costs or None)."""
     loaded = data_loading.load_measures_from_csv(Path(measure_csv), allocate_statewide=allocate_statewide, dtypes=dtypes, extra_columns=extra_columns)
     measures = apply_scaled_profiles(loaded, allocated=allocate_statewide)
-    if has_parent_profiles(loaded):        # a true-up's parent profile (BR-05.6): its records as filed on that profile, kept beside them
+    if has_parent_profiles(loaded):        # a true-up's parent profile: its records as filed on that profile, kept beside them
         measures = _attach_parent_profiles(measures, apply_scaled_profiles(_on_parent_profiles(loaded), allocated=allocate_statewide))
     program = cost_tests.load_program_costs(Path(program_cost_csv), allocate_statewide=allocate_statewide) if program_cost_csv else None
     return measures, program

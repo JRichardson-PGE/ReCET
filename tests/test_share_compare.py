@@ -1,4 +1,4 @@
-"""Sharing a run read-only with another user, and comparing any two runs (BRD BR-06.11)."""
+"""Sharing a run read-only with another user, and comparing any two runs."""
 from __future__ import annotations
 
 import io

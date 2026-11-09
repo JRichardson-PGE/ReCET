@@ -1,4 +1,4 @@
-"""The ACC-for-program-year check (BRD BR-06.5, TIER2_PLAN step 2): records priced on an ACC that does not normally apply to their program year are
+"""The ACC-for-program-year check (TIER2_PLAN step 2): records priced on an ACC that does not normally apply to their program year are
 flagged -- in preflight and run_settings.json -- and still priced."""
 from __future__ import annotations
 

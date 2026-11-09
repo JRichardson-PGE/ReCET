@@ -1,4 +1,4 @@
-"""The combined 8,760 by climate zone and its peaks (BRD BR-06.13): the zones add up to the portfolio, the peaks table reads the profile, and a run in
+"""The combined 8,760 by climate zone and its peaks: the zones add up to the portfolio, the peaks table reads the profile, and a run in
 parts gives the same files."""
 from __future__ import annotations
 

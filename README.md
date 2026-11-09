@@ -27,16 +27,16 @@ The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021
     recet data status                       what is there and what is missing
     recet data verify D:\cedars_reference_data --full     check sizes and SHA-256 against manifest.json
     recet data build D:\cedars_reference_data             copy (or --link) the files the tool currently finds into a new folder
-                       [--pack-version 2026-10-30] [--draft 2028]   name the pack; mark an ACC as a draft (analysis runs only, BR-11.8)
+                       [--pack-version 2026-10-30] [--draft 2028]   name the pack; mark an ACC as a draft (analysis runs only)
     recet data draft D:\cedars_reference_data 2028 [--final]      mark an ACC in a built folder as draft, or final
     recet data tie-out D:\cedars_reference_data --acc 2024 [--source-totals totals.csv]
-                                                          the acceptance report (BR-06.21): structure, control totals against the
+                                                          the acceptance report: structure, control totals against the
                                                           source workbook's, reference measures engine vs tests/reference_calc.py
     recet data pack D:\cedars_reference_data D:\parts     split it into <= 4 GB parts (+ SHA256SUMS) for transfer
     recet data unpack D:\parts E:\cedars_reference_data   rebuild it on the other machine
     recet data consolidate-profiles D:\cedars_reference_data D:\consolidated
                                                           the profile library with each profile whose every zone's 8,760 is
-                                                          identical stored once, every name kept (BR-06.18); checked name by name.
+                                                          identical stored once, every name kept; checked name by name.
                                                           Into a reference folder (e.g. a `data build --link` copy) it replaces the two
                                                           library files and updates that folder's manifest; the linked source is untouched
 
@@ -151,7 +151,7 @@ read-only at `/data`; S3 credentials come from the environment or the instance /
 
 ## Performance
 
-The replacement BRD's target (NFR Performance) is at least 1,000,000 records priced on 8,760 profiles in 15 minutes or less. Measured with
+The target is at least 1,000,000 records priced on 8,760 profiles in 15 minutes or less. Measured with
 `poc/benchmark_recet_scale.py` in the CEDARS review research repository: the four real PG&E 2028-2031 jobs repeated to 1,000,000 records, the 2024 ACC,
 societal tests and emissions on, one process on a 16-thread laptop with 11.6 GB of memory (version 0.1.34, 2026-10-23). The job is run in 50 parts of
 20,000 measures (the default `chunk_size` until 0.1.56; it is now 50,000, as the web server runs; see the user guide's "What a run does"):

@@ -1,4 +1,4 @@
-"""The tie-out report an ACC load (and an engine release) is accepted on (BRD v0.5 BR-06.21): `recet data tie-out FOLDER --acc 2024`.
+"""The tie-out report an ACC load (and an engine release) is accepted on: `recet data tie-out FOLDER --acc 2024`.
 
 Three parts, each PASS or FAIL, written as tieout_acc<version>.json and .md:
 

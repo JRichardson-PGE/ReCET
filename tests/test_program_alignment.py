@@ -1,4 +1,4 @@
-"""PrgIDs that do not line up between Measure.csv and ProgramCost.csv (BRD BR-06.16): the run goes on with warnings. A measure whose program has no
+"""PrgIDs that do not line up between Measure.csv and ProgramCost.csv: the run goes on with warnings. A measure whose program has no
 ProgramCost row is priced with no program costs; a ProgramCost row with no measures is charged to none (CALCULATIONS C17 item 11)."""
 from __future__ import annotations
 
