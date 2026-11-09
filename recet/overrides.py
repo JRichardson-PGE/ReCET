@@ -23,7 +23,7 @@ Matching rules ("if a profile matches an existing defined version, the separate 
 Everything is validated when loaded and raises `OverrideError` with the row/hour that is wrong, never a silent fix -- except the two documented
 normalisations (impacts that do not sum to 1 are rescaled and the run says so).
 
-An 8,760 profile may instead be given in kWh per unit per hour (`profile_basis` = `kwh_per_unit`, BRD BR-06.6): the measure's annual kWh is then derived from
+An 8,760 profile may instead be given in kWh per unit per hour (`profile_basis` = `kwh_per_unit`): the measure's annual kWh is then derived from
 the profile, and a profile that sums to zero (a load-shifting-only measure) is valid. See `load_user_profiles` and run_poc.apply_scaled_profiles.
 """
 from __future__ import annotations

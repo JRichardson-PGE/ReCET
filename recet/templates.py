@@ -96,7 +96,7 @@ _EXAMPLE_PROGRAMCOST = {"PrgID": "EXAMPLE_PRG", "PrgYear": "2028", "ClaimYearQua
 # Public names (the input editor, editor.py, builds its tables from these)
 # Optional ReCET columns, not CET fields, kept after CET's 74: a separate electric shape for the 2nd-baseline years and for the water energy, and an ACC
 # version per measure (blank = the measure's own shape / the run's version). CET files written by the editor leave them out when they are all blank.
-# Required by the CET layout but changing no result (BRD BR-06.15, the minimal input set): a file may leave them out, and they are then read as blank
+# Required by the CET layout but changing no result (the minimal input set): a file may leave them out, and they are then read as blank
 # (with_defaults). They are the preflight's required columns that editor.EFFECTS gives no effect, CEInputID (the key) aside; a test keeps the two in step.
 DESCRIPTIVE_MEASURE_COLUMNS = ("MeasDescription", "Sector")
 

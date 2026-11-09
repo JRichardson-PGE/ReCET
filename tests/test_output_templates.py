@@ -1,4 +1,4 @@
-"""Output templates and the key-metrics summary (BRD BR-06.10, TIER2_PLAN step 3): a saved template returns only the selected fields, in the saved order,
+"""Output templates and the key-metrics summary (TIER2_PLAN step 3): a saved template returns only the selected fields, in the saved order,
 each linked to its definition; the key-metrics summary gives the headline results and their main drivers."""
 from __future__ import annotations
 

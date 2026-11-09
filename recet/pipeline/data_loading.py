@@ -30,7 +30,7 @@ def load_measures_from_csv(measure_csv_path: Path, allocate_statewide: bool = Fa
     Factor, as CET's per-unit benefit and cost fields do (UnitMiscBens ...)."""
     df = read_cet_csv(measure_csv_path, low_memory=False, **({"dtype": dtypes} if dtypes else {}))
     from ..templates import with_defaults
-    df = with_defaults(df)                          # the minimal input set: a missing descriptive column is read as blank (BR-06.15)
+    df = with_defaults(df)                          # the minimal input set: a missing descriptive column is read as blank
     if allocate_statewide:
         from .statewide_allocation import allocate_measure_inputs, warn_unmatched
         rules = None
@@ -72,7 +72,7 @@ COLUMNS = [
     "AC_Net_Therms_1st_Baseline", "AC_Net_Therms_2nd_Baseline", "AC_Net_kWh_Water_1st_Baseline", "AC_Net_kWh_Water_2nd_Baseline",
     "Fuel_Sub_Flag", "Scaled_Profile_Flag", "ACCVersion",
 ]
-# ReCET-only columns for a true-up (BRD BR-05.6): the electric profile of the claim it adjusts (its parent), and that claim's 2nd-baseline profile (blank =
+# ReCET-only columns for a true-up: the electric profile of the claim it adjusts (its parent), and that claim's 2nd-baseline profile (blank =
 # AC_Elec_Impact_Profile_Parent). A record that names a parent is also priced on the parent's profile, and its incremental columns are the difference
 # (run_poc.parent_profile_measures, CALCULATIONS C21). Kept in the frame only when the file has one of the columns, so a job without them is unchanged.
 PARENT_PROFILE_COLUMNS = ("AC_Elec_Impact_Profile_Parent", "AC_Elec_Impact_Profile_Parent_2nd_Baseline")
@@ -101,7 +101,7 @@ def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] 
         given[c] = _text(df, c)
         df[c] = given[c].where(given[c] != "", df["AC_Elec_Impact_Profile"])
     parent_columns = []
-    if any(c in df.columns for c in PARENT_PROFILE_COLUMNS):         # a true-up's parent profile (BR-05.6): blank = no parent
+    if any(c in df.columns for c in PARENT_PROFILE_COLUMNS):         # a true-up's parent profile: blank = no parent
         parent, parent_2nd = _text(df, PARENT_PROFILE_COLUMNS[0]), _text(df, PARENT_PROFILE_COLUMNS[1])
         df[PARENT_PROFILE_COLUMNS[0]] = parent
         df[PARENT_PROFILE_COLUMNS[1]] = parent_2nd.where((parent_2nd != "") | (parent == ""), parent)
@@ -134,7 +134,7 @@ def _derive_fields(df: pd.DataFrame, extra_columns: tuple[str, ...] | list[str] 
     fuel_sub_by_fuel_id = df["FuelID"].isin(FUEL_SUB_FUEL_IDS) if "FuelID" in df.columns else False
     fuel_sub_by_impact_type = df["MeasImpactType"].astype(str).str.contains("FuelSub") if "MeasImpactType" in df.columns else False
     df["Fuel_Sub_Flag"] = fuel_sub_by_fuel_id | fuel_sub_by_impact_type
-    # ACCVersion (ReCET-only column, BRD BR-06.5): the ACC this measure is priced on, spelt as a version key ("2024 ACC" -> "2024"). Blank = the run's ACC.
+    # ACCVersion (ReCET-only column): the ACC this measure is priced on, spelt as a version key ("2024 ACC" -> "2024"). Blank = the run's ACC.
     df["ACCVersion"] = acc_versions(df["ACCVersion"]) if "ACCVersion" in df.columns else ""
     extra = [c for c in dict.fromkeys(extra_columns) if c not in COLUMNS]     # a cost-test set's input-stream columns (pipeline/input_streams.py)
     for c in extra:

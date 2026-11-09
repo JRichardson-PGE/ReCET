@@ -1,4 +1,4 @@
-"""When a queued run will start and finish (BRD BR-06.2: estimated completion for every run, a queued one included).
+"""When a queued run will start and finish (estimated completion for every run, a queued one included).
 
 A queued run has not reported any progress, so its time is estimated from its size: the measure rows of its Measure.csv (or its workbook's Measure sheet),
 counted once and kept in its folder as `estimate.json`. The seconds per million measures come from the stage seconds the progress bar is weighted by

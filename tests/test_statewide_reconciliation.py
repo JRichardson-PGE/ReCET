@@ -1,4 +1,4 @@
-"""Statewide allocation reconciles (BRD BR-06.7 and its acceptance scenario): statewide_reconciliation_<acc> adds each statewide program's allocated
+"""Statewide allocation reconciles : statewide_reconciliation_<acc> adds each statewide program's allocated
 fields back up, and the IOU shares' priced benefits add up to the unallocated program's wherever its inputs do."""
 from __future__ import annotations
 

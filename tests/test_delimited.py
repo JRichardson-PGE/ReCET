@@ -1,4 +1,4 @@
-"""Comma-delimited inputs (BRD BR-02.2): a Measure.csv / ProgramCost.csv saved as an ordinary CSV is read exactly like CET's pipe-delimited file."""
+"""Comma-delimited inputs: a Measure.csv / ProgramCost.csv saved as an ordinary CSV is read exactly like CET's pipe-delimited file."""
 from __future__ import annotations
 
 import pandas as pd

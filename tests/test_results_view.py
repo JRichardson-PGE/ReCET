@@ -206,7 +206,7 @@ def test_a_run_keeps_its_group_sums(tmp_path):
 
 
 def test_program_years_level_and_filter():
-    """BRD BR-04.1: a program-year level, and every level totalled over the years picked (the summary file has a program year group too)."""
+    """A program-year level, and every level totalled over the years picked (the summary file has a program year group too)."""
     f = _frame()
     f["Used_Year"] = [2028, 2029, 2029, 2030]
     res = rv.RunResults.from_frame(f)

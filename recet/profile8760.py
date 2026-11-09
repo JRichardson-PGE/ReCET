@@ -18,7 +18,7 @@ Shapes and calendar:
   weekdays), so the same hour carries the same weekday in every year's column.
 
 Output frame: hour_of_year, datetime (ACC calendar, 2018), then per year `net_kwh_<Y>` (all IOUs), `net_kwh_<Y>_<PA>` for each PA present and
-`net_kwh_<Y>_CZ<zone>` for each climate zone present (the measure's AC_Climate_Zone as filed, e.g. CZ13 or CZSystem; BRD BR-06.13).
+`net_kwh_<Y>_CZ<zone>` for each climate zone present (the measure's AC_Climate_Zone as filed, e.g. CZ13 or CZSystem).
 
 `peaks(profile, years)` (the portfolio_8760_peaks table): per year, for the portfolio, each PA and each climate zone, the year's net kWh, the hour of its
 largest net savings (its own peak) and of its largest added load, and its kWh in the portfolio's peak hour (coincident with the portfolio peak).

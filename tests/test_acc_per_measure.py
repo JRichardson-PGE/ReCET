@@ -1,4 +1,4 @@
-"""A different ACC version per measure (BRD BR-06.5): the optional ACCVersion column prices each measure on its own ACC within one run."""
+"""A different ACC version per measure: the optional ACCVersion column prices each measure on its own ACC within one run."""
 from __future__ import annotations
 
 import pytest

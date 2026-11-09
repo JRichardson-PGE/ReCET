@@ -1,4 +1,4 @@
-"""The data-dictionary attributes of a measure-level column beyond its definition (BRD BR-08.1), as the field_definitions table carries them:
+"""The data-dictionary attributes of a measure-level column beyond its definition, as the field_definitions table carries them:
 
     unit          the unit its entry gives ("Dollars (PV)", "kWh", "Metric Tons"), read from the definition's "Unit:" / "Units:" text
     source        where the value comes from: the Measure.csv / ProgramCost.csv input, the CEDARS Programs list, or a ReCET calculation (and on what)

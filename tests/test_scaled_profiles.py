@@ -1,4 +1,4 @@
-"""8,760 profiles given in kWh per unit per hour (BRD BR-06.6): the measure's kWh comes from the profile, and a profile that nets to zero (load shifting only)
+"""8,760 profiles given in kWh per unit per hour: the measure's kWh comes from the profile, and a profile that nets to zero (load shifting only)
 is priced in one record."""
 from __future__ import annotations
 

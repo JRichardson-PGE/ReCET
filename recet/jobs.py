@@ -48,14 +48,14 @@ class RunConfig:
     workbook: str | None = None              # an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760 sheets) instead of files
     out_dir: str = "recet_results"
     run_name: str = ""                       # folder name prefix; default is a timestamp
-    # --- the engine (D13, BR-06.4): "" / "recet" = ReCET's own hourly pricing; "cet-<release>" = an exact replica of that CET release (cet_versions/job.py),
+    # --- the engine: "" / "recet" = ReCET's own hourly pricing; "cet-<release>" = an exact replica of that CET release (cet_versions/job.py),
     #     on the release's own quarterly tables, CET's errors included. A filing accepts only ReCET's own engine.
     engine: str = ""
     # --- ACC version and supplied ACC files
     acc_version: str = "2024"                # "2024", "2026", or a new label defined by the supplied files
     acc_electric_file: str | None = None     # replaces the built-in electric ACC for acc_version (or defines a new version)
     acc_gas_file: str | None = None
-    acc_draft: bool = False                  # the supplied ACC file is a draft (BR-11.8): analysis runs only, every output labelled draft (apply_draft)
+    acc_draft: bool = False                  # the supplied ACC file is a draft: analysis runs only, every output labelled draft (apply_draft)
     settings_from: int | None = None         # the ACC version whose run parameters / E3 tables a NEW acc label uses (default: the newest built-in)
     # --- supplied profiles
     profiles_8760_file: str | None = None
@@ -86,15 +86,15 @@ class RunConfig:
     preflight_only: bool = False
     filing_validation: str = ""              # "" | "claims" | "budget_filing": also apply CEDARS' upload checks for that filing (filing_rules.py); flags, never stops
     filing_year: int | None = None           # the filing's year for the rules that name it (default: each record's claim year; ProgramCost: the earliest)
-    output_template: list[str] = field(default_factory=list)   # the measure-level file's columns, in order (BR-06.10; output_templates.py); empty = every column
+    output_template: list[str] = field(default_factory=list)   # the measure-level file's columns, in order (output_templates.py); empty = every column
     output_template_name: str = ""           # the template's name, for the record
-    acc_purpose: str = ""                    # what the run is priced for (BR-06.5): "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
+    acc_purpose: str = ""                    # what the run is priced for: "" any filing, "claims", or a versions.FILINGS key; records on an ACC that does
                                              # not normally apply to their program year are flagged (preflight, run_settings.json), never stopped
-    cost_test_set: str = ""                  # the cost-test definition set (BR-06.8; cost_test_sets.py): a built-in id ("EE-2026") or a YAML file for an analysis
+    cost_test_set: str = ""                  # the cost-test definition set (cost_test_sets.py): a built-in id ("EE-2026") or a YAML file for an analysis
                                              # run; "" = the set in force for the job's first program year. A filing run takes a published built-in set only
     parquet_row_group: int = 200_000         # rows per row group when a run in parts writes parquet (outputs.TableWriter): bigger compresses better, holds more memory
     chunk_size: int = 50_000                 # a job with more Measure.csv rows than this is run in parts of this many rows, to bound memory (chunked.py); 0 = never
-    max_records: int = 2_000_000             # the record cap (BRD v0.5 BR-06.3): a job with more Measure.csv rows is refused in preflight; 0 = no cap
+    max_records: int = 2_000_000             # the record cap: a job with more Measure.csv rows is refused in preflight; 0 = no cap
     replica_part_size: int = 10_000          # a CET replica engine prices this many measures at a time (cet_versions.price); 0 = the whole job at once.
                                              # Smaller than chunk_size: a replica expands each measure to its quarters (a 200k-measure job on CET 25.1
                                              # peaks at 1.2 GB with 10,000, at 4.2 GB with 50,000, in the same time)
@@ -317,7 +317,7 @@ def _acc_text(cfg: RunConfig) -> str:
 
 def write_template_files(cfg: RunConfig, writer, km_totals, run_dir: Path, tag: str, excel, result: RunResult, log: Log) -> None:
     """After the measure-level file: a note for any template column the run did not produce, the field_definitions table (one row per column of the file,
-    its definition and documentation link) and the key_metrics table (BR-06.10)."""
+    its definition and documentation link) and the key_metrics table."""
     from . import field_docs, key_metrics, outputs
     if writer.left_out:
         note = (f"output template{' ' + repr(cfg.output_template_name) if cfg.output_template_name else ''}: this run did not produce "
@@ -349,7 +349,7 @@ def write_findings(rep, cfg: RunConfig, run_dir: Path) -> Path | None:
 
 
 def write_reconciliation(cfg: RunConfig, parts, run_dir: Path, tag: str, excel, result: RunResult, log: Log) -> None:
-    """statewide_reconciliation_<tag> (BRD BR-06.7): each statewide program's allocated fields, before allocation and by IOU, with the difference
+    """statewide_reconciliation_<tag>: each statewide program's allocated fields, before allocation and by IOU, with the difference
     (statewide_allocation.reconciliation). A field that does not reconcile is a note in the log and in RunResult.notes; the run goes on."""
     from . import outputs
     from .pipeline import statewide_allocation
@@ -371,7 +371,7 @@ DRAFT_LABEL = " (draft)"
 
 
 def is_filing_run(cfg: RunConfig) -> bool:
-    """A run for a filing: CEDARS filing checks, or priced for a filing (BR-11.8: no draft ACC; COST_TESTS.md: only a published built-in cost-test set)."""
+    """A run for a filing: CEDARS filing checks, or priced for a filing (no draft ACC; COST_TESTS.md: only a published built-in cost-test set)."""
     return bool(cfg.filing_validation or cfg.acc_purpose)
 
 
@@ -413,7 +413,7 @@ def check_input_columns(result: RunResult, files, log: Log):
 
 
 def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
-    """`acc` labelled as a draft ACC (BRD v0.5 BR-11.8) when its electric file is marked draft in the reference folder's manifest (datapack.set_draft), or
+    """`acc` labelled as a draft ACC when its electric file is marked draft in the reference folder's manifest (datapack.set_draft), or
     when `supplied` files are flagged with cfg.acc_draft. A draft is for analysis only: a run asking for CEDARS filing checks or priced for a filing
     (acc_purpose) is refused (ValueError); any other run carries "(draft)" in the ACC's label, so in Used_ACCVersion and run_settings.json, and a note."""
     import dataclasses
@@ -425,7 +425,7 @@ def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
     where = f"pack {info['pack'].get('version')}" if info and info.get("draft") else "supplied file marked draft"
     if cfg.filing_validation or cfg.acc_purpose:
         raise ValueError(f"the {acc.label} is a DRAFT ACC ({where}): it is for analysis runs only, so a run with CEDARS filing checks or priced for a "
-                         "filing is refused (BR-11.8). Run it without those options, or use a final ACC.")
+                         "filing is refused. Run it without those options, or use a final ACC.")
     note = f"the {acc.label} is a DRAFT ACC ({where}): for analysis only, never for a filing; every output names it as a draft"
     return dataclasses.replace(acc, label=acc.label + DRAFT_LABEL, notes=[*acc.notes, note])
 
@@ -433,7 +433,7 @@ def apply_draft(acc, cfg: RunConfig, supplied: bool = False):
 def run_job(cfg: RunConfig, log: Log = print) -> RunResult:
     from .cet_versions import job as cet_job
     if cet_job.release_of(cfg.engine) is not None:
-        return cet_job.run_job(cfg, log)            # a CET replica (D13): its own run, its own files
+        return cet_job.run_job(cfg, log)            # a CET replica: its own run, its own files
     t_start = time.time()
     if not cfg.measures and not cfg.workbook:
         raise ValueError("no Measure.csv or job workbook given")
@@ -535,7 +535,7 @@ def _run(cfg: RunConfig, acc, run_dir: Path, result: RunResult, tag: str, log: L
                             f"{dict(csv='CSV', parquet='parquet').get(used, 'zipped CSV')}")
         cfg.output_format = used                                   # cfg is this run's own copy (run_job)
 
-    # ---- ACC versions: a measure may name its own (ACCVersion column, BRD BR-06.5); blank = this run's version
+    # ---- ACC versions: a measure may name its own (ACCVersion column); blank = this run's version
     from . import runtime, versions
     acc_keys = measures["ACCVersion"].replace("", acc.key)          # the ACC each measure is priced on: its ACCVersion, blank = this run's
     groups = {k: (acc if k == acc.key else apply_draft(versions.resolve_acc(k), cfg)) for k in sorted(acc_keys.unique(), key=lambda k: (k != acc.key, k))}

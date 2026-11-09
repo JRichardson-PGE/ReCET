@@ -1,4 +1,4 @@
-"""The record cap (BRD v0.5 BR-06.3): a job with more Measure.csv records than RunConfig.max_records (2,000,000 by default) is refused in preflight, before
+"""The record cap: a job with more Measure.csv records than RunConfig.max_records (2,000,000 by default) is refused in preflight, before
 it is split or priced, with one clear message; a CET replica refuses it the same way; 0 = no cap."""
 from __future__ import annotations
 

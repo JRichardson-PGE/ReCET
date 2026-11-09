@@ -1,4 +1,4 @@
-"""A true-up priced against its parent's profile (BRD BR-05.6, CALCULATIONS C21): AC_Elec_Impact_Profile_Parent (and _Parent_2nd_Baseline) price the
+"""A true-up priced against its parent's profile (CALCULATIONS C21): AC_Elec_Impact_Profile_Parent (and _Parent_2nd_Baseline) price the
 record a second time on the parent's profile, and the incremental columns are the difference, bit for bit what pricing the job twice and subtracting gives."""
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _profiles(path):
     peak[PEAK_HOUR - 1] = 1.0
     evening = np.zeros(8760)
     evening[np.arange(18, 8760, 24)] = 1 / 365
-    measured = np.full(8760, 900.0 / 8760)          # a metered true-up: 900 kWh per unit per year, its own kWh (BR-06.6)
+    measured = np.full(8760, 900.0 / 8760)          # a metered true-up: 900 kWh per unit per year, its own kWh
     measured[PEAK_HOUR - 1] += 100.0
     frames = [pd.DataFrame({"end_use_name": name, "pa": "PGE", "target_sector": "Residential", "climate_zone": "ALL", "hour_of_year": np.arange(1, 8761),
                             "impact": v, "profile_basis": basis, "represents_year": year})

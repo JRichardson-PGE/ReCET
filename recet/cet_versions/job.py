@@ -1,4 +1,4 @@
-"""A run on a CET replica engine (D13, BR-06.4): `RunConfig.engine` names the engine, "" (or "recet") for ReCET's own hourly pricing, or
+"""A run on a CET replica engine: `RunConfig.engine` names the engine, "" (or "recet") for ReCET's own hourly pricing, or
 "cet-<release>" for an exact replica of that CET release (`releases.RELEASES`). The web app's New run, `recet run --engine` and `jobs.run_job`
 all come here for a replica.
 
@@ -9,7 +9,7 @@ runs on different engines can be put side by side. run_settings.json records the
 
 A replica prices what the release priced and nothing else: the options that change ReCET's pricing (supplied ACC or profile files, run parameters,
 statewide allocation, components, the combined 8,760, a two-version comparison) have no meaning for it and are refused (`problems`), and a filing
-accepts only ReCET's current release (D13), so the CEDARS filing checks are refused too.
+accepts only ReCET's current release, so the CEDARS filing checks are refused too.
 """
 from __future__ import annotations
 
@@ -200,7 +200,7 @@ def measure_level(raw: pd.DataFrame, res, acc_label: str) -> pd.DataFrame:
 
 
 def _check_record_cap(measures, cap) -> None:
-    """The record cap (BR-06.3) on a replica run, which has no ReCET preflight: a Measure.csv with more rows than `cap` (0 = none) is refused."""
+    """The record cap on a replica run, which has no ReCET preflight: a Measure.csv with more rows than `cap` (0 = none) is refused."""
     from .. import preflight
     from ..pipeline import delimited
     if cap and measures and Path(measures).exists():

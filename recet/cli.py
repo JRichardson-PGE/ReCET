@@ -4,7 +4,7 @@
     recet run --measures M.csv [--programcost P.csv] --acc 2026 --out results
     recet run --config job.json             a saved configuration (the GUI's "Save settings" writes one)
     recet run --workbook job.xlsx --acc 2026 --out results      a job workbook instead of the CSVs
-    recet run --engine cet-24.3 --acc 2022 --measures M.csv --out results      the job on a CET replica engine instead of ReCET's own (D13)
+    recet run --engine cet-24.3 --acc 2022 --measures M.csv --out results      the job on a CET replica engine instead of ReCET's own
     recet preflight --measures M.csv --acc 2026
     recet template all --out templates      every template + INPUT_FORMATS.md
     recet template workbook --out job.xlsx  an Excel job workbook (Measure, ProgramCost, RunParameters, SWAllocation, GasProfiles, Profiles8760)
@@ -87,7 +87,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--parquet-row-group", type=int, help="rows per parquet row group when a large job is written in parts (default 200,000; smaller uses less memory)")
     g.add_argument("--replica-part-size", type=int, help="with a CET replica engine: measures priced at a time (default 10,000; 0 = the whole job at once)")
     g.add_argument("--chunk-size", type=int, help="run a job with more Measure rows than this in parts of this many, to bound memory (default 50,000; 0 = never)")
-    g.add_argument("--max-records", type=int, help="refuse a job with more Measure rows than this (the record cap, BR-06.3; default 2,000,000; 0 = no cap)")
+    g.add_argument("--max-records", type=int, help="refuse a job with more Measure rows than this (the record cap; default 2,000,000; 0 = no cap)")
 
 
 def _config_from_args(a: argparse.Namespace):

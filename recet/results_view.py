@@ -1,7 +1,7 @@
 """The Results tab's tables: a run's measure-level results filtered to one PA and to the program years picked, and shown at six levels, with columns chosen by
 a saved view. No tkinter here.
 
-Levels (`LEVELS`): measure, program (PrgID), program year (the claim year, `Used_Year`; BRD BR-04.1), program sector (the program's PrimarySector from the
+Levels (`LEVELS`): measure, program (PrgID), program year (the claim year, `Used_Year`), program sector (the program's PrimarySector from the
 Programs list), program segment (its ProgramSegment) and portfolio. `years` (a list of program years; empty = every year) limits every level to those
 years, so a multi-year filing's tests and TSB can be totalled over the years chosen. Every level above the measure is a sum over its measures; ratio columns are recomputed from the summed benefits and costs (`outputs.group_ratios`,
 the same definition the portfolio summary and CET's run receipt use), never averaged.
@@ -436,7 +436,7 @@ class RunResults:
         return [ALL_PAS] + sorted(self.sums["_pa"].unique()) if len(self.sums) else [ALL_PAS]
 
     def years(self) -> list[str]:
-        """The run's program years, in order (BR-04.1): the choices of the years filter."""
+        """The run's program years, in order: the choices of the years filter."""
         return sorted(self.sums["_year"].astype(str).unique()) if len(self.sums) and "_year" in self.sums else []
 
     def _of(self, pa: str, years=None) -> pd.DataFrame:
@@ -574,7 +574,7 @@ SIDES = ("a", "b", "diff", "pct")
 
 
 def compare(a: RunResults, b: RunResults, level: str, keys: list[str], pa: str = ALL_PAS, years=None) -> pd.DataFrame:
-    """Two runs side by side at one level (BRD BR-06.11, any two runs, not only two ACCs of one job): one row per group present in either run, matched
+    """Two runs side by side at one level (any two runs, not only two ACCs of one job): one row per group present in either run, matched
     on the group (the PrgID, program year, sector or segment; the portfolio is one row), and for each key `<key>__a`, `<key>__b`, `<key>__diff` (b - a) and
     `<key>__pct` (diff / |a|, blank when a is 0; ratios are recomputed in each run from its own sums, as everywhere). Measures counts as a key too.
     Keys only one run has are blank for the other."""

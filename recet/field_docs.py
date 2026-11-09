@@ -1,5 +1,5 @@
 """Each measure-level column's definition, read from the packaged documents (OUTPUT_FIELDS.md, and INPUT_FIELDS.md for the echoed input columns), so a written
-table can carry a definition and a link for every column (BRD BR-06.10).
+table can carry a definition and a link for every column.
 
     definition("ElecBen") -> Definition("ElecBen", "OUTPUT_FIELDS.md", "elecben", "The lifetime value of the measure's net electric savings ...")
 
@@ -142,7 +142,7 @@ def definition(column: str) -> Definition | None:
 def table(columns, base_url: str = "", acc: str = "", cset=None) -> "pd.DataFrame":
     """One row per column, in order: position, column, definition and link (`base_url` + the document link, e.g. a web app's '/docs/'), then the
     data-dictionary attributes of field_attributes.py (unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use;
-    BRD BR-08.1; `acc` names the run's ACC in `version`; `cset`, the run's cost-test set, says which tests a column enters). A column without an
+    `acc` names the run's ACC in `version`; `cset`, the run's cost-test set, says which tests a column enters). A column without an
     entry gets the definition the run's set gives it, else a blank one."""
     import pandas as pd
     from .field_attributes import ATTRIBUTE_COLUMNS, attributes

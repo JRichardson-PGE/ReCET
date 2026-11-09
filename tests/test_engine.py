@@ -1,4 +1,4 @@
-"""The calculation engine of a run (D13, BR-06.4): ReCET's own, or a CET replica through the ordinary run path (jobs.run_job, `recet run --engine`, the web
+"""The calculation engine of a run: ReCET's own, or a CET replica through the ordinary run path (jobs.run_job, `recet run --engine`, the web
 app's New run), its outputs readable by the Results and Compare pages, and what a replica refuses (a filing accepts only ReCET's own engine)."""
 from __future__ import annotations
 

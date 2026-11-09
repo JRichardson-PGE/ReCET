@@ -5,15 +5,15 @@ folder* laid out as described in `recet.paths`, with a `manifest.json` recording
 
   build_reference_folder(dest)         copy the current reference folder's files to a new folder (or hard link, same drive); the manifest names the pack
                                        (version, type) and each file (its type, ACC version, draft flag)
-  set_draft(folder, acc, draft)        mark an ACC in a folder's manifest as a draft (BR-11.8) or as final
+  set_draft(folder, acc, draft)        mark an ACC in a folder's manifest as a draft or as final
   verify(folder, full=False)           check the folder against its manifest (sizes; add full=True for the checksums)
   pack(folder, out_dir, part_gb=4)     write the folder as a plain (uncompressed -- parquet is already compressed) tar split into parts <= part_gb, e.g. to fit FAT32
                                        drives or upload limits, plus SHA256SUMS
   unpack(parts_dir, dest)              rebuild the folder from the parts
 
-A DRAFT ACC (BRD v0.5 BR-11.8: a proposed ACC loaded before its release, for analysis) is usable for analysis runs only: a run on it is refused when it
+A DRAFT ACC (a proposed ACC loaded before its release, for analysis) is usable for analysis runs only: a run on it is refused when it
 asks for CEDARS filing checks or is priced for a filing (`acc_purpose`), and every other run labels its ACC "(draft)" in every output (jobs.apply_draft).
-`file_info` finds a file's manifest entry; tieout.py writes the acceptance report a pack (and an engine release) is promoted on (BR-06.21).
+`file_info` finds a file's manifest entry; tieout.py writes the acceptance report a pack (and an engine release) is promoted on.
 
 Point the program at the folder with `recet data set-dir PATH`, the GUI's "Reference data folder" box, `--data-dir`, or the environment variable RECET_DATA.
 """
@@ -58,7 +58,7 @@ def _acc_of(key: str) -> str | None:
 def build_reference_folder(dest: str | Path, *, link: bool = False, log: Log = print, checksums: bool = True, pack_version: str | None = None,
                            draft_accs: tuple[str, ...] | list[str] = ()) -> Path:
     """Copy (or hard-link, same drive only) every file in paths.REF_FILES that exists in the current reference folder into `dest` and write the manifest.
-    `pack_version` names this pack (default: today's date); `draft_accs` lists the ACC versions whose electric file is a draft (BR-11.8)."""
+    `pack_version` names this pack (default: today's date); `draft_accs` lists the ACC versions whose electric file is a draft."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     files = {}

@@ -7,9 +7,9 @@ Reads Measure.csv (and ProgramCost.csv) exactly as the run would and reports, wi
   H-factor profile exists, for every measure with gas savings whether its monthly profile exists,
 * the ACC horizon: claim years before the first ACC year or measure lives that run past the last one,
 * PrgID alignment between Measure.csv and ProgramCost.csv, and statewide-program rows,
-* the ACC each record is priced on against the ACCs that normally apply to its program year (BR-06.5; `acc_purpose`: any filing, claims, or one budget
+* the ACC each record is priced on against the ACCs that normally apply to its program year (`acc_purpose`: any filing, claims, or one budget
   filing; versions.expected_accs): a record outside them is a warning, never a stop,
-* the record cap (`max_records`, BR-06.3): a Measure.csv with more rows than the cap is refused before anything else is read,
+* the record cap (`max_records`): a Measure.csv with more rows than the cap is refused before anything else is read,
 * optionally (`filing_rules`), CEDARS' own upload checks for a claims or a budget filing (filing_rules.py): the records CEDARS would reject or warn on, each
   listed under the rule's ID, and kept on the report (`PreflightReport.filing`) for the run to flag in the measure-level table. They never stop the run.
 
@@ -43,7 +43,7 @@ OPTIONAL_MEASURE_COLUMNS = {
     "UnitkWhIOUWater2ndBaseline": "water energy benefits/costs are 0 without it and UnitkWhIOUWater1stBaseline",
 }
 KEY_COLUMNS = ("CEInputID",)
-# the minimal input set (BRD BR-06.15): the required columns that change a result; the others (templates.DESCRIPTIVE_MEASURE_COLUMNS) may be left out
+# the minimal input set: the required columns that change a result; the others (templates.DESCRIPTIVE_MEASURE_COLUMNS) may be left out
 from .templates import DESCRIPTIVE_MEASURE_COLUMNS  # noqa: E402
 CALCULATION_MEASURE_COLUMNS = [c for c in REQUIRED_MEASURE_COLUMNS if c not in DESCRIPTIVE_MEASURE_COLUMNS]
 NUMERIC_COLUMNS = [c for c in REQUIRED_MEASURE_COLUMNS if c.startswith(("Unit", "NTGR", "RealizationRate", "InstallationRate"))
@@ -64,7 +64,7 @@ NEEDED_VALUES = ("NumUnits", "UnitkW1stBaseline", "UnitkWh1stBaseline", "UnitThe
                  "UnitGasInfraBens", "UnitRefrigCosts", "UnitRefrigBens", "UnitMiscCosts", "UnitMiscBens")
 VALID_GAS_SECTORS = {"RESIDENTIAL", "COMMERCIAL", "CORE"}
 MAX_CELLS = 5000          # cells listed per issue (the web editor highlights them)
-MAX_RECORDS = 2_000_000   # the record cap at launch (BRD v0.5 BR-06.3): a larger job is refused; RunConfig.max_records changes it, 0 = no cap
+MAX_RECORDS = 2_000_000   # the record cap at launch: a larger job is refused; RunConfig.max_records changes it, 0 = no cap
 
 
 @dataclass
@@ -92,7 +92,7 @@ class PreflightReport:
     agg: dict = field(default_factory=dict)          # raw values behind some stats, for combining the reports of a file checked in parts (not reported)
     filing: pd.DataFrame | None = None               # with filing_rules: one row per failing record (table, id, FilingValidation, FilingRules)
     filing_rules: dict | None = None                 # with filing_rules: the rule set used (filing_rules.RuleSet.describe)
-    acc_check: dict | None = None                    # the ACC-for-program-year check (BR-06.5): purpose, counts, and one row per (ACC, program year)
+    acc_check: dict | None = None                    # the ACC-for-program-year check: purpose, counts, and one row per (ACC, program year)
 
     def add(self, severity: str, code: str, message: str, count: int = 0, examples=None, cells=None, impact=None) -> None:
         self.issues.append(Issue(severity, code, message, count, list(examples or [])[:5], list(cells or [])[:MAX_CELLS],
@@ -277,9 +277,9 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
     `filing_rules` ("claims" or "budget_filing") also applies CEDARS' upload checks for that kind of filing (filing_rules.py); `filing_year` is the filing's
     year for the rules that name it (default: each record's claim year, and the job's earliest claim year for ProgramCost).
 
-    `acc_purpose` says what the run is priced for, for the ACC-for-program-year check (BR-06.5): "" any filing, "claims", or a versions.FILINGS key.
+    `acc_purpose` says what the run is priced for, for the ACC-for-program-year check: "" any filing, "claims", or a versions.FILINGS key.
 
-    `max_records` is the record cap (BR-06.3; None = MAX_RECORDS, 0 = no cap): a Measure.csv with more data rows than it is refused with the one
+    `max_records` is the record cap (None = MAX_RECORDS, 0 = no cap): a Measure.csv with more data rows than it is refused with the one
     `too_many_records` error, before the file is split or parsed."""
     from . import filing_rules as fr
     cap = MAX_RECORDS if max_records is None else int(max_records)
@@ -310,8 +310,8 @@ def check_inputs(measure_csv: str | Path, programcost_csv: str | Path | None = N
 
 
 def too_many_records_message(n: int, cap: int) -> str:
-    """The record cap's message (BR-06.3), shared by preflight and the CET replica engines."""
-    return (f"Measure.csv has {n:,} records, more than the {cap:,} a run takes (the record cap, BRD BR-06.3). Split the job into files of at most "
+    """The record cap's message, shared by preflight and the CET replica engines."""
+    return (f"Measure.csv has {n:,} records, more than the {cap:,} a run takes (the record cap). Split the job into files of at most "
             f"{cap:,} records and run each, or raise the cap (max_records / --max-records) where the system allows it.")
 
 
@@ -325,7 +325,7 @@ def _expected_text(exp: set[int], year: int, purpose: str) -> str:
 
 
 def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpose: str, mrows) -> None:
-    """BR-06.5: each record's ACC (its ACCVersion, else the run's) against the ACCs that normally apply to its program year (its claim year) for
+    """Each record's ACC (its ACCVersion, else the run's) against the ACCs that normally apply to its program year (its claim year) for
     `purpose` (versions.expected_accs). A warning per (ACC, program year) that does not apply, naming the records; the counts by (ACC version, program year)
     go to rep.agg["acc_check"] for _finish_acc_check (a file checked in parts adds its parts' up)."""
     from . import versions
@@ -480,7 +480,7 @@ def _check_parts(p: Path, parts: list, dtypes: dict, programcost_csv, acc, alloc
 
 
 def _program_alignment(rep: PreflightReport, gap: dict, program: pd.DataFrame, pc: pd.DataFrame, measure_cells: list) -> None:
-    """PrgIDs that do not line up between Measure.csv and ProgramCost.csv (BRD BR-06.16): warnings, and the run goes on. A measure whose program has no
+    """PrgIDs that do not line up between Measure.csv and ProgramCost.csv: warnings, and the run goes on. A measure whose program has no
     ProgramCost row is priced with no program costs; a ProgramCost row whose program has no measures is charged to none, so its costs are in no cost test.
     (CET stops the job on either; ReCET did too before 0.1.59.) `program` is the loaded (possibly allocated) table, `pc` the file as filed, `measure_cells`
     the Measure cells of the measures with no cost row."""
@@ -653,7 +653,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
         return rep
     rep.stats["claim years"] = f"{measures['Used_Year'].min()}-{measures['Used_Year'].max()}"
     named = measures.loc[measures["ACCVersion"] != "", "ACCVersion"]
-    if len(named):                                  # the optional ACCVersion column (BRD BR-06.5): each measure may name its own ACC version
+    if len(named):                                  # the optional ACCVersion column: each measure may name its own ACC version
         from . import paths, versions
         run_key = acc.key if acc is not None else None
         rep.stats["measures by ACC version"] = ", ".join(f"{k}: {n:,}" for k, n in named.value_counts().sort_index().items())
@@ -735,7 +735,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
     if cat is None and not counts["user profile"]:
         rep.add("warning", "no_profile_library", "CEDARS impact-profile library not found (reference data folder): measures cannot be matched to 8,760 profiles")
 
-    # --- kWh-per-unit profiles (BRD BR-06.6): the measure's electric kWh comes from the profile, not from UnitkWh1stBaseline / UnitkWh2ndBaseline
+    # --- kWh-per-unit profiles: the measure's electric kWh comes from the profile, not from UnitkWh1stBaseline / UnitkWh2ndBaseline
     if user is not None and any(e.scaled for e in user.entries):
         zones = [system_zones.priced_zone(k, pa, ts, cz) for k, pa, ts, cz in zip(measures["AC_Elec_Impact_Profile"], measures["IOU_AC_Territory"], measures["AC_Elec_Target_Sector"], measures["AC_Climate_Zone"])]
         scaled = pd.Series([real_impact_profiles.scaled_profile(k, pa, ts, z) is not None for k, pa, ts, z in
@@ -767,7 +767,7 @@ def _check(p: Path, programcost_csv, *, acc=None, allocate_statewide: bool = Fal
             rep.add("warning", "no_electric_profile_2nd", "measures whose AC_Elec_Impact_Profile_2nd_Baseline has no 8,760 profile: their 2nd-baseline years are NOT priced "
                     "(ElecPricingStatus = PARTLY PRICED)", missing2, eg2, where2)
 
-    # --- a true-up priced against its parent's profile (AC_Elec_Impact_Profile_Parent, BRD BR-05.6): the parent's profiles must price too
+    # --- a true-up priced against its parent's profile (AC_Elec_Impact_Profile_Parent): the parent's profiles must price too
     if "AC_Elec_Impact_Profile_Parent" in measures.columns:
         named = measures["AC_Elec_Impact_Profile_Parent"] != ""
         rep.stats["true-ups priced against a parent profile"] = f"{int(named.sum()):,}"

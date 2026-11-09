@@ -2,7 +2,7 @@
 come from `results_view.py`.
 
 * Top: the run shown, Load results from a folder, Open measure-level table, Export table.
-* Filter row: PA (All PAs or one administrator), Program years (a menu of the run's years to total over; none ticked = every year, BRD BR-04.1), View (the built-in Default or a saved view), Edit views (a dialog to add, remove and order columns and save
+* Filter row: PA (All PAs or one administrator), Program years (a menu of the run's years to total over; none ticked = every year), View (the built-in Default or a saved view), Edit views (a dialog to add, remove and order columns and save
   the view under a name).
 * Tabs: Measure, Program, Program year, Program sector, Program segment and Portfolio level. The measure tab is turned off when the filtered run has more than
   results_view.MAX_MEASURE_ROWS measures (open the measure-level file instead).

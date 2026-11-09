@@ -1,4 +1,4 @@
-"""The minimal input set (BRD BR-06.15, TIER2_PLAN step 4): an exploratory run needs only the Measure.csv columns that change a result. A file with only
+"""The minimal input set (TIER2_PLAN step 4): an exploratory run needs only the Measure.csv columns that change a result. A file with only
 those columns prices every test without errors; a missing descriptive column is a warning (filled blank), a missing calculation column an error."""
 from __future__ import annotations
 
