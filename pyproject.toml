@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "recet"
 dynamic = ["version"]
-description = "ReCET, the rebuilt CEDARS Cost Effectiveness Tool: price CET-format inputs hour by hour on the 2024 or draft 2026 ACC, with a graphical interface"
+description = "ReCET, the rebuilt CEDARS Cost Effectiveness Tool: price CET-format inputs hour by hour on the 2021, 2022, 2024 or 2026 ACC, with a graphical interface, a web app and a batch worker"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

@@ -40,7 +40,7 @@ CEDARS.
 | Hourly valuation, load shifting | value savings in the hour they occur; a measure that only moves load has value | each measure's 8,760 profile is multiplied by that hour's avoided cost **before** summing (C5.1); kWh-per-unit profiles (C4.5) | met |
 | ACC per measure | price records on the ACC that applies to them; flag the ones that are not | optional `ACCVersion` column (C3.5); the "Priced for" check flags records whose ACC does not normally apply to their program year (`versions.expected_accs`) | met |
 | Version labels | name each ACC release unambiguously | versions keyed and shown by ACC year ("2026 ACC"); CET's Avoided Cost Version numbers mapped on read (`versions.py`) | met |
-| Participant Cost Test | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test` (its streams); the tests are a versioned definition set (`data/cost_tests/EE-2026`, `cost_test_sets.py`, COST_TESTS.md) that every run pins and `pipeline/test_evaluator.py` prices | partly met: the PCT is added and the tests are a pinned set priced by one evaluator, which every summary, Results page and data-dictionary attribute follows; a set can add non-energy benefits as input streams from its own Measure columns (`pipeline/input_streams.py`), so the NEBs D14 adopts are a new set, not a release; the platform's pack kind is the last step |
+| Participant Cost Test | the SPM's fourth test, which the CET lacks; cost tests and value streams as configuration | `run_poc.participant_cost_test` (its streams); the tests are a versioned definition set (`data/cost_tests/EE-2026`, `cost_test_sets.py`, COST_TESTS.md) that every run pins and `pipeline/test_evaluator.py` prices | partly met: the PCT is added and the tests are a pinned set priced by one evaluator, which every summary, Results page and data-dictionary attribute follows; a set can add non-energy benefits as input streams from its own Measure columns (`pipeline/input_streams.py`), so adopting non-energy benefits takes a new set, not a new release; the platform's pack kind is the last step |
 | Filing checks | check a job against CEDARS' upload rules before upload | CEDARS' published claims and budget-filing rule files, shipped unchanged and versioned by effective date (`filing_rules.py`); failing records flagged, never blocked; the rule set used recorded in `run_settings.json` | met; multi-file batch upload dropped for ReCET |
 | Output templates and key metrics | choose and order output columns; headline results with definitions and drivers | `output_templates.py`, `key_metrics.py`, `field_definitions` written by every run (`field_docs.py`) | met |
 | Program costs need not line up | calculate measures whose program has no program-cost record | a measure with no `ProgramCost.csv` row is priced with no program costs, and a row with no measures is charged to none; preflight warns about both (`preflight._program_alignment`; C17 item 11) | met |
@@ -136,7 +136,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `gui_editor.py` | interface | the window's Edit inputs tab (layout and events over `editor.py`) |
 | `gui_results.py` | interface | the window's Results tab (layout and events over `results_view.py`) |
 | `gui_templates.py` | interface | the window's output-template editor: two-list field picker and the default template (over `output_templates.py`) |
-| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `openbca`, `cet-version` |
+| `cli.py` | interface | `recet run`, `preflight`, `template`, `check`, `data`, `cost-tests`, `worker`, `regress`, `openbca`, `cet-version` |
 | `web/app.py` | interface | the FastAPI pages and JSON endpoints under `/ReCET` |
 | `web/edit_api.py` | interface | the web Edit inputs page: drafts, saves, Validate inputs |
 | `web/runner.py` | interface | the run queue: worker threads, child processes, Stop, retention clean-up |
@@ -207,7 +207,7 @@ Every module in the package. Paths are relative to `recet/`.
 | `cet_versions/parts.py` | data | a replica job read part by part: Measure.csv split once, scanned for the table keys, First Year and repeated CEInputIDs |
 | `cet_versions/cli.py` | interface | `recet cet-version list` and `run` |
 | `outputs.py` | outputs | the measure-level table, the portfolio summary, file formats and writers |
-| `results_view.py` | outputs | the Results tables at five levels, from kept per-program sums |
+| `results_view.py` | outputs | the Results tables at six levels, from kept per-program sums |
 | `key_metrics.py` | outputs | the key-metrics summary |
 | `field_docs.py` | outputs | each output column's definition and documentation link, read from these documents |
 | `field_attributes.py` | outputs | each column's data-dictionary attributes: unit, source, version, cost-test treatment, time basis, aggregation, rounding, years in use |
@@ -560,10 +560,11 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
 * **Run status is only partly built.** Queue position, progress, time estimates and email on finish or failure are built; adding workers under heavy load and
   per-run caps beyond the container limit and the time limit are not. With one worker, one large run makes every other run wait.
 * **One server, one database file.** The web app is a single container on a small instance with SQLite. It is a prototype's deployment, not a production
-  one: a production system would put runs on a batch service (AWS Batch or Fargate, sized by peak load), results in object storage and accounts in a
-  managed database. The run path would not change: a worker still runs `recet run --config`. Until then the server's state (the SQLite database, run and
+  one. The production path is the worker instead (`recet worker run`, the README's "Batch worker"): the CEDARS platform submits each run as a job spec to a batch
+  service, with its files in object storage and its accounts in the platform's own database. On this server the state (the SQLite database, run and
   draft folders) is copied to S3 every night and can be restored by `deploy/backup` (its README is the setup and restore runbook).
-* **No API.** Users upload files and download results; nothing else can call ReCET except through Python (`recet.jobs`).
+* **No web API.** The web app's users upload files and download results. Another system calls ReCET through the worker and its job spec
+  (`recet worker run`, `jobspec.py`) or through Python (`recet.jobs`).
 * **No lifecycle-savings input**: inputs stay the CET's per-unit annual values.
 * **Multi-file batch upload** is not built: one job zip holds one `Measure.csv`.
 * **No integration with CEDARS or eTRM.** Profiles, programs and rules are files refreshed by hand.

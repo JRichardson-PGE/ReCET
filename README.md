@@ -64,7 +64,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 ## Documentation
 
 In the package (`recet/docs`, and **Help > Documentation** in the window): `USER_GUIDE.md` (every control, the command line, common jobs), `INPUT_FORMATS.md`, `INPUT_FIELDS.md` (every input field),
-`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number) and `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
+`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number), `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example), `COST_TESTS.md` (the cost tests and value streams as a versioned definition set), `WEB_GUIDE.md` (the web app's pages) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
 
 ## Web app
 
@@ -118,7 +118,7 @@ releases' table export in `<reference data folder>/cet_versions/`. ReCET's own r
 allocation table differs from what it asks for, runs it, and sends the run folder with `receipt.json` to the spec's outputs URI.
 
     {"spec_version": 1, "job_id": "2028-claims-pge-0001",
-     "engine": {"release": "0.1.78", "calculation": "recet"},
+     "engine": {"release": "0.1.93", "calculation": "recet"},
      "inputs": {"job_zip": {"uri": "s3://bucket/jobs/0001/job.zip", "sha256": "..."}},
      "settings": {"acc_version": "2024", "acc_purpose": "claims"},
      "packs": {"files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},
@@ -140,7 +140,7 @@ engine release: push the tag `vX.Y.Z` matching `recet/__init__.py` and `.github/
 `ghcr.io/jrichardson-pge/recet-worker:X.Y.Z`, with `RECET_IMAGE` and `RECET_COMMIT` set so every receipt names the image. Mount the reference data
 read-only at `/data`; S3 credentials come from the environment or the instance / task role:
 
-    docker run --rm -v /path/to/reference:/data:ro ghcr.io/jrichardson-pge/recet-worker:0.1.78 run s3://bucket/jobs/0001/job.json
+    docker run --rm -v /path/to/reference:/data:ro ghcr.io/jrichardson-pge/recet-worker:X.Y.Z run s3://bucket/jobs/0001/job.json
 
 ## From Python
 

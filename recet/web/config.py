@@ -1,10 +1,10 @@
 """The web app's settings, read from environment variables (all optional).
 
-RECET_WEB_STATE          folder for the database, uploads, runs and drafts (default ~/.recet/web)
+RECET_WEB_STATE          folder for the database, uploads, runs and drafts (default <RECET_HOME>/web, i.e. ~/.recet/web)
 RECET_WEB_PREFIX         URL path the app lives under (default /ReCET); every page, asset and cookie uses it
 RECET_WEB_SECURE_COOKIES 1 (default) sends the session cookie over HTTPS only; set 0 to try the app over plain http on another machine
 RECET_WEB_TRUST_PROXY    1 (default) takes the client address from X-Real-IP (set by the edge nginx) for login rate limits and the audit log
-RECET_WEB_WORKERS        how many runs may execute at once (default 1: the server has 1.8 GB of memory)
+RECET_WEB_WORKERS        how many runs may execute at once (default 1: one large run fills the server's 1.4 GB container)
 RECET_WEB_ACC_VERSIONS   the ACC versions offered (default "2024,2026")
 RECET_WEB_RETENTION_DAYS days a run's uploads and results are kept (default 7)
 RECET_WEB_DRAFT_DAYS     days an untouched Edit inputs draft is kept (default 30)

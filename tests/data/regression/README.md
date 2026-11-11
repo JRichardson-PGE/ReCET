@@ -29,5 +29,5 @@ Only needed for new jobs or new reference data, on a machine with the full refer
 slices it, runs each job again on the slice in a new process and stops unless every table is equal (1e-12 relative), then replaces this folder
 (this README is kept):
 
-    recet regress build --job c3_three_zones=tests/data/regression/jobs/c3_three_zones/inputs ^
+    recet regress build --job c3_three_zones=tests/data/regression/jobs/c3_three_zones/inputs \
                         --job k10_three_zones=tests/data/regression/jobs/k10_three_zones/inputs --acc 2024 --out tests/data/regression

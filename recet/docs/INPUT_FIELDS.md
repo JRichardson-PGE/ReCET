@@ -51,7 +51,7 @@ so they can be uploaded to the CET as they are.
 |---|---|---|---|
 | `CEInputID` | text, unique | required | The measure's unique, persistent ID. The key of every output row and the join key to a CET outputs file. Blank or duplicate values stop the run. |
 | `ACCVersion` | text | optional, **not a CET column** | The ACC version this measure is priced on. Accepts values such as 2024, 2026, as well as values like "2022 ACC", "2024 ACC". Blank, or a file without the column, means the run's "ACC version" setting is used. Measures on different versions are priced in one run, each on its own ACC's avoided costs, run parameters and E3 tables; program costs are then shared over all of them and discounted at the run's version's rates. A supplied ACC file replaces only the run's own version and is not saved for future use. |
-| `PrgID` | text | required | The program the measure belongs to; must equal a `PrgID` in `ProgramCost.csv` (and vice versa). Groups measures for the program-cost share and, through the program's PA in `ProgramCost.csv`, gives `CreditedPA`. |
+| `PrgID` | text | required | The program the measure belongs to; should equal a `PrgID` in `ProgramCost.csv` (a measure whose program has no row there is priced with no program costs, with a warning). Groups measures for the program-cost share and, through the program's PA in `ProgramCost.csv`, gives `CreditedPA`. |
 | `MeasDescription` | text | required (may be left out: read as blank) | Description of measure; should include enough information to allow understanding of what EE measure(s) are being installed. |
 | `MeasureID` | text | carried | The measure's unique ID in the source workpaper. |
 | `MeasCode` | text | carried | PA-specific measure code. |
@@ -177,7 +177,7 @@ statewide allocation they take the Weighted Factor.
 
 ## 2. `ProgramCost.csv`
 
-Optional. One row per program per year; pipe or comma delimited. Every `PrgID` must appear in both files. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
+Optional. One row per program per year; pipe or comma delimited. Each `PrgID` should appear in both files: a program with no measures is warned about and its costs are in no cost test. Dollar amounts are **nominal dollars for the whole program-year** (not per unit). All ten cost fields are summed (C11.1);
 blank = 0.
 
 | Field | Type / unit | Description and use |
@@ -229,7 +229,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `portfolio_8760` | Produce combined 8760 electric load profile | `--portfolio-8760` | false | Write the portfolio's hourly net kWh (C16.2). |
 | `profile_years` | Year(s) | `--profile-years` | every year the measures cover | Calendar years of the combined profile (blank: every year from the earliest claim year to the end of the longest-lived measure, C16.2). |
 | `market_effects` | Apply 5% market effects (benefits and costs) | `--market-effects` | 0.0 | 0 or 0.05, added to the NTG of benefits and of costs (CET's `MEBens` and `MECost` together; C13). |
-| `include_societal` | Include societal cost tests | `--no-societal` (turns it off) | true | Compute SCB / SCH; off = those columns blank and the run about 3x faster. |
+| `include_societal` | Include societal cost tests | `--no-societal` (turns it off) | true | Compute SCB / SCH; off = those columns blank and the run about 15% faster. |
 | `emissions` | Include emissions | `--no-emissions` (turns it off) | true | Compute the CO2 / NOx / PM10 columns (C14). |
 | `allocate_statewide` | Allocate statewide (SW_) programs | `--allocate-statewide` | false | Split statewide programs across the IOUs before pricing (C15). |
 | `apply_exclude_from_ce` | Leave Exclude_From_CE programs out of the portfolio summary | `--apply-exclude-from-ce` | false | Measures of programs whose `Exclude_From_CE` is true in the program metadata are left out of every summary row and shown in one `excluded` row (OUTPUT_FIELDS 2.2). They are still priced and in the measure-level table. |
