@@ -246,7 +246,7 @@ def test_old_column_names_appear_only_in_the_rename_note(runs):
     old = set(fieldnames.OUTPUT_RENAMES) | set(fieldnames.OUTPUT_REMOVED)
     assert not (old & cols)
     text = TEXT[DOC]
-    note = text[text.index("**Column names (0.1.50, 0.1.55).**"):text.index("### 2.2 ")]
+    note = text[text.index("**Old column names.**"):text.index("### 2.2 ")]
     rest = text.replace(note, "")
     bad = sorted({t for t in re.findall(r"`([A-Za-z][A-Za-z0-9_]*)`", rest) if t in old and t not in ("FilingValidation", "FilingRules", "ACCCheck")})   # filing_validation columns; 2.9b names the old ACCCheck
     assert not bad, f"old column names used outside the rename note: {bad}"

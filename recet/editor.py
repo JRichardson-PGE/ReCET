@@ -211,7 +211,7 @@ EFFECTS = {
         "GSIA_ID": (None, "A reference ID; the installation rates are what is used."),
     },
     "ProgramCost": {
-        "PrgID": ("which measures share this row's costs", "Must match the measures' PrgID (else the run stops)."),
+        "PrgID": ("which measures share this row's costs", "Should match the measures' PrgID: a row no measure names is warned about and its costs are in no cost test."),
         "ClaimYearQuarter": ("the discounting of this row's costs: " + _PROGRAM, "Its year is when the cost is incurred and discounted from."),
         "PA": ("the discount rate of this row's costs (" + _PROGRAM + "); the credited PA in the summary",
                "SW is treated as SCE unless statewide allocation is on."),
@@ -678,7 +678,7 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
         if not g("PrgID"):
             add("Measure", i, "PrgID", "error", "PrgID is blank")
         elif len(pc_ids) and g("PrgID") not in pc_ids:
-            add("Measure", i, "PrgID", "error", "no ProgramCost row has this PrgID: with program costs, every measure's program needs a row (else the run stops)")
+            add("Measure", i, "PrgID", "warning", "no ProgramCost row has this PrgID: the measure is priced with no program costs")
         if year is None:
             add("Measure", i, "ClaimYearQuarter", "error", "ClaimYearQuarter must look like 2028Q1")
         if g("IOU_AC_Territory") not in preflight.VALID_PA:
@@ -771,7 +771,7 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
             if not g("PrgID"):
                 add("ProgramCost", i, "PrgID", "error", "PrgID is blank")
             elif g("PrgID") not in m_prg:
-                add("ProgramCost", i, "PrgID", "error", "no measure has this PrgID: its costs would never be charged (the run stops on it)")
+                add("ProgramCost", i, "PrgID", "warning", "no measure has this PrgID: its costs are in no cost test")
             if claim_year(g("ClaimYearQuarter")) is None:
                 add("ProgramCost", i, "ClaimYearQuarter", "error", "ClaimYearQuarter must look like 2028Q4 (its year is when the cost is incurred)")
             elif keys.iloc[i] in dup_keys:
