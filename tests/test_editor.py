@@ -60,14 +60,16 @@ def test_duplicate_ids_flag_both_rows():
     assert ("Measure", 0, "CEInputID", "error") in got and ("Measure", 1, "CEInputID", "error") in got
 
 
-def test_program_ids_must_line_up_both_ways():
+def test_program_ids_that_do_not_line_up_are_warnings():
     job = _job()
     m, pc = job.measures, job.programcost
     m.loc[0, "PrgID"] = "OTHER"
     got = _issues(m, pc)
-    assert ("Measure", 0, "PrgID", "error") in got and ("ProgramCost", 0, "PrgID", "error") in got
+    # as the preflight has it (measures_without_program_costs / program_costs_without_measures): the run goes ahead
+    assert ("Measure", 0, "PrgID", "warning") in got and ("ProgramCost", 0, "PrgID", "warning") in got
+    assert ("Measure", 0, "PrgID", "error") not in got and ("ProgramCost", 0, "PrgID", "error") not in got
     # without program costs, a measure's PrgID is not checked against anything
-    assert ("Measure", 0, "PrgID", "error") not in _issues(m, editor.conform(None, editor.PROGRAMCOST_COLUMNS))
+    assert not {k for k in _issues(m, editor.conform(None, editor.PROGRAMCOST_COLUMNS)) if k[:3] == ("Measure", 0, "PrgID")}
 
 
 def test_gas_rules_apply_only_with_gas_savings():
