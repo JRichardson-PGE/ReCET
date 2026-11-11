@@ -271,6 +271,26 @@ forecast year's own 1 January weekday (although the ACC data do not follow those
 **C4.3 Gas monthly shape.** `AC_Gas_Impact_Profile` names a profile of 12 monthly shares summing to 1 (`Annual`, `Winter Only`, `Summer Only`, and the three `...-FuelSub-ToElec` versions ship with the package;
 a supplied profile with the same name replaces it). A gas measure whose profile name matches nothing is not priced (`GasPricingStatus = UNPRICED ...`).
 
+**C4.4 The System climate zone.** A measure with `AC_Climate_Zone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
+the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
+
+```text
+total(z)    = SUM over every year y in the ACC file, SUM over hours i:  shape_z,aligned(i) * AC_TRC(PA, z, y, i)        $ per annual kWh, undiscounted
+System zone = the zone z with the lowest total(z); a tie goes to the first zone in the order 1, 2, 3A, 3B, 4 ... 16
+```
+
+`shape_z,aligned` is the profile's own shape for zone z aligned as in C4.2, and `AC_TRC(PA, z, ...)` is the TRC total avoided cost found by the rules of C3.1 (so SCE CZ5 and
+SDG&E CZ6/CZ8 are options, priced on their stand-in zones, and SCG's options are the zones its routing reaches). A zone the ACC cannot price is not an option. The TRC cost
+test decides the zone; the same zone is then used for the shape, every cost test, every component, water energy and the hourly CO2 (NOx and PM10 still use the literal
+`System` key of the Emissions table, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
+the measure's `PA` has prices for, so the prices alone decide.
+
+The choice depends only on the profile and the ACC file, so it is **cataloged**: the package ships the System zone of every library profile under each built-in ACC
+(`data/system_zones/system_zones.csv.gz`, with every option's total; rebuild with `recet data build-system-zones`). A run uses the catalog for a library profile
+priced on a built-in ACC file that matches the one the catalog was built from, and calculates the choice otherwise (a supplied profile or ACC file). Each measure reports
+the zone in `SystemClimateZone` and where it came from in `SystemZoneSource`. If no zone can be priced the measure falls back to the profile's `System` rows and the
+blended prices of C3.1 item 3.
+
 **C4.5 Already-scaled profiles and load shifting.** A supplied profile with `profile_basis = kwh_per_unit` holds the kWh saved per unit in each hour
 (negative = added load) and is priced as given; it is not rescaled. For such a measure
 
@@ -296,26 +316,6 @@ annual-rate bill impacts are 0. (CET nets annual savings before shaping, so it v
   The phasing of C2 is linear in the two quantities, so with one shape the result is unchanged; the boundary quarter's split is kept. Electric benefits and supply costs (all
   three tests), emissions and the combined 8,760 output use the parts. If only one of the two shapes is found, the measure is `PARTLY PRICED`.
 * `AC_Elec_Impact_Profile_Water`: the water energy (C5.3) is spread over this shape for both baselines.
-
-**C4.4 The System climate zone.** A measure with `AC_Climate_Zone = System` is priced exactly as if its zone were the profile's **System zone**: the real climate zone, out of
-the zones the profile has, with the **lowest total electric avoided cost over the full length of the ACC data**:
-
-```text
-total(z)    = SUM over every year y in the ACC file, SUM over hours i:  shape_z,aligned(i) * AC_TRC(PA, z, y, i)        $ per annual kWh, undiscounted
-System zone = the zone z with the lowest total(z); a tie goes to the first zone in the order 1, 2, 3A, 3B, 4 ... 16
-```
-
-`shape_z,aligned` is the profile's own shape for zone z aligned as in C4.2, and `AC_TRC(PA, z, ...)` is the TRC total avoided cost found by the rules of C3.1 (so SCE CZ5 and
-SDG&E CZ6/CZ8 are options, priced on their stand-in zones, and SCG's options are the zones its routing reaches). A zone the ACC cannot price is not an option. The TRC cost
-test decides the zone; the same zone is then used for the shape, every cost test, every component, water energy and the hourly CO2 (NOx and PM10 still use the literal
-`System` key of the Emissions table, as CET does). For a supplied profile the options are the zones it gives; one given only for `ALL` (or `System`) uses that shape in every zone
-the measure's `PA` has prices for, so the prices alone decide.
-
-The choice depends only on the profile and the ACC file, so it is **cataloged**: the package ships the System zone of every library profile under each built-in ACC
-(`data/system_zones/system_zones.csv.gz`, with every option's total; rebuild with `recet data build-system-zones`). A run uses the catalog for a library profile
-priced on a built-in ACC file that matches the one the catalog was built from, and calculates the choice otherwise (a supplied profile or ACC file). Each measure reports
-the zone in `SystemClimateZone` and where it came from in `SystemZoneSource`. If no zone can be priced the measure falls back to the profile's `System` rows and the
-blended prices of C3.1 item 3.
 
 ---------------------------------------------------------------------------------------------------------------------------------
 

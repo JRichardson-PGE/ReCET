@@ -2,7 +2,7 @@
 
 Tabs: Job (a job workbook or the CET files, output folder, ACC version), Edit inputs (edit a small job's Measure and ProgramCost tables cell by cell and run
 them: gui_editor.py), Supplied inputs (profiles, run parameters, SW allocation factors, ACC files -- each with a
-"Template" button and a live check), Options (the modes), Reference data (the large files), Log (the running job's output) and Results (the finished run by PA at five levels,
+"Template" button and a live check), Options (the modes), Reference data (the large files), Log (the running job's output) and Results (the finished run by PA at six levels,
 with saved column views: gui_results.py). A header carries a light / dark switch; the Run / Stop bar stays at the bottom. The look is the Sun Valley theme (`sv-ttk`, Windows 11 style); without it
 the window falls back to the system theme. Jobs run in a separate process, so the window stays responsive and the log streams live. Settings are remembered between
 sessions and can be saved to / loaded from a JSON file (the same file `recet run --config` reads).
@@ -31,7 +31,7 @@ INPUTS_KEY = "gui_job_inputs"            # the Job tab's input type and the path
 DOCS_DIR = Path(__file__).resolve().parent / "docs"
 DOCUMENTS = [("User guide", "USER_GUIDE.md"), ("Input formats (supplied files)", "INPUT_FORMATS.md"), ("Input field reference", "INPUT_FIELDS.md"),
              ("Output field reference", "OUTPUT_FIELDS.md"), ("How every output is calculated", "CALCULATIONS.md"),
-             ("System architecture", "ARCHITECTURE.md")]
+             ("Cost tests and value streams", "COST_TESTS.md"), ("System architecture", "ARCHITECTURE.md")]
 OK_COLOR, BAD_COLOR, MUTED = "#1a7f37", "#c62828", "#6b6b6b"
 try:
     import sv_ttk
@@ -361,7 +361,7 @@ class App:
         ttk.Entry(row, textvariable=self._var("profile_years"), width=22).pack(side="left", padx=6)
         check("market_effects", "Apply 5% market effects (benefits and costs)",
               hint="CET's Market Effects: NTG + 0.05 on benefits (electric, gas, water energy, other benefits, tax credits) and on costs (other costs, participant cost).")
-        check("include_societal", "Include societal cost tests (SCB / SCH)", True, "Turn off for a run about 3x faster; the SCB/SCH columns are then blank.")
+        check("include_societal", "Include societal cost tests (SCB / SCH)", True, "Turn off for a run about 15% faster; the SCB/SCH columns are then blank.")
         check("emissions", "Include emissions (CO2 / NOx / PM10)", True)
         check("allocate_statewide", "Allocate statewide (SW_) programs across the IOUs", hint="Splits each statewide program's measures and costs by the allocation factors.")
         check("apply_exclude_from_ce", "Leave Exclude_From_CE programs out of the portfolio summary",
