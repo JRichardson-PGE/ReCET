@@ -136,6 +136,15 @@ sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) t
 (`run_acc<ACC>/` each) and writes the comparison beside them, as `recet run --compare-with` does; the receipt's totals are the primary ACC's. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
 `recet worker validate job.json` checks a spec without running it.
 
+`recet worker check check.json` runs a filing's rules in this release instead of pricing it (`recet/checkjob.py`): the CEDARS platform keeps each
+filing's rules as data and has the worker of the release its specification names check the filing, so the findings come from the release that prices it.
+The check spec gives the rules (each with its definition), the tables by URI (UTF-8 CSV, read as text, optionally pinned by SHA-256), and what the wider
+rule language reads (the filing year, the upload date, who files, each table's key columns, the program records, value lists the engine does not ship,
+changes over the shipped lists); `findings.json` (each failing rule's rows and values, and notes on rules that could not be checked) and `receipt.json`
+go to its outputs URI. Same exit codes. The rule language (`recet/filing_rules.py`) reads CEDARS' rule files as before and, for rules kept as data,
+conditions on another table of the filing (linked by the tables' keys), on the program record or on who files, groups of conditions (all / any, one
+level), and tests for text, flags, dates, a date within so many years of the upload and a code in effect on a date.
+
 The worker image (`Dockerfile.worker`: the locked `requirements/worker.txt`, which is the engine plus boto3, and no web app) is published for each
 engine release: push the tag `vX.Y.Z` matching `recet/__init__.py` and `.github/workflows/worker-image.yml` builds it for amd64 and arm64 as
 `ghcr.io/jrichardson-pge/recet-worker:X.Y.Z`, with `RECET_IMAGE` and `RECET_COMMIT` set so every receipt names the image. Mount the reference data

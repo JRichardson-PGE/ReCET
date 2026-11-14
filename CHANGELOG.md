@@ -3,6 +3,19 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are in the git history.
 
+- 0.1.95 (2026-11-14, Jake; step 4 of CEDARS-Platform's filing specifications: a filing's rules run in the release its specification names, and the
+  rule language grows): `recet worker check check.json` (`checkjob.py`) runs a filing's rules, given as data, on its tables in this release and sends
+  `findings.json` (each failing rule's rows and values, notes on rules not checked) and `receipt.json` (engine, the rules' SHA-256, each table's
+  SHA-256 and rows, the caller's references) to the spec's outputs URI; exit codes as `worker run`, a spec for another release refused.
+  `context.tables` gives tables conditions read but that are not checked (a claims filing's year to date beside the upload's own records).
+  `checkjob.run_check` gives the same findings in the caller's process. The rule runner (`filing_rules.py`) gains, for rules kept as data: conditions
+  on another table of the filing (linked by the other table's key columns, else this table's; the first linked record; `Context.tables`, `keys`), on
+  the program record (`Program`, by PrgID, `Context.programs`) and on who files (`Filer`, `Context.filer`); one level of grouped conditions
+  ({"connector", "conds"}); tests "contains", "does not contain", "is true", "is not true", "is before / on or before / after / on or after" (a date,
+  a date column or `UploadDate`), "within years of upload" and "in effect on" (a code's first and last year against a date column's year); value lists
+  given with the check (`Context.lists`). A rule that reads something not given is noted (`NotCheckable`), never failed. `rule_id`, `describe`,
+  `condition_key`, `conditions`, `applies` and `check_tables` are public for the platform. CEDARS' shipped rule files read exactly as before: every
+  rule keeps its ID and wording (tests/test_rule_language.py checks both sets), and no pricing output changes.
 - 0.1.94 (2026-11-11): the Edit inputs check (`editor.check_tables`, window and web) flags a `PrgID` with no partner row in the other table as a
   warning, as the preflight has since 0.1.59 (the measure is priced with no program costs; the row's costs are in no cost test); it was an error that
   blocked a run the engine allows. Python 3.11+ (`requires-python`, as the locks and CI already were). Documentation shortened after a review: this

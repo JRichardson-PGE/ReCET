@@ -22,6 +22,19 @@ How the rules are read (CEDARS' own code is not published, so these are choices,
   end use + IOU + target sector match), and is not checked when the library is not installed;
 * the messages follow CET's upload feedback ("When UnitIncentiveToOthers equals 0 and ..., UnitMeaCost1stBaseline should be different from 0, but is 0.0");
   only that one wording has been seen, the others are written the same way.
+
+The wider rule language (0.1.95, for rule sets kept as data by the CEDARS platform; CEDARS' own files use none of it):
+* a condition names its table. Blank or the rule's own table: the record itself. Another table of the filing (`Context.tables`): that table's record
+  linked to this one by a key, the other table's key columns when this table has them all (a Claim's Measure by ClaimID), else this table's key
+  columns in the other table (`Context.keys`); the first linked record counts, none reads as blank. `Program`: the program's record
+  (`Context.programs`, by PrgID). `Filer`: who files (`Context.filer`, e.g. PA and PAType), the same for every record;
+* a condition may instead be a group, {"connector": "all" | "any", "conds": [...]}, of plain conditions (one level: groups do not nest);
+* more tests: "contains" / "does not contain" (text, any case), "is true" / "is not true" (1, true, yes; blank is not true), dates ("is before",
+  "is on or before", "is after", "is on or after" a date YYYY-MM-DD, a date column or UploadDate), "within years of upload" (a date at most the
+  value's number of years before or after the upload date, `Context.upload_date`) and "in effect on" (the field's code is in effect in the year of
+  the date column the value names, on the list the definition's "list" names, else the list of the field's name);
+* values may name UploadDate as they name FilingYear; a value list the engine does not ship may be given with the check (`Context.lists`);
+* a rule that cannot be checked because what it reads was not given (no such table, no program records, no upload date) is noted, not failed.
 """
 from __future__ import annotations
 
@@ -29,6 +42,7 @@ import ast
 import hashlib
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -46,8 +60,15 @@ _CHECK_PHRASES = {
     "equals": "equal", "does not equal": "be different from", "is less than": "be less than", "is less than or equal to": "be less than or equal to",
     "greater than": "be greater than", "is greater than": "be greater than", "is greater than or equal to": "be greater than or equal to",
     "not in": "not be one of", "in": "be one of", "is not null": "not be blank", "ends with string": "end with", "matches_year_quarter": "match the year of",
-    "combo_value_list": "be a combination in",
+    "combo_value_list": "be a combination in", "is null": "be blank", "starts with string": "start with", "contains": "contain",
+    "does not contain": "not contain", "is true": "be true", "is not true": "not be true", "is before": "be before", "is on or before": "be on or before",
+    "is after": "be after", "is on or after": "be on or after", "within years of upload": "be within this many years of the upload:",
+    "in effect on": "be a code in effect on",
 }
+PSEUDO_TABLES = ("Program", "Filer")       # condition tables that are not tables of the filing
+TRUE = frozenset({"1", "1.0", "true", "yes", "y", "t"})
+DATE_TESTS = {"is before": "<", "is on or before": "<=", "is after": ">", "is on or after": ">="}
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass
@@ -82,9 +103,21 @@ class RuleSet:
 
 @dataclass
 class Context:
-    """What a check needs beyond the table: the filing year (budget filings: PrgYear and CEInputID must name it) and whether the profile library is there."""
+    """What a check needs beyond the table: the filing year (budget filings: PrgYear and CEInputID must name it), whether the profile library is there,
+    and for the wider rule language (all optional) the date of the upload, who files, the program records, the filing's other tables (raw text, by
+    table name) with each table's key columns, and value lists the engine does not ship ({name: [{code, start_year, end_year}]})."""
     filing_year: int | None = None
     library: bool = False
+    upload_date: date | None = None
+    filer: dict | None = None
+    programs: pd.DataFrame | None = None
+    tables: dict | None = None
+    keys: dict | None = None
+    lists: dict | None = None
+
+
+class NotCheckable(Exception):
+    """A rule reads something the check was not given (another table, the program records, the upload date): it is noted, not failed."""
 
 
 @dataclass
@@ -153,11 +186,54 @@ def _read_rule_file(path: Path, severity: str) -> list[Rule]:
     return out
 
 
-def _describe(spec: dict) -> str:
-    join = " or " if spec["connector"] == "any" else " and "
-    when = join.join(f"{f} {r} {v}".strip() for _t, f, r, v in spec["conds"])
-    check = f"{spec['field']} should {_CHECK_PHRASES.get(spec['rule'], spec['rule'])} {spec['value']}".strip()
+def _describe(spec: dict, table: str | None = None) -> str:
+    """A rule's wording. With `table` (the rule's table), a condition on another table names it ("Measure's MeasImpactType"); without, no condition
+    names its table (CEDARS' files name the rule's own table on every condition)."""
+    def one(c) -> str:
+        if isinstance(c, dict):
+            inner = (" or " if c.get("connector") == "any" else " and ").join(one(x) for x in c.get("conds") or [])
+            return f"({inner})"
+        tb, f, r, v = (list(c) + ["", "", "", ""])[:4]
+        own = table is None or not str(tb).strip() or str(tb).strip().lower() == str(table).strip().lower()
+        return f"{'' if own else str(tb).strip() + chr(39) + 's '}{f} {r} {v}".strip()
+    join = " or " if spec.get("connector") == "any" else " and "
+    when = join.join(one(c) for c in spec.get("conds") or [])
+    value = spec.get("value", "")
+    if spec.get("rule") == "within years of upload":
+        check = f"{spec['field']} should be within {value} years of the upload date"
+    elif spec.get("rule") == "in effect on":
+        check = f"{spec['field']} should be a code in effect on {value}" + (f" ({spec['list']} value list)" if spec.get("list") else "")
+    else:
+        check = f"{spec['field']} should {_CHECK_PHRASES.get(spec['rule'], spec['rule'])} {value}".strip()
     return f"When {when}, {check}" if when else check[:1].upper() + check[1:]
+
+
+def describe(spec: dict, table: str) -> str:
+    """A validation or warning rule's wording, naming the table of any condition on another table (the platform's rule pages)."""
+    return _describe(spec, table)
+
+
+def condition_key(c) -> tuple:
+    """A condition as a sortable tuple of text, for the rule's ID: a plain condition its four parts, a group "group", its connector and its conditions."""
+    if isinstance(c, dict):
+        inner = sorted(condition_key(x) for x in c.get("conds") or [])
+        return ("group", str(c.get("connector") or "all"), *(x for k in inner for x in k))
+    return tuple(str(x) for x in c)
+
+
+def rule_id(severity: str, table: str, field: str, rule: str, value, connector: str, conds) -> str:
+    """The stable ID of a validation or warning rule, as `_read_rule_file` builds it for CEDARS' rules (so a rule written on the platform with plain
+    conditions has the ID the same rule has in CEDARS' files); a group is part of the hash as `condition_key` spells it."""
+    keys = sorted(condition_key(c) for c in conds)
+    return _rule_id("V" if severity == "reject" else "W", table, field, rule, value, connector if len(conds) > 1 else "", *(x for k in keys for x in k))
+
+
+def conditions(spec: dict) -> list:
+    """Every plain condition of a rule, those inside groups included."""
+    out = []
+    for c in spec.get("conds") or []:
+        out += [x for x in c.get("conds") or []] if isinstance(c, dict) else [c]
+    return out
 
 
 _SPEC_LINE = re.compile(r"^\s*(\w+)\s+(nvarchar\((\d+)\)|numeric|bit|CedarsYearQuarter)(?=[\s,)]|$)(.*?)[,)]*;?\s*$", re.I)
@@ -226,12 +302,55 @@ def library_frame(name: str, as_of: str | None = None) -> pd.DataFrame:
 class _Table:
     """A table's raw text columns, looked up by CET name or ReCET name: stripped, blanks as NA and numbers parsed once per column."""
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, name: str = ""):
         self.df = df
+        self.name = name
         self.n = len(df)
         self._text: dict[str, pd.Series] = {}
         self._num: dict[str, pd.Series] = {}
         self._combo: dict[tuple, np.ndarray] = {}
+        self._links: dict[str, _Table] = {}
+        self._dates: dict[str, np.ndarray] = {}
+
+    def for_condition(self, table: str, ctx: Context) -> "_Table":
+        """The table a condition reads: this one (blank or its own name), or another table, the program or the filer, linked to this table's rows."""
+        tb = str(table or "").strip()
+        if not tb or not self.name or tb.lower() == self.name.lower():
+            return self
+        key = tb.lower()
+        if key not in self._links:
+            self._links[key] = self._link(tb, ctx)
+        return self._links[key]
+
+    def _link(self, other: str, ctx: Context) -> "_Table":
+        key = other.lower()
+        if key == "filer":
+            if not ctx.filer:
+                raise NotCheckable("who files was not given")
+            return _Table(pd.DataFrame({k: [str(v if v is not None else "")] * self.n for k, v in ctx.filer.items()}, index=self.df.index), "Filer")
+        if key == "program":
+            if ctx.programs is None:
+                raise NotCheckable("the program records were not given")
+            right, on = ctx.programs, ["PrgID"]
+            if not self.has("PrgID"):
+                raise NotCheckable(f"{self.name or 'the table'} has no PrgID to find its program by")
+        else:
+            found = {str(k).lower(): (k, v) for k, v in (ctx.tables or {}).items()}
+            if key not in found:
+                raise NotCheckable(f"the filing has no {other} table")
+            name, right = found[key]
+            on = _link_columns(self, name, right, ctx.keys or {})
+        rt = _Table(right, other)
+        lkey = _joined_key([self.text(c) for c in on])
+        rkey = _joined_key([rt.text(c) for c in on])
+        first = ~rkey.duplicated(keep="first").to_numpy()
+        idx = pd.Index(rkey[first]).get_indexer(lkey)
+        cols = {}
+        for c in right.columns:
+            v = rt.text(c).to_numpy(dtype=object)[first]
+            got = np.where(idx >= 0, v[np.clip(idx, 0, None)] if len(v) else None, None)
+            cols[c] = pd.array([None if (x is None or x is pd.NA) else x for x in got], dtype="string") if self.n else pd.array([], dtype="string")
+        return _Table(pd.DataFrame(cols, index=self.df.index), other)
 
     def has(self, col: str) -> bool:
         return recet_name(col) in self.df.columns
@@ -260,6 +379,43 @@ class _Table:
         return self._num[c]
 
 
+    def date(self, col: str) -> np.ndarray:
+        c = recet_name(col)
+        if c not in self._dates:
+            self._dates[c] = _date_days(self.text(col))
+        return self._dates[c]
+
+
+def _joined_key(parts: list[pd.Series]) -> pd.Series:
+    """The key of each row over several text columns, any case; a row with a blank key part links to nothing."""
+    out = None
+    for p in parts:
+        p = p.str.lower()
+        out = p if out is None else out + "\x1f" + p
+    return out.fillna("\x00blank")
+
+
+def _link_columns(t: _Table, other: str, right: pd.DataFrame, keys: dict) -> list[str]:
+    """The columns that link table `t` to `other`: other's key columns when `t` has them all (a Claim's Measure by ClaimID), else `t`'s key columns
+    when `other` has them all."""
+    by = {str(k).lower(): v for k, v in keys.items()}
+    theirs = [c for c in by.get(other.lower()) or []]
+    mine = [c for c in by.get(t.name.lower()) or []]
+    have = {recet_name(c) for c in right.columns}
+    if theirs and all(t.has(c) for c in theirs):
+        return theirs
+    if mine and all(recet_name(c) in have for c in mine):
+        return mine
+    raise NotCheckable(f"no key links {t.name or 'the table'} to {other}")
+
+
+def _date_days(s: pd.Series) -> np.ndarray:
+    """Dates (YYYY-MM-DD, or M/D/YYYY, a time of day ignored) as days since 1970; NaN where blank or not a date."""
+    v = pd.to_datetime(s.astype("string").str.strip().str.split(" ").str[0], errors="coerce", format="mixed")
+    out = (v - pd.Timestamp("1970-01-01")).dt.days.astype(float).to_numpy()
+    return out
+
+
 def _operand(raw: str, t: _Table, ctx: Context):
     """A rule's Value: a number, a quoted text, a list, FilingYear, a column of the table, or arithmetic on one ("EUL_Yrs /2.75")."""
     v = str(raw).strip()
@@ -273,6 +429,12 @@ def _operand(raw: str, t: _Table, ctx: Context):
         pass
     if v.lower() == "filingyear":
         return ("num", float(ctx.filing_year)) if ctx.filing_year is not None else ("missing", "FilingYear")
+    if v.lower() == "uploaddate":
+        if ctx.upload_date is None:
+            raise NotCheckable("the upload date was not given")
+        return ("date", float((pd.Timestamp(ctx.upload_date) - pd.Timestamp("1970-01-01")).days))
+    if _ISO_DATE.match(v):
+        return ("date", float((pd.Timestamp(v) - pd.Timestamp("1970-01-01")).days))
     m = re.match(r"^(\w+)\s*([*/+-])\s*([\d.]+)$", v)
     if m and t.has(m.group(1)):
         a, op, b = t.num(m.group(1)), m.group(2), float(m.group(3))
@@ -293,6 +455,40 @@ def _compare(t: _Table, col: str, rule: str, value: str, ctx: Context) -> tuple[
         return s.isna().to_numpy(), np.ones(t.n, bool)
     if kind == "missing":
         raise KeyError(rest[0])
+    if rule in ("contains", "does not contain"):
+        s = t.text(col).str.lower()
+        known = s.notna().to_numpy()
+        hit = s.str.contains(str(rest[0] if kind != "col" else value).lower(), regex=False).fillna(False).to_numpy(bool)
+        return (hit if rule == "contains" else ~hit) & known, known
+    if rule in ("is true", "is not true"):
+        true = t.text(col).str.lower().isin(TRUE).fillna(False).to_numpy(bool)
+        return (true if rule == "is true" else ~true), np.ones(t.n, bool)
+    if rule in DATE_TESTS:
+        left = t.date(col)
+        if kind == "date":
+            right = np.full(t.n, rest[0])
+        elif kind == "col":
+            right = t.date(rest[1])
+        else:
+            raise ValueError(f"{value!r} is not a date (YYYY-MM-DD), a date field or UploadDate")
+        known = ~np.isnan(left) & ~np.isnan(right)
+        with np.errstate(invalid="ignore"):
+            out = {"<": left < right, "<=": left <= right, ">": left > right, ">=": left >= right}[DATE_TESTS[rule]]
+        return out & known, known
+    if rule == "within years of upload":
+        if ctx.upload_date is None:
+            raise NotCheckable("the upload date was not given")
+        if kind != "num" or rest[0] < 0:
+            raise ValueError(f"{value!r} is not a number of years")
+        up = pd.Timestamp(ctx.upload_date)
+        lo = float((up - pd.DateOffset(years=int(rest[0])) - pd.Timestamp("1970-01-01")).days)
+        hi = float((up + pd.DateOffset(years=int(rest[0])) - pd.Timestamp("1970-01-01")).days)
+        left = t.date(col)
+        known = ~np.isnan(left)
+        with np.errstate(invalid="ignore"):
+            return (left >= lo) & (left <= hi) & known, known
+    if kind == "date":
+        raise ValueError(f"{rule!r} does not compare dates; use is before, is on or before, is after or is on or after")
     if rule in ("not in", "in"):
         s = t.text(col)
         known = s.notna().to_numpy()
@@ -345,12 +541,41 @@ def _combo_ok(t: _Table, fields: list[str]) -> np.ndarray:
     return t._combo[key]
 
 
+def _when(conds, connector: str, t: _Table, ctx: Context, depth: int = 0) -> np.ndarray:
+    """Where a rule's conditions hold: all of them, or any (connector "any"); a group is evaluated the same way, one level deep."""
+    anyof = connector == "any"
+    if not conds:
+        if depth:
+            raise ValueError("a group of conditions is empty")
+        return np.ones(t.n, bool)
+    applies = np.zeros(t.n, bool) if anyof else np.ones(t.n, bool)
+    for c in conds:
+        if isinstance(c, dict):
+            if depth:
+                raise ValueError("groups of conditions nest only one level")
+            held = _when(c.get("conds") or [], str(c.get("connector") or "all").lower(), t, ctx, depth + 1)
+        else:
+            tb, f, rule, v = (list(c) + ["", "", "", ""])[:4]
+            held, _k = _compare(t.for_condition(tb, ctx), f, str(rule).lower(), v, ctx)
+        applies = (applies | held) if anyof else (applies & held)
+    return applies
+
+
+def applies(spec: dict, table: str, df: pd.DataFrame, ctx: Context | None = None) -> np.ndarray:
+    """Where a validation or warning rule's conditions hold on a table's raw text (every row for a rule with none)."""
+    return _when(spec.get("conds") or [], str(spec.get("connector") or "all").lower(), _Table(df, table), ctx or Context())
+
+
 def _apply_rule(r: Rule, t: _Table, ctx: Context) -> Result | None:
     s = r.spec
-    applies = np.ones(t.n, bool) if s["connector"] != "any" or not s["conds"] else np.zeros(t.n, bool)
-    for _tb, f, rule, v in s["conds"]:
-        held, _k = _compare(t, f, rule.lower(), v, ctx)
-        applies = (applies & held) if s["connector"] != "any" else (applies | held)
+    applies = _when(s.get("conds") or [], str(s.get("connector") or "all").lower(), t, ctx)
+    if s["rule"] == "in effect on":
+        name = s.get("list") or s["field"]
+        if not _value_list_available(name, ctx):
+            return None
+        years = pd.Series(pd.to_datetime(t.text(s["value"]).str.split(" ").str[0], errors="coerce", format="mixed").dt.year, index=t.df.index)
+        txt = t.text(s["field"])
+        return Result(r, applies & ~_value_list_ok(name, txt, years.astype(float), ctx), txt)
     if s["rule"] == "combo_value_list":
         if not ctx.library:
             return None
@@ -361,15 +586,31 @@ def _apply_rule(r: Rule, t: _Table, ctx: Context) -> Result | None:
     return Result(r, applies & ~held, t.text(s["field"]))
 
 
-def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None) -> np.ndarray:
-    """Whether each value is an active code of CET value list `name` in its row's year (blank: True, NotEmpty checks it). Worked out once per distinct
-    (value, year)."""
-    if name.lower() == "prgid":
+def _given_list(name: str, ctx: Context | None) -> pd.DataFrame | None:
+    """A value list given with the check (Context.lists), by name in any case, as code / start_year / end_year."""
+    for k, rows in ((ctx.lists or {}) if ctx is not None else {}).items():
+        if str(k).lower() == name.lower():
+            df = pd.DataFrame(list(rows), columns=["code", "start_year", "end_year"]) if rows else pd.DataFrame(columns=["code", "start_year", "end_year"])
+            for c in ("start_year", "end_year"):
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            df["code"] = df["code"].astype(str)
+            return df
+    return None
+
+
+def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None, ctx: Context | None = None) -> np.ndarray:
+    """Whether each value is an active code of CET value list `name` (or a list given with the check) in its row's year (blank: True, NotEmpty
+    checks it). Worked out once per distinct (value, year)."""
+    given = _given_list(name, ctx)
+    if given is None and name.lower() == "prgid":
         from . import programs
         meta = programs.lookup(values.fillna(""))
         return (values.isna().to_numpy() | (meta["Prg_MatchedOn"].to_numpy() != "(not found)"))
-    from . import editor
-    df = editor.value_list(VALUE_LIST_FILES.get(name.lower(), name.lower()))
+    if given is not None:
+        df = given
+    else:
+        from . import editor
+        df = editor.value_list(VALUE_LIST_FILES.get(name.lower(), name.lower()))
     spans: dict[str, list] = {}
     for code, a, b in zip(df["code"].astype(str).str.strip().str.lower(), df["start_year"], df["end_year"]):
         spans.setdefault(code, []).append((None if pd.isna(a) else int(a), None if pd.isna(b) else int(b)))
@@ -384,8 +625,8 @@ def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None) -> np.
     return ok[inverse.reshape(-1)]
 
 
-def _value_list_available(name: str) -> bool:
-    if name.lower() == "prgid":
+def _value_list_available(name: str, ctx: Context | None = None) -> bool:
+    if _given_list(name, ctx) is not None or name.lower() == "prgid":
         return True
     from . import paths
     return Path(paths.package_data("value_lists", f"{VALUE_LIST_FILES.get(name.lower(), name.lower())}.csv")).exists()
@@ -423,9 +664,9 @@ def _apply_spec(r: Rule, t: _Table, ctx: Context, years: pd.Series | None) -> Re
                 bad |= (v >= hi) if s["hi_open"] else (v > hi)
         return Result(r, bad & ~np.isnan(v), txt)
     if kind == "value_list":
-        if not _value_list_available(s["list"]):
+        if not _value_list_available(s["list"], ctx):
             return None
-        return Result(r, ~_value_list_ok(s["list"], txt, years), txt)
+        return Result(r, ~_value_list_ok(s["list"], txt, years, ctx), txt)
     if kind == "starts_with":                   # UploadPA-YYYY: a plain prefix, a PA code, a dash and the filing year (CET accepts "PGE-2028Q4-...")
         from . import editor
         pas = sorted(set(editor.value_list("pa")["code"].astype(str).str.strip().str.lower()))
@@ -444,7 +685,7 @@ def _apply_spec(r: Rule, t: _Table, ctx: Context, years: pd.Series | None) -> Re
 def check_frame(rs: RuleSet, table: str, df: pd.DataFrame, ctx: Context) -> tuple[list[Result], list[str]]:
     """Apply rule set `rs`'s rules for `table` to `df` (the table's raw text, as read with dtype=str). Returns the results with at least one failing row, and
     notes on the rules that could not be checked (with why)."""
-    t = _Table(df)
+    t = _Table(df, table)
     years = None
     if table == "Measure":
         years = pd.to_numeric(t.text("ClaimYearQuarter").str[:4], errors="coerce")
@@ -459,14 +700,27 @@ def check_frame(rs: RuleSet, table: str, df: pd.DataFrame, ctx: Context) -> tupl
         except KeyError as exc:
             notes.append(f"{r.id} not checked: no {exc.args[0]} given ({r.text})")
             continue
+        except NotCheckable as exc:
+            notes.append(f"{r.id} not checked: {exc} ({r.text})")
+            continue
         if res is None:
             why = ("the CEDARS impact-profile library is not installed" if r.spec.get("rule") == "combo_value_list"
-                   else f"value list {r.spec.get('list')} does not ship with ReCET" if r.spec.get("check") == "value_list" else "not applicable")
+                   else f"value list {r.spec.get('list')} does not ship with ReCET" if r.spec.get("check") == "value_list"
+                   else f"value list {r.spec.get('list') or r.spec.get('field')} does not ship with ReCET" if r.spec.get("rule") == "in effect on"
+                   else "not applicable")
             notes.append(f"{r.id} not checked: {why} ({r.text})")
             continue
         if res.fail.any():
             results.append(res)
     return results, notes
+
+
+def check_tables(rs: RuleSet, tables: dict[str, pd.DataFrame], ctx: Context) -> dict[str, tuple[list[Result], list[str]]]:
+    """Apply rule set `rs` to every table of a filing ({name: raw text}), each table's conditions able to read the others (Context.tables is set to
+    `tables` when not given). Returns {table: (results, notes)} for the tables given."""
+    from dataclasses import replace
+    ctx = ctx if ctx.tables is not None else replace(ctx, tables=tables)
+    return {name: check_frame(rs, name, df, ctx) for name, df in tables.items()}
 
 
 def flags(results: list[Result], ids: pd.Series) -> pd.DataFrame:
