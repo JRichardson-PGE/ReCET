@@ -7,6 +7,7 @@ Releases before 0.1.31 are in the git history.
   rule language grows): `recet worker check check.json` (`checkjob.py`) runs a filing's rules, given as data, on its tables in this release and sends
   `findings.json` (each failing rule's rows and values, notes on rules not checked) and `receipt.json` (engine, the rules' SHA-256, each table's
   SHA-256 and rows, the caller's references) to the spec's outputs URI; exit codes as `worker run`, a spec for another release refused.
+  `context.tables` gives tables conditions read but that are not checked (a claims filing's year to date beside the upload's own records).
   `checkjob.run_check` gives the same findings in the caller's process. The rule runner (`filing_rules.py`) gains, for rules kept as data: conditions
   on another table of the filing (linked by the other table's key columns, else this table's; the first linked record; `Context.tables`, `keys`), on
   the program record (`Program`, by PrgID, `Context.programs`) and on who files (`Filer`, `Context.filer`); one level of grouped conditions

@@ -9,10 +9,12 @@ from the same release for the filing's whole life, whatever release the website 
       "rule_set": {"code": "claims", "version": "2026-03-12",  # what the rules are (echoed in the receipt)
                    "rules": [{"id": "V1a2b3c", "severity": "reject", "table": "Measure", "field": "NTGRkWh", "text": "...",
                               "kind": "rule", "source": "", "definition": {...}}]},   # definition: filing_rules.Rule.spec
-      "tables": {"Measure": "s3://.../Measure.csv",            # each a URI or {"uri", "sha256"}: UTF-8 CSV with a header, read as text
-                 "Claim": {"uri": "...", "sha256": "..."}},
+      "tables": {"Measure": "s3://.../Measure.csv",            # the tables checked, each a URI or {"uri", "sha256"}: UTF-8 CSV with a
+                 "Claim": {"uri": "...", "sha256": "..."}},  # header, read as text
       "context": {"filing_year": 2028, "upload_date": "2028-04-30", "filer": {"PA": "PGE", "PAType": "IOU"},
                   "keys": {"Claim": ["ClaimID"], "Measure": ["ClaimID"]},             # each table's key columns (links between tables)
+                  "tables": {"Claim": "s3://.../compiled/Claim.csv"},                 # tables conditions read but not checked (a filing's
+                                                                                      # year to date); a checked table is read where none is given
                   "programs": [{"PrgID": "PGE_Ag_001", "Category": "..."}],          # the program records conditions on Program read
                   "lists": {"BldgType": [{"code": "Com", "start_year": 2015, "end_year": null}]},   # lists the engine does not ship
                   "value_list_changes": {"ac_climate_zone": {...}}},                 # changes over the shipped lists (editor.set_value_list_changes)
@@ -43,7 +45,7 @@ RECEIPT_VERSION = 1
 JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 TOP = {"check_spec_version", "job_id", "engine", "rule_set", "tables", "context", "skip", "outputs", "caller", "description"}
-CONTEXT = {"filing_year", "upload_date", "filer", "keys", "programs", "lists", "value_list_changes"}
+CONTEXT = {"filing_year", "upload_date", "filer", "keys", "tables", "programs", "lists", "value_list_changes"}
 RULE_KEYS = {"id", "severity", "table", "field", "text", "kind", "source", "definition"}
 MAX_ACTUAL = 200                                     # characters of a failing value kept in findings.json
 
@@ -85,13 +87,7 @@ def validate(spec) -> list[str]:
     if not isinstance(tables, dict) or not tables:
         errors.append("tables: an object of {table: URI}")
     else:
-        for name, v in tables.items():
-            if isinstance(v, str) and v.strip():
-                continue
-            if isinstance(v, dict) and isinstance(v.get("uri"), str) and v["uri"].strip() and not set(v) - {"uri", "sha256"} \
-                    and ("sha256" not in v or (isinstance(v["sha256"], str) and SHA256.match(v["sha256"]))):
-                continue
-            errors.append(f"tables.{name}: a URI or {{\"uri\", \"sha256\"}}")
+        errors += _table_errors(tables, "tables")
     ctx = spec.get("context", {})
     if not isinstance(ctx, dict):
         errors.append("context: an object")
@@ -104,9 +100,11 @@ def validate(spec) -> list[str]:
                 errors.append("context.upload_date: YYYY-MM-DD")
         if ctx.get("filing_year") is not None and not (isinstance(ctx["filing_year"], int) and not isinstance(ctx["filing_year"], bool)):
             errors.append("context.filing_year: a year")
-        for k, t in (("filer", dict), ("keys", dict), ("programs", list), ("lists", dict), ("value_list_changes", dict)):
+        for k, t in (("filer", dict), ("keys", dict), ("tables", dict), ("programs", list), ("lists", dict), ("value_list_changes", dict)):
             if ctx.get(k) is not None and not isinstance(ctx[k], t):
                 errors.append(f"context.{k}: {'an object' if t is dict else 'a list'}")
+        if isinstance(ctx.get("tables"), dict):
+            errors += _table_errors(ctx["tables"], "context.tables")
     skip = spec.get("skip", {})
     if not isinstance(skip, dict) or any(not isinstance(v, list) for v in skip.values()):
         errors.append("skip: an object of {table: [rule IDs]}")
@@ -115,6 +113,18 @@ def validate(spec) -> list[str]:
         errors.append("outputs.uri: the folder (path, file:// or s3://) findings.json and receipt.json go to")
     if "caller" in spec and not isinstance(spec["caller"], dict):
         errors.append("caller: an object (echoed into receipt.json as given)")
+    return errors
+
+
+def _table_errors(tables: dict, where: str) -> list[str]:
+    errors = []
+    for name, v in tables.items():
+        if isinstance(v, str) and v.strip():
+            continue
+        if isinstance(v, dict) and isinstance(v.get("uri"), str) and v["uri"].strip() and not set(v) - {"uri", "sha256"} \
+                and ("sha256" not in v or (isinstance(v["sha256"], str) and SHA256.match(v["sha256"]))):
+            continue
+        errors.append(f"{where}.{name}: a URI or {{\"uri\", \"sha256\"}}")
     return errors
 
 
@@ -151,9 +161,10 @@ def library_available() -> bool:
         return False
 
 
-def run_check(spec: dict, tables: dict, library: bool | None = None) -> dict:
-    """Run a check spec's rules on its tables ({name: raw-text DataFrame}) here; returns findings.json's content. The spec's value list changes are
-    applied while it runs and the previous ones put back after."""
+def run_check(spec: dict, tables: dict, library: bool | None = None, linked: dict | None = None) -> dict:
+    """Run a check spec's rules on its tables ({name: raw-text DataFrame}) here; returns findings.json's content. `linked`: the tables conditions
+    read but that are not checked (context.tables; a checked table is read where it has none). The spec's value list changes are applied while it
+    runs and the previous ones put back after."""
     import numpy as np
     import pandas as pd
 
@@ -162,7 +173,7 @@ def run_check(spec: dict, tables: dict, library: bool | None = None) -> dict:
     library = library_available() if library is None else library
     rs = rule_set_of(spec)
     ctx = context_of(spec, library)
-    ctx.tables = tables
+    ctx.tables = {**tables, **(linked or {})}
     skip = {k: set(v) for k, v in (spec.get("skip") or {}).items()}
     changes = (spec.get("context") or {}).get("value_list_changes")
     before = dict(editor._VALUE_LIST_CHANGES)
@@ -203,6 +214,21 @@ def _sha(path: Path) -> str:
     return h.hexdigest()
 
 
+def _fetch(given: dict, folder: Path, where: str) -> tuple[dict, dict]:
+    """Fetch each table of `given` ({name: URI or {"uri", "sha256"}}) into `folder`, refusing one whose SHA-256 is not the pinned one."""
+    from . import storage
+    files, inputs = {}, {}
+    for i, (name, v) in enumerate(given.items()):
+        uri, pinned = _uri(v)
+        local = storage.for_uri(uri).fetch(uri, folder / f"{i:02d}.csv")
+        digest = _sha(local)
+        if pinned and pinned != digest:
+            raise CheckRefused(f"{where}.{name}: SHA-256 {digest} is not the pinned {pinned} ({uri})")
+        files[name] = local
+        inputs[name] = {"uri": uri, "sha256": digest, "bytes": local.stat().st_size}
+    return files, inputs
+
+
 def check(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict | None]:
     """Run one check spec; returns (exit code, receipt or None when the spec was refused)."""
     import shutil
@@ -226,15 +252,8 @@ def check(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict
             release = (spec.get("engine") or {}).get("release")
             if release and release != __version__:
                 raise CheckRefused(f"engine.release {release} was asked for; this worker is recet {__version__}")
-            files, inputs = {}, {}
-            for i, (name, v) in enumerate(spec["tables"].items()):
-                uri, pinned = _uri(v)
-                local = storage.for_uri(uri).fetch(uri, work / "tables" / f"{i:02d}.csv")
-                digest = _sha(local)
-                if pinned and pinned != digest:
-                    raise CheckRefused(f"tables.{name}: SHA-256 {digest} is not the pinned {pinned} ({uri})")
-                files[name] = local
-                inputs[name] = {"uri": uri, "sha256": digest, "bytes": local.stat().st_size}
+            files, inputs = _fetch(spec["tables"], work / "tables", "tables")
+            linked_files, linked_inputs = _fetch((spec.get("context") or {}).get("tables") or {}, work / "linked", "context.tables")
         except (CheckRefused, storage.StorageError, TypeError) as exc:
             print(f"recet worker: check refused: {exc}", file=sys.stderr)
             return 2, None
@@ -243,9 +262,11 @@ def check(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict
         status, error, findings = "succeeded", None, None
         try:
             tables = {name: read_table(p) for name, p in files.items()}
-            for name, df in tables.items():
-                inputs[name]["rows"] = int(len(df))
-            findings = run_check(spec, tables)
+            linked = {name: read_table(p) for name, p in linked_files.items()}
+            for given, frames in ((inputs, tables), (linked_inputs, linked)):
+                for name, df in frames.items():
+                    given[name]["rows"] = int(len(df))
+            findings = run_check(spec, tables, linked=linked or None)
         except Exception as exc:                                       # a failed check still gets a receipt
             status, error = "failed", f"{type(exc).__name__}: {exc}"
             log(traceback.format_exc())
@@ -265,6 +286,7 @@ def check(spec_uri: str, work: Path | None = None, log=print) -> tuple[int, dict
             "rule_set": {"code": spec["rule_set"].get("code"), "version": spec["rule_set"].get("version"), "rules": len(spec["rule_set"]["rules"]),
                          "sha256": hashlib.sha256(rules_json).hexdigest()},
             "tables": inputs,
+            "linked_tables": linked_inputs,
             "library": (findings or {}).get("library"),
             "findings": sum(len(r["rows"]) for t in (findings or {}).get("tables", {}).values() for r in t["results"]) if findings else None,
             "outputs": outputs,

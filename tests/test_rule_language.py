@@ -219,3 +219,22 @@ def test_a_failed_check_still_writes_its_receipt(tmp_path):
     assert worker.main(["check", str(path)]) == 1
     receipt = json.loads((tmp_path / "out" / "receipt.json").read_text())
     assert receipt["status"] == "failed" and "one level" in receipt["error"] and not (tmp_path / "out" / "findings.json").exists()
+
+
+def test_check_job_reads_linked_tables_without_checking_them(tmp_path):
+    """context.tables: a filing's year to date, read by conditions on another table; only the tables under "tables" are checked."""
+    sem = pd.DataFrame({"ClaimID": ["PGE-2027-4"], "MeasImpactType": ["Cust-SEM"], "PrgID": ["P2"]})
+    folder = tmp_path / "linked"
+    folder.mkdir()
+    sem.to_csv(folder / "Measure.csv", index=False)
+    spec, path = _spec(tmp_path, RULES, {"Claim": CLAIM})
+    spec["context"]["tables"] = {"Measure": str(folder / "Measure.csv")}
+    path.write_text(json.dumps(spec), encoding="utf-8")
+    assert worker.main(["check", str(path)]) == 0
+    findings = json.loads((tmp_path / "out" / "findings.json").read_text())
+    receipt = json.loads((tmp_path / "out" / "receipt.json").read_text())
+    assert set(findings["tables"]) == {"Claim"}                                   # the linked Measure table is read, not checked
+    assert {r["rule_id"]: r["rows"] for r in findings["tables"]["Claim"]["results"]}["A"] == [3]   # only claim 4's linked measure is SEM
+    assert receipt["linked_tables"]["Measure"]["rows"] == 1
+    assert checkjob.run_check(spec, {"Claim": CLAIM}, library=False, linked={"Measure": sem})["tables"] == findings["tables"]
+    assert any("context.tables.Measure" in e for e in checkjob.validate({**spec, "context": {"tables": {"Measure": 3}}}))
