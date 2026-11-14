@@ -9,7 +9,9 @@ ACC each record was priced on (by ACC version and program year), the cost-test s
 manifest.json, else computed) and the hash of the packaged data, the run parameters and statewide allocation table used, the filing rule set, every output
 file's SHA-256, the totals, notes and timings. A failed run still gets a receipt (status "failed", the error), sent with whatever the run wrote.
 
-Exit codes: 0 succeeded; 1 the run failed (receipt written); 2 the spec was refused (nothing run; the reasons on stderr)."""
+Exit codes: 0 succeeded; 1 the run failed (receipt written); 2 the spec was refused (nothing run; the reasons on stderr).
+
+`recet worker check check.json` runs a filing's rules instead (checkjob.py): the platform's check of a filing in the release its specification names."""
 from __future__ import annotations
 
 import hashlib
@@ -438,12 +440,15 @@ def make_receipt(spec, spec_sha, cfg, result, run_dir: Path, inputs, ref, ref_fi
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`recet worker run|validate|schema`."""
+    """`recet worker run|check|validate|schema`."""
     import argparse
     ap = argparse.ArgumentParser(prog="recet worker", description="run one job from a job spec (recet/jobspec.py) and write its receipt")
     sub = ap.add_subparsers(dest="action", required=True)
     p = sub.add_parser("run", help="run a job spec: fetch its inputs, run it, send its outputs and receipt.json to its outputs URI")
     p.add_argument("spec", help="the job spec: a path, file:// or s3:// URI")
+    p.add_argument("--work", help="the work folder (default: a temporary folder, removed afterwards)")
+    p = sub.add_parser("check", help="run a check spec (checkjob.py): a filing's rules on its tables; findings.json and receipt.json to its outputs URI")
+    p.add_argument("spec", help="the check spec: a path, file:// or s3:// URI")
     p.add_argument("--work", help="the work folder (default: a temporary folder, removed afterwards)")
     p = sub.add_parser("validate", help="check a job spec without running it")
     p.add_argument("spec")
@@ -464,5 +469,9 @@ def main(argv: list[str] | None = None) -> int:
             print(e, file=sys.stderr)
         print("valid" if not errors else f"{len(errors)} problem(s)")
         return 2 if errors else 0
+    if a.action == "check":
+        from . import checkjob
+        code, _receipt = checkjob.check(a.spec, Path(a.work) if a.work else None)
+        return code
     code, _receipt = run(a.spec, Path(a.work) if a.work else None)
     return code
