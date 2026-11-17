@@ -1,0 +1,24 @@
+{
+  "release": "21.0",
+  "database": "CETbk_21_0",
+  "MeasureTable": "InputMeasureCEDARS",
+  "ProgramTable": "InputProgramCEDARS",
+  "MEBens": 0.0,
+  "MECost": 0.0,
+  "SourceType": "CEDARSDatabase",
+  "AVCVersion": "2020",
+  "FirstYear": 2020,
+  "IncludeNonResourceCosts": 0,
+  "avoided_cost_version": {
+    "ID": "5",
+    "Version": "2020",
+    "AvoidedCostVersion": "7/15/2019",
+    "BaseYear": "2019",
+    "LastYear": "2049",
+    "CO2Gas": "0.00585",
+    "NOxGas": "0.0092",
+    "AVCElecTable": "E3AvoidedCostElecCO2Seq2020",
+    "AVCGasTable": "E3AvoidedCostGasSeq2020"
+  },
+  "ran_at": "2026-10-28T23:49:32"
+}

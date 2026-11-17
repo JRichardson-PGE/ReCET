@@ -1,0 +1,22 @@
+code,start_year,end_year,start_date,end_date,claim_spec,filing_spec,description
+Cust-FuelSub,2019,,2019-08-05,,1,1,Custom Fuel Substitution: site-specific calculation using approved tool or method
+Cust-Gen,2019,,2019-01-01,,1,1,"Custom Generic: generic, site-specific calculation or using approved tool or method and/or metered data (excluding NMEC, SEM, or RCT offerings)"
+Cust-NC-AE,2023,,2023-01-01,,1,1,"Custom All-Electric New Construction: site-specific calculation using approved tool or method and/or metered data (excluding NMEC, SEM, or RCT offerings)"
+Cust-NMEC,2019,2019,2019-01-01,2019-12-31,1,1,"Custom NMEC: uses a normalized, metered energy consumption (NMEC) method following CPUC-staff-issued guidance and an approved M&V/analysis plan"
+Cust-NMEC-Pop,2020,,2020-01-01,,1,1,Population-level Normalized Metered Energy Consumption (NMEC) energy impacts are specified on a custom basis.
+Cust-NMEC-Pop-FuelSub,2022,,2022-01-01,,1,1,Population-level Normalized Metered Energy Consumption (NMEC) energy impacts for fuel-substitution measures are specified on a custom basis
+Cust-NMEC-Site,2020,,2020-01-01,,1,1,Site-level Normalized Metered Energy Consumption (NMEC) energy impacts are specified on a custom basis.
+Cust-NMEC-Site-FuelSub,2022,,2022-01-01,,1,1,Site-level Normalized Metered Energy Consumption (NMEC) energy impacts for fuel-substitution measures are specified on a custom basis.
+Cust-RCT,2019,,2019-01-01,,1,1,Custom RCT: uses a randomized-control trial (RCT) or experimental design method
+Cust-SEM,2019,,2019-01-01,,1,1,Custom SEM: uses a strategic energy-management method
+Cust-SEM-FuelSub,2022,,2022-01-01,,1,1,Custom SEM: uses a strategic energy-management method involving fuel substitution
+Deem,2026,,2026-01-01,,1,1,Deemed measure
+Deem-DEER,2019,,2019-01-01,,1,1,Deemed DEER: uses DEER-adopted values
+Deem-DEER-FuelSub,2019,,2019-08-05,,1,1,Deemed DEER Fuel Substitution: uses DEER-adopted values
+Deem-WP,2019,,2019-01-01,,1,1,Deemed Workpaper: uses values from an approved workpaper
+Deem-WP-FuelSub,2019,,2019-08-05,,1,1,Deemed Workpaper Fuel Substitution: uses values from an approved workpaper
+Deem-WP-NC-AE,2023,,2023-01-01,,1,1,Deemed measure for All-Electric New Construction: uses values from an approved measure package
+DEER,2013,2018,2013-01-01,2018-12-31,1,1,Measure can be referenced as part of the DEER ex-ante database
+IOU-Custom,2013,2018,2013-01-01,2018-12-31,1,1,Custom Measure that requires site-specific impact values
+IOU-Deemed,2013,2018,2013-01-01,2018-12-31,1,1,deemed measure is part of an IOU work paper
+NonDEER,2013,2018,2013-01-01,2018-12-31,1,1,Non-DEER measure utilizing the Best-Available methods

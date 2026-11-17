@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main_class %}page docs-layout{% endblock %}
+{% block content %}
+{% include "_docnav.html" %}
+<article class="doc">
+{{ html|safe }}
+</article>
+{% endblock %}
+{% block scripts %}{% if mermaid %}
+<script src="{{ u('/static/vendor/mermaid/mermaid.min.js') }}?v={{ version }}"></script>
+<script src="{{ u('/static/docs.js') }}?v={{ version }}"></script>
+{% endif %}{% endblock %}

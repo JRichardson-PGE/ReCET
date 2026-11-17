@@ -1,0 +1,8 @@
+{
+  "release": "21.0",
+  "version": "2020",
+  "base_year": 2019,
+  "max_qac_elec": 123,
+  "max_qac_gas": 123,
+  "source": "CETbk_21_0, reference run synthetic_avc2020_data"
+}

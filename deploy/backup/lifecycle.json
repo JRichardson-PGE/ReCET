@@ -1,0 +1,8 @@
+{
+  "Rules": [
+    {"ID": "database-copies-90-days", "Filter": {"Prefix": "recet/db/"}, "Status": "Enabled", "Expiration": {"Days": 90}},
+    {"ID": "mirror-history-30-days", "Filter": {"Prefix": "recet/state/"}, "Status": "Enabled",
+     "NoncurrentVersionExpiration": {"NoncurrentDays": 30}, "Expiration": {"ExpiredObjectDeleteMarker": true}},
+    {"ID": "abort-incomplete-uploads", "Filter": {"Prefix": "recet/"}, "Status": "Enabled", "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 2}}
+  ]
+}

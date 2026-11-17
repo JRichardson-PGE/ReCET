@@ -1,0 +1,8 @@
+code,start_year,end_year,claim_spec,filing_spec
+Large Boilers (>100 MMBtu/hr Heat Input):Controlled Flue Gas Recirculation,2016,,1,1
+Large Boilers (>100 MMBtu/hr Heat Input):Controlled Low NOx Burner,2016,,1,1
+Large Boilers (>100 MMBtu/hr Heat Input):Uncontrolled,2016,,1,1
+Residential Furnaces (<0.3):Uncontrolled,2016,,1,1
+Small Boilers (<100 MMBtu/hr Heat Input):Controlled Flue Gas Recirculation,2016,,1,1
+Small Boilers (<100 MMBtu/hr Heat Input):Controlled Low NOx Burner,2016,,1,1
+Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled,2016,,1,1

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recet"
+dynamic = ["version"]
+description = "ReCET, the rebuilt CEDARS Cost Effectiveness Tool: price CET-format inputs hour by hour on the 2021, 2022, 2024 or 2026 ACC, with a graphical interface, a web app and a batch worker"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "openpyxl>=3.1",        # the Excel job workbook and its template
+    "pyyaml>=6.0",          # the cost-test definition sets (recet/data/cost_tests/*/definition.yaml, cost_test_sets.py)
+    "sv-ttk>=2.6",          # the window's Sun Valley theme (the window falls back to the system theme without it)
+    "tksheet>=7.4",         # the Edit inputs tab's grid (the tab says how to install it if it is missing)
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "httpx>=0.27", "jsonschema>=4.20"]   # jsonschema: the cost-test set schema check (tests/test_cost_test_sets.py)
+# the web app: pip install ".[web]"
+web = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.18",
+    "argon2-cffi>=23.1",
+    "markdown>=3.6",
+    "isal>=1.6",            # ISA-L: zips the web app's CSV outputs about 6x faster than zlib (outputs.deflater)
+]
+# faster zipped-CSV output for the command line and the window too: pip install ".[fast]"
+fast = ["isal>=1.6"]
+excel = ["openpyxl>=3.1"]
+# s3:// inputs and outputs for `recet worker run` (recet/storage.py; the engine never imports boto3 otherwise)
+s3 = ["boto3>=1.34"]
+
+[project.scripts]
+recet = "recet.cli:main"
+recet-web = "recet.web.cli:main"
+
+[project.gui-scripts]
+recet-gui = "recet.gui:launch"
+
+[tool.setuptools.dynamic]
+version = { attr = "recet.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["recet*"]
+
+[tool.setuptools.package-data]
+recet = ["data/**/*", "docs/*.md", "web/templates/*.html", "web/static/*", "web/static/vendor/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

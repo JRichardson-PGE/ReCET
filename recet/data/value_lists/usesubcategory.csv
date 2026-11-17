@@ -1,0 +1,80 @@
+code,start_year,end_year,claim_spec,filing_spec,description
+AirDist,2013,,1,1,Air distribution (fan systems)
+Audit,2013,,1,1,Audit
+ChemTreat,2013,,1,1,Chemical treatment
+Cleaning,2013,,1,1,Cleaning
+Condensing,2013,,1,1,Condensing
+Controls,2013,,1,1,Pneumatic controls operation
+Cooking,2013,,1,1,Cooking
+Curing,2013,,1,1,Curing
+DairyVac,2013,,1,1,Diary Vacuum Pump
+Diagnostic,2013,,1,1,Diagnostic Services
+Display,2013,,1,1,Refrigerated Display
+Distribute,2013,,1,1,Water Distribution
+Drying,2013,,1,1,Drying
+Electronics,2013,,1,1,Consumer Electronics
+EnvContols,2013,,1,1,Environmental controls
+EnvCtrl,2013,,1,1,Environmental Controls
+Equipment,2013,,1,1,Refrigeration Equipment
+EvapSepDehyd,2013,,1,1,Evaporating/Separating/Dehydration
+FarmIrrig,2013,,1,1,Farming Irrigation
+Fenestration,2013,,1,1,Fenestration
+Finish,2013,,1,1,Finishing
+HeatCool,2013,,1,1,Space Heating and Cooling
+Heating,2013,,1,1,Water Heating
+HeatTreat,2013,,1,1,Heat treatment
+HtRej,2013,,1,1,Heat Rejection
+InCommon,2013,,1,1,Indoor Common Area
+InExit,2013,,1,1,Indoor Exit Lighting
+InGen,2013,,1,1,Indoor General Lighting
+InGen-CFL,2013,,1,1,Indoor General CFL Lighting
+InGen-HB,2013,,1,1,Indoor General High Bay Lighting
+InGen-LF,2013,,1,1,Indoor General Linear Fluorescent Lighting
+InRetDisp,2013,,1,1,Indoor Retail Display Lighting
+InTask,2013,,1,1,Indoor Task Lighting
+KitchenApp,2013,,1,1,Kitchen Appliances
+LandScape,2013,,1,1,Landscape Irrigation
+Laundry,2013,,1,1,Laundry Appliances
+LiquidDist,2013,,1,1,Liquid Distribution
+Maintenance,2013,,1,1,Maintenance
+ManufAQA,2013,,1,1,Manufacturing - Average quality air
+ManufDryAir,2013,,1,1,Manufacturing - Dry air
+MatConvPkg,2013,,1,1,Material conveying/packaging
+Melting,2013,,1,1,Metal/material melting
+NonSav,2013,,1,1,Non-Savings Measure
+Office_eq,2013,,1,1,Office Equipment
+Opaque,2013,,1,1,Opaque Envelope
+Out24hr,2013,,1,1,Outdoor 24-hour
+OutCommon,2013,,1,1,Outdoor Common Area Lighting
+OutDuskDawn,2013,,1,1,Outdoor Dusk to Dawn
+OutGen,2013,,1,1,Outdoor General Lighting
+OutSign,2013,,1,1,Outdoor Signage
+Packaging,2013,,1,1,Packaging
+ParkGar,2013,,1,1,Parking Garage (Unconditioned)
+Pasteurize,2013,,1,1,Pasteurizing
+PatioHeat,2023,,1,1,Patio Heaters
+PointOfUse,2013,,1,1,Cold Water PointOfUse
+Pool,2013,,1,1,Pool
+Power,2013,,1,1,Power
+PreheatLiqSol,2013,,1,1,Preheating of liquids/solids
+ProdChill,2013,,1,1,Product chilling
+ProdManuf,2013,,1,1,Product manufacturing
+ProdStore,2013,,1,1,Product storage
+Pumping,2013,,1,1,Pumping
+RefDisplay,2013,,1,1,Refrigeration Display Case Lighting
+Refrig,2013,,1,1,Refrigerated Storage
+Reheat,2013,,1,1,Reheat
+RetroComm,2013,,1,1,Retro-Commissioning Services
+Seasonal,2013,,1,1,Seasonal Lighting
+Separate,2013,,1,1,Separation
+Spa,2013,,1,1,Spa
+SpaceCool,2013,,1,1,Space Cooling
+SpaceHeat,2013,,1,1,Space Heating
+SteamDist,2013,,1,1,Steam Distribution
+Storage,2013,,1,1,Refrigerated Storage
+Testing,2013,,1,1,Testing Services
+ToolsOp,2013,,1,1,Tools operation
+UnCatC&S,2013,,1,1,Codes and Standards Uncategorized
+Vending,2013,,1,1,Product Vending
+VentAirDist,2013,,1,1,Ventilation and Air Distribution
+WBUpgrade,2013,,1,1,Whole Building Upgrade

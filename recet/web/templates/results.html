@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Results · {{ run.label or run.id }}{% endblock %}
+{% block main_class %}page wide{% endblock %}
+{% block content %}
+{% macro tile_help(tiles) %}{% if tiles|selectattr('help')|list %}<details class="tile-help small"><summary>What these numbers are</summary>
+  <dl>{% for t in tiles if t.help %}<dt>{{ t.label }}</dt><dd>{{ t.help }}</dd>{% endfor %}</dl></details>{% endif %}{% endmacro %}
+<div class="head-row">
+  <h1>Results: {{ run.label or run.id }}</h1>
+  <a class="button" href="{{ u('/runs/' + run.id) }}">Run page, files and log</a>
+</div>
+{% if subruns %}
+<p class="tabs">
+  <a href="{{ u('/runs/' + run.id + '/results') }}" class="{% if not sub %}on{% endif %}">Comparison</a>
+  {% for sr in subruns %}<a href="{{ u('/runs/' + run.id + '/results?sub=' + sr) }}" class="{% if sub == sr %}on{% endif %}">{{ sr.replace('run_acc', 'ACC ') }}</a>{% endfor %}
+</p>
+{% endif %}
+
+{% if plain is not none %}
+<h2>{{ plain_name }}</h2>
+<div class="scroll"><table class="data sortable">
+  <thead><tr>{% for c in plain.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in plain.itertuples(index=False) %}<tr>{% for v in r %}<td class="{{ 'num' if v is number else '' }}" {% if v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,.4f}'.format(v) if v is number and v == v and (v|abs) < 100 else ('{:,.0f}'.format(v) if v is number and v == v else ('' if v is number else v)) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% elif note and table is none and not catalog %}
+<p>{{ note }}</p>
+{% else %}
+<form method="get" class="filters" id="filters">
+  {% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% endif %}
+  <input type="hidden" name="level" value="{{ level }}">
+  <label>PA <select name="pa">{% for p in pas %}<option {% if p == pa %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+  <label>View <select name="view" data-view>
+    {% if not view %}<option value="" selected>(unsaved columns)</option>{% endif %}
+    {% for v in views %}<option {% if v == view %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  {% if not view %}<input type="hidden" name="columns" value="{{ keys|join(',') }}">{% endif %}
+  <button type="button" id="columns-btn" aria-expanded="false" aria-controls="columns">Columns…</button>
+  {% if all_years|length > 1 %}
+  <fieldset class="years" aria-describedby="years-help">
+    <legend>Program years</legend>
+    {% for y in all_years %}<label class="inline"><input type="checkbox" name="years" value="{{ y }}" {% if y in years %}checked{% endif %}> {{ y }}</label>{% endfor %}
+    <span class="small muted" id="years-help">(totals over the ticked years; none ticked = every year)</span>
+    {% if years %}<a class="small" href="?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'columns': '' if view else keys|join(',')}|urlencode }}">all years</a>{% endif %}
+  </fieldset>
+  {% endif %}
+  <button>Apply</button>
+</form>
+<p class="muted small">{{ file_name }} · {{ '{:,}'.format(n_measures) }} measures{% if years %} · totalled over program year{{ 's' if years|length > 1 }} {{ years|join(', ') }}{% endif %}. Every level above the measure is a sum of its measures; ratios are recomputed from the summed benefits and costs.</p>
+
+<section class="card" id="columns" hidden aria-label="Choose columns">
+  <form method="get" id="pick">
+    <input type="hidden" name="level" value="{{ level }}"><input type="hidden" name="pa" value="{{ pa }}">{% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% endif %}
+    <input type="hidden" name="columns" value="{{ keys|join(',') }}" id="pick-columns">{% if years_param %}<input type="hidden" name="years" value="{{ years_param }}">{% endif %}
+    <div class="pick-tools">
+      <label class="inline">Find <input type="search" id="pick-find" placeholder="column name" autocomplete="off"></label>
+      <button type="button" data-pick="defaults" data-defaults="{{ rv.DEFAULT_VIEW|join(',') }}">Default columns</button>
+      <button type="button" data-pick="clear">Clear</button>
+      <button class="primary">Show these columns</button>
+    </div>
+    <div class="pick">
+    {% for g, items in groups %}
+      <fieldset class="pick-group"><legend>{{ g }}</legend>
+      {% for k, label, help in items %}<label title="{{ help }}{{ ' [' + k + ']' if label != k }}"><input type="checkbox" value="{{ k }}" {% if k in keys %}checked{% endif %}> {{ label }}</label>{% endfor %}
+      </fieldset>
+    {% endfor %}
+    </div>
+  </form>
+  <form method="post" action="{{ u('/views') }}" class="inline" id="save-view">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ request.url.path }}?{{ {'level': level, 'pa': pa, 'sub': sub, 'years': years_param}|urlencode }}">
+    <span id="save-keys">{% for k in keys %}<input type="hidden" name="keys" value="{{ k }}">{% endfor %}</span>
+    <label>Save the ticked columns as view <input type="text" name="name" maxlength="60" value="{{ view if view != 'Default' else '' }}" required></label>
+    <button>Save view</button>
+  </form>
+  {% if view and view != 'Default' %}
+  <form method="post" action="{{ u('/views') }}" class="inline confirm" data-confirm="Delete the view '{{ view }}'?">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ view }}"><input type="hidden" name="delete" value="1">
+    <input type="hidden" name="back" value="{{ request.url.path }}?{{ {'level': level, 'pa': pa, 'sub': sub, 'years': years_param}|urlencode }}">
+    <button class="danger">Delete view '{{ view }}'</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if tiles %}
+<section class="tiles" aria-label="Portfolio results{{ ' for ' + pa if pa != rv.ALL_PAS }}">
+  {% for t in tiles %}<div class="tile" title="{{ t.help }}"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.value }}</span></div>{% endfor %}
+</section>
+{{ tile_help(tiles) }}
+{% endif %}
+{% if chart %}
+<h2 class="sr-only">{{ chart.title }}</h2>
+<details class="card chart-card" open>
+  <summary>{{ chart.title }}{{ ' (' + pa + ')' if pa != rv.ALL_PAS }}</summary>
+  <div class="bars" role="list">
+    {% for b in chart.bars %}
+    <div class="bar-row" role="listitem"><span class="bar-name">{{ b.name }}</span>
+      <span class="bar-track"><span class="bar {% if b.neg %}neg{% endif %}" style="width: {{ b.pct }}%"></span></span>
+      <span class="bar-value">{{ b.value }}</span></div>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+
+<p class="tabs" role="navigation" aria-label="Level">
+  {% for key, label in levels|reverse %}
+  {% if key == 'measure' and not measure_ok %}
+  <span class="off muted" title="Shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures: the measure-level table is in the run's downloads">{{ label }} (off: {{ '{:,}'.format(n_measures) }} measures)</span>
+  {% else %}
+  <a class="{% if key == level %}on{% endif %}" {% if key == level %}aria-current="page"{% endif %} href="?{{ {'level': key, 'pa': pa, 'view': view, 'sub': sub, 'years': years_param, 'columns': '' if view else keys|join(',')}|urlencode }}">{{ label }}</a>
+  {% endif %}
+  {% endfor %}
+</p>
+{% if measure_ok is defined and not measure_ok %}<p class="small muted">The measure level is shown only for runs of up to {{ '{:,}'.format(max_run_measures) }} measures; the measure-level table is in the run's downloads.</p>{% endif %}
+{% if note %}<p class="note">{{ note }}</p>{% endif %}
+{% if table is not none %}
+<h2 class="sr-only">Results table</h2>
+<div class="table-tools">
+  <label class="inline small">Filter rows <input type="search" data-filter="results-table" data-count="filter-count" placeholder="program, PA, text…" autocomplete="off"></label>
+  <span class="small muted" id="filter-count"></span>
+  <span class="small muted">Click a column heading to sort.</span>
+  <a class="button" href="{{ u('/runs/' + run.id + '/results.csv') }}?{{ {'level': level, 'pa': pa, 'view': view, 'sub': sub, 'years': years_param, 'columns': '' if view else keys|join(',')}|urlencode }}">Download this table (CSV)</a>
+</div>
+<div class="scroll"><table class="data sortable" id="results-table">
+  <thead><tr>{% for c in table.columns %}<th title="{{ catalog[c].help if c in catalog else '' }}" scope="col">{{ labels[c] if c in labels else c }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in table.itertuples(index=False) %}<tr>{% for c, v in zip(table.columns, r) %}<td class="{{ 'num' if c in catalog or c == 'Measures' else '' }}" {% if (c in catalog or c == 'Measures') and v is number and v == v %}data-v="{{ v }}"{% endif %}>{{ '{:,}'.format(v) if c == 'Measures' and v is number else rv.format_value(catalog.get(c), v) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% set defs = table.columns|list|select('in', catalog)|list %}
+{% if defs %}<details class="small"><summary>Column definitions</summary>
+  <dl class="tile-help">{% for c in defs if catalog[c].help %}<dt>{{ labels[c] if c in labels else c }}</dt><dd>{{ catalog[c].help }}</dd>{% endfor %}</dl></details>{% endif %}
+{% if table|length == 0 %}<p class="muted">No rows for this PA{{ ' and these years' if years }} at this level.</p>{% endif %}
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

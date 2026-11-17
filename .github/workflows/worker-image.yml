@@ -1,0 +1,88 @@
+# The batch worker image (Dockerfile.worker), one per engine release: a tag vX.Y.Z (= recet.__version__) builds it for amd64 and arm64 and publishes
+# ghcr.io/<owner>/recet-worker:X.Y.Z. A pull request that touches the image builds it (amd64, not published) and runs the same checks.
+# The image carries RECET_IMAGE and RECET_COMMIT, so every receipt.json names the image and commit that produced it.
+name: Worker image
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - Dockerfile.worker
+      - requirements/worker.txt
+      - recet/worker.py
+      - recet/jobspec.py
+      - recet/storage.py
+      - .github/workflows/worker-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build${{ startsWith(github.ref, 'refs/tags/v') && ' and publish' || '' }} the worker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release and image name
+        id: meta
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' recet/__init__.py)
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$owner/recet-worker:$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$version" ]]; then
+            echo "::error::tag ${GITHUB_REF#refs/tags/} does not match recet/__init__.py's version $version"
+            exit 1
+          fi
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (amd64) for the checks
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          load: true
+          tags: recet-worker:ci
+          build-args: |
+            RECET_IMAGE=${{ steps.meta.outputs.image }}
+            RECET_COMMIT=${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
+      - name: The image is the release and has its S3 client
+        run: |
+          test "$(docker run --rm --entrypoint recet recet-worker:ci --version)" = "recet ${{ steps.meta.outputs.version }}" \
+            || { docker run --rm --entrypoint recet recet-worker:ci --version; exit 1; }
+          docker run --rm --entrypoint python recet-worker:ci -c "import boto3, os; assert os.environ['RECET_COMMIT'] == '${{ github.sha }}'"
+          docker run --rm recet-worker:ci schema > /dev/null
+      - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish (amd64 and arm64)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          build-args: |
+            RECET_IMAGE=${{ steps.meta.outputs.image }}
+            RECET_COMMIT=${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max

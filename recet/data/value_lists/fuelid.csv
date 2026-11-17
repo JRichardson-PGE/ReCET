@@ -1,0 +1,8 @@
+code,description,claim_spec,filing_spec,start_year,end_year
+AllElec-New,All-electric new construction without gas service where the standard practice baseline is natural gas-burning equipment,1,1,2026,
+EE-Elec-Only,Energy efficiency measure that saves electricity only and does not burn natural gas,1,1,2026,
+EE-Gas,Energy efficiency measure that burns natural gas,1,1,2026,
+Exempt,Energy efficiency measure that saves natural gas but does not burn natural gas.,1,1,2026,
+FuelSub-ToElec,Fuel substitution measure that replaces natural gas-burning equipment with electric-only equipment,1,1,2026,
+FuelSub-ToGas,Fuel substitution measure that replaces electric-only equipment with natural gas-burning equipment,1,1,2026,
+None,A non-saving measure that uses neither electricity nor natural gas,1,1,2026,

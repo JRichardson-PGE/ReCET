@@ -1,0 +1,68 @@
+code,start_year,end_year,start_date,end_date,claim_spec,filing_spec,description
+AgOth,2013,,2013-01-01,,1,1,Other Agricultural
+ALF,2013,,2013-01-01,,1,1,Livestock Farms
+Any,2013,,2013-01-01,,0,1,All Subsectors
+APF,2013,,2013-01-01,,1,1,Agricultural Produce Farms
+Asm,2013,,2013-01-01,,1,1,Assembly
+Cnc,2013,,2013-01-01,,1,1,Health/Medical - Clinics
+Com,2013,,2013-01-01,,1,1,Commercial
+CRe,2013,,2013-01-01,,1,1,Municipal - City Parks/Recreations
+Dat,2013,,2013-01-01,,1,1,Data Center
+DMo,2013,,2013-01-01,,1,1,Residential Mobile Home
+ECC,2013,,2013-01-01,,1,1,Education - Community College
+EPr,2013,,2013-01-01,,1,1,Education - Primary School
+ERC,2013,,2013-01-01,,1,1,Education - Relocatable Classroom
+ESe,2013,,2013-01-01,,1,1,Education - Secondary School
+EUD,2013,,2013-01-01,,1,1,University Dormitory
+EUn,2013,,2013-01-01,,1,1,Education - University
+Fhc,2013,,2013-01-01,,1,1,FItness Center - Private Health Club
+Fin,2024,,2024-06-24,,1,1,"Financial buildings, incl. banks"
+GHs,2013,,2013-01-01,,1,1,Greenhouse
+Gro,2013,,2013-01-01,,1,1,Grocery
+Gst,2013,,2013-01-01,,1,1,Lodging - Guest Room
+HGR,2013,,2013-01-01,,1,1,Hotel Guest Room
+Hsp,2013,,2013-01-01,,1,1,Health/Medical - Hospital
+Htl,2013,,2013-01-01,,1,1,Lodging - Hotel
+IAT,2013,,2013-01-01,,1,1,Transportation Equipment
+IBM,2013,,2013-01-01,,1,1,Manufacturing Beverage
+ICP,2013,,2013-01-01,,1,1,Chemical Processing
+ICS,2013,,2013-01-01,,1,1,Manufacturing Cement/Stone
+IFP,2013,,2013-01-01,,1,1,Food Processing
+IGM,2013,,2013-01-01,,1,1,Manufacturing Glass
+IGP,2013,,2013-01-01,,1,1,Gas Production
+IndOth,2013,,2013-01-01,,1,1,Other Industrial
+IPe,2013,,2013-01-01,,1,1,Petroleum
+IPH,2013,,2013-01-01,,1,1,Manufacturing Pharmaceutical
+IPM,2013,,2013-01-01,,1,1,Manufacturing Plastics
+Lib,2024,,2024-06-24,,1,1,Libraries
+MBT,2013,,2013-01-01,,1,1,Manufacturing Biotech
+MCE,2013,,2013-01-01,,1,1,Manufacturing Electronics
+MFm,2013,,2013-01-01,,1,1,Residential Multi-family
+MFmCmn,2013,,2013-01-01,,1,1,Residential Multi-family Common Area
+MLI,2013,,2013-01-01,,1,1,Manufacturing Light Industrial
+MPF,2013,,2013-01-01,,1,1,Metal Production and Fabrication
+Mtl,2013,,2013-01-01,,1,1,Lodging - Motel
+Nrs,2013,,2013-01-01,,1,1,Health/Medical - Nursing Home
+OfL,2013,,2013-01-01,,1,1,Office - Large
+OfS,2013,,2013-01-01,,1,1,Office - Small
+Rel,2024,,2024-06-24,,1,1,Religious assembly buildings
+Res,2013,,2013-01-01,,1,1,Residential
+RFF,2013,,2013-01-01,,1,1,Restaurant - Fast-Food
+RSD,2013,,2013-01-01,,1,1,Restaurant - Sit-Down
+Rt3,2013,,2013-01-01,,1,1,Retail - Multistory Large
+RtL,2013,,2013-01-01,,1,1,Retail - Single-Story Large
+RtS,2013,,2013-01-01,,1,1,Retail - Small
+s_Agr,2013,,2013-01-01,,1,1,SCE Agricultural
+s_Cli,2013,,2013-01-01,,1,1,SCE Health/Medical Clinic
+SCn,2013,,2013-01-01,,1,1,Storage - Conditioned
+SFm,2013,,2013-01-01,,1,1,Residential Single Family
+s_FSt,2013,,2013-01-01,,1,1,SCE Food Store
+s_Ind,2013,,2013-01-01,,1,1,SCE Industrial
+s_MiC,2013,,2013-01-01,,1,1,SCE Miscellaneous Commercial
+SMo,2013,,2013-01-01,,1,1,Single-wide Mobile Home
+s_TCU,2013,,2013-01-01,,1,1,SCE Transportation - Communication - Utilities
+SUn,2013,,2013-01-01,,1,1,Storage - Unconditioned
+Sup,2013,,2013-01-01,,1,1,Supermarket
+VPr,2013,,2013-01-01,,1,1,Vineyards and Processing
+WRf,2013,,2013-01-01,,1,1,Warehouse - Refrigerated
+WWT,2013,,2013-01-01,,1,1,Water Waste Treatment

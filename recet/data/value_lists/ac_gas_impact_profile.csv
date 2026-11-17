@@ -1,0 +1,7 @@
+code,start_year,end_year,claim_spec,filing_spec
+Annual,2016,,1,1
+Annual-FuelSub-ToElec,2026,,1,1
+Summer Only,2016,,1,1
+Summer Only-FuelSub-ToElec,2026,,1,1
+Winter Only,2016,,1,1
+Winter Only-FuelSub-ToElec,2026,,1,1

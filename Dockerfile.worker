@@ -1,0 +1,39 @@
+# The ReCET batch worker: one job from a job spec (`recet worker run SPEC`; README "Batch worker"). No web app, no window.
+# Published per engine release to ghcr.io/jrichardson-pge/recet-worker:<release> by .github/workflows/worker-image.yml (amd64 and arm64).
+#
+#   docker run --rm -v /path/to/reference:/data:ro -v "$PWD/work:/work" ghcr.io/jrichardson-pge/recet-worker:0.1.78 run s3://bucket/jobs/1/spec.json
+#
+# The reference data (electric ACC parquets, impact-profile library, CET release exports) is NOT in the image: mount it read-only at /data.
+# S3 credentials come from the environment or the instance / task role, never from the image.
+FROM python:3.12-slim
+
+ARG RECET_IMAGE=""
+ARG RECET_COMMIT=""
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    RECET_HOME=/var/lib/recet \
+    RECET_DATA=/data \
+    MPLBACKEND=Agg \
+    RECET_IMAGE=${RECET_IMAGE} \
+    RECET_COMMIT=${RECET_COMMIT}
+
+RUN useradd --create-home --uid 10001 recet \
+ && mkdir -p /var/lib/recet /data /work \
+ && chown recet:recet /var/lib/recet /work
+
+WORKDIR /app
+# the locked versions first (requirements/README.md), every file checked against its hash; then ReCET itself, which adds no dependency
+COPY requirements/worker.txt requirements/worker.txt
+RUN pip install --require-hashes -r requirements/worker.txt
+COPY pyproject.toml README.md ./
+COPY recet ./recet
+RUN pip install --no-deps . && rm -rf /app/build
+
+USER recet
+WORKDIR /work
+LABEL org.opencontainers.image.source="https://github.com/JRichardson-PGE/ReCET" \
+      org.opencontainers.image.description="ReCET batch worker: recet worker run SPEC"
+ENTRYPOINT ["recet", "worker"]
+CMD ["--help"]

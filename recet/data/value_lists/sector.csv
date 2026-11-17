@@ -1,0 +1,18 @@
+code,start_year,end_year,claim_spec,filing_spec,description
+Ag,2013,2018,1,1,Agricultural
+Agricultural,2019,,1,1,Agricultural
+Codes and Standards,2019,,1,1,Codes and Standards
+Com,2013,2018,1,1,Commercial
+Commercial,2019,,1,1,Commercial
+Emerging Technologies,2019,,1,1,Emerging Technologies
+Energy Savings Assistance,2019,,1,1,Energy Savings Assistance
+Evaluation Measurement and Verification,2019,,1,1,Evaluation Measurement and Verification
+Finance,2019,,1,1,Finance
+Ind,2013,2018,1,1,Industrial
+Industrial,2019,,1,1,Industrial
+On Billing Finance,2019,,1,1,On Billing Finance
+Other,2019,,1,1,Other
+Public,2019,,1,1,Public
+Res,2013,2018,1,1,Residential
+Residential,2019,,1,1,Residential
+Workforce Education and Training,2019,,1,1,Workforce Education and Training

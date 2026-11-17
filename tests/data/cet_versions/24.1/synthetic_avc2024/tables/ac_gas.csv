@@ -1,0 +1,869 @@
+ID,PA,Version,FirstYear,GS,GP,ComboField,Qtr,Qac,Commodity,TD,Total,ACGasKey
+1,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2022Q1,0,0.313774082,0.081133186,0.394907268,PGECommercialAnnual
+2,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2022Q2,1,0.309054572,0.0,0.309054572,PGECommercialAnnual
+3,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2022Q3,2,0.307365017,0.0,0.307365017,PGECommercialAnnual
+4,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2022Q4,3,0.304729786,0.054088791,0.358818576,PGECommercialAnnual
+5,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2023Q1,4,0.333417075,0.082915169,0.416332245,PGECommercialAnnual
+6,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2023Q2,5,0.328542748,0.0,0.328542748,PGECommercialAnnual
+7,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2023Q3,6,0.326442595,0.0,0.326442595,PGECommercialAnnual
+8,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2023Q4,7,0.323635943,0.05527678,0.378912722,PGECommercialAnnual
+9,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2024Q1,8,0.352667299,0.084736292,0.437403591,PGECommercialAnnual
+10,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2024Q2,9,0.347618497,0.0,0.347618497,PGECommercialAnnual
+11,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2024Q3,10,0.345490933,0.0,0.345490933,PGECommercialAnnual
+12,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2024Q4,11,0.342579245,0.056490861,0.399070106,PGECommercialAnnual
+13,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2025Q1,12,0.373130861,0.086460989,0.45959185,PGECommercialAnnual
+14,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2025Q2,13,0.368029159,0.0,0.368029159,PGECommercialAnnual
+15,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2025Q3,14,0.366086293,0.0,0.366086293,PGECommercialAnnual
+16,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2025Q4,15,0.363199427,0.05764066,0.420840086,PGECommercialAnnual
+17,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2026Q1,16,0.395284375,0.088224157,0.483508532,PGECommercialAnnual
+18,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2026Q2,17,0.390106047,0.0,0.390106047,PGECommercialAnnual
+19,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2026Q3,18,0.388063438,0.0,0.388063438,PGECommercialAnnual
+20,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2026Q4,19,0.385126687,0.058816104,0.443942792,PGECommercialAnnual
+21,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2027Q1,20,0.418793535,0.089987324,0.508780859,PGECommercialAnnual
+22,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2027Q2,21,0.413511877,0.0,0.413511877,PGECommercialAnnual
+23,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2027Q3,22,0.411447121,0.0,0.411447121,PGECommercialAnnual
+24,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2027Q4,23,0.408460648,0.059991549,0.468452197,PGECommercialAnnual
+25,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2028Q1,24,0.44381837,0.091750491,0.535568861,PGECommercialAnnual
+26,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2028Q2,25,0.438433821,0.0,0.438433821,PGECommercialAnnual
+27,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2028Q3,26,0.43636014,0.0,0.43636014,PGECommercialAnnual
+28,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2028Q4,27,0.433329104,0.061166994,0.494496098,PGECommercialAnnual
+29,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2029Q1,28,0.470554221,0.093513658,0.564067879,PGECommercialAnnual
+30,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2029Q2,29,0.465042425,0.0,0.465042425,PGECommercialAnnual
+31,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2029Q3,30,0.462899735,0.0,0.462899735,PGECommercialAnnual
+32,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2029Q4,31,0.4597967,0.062342439,0.522139139,PGECommercialAnnual
+33,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2030Q1,32,0.498940184,0.095276826,0.59421701,PGECommercialAnnual
+34,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2030Q2,33,0.49319292,0.0,0.49319292,PGECommercialAnnual
+35,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2030Q3,34,0.490723727,0.0,0.490723727,PGECommercialAnnual
+36,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2030Q4,35,0.48741748,0.063517884,0.550935364,PGECommercialAnnual
+37,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2031Q1,36,0.528255973,0.097039993,0.625295966,PGECommercialAnnual
+38,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2031Q2,37,0.522348852,0.0,0.522348852,PGECommercialAnnual
+39,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2031Q3,38,0.519976521,0.0,0.519976521,PGECommercialAnnual
+40,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2031Q4,39,0.516607047,0.064693329,0.581300376,PGECommercialAnnual
+41,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2032Q1,40,0.559503647,0.09880316,0.658306807,PGECommercialAnnual
+42,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2032Q2,41,0.55347668,0.0,0.55347668,PGECommercialAnnual
+43,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2032Q3,42,0.551060038,0.0,0.551060038,PGECommercialAnnual
+44,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2032Q4,43,0.547624973,0.065868773,0.613493747,PGECommercialAnnual
+45,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2033Q1,44,0.592762815,0.100566327,0.693329142,PGECommercialAnnual
+46,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2033Q2,45,0.586615271,0.0,0.586615271,PGECommercialAnnual
+47,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2033Q3,46,0.584166437,0.0,0.584166437,PGECommercialAnnual
+48,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2033Q4,47,0.580669073,0.067044218,0.647713292,PGECommercialAnnual
+49,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2034Q1,48,0.628198205,0.102329495,0.730527699,PGECommercialAnnual
+50,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2034Q2,49,0.621921018,0.0,0.621921018,PGECommercialAnnual
+51,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2034Q3,50,0.619414972,0.0,0.619414972,PGECommercialAnnual
+52,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2034Q4,51,0.615844743,0.068219663,0.684064407,PGECommercialAnnual
+53,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2035Q1,52,0.6659257,0.104092662,0.770018362,PGECommercialAnnual
+54,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2035Q2,53,0.659517568,0.0,0.659517568,PGECommercialAnnual
+55,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2035Q3,54,0.656977711,0.0,0.656977711,PGECommercialAnnual
+56,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2035Q4,55,0.653339882,0.069395108,0.72273499,PGECommercialAnnual
+57,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2036Q1,56,0.705954045,0.105855829,0.811809874,PGECommercialAnnual
+58,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2036Q2,57,0.699415835,0.0,0.699415835,PGECommercialAnnual
+59,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2036Q3,58,0.696826566,0.0,0.696826566,PGECommercialAnnual
+60,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2036Q4,59,0.693117627,0.070570553,0.763688179,PGECommercialAnnual
+61,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2037Q1,60,0.748539366,0.107618996,0.856158363,PGECommercialAnnual
+62,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2037Q2,61,0.741870862,0.0,0.741870862,PGECommercialAnnual
+63,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2037Q3,62,0.739236081,0.0,0.739236081,PGECommercialAnnual
+64,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2037Q4,63,0.735456909,0.071745998,0.807202907,PGECommercialAnnual
+65,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2038Q1,64,0.793857193,0.109382164,0.903239357,PGECommercialAnnual
+66,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2038Q2,65,0.787058395,0.0,0.787058395,PGECommercialAnnual
+67,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2038Q3,66,0.784378103,0.0,0.784378103,PGECommercialAnnual
+68,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2038Q4,67,0.780528698,0.072921443,0.85345014,PGECommercialAnnual
+69,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2039Q1,68,0.842113102,0.111145331,0.953258433,PGECommercialAnnual
+70,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2039Q2,69,0.835184009,0.0,0.835184009,PGECommercialAnnual
+71,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2039Q3,70,0.832458205,0.0,0.832458205,PGECommercialAnnual
+72,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2039Q4,71,0.828538568,0.074096887,0.902635455,PGECommercialAnnual
+73,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2040Q1,72,0.893528134,0.112908498,1.006436632,PGECommercialAnnual
+74,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2040Q2,73,0.886468747,0.0,0.886468747,PGECommercialAnnual
+75,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2040Q3,74,0.883697431,0.0,0.883697431,PGECommercialAnnual
+76,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2040Q4,75,0.87970756,0.075272332,0.954979893,PGECommercialAnnual
+77,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2041Q1,76,0.94833996,0.114671666,1.063011625,PGECommercialAnnual
+78,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2041Q2,77,0.941150278,0.0,0.941150278,PGECommercialAnnual
+79,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2041Q3,78,0.938333451,0.0,0.938333451,PGECommercialAnnual
+80,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2041Q4,79,0.934273348,0.076447777,1.010721125,PGECommercialAnnual
+81,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2042Q1,80,1.006804132,0.116434833,1.123238965,PGECommercialAnnual
+82,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2042Q2,81,0.999484156,0.0,0.999484156,PGECommercialAnnual
+83,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2042Q3,82,0.996621818,0.0,0.996621818,PGECommercialAnnual
+84,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2042Q4,83,0.992491481,0.077623222,1.070114703,PGECommercialAnnual
+85,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2043Q1,84,1.06919543,0.118198,1.18739343,PGECommercialAnnual
+86,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2043Q2,85,1.061745159,0.0,1.061745159,PGECommercialAnnual
+87,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2043Q3,86,1.058837309,0.0,1.058837309,PGECommercialAnnual
+88,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2043Q4,87,1.05463674,0.078798667,1.133435407,PGECommercialAnnual
+89,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2044Q1,88,1.135809302,0.119961167,1.25577047,PGECommercialAnnual
+90,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2044Q2,89,1.128228738,0.0,1.128228738,PGECommercialAnnual
+91,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2044Q3,90,1.125275376,0.0,1.125275376,PGECommercialAnnual
+92,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2044Q4,91,1.121004574,0.079974112,1.200978686,PGECommercialAnnual
+93,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2045Q1,92,1.206963429,0.121724335,1.328687764,PGECommercialAnnual
+94,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2045Q2,93,1.19925257,0.0,1.19925257,PGECommercialAnnual
+95,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2045Q3,94,1.196253696,0.0,1.196253696,PGECommercialAnnual
+96,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2045Q4,95,1.191912662,0.081149556,1.273062218,PGECommercialAnnual
+97,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2046Q1,96,1.282999388,0.123487502,1.40648689,PGECommercialAnnual
+98,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2046Q2,97,1.275158234,0.0,1.275158234,PGECommercialAnnual
+99,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2046Q3,98,1.272113849,0.0,1.272113849,PGECommercialAnnual
+100,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2046Q4,99,1.267702582,0.082325001,1.350027583,PGECommercialAnnual
+101,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2047Q1,100,1.364284455,0.125250669,1.489535125,PGECommercialAnnual
+102,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2047Q2,101,1.356313008,0.0,1.356313008,PGECommercialAnnual
+103,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2047Q3,102,1.353223111,0.0,1.353223111,PGECommercialAnnual
+104,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2047Q4,103,1.348741611,0.083500446,1.432242057,PGECommercialAnnual
+105,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2048Q1,104,1.45121354,0.127013836,1.578227376,PGECommercialAnnual
+106,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2048Q2,105,1.443111798,0.0,1.443111798,PGECommercialAnnual
+107,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2048Q3,106,1.43997639,0.0,1.43997639,PGECommercialAnnual
+108,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2048Q4,107,1.435424656,0.084675891,1.520100547,PGECommercialAnnual
+109,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2049Q1,108,1.544211259,0.128777004,1.672988263,PGECommercialAnnual
+110,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2049Q2,109,1.535979223,0.0,1.535979223,PGECommercialAnnual
+111,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2049Q3,110,1.532798303,0.0,1.532798303,PGECommercialAnnual
+112,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2049Q4,111,1.528176337,0.085851336,1.614027673,PGECommercialAnnual
+113,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2050Q1,112,1.643734177,0.130540171,1.774274348,PGECommercialAnnual
+114,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2050Q2,113,1.635371846,0.0,1.635371846,PGECommercialAnnual
+115,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2050Q3,114,1.632145415,0.0,1.632145415,PGECommercialAnnual
+116,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2050Q4,115,1.627453216,0.087026781,1.714479997,PGECommercialAnnual
+117,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2051Q1,116,1.750273206,0.132303338,1.882576545,PGECommercialAnnual
+118,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2051Q2,117,1.741780581,0.0,1.741780581,PGECommercialAnnual
+119,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2051Q3,118,1.738508638,0.0,1.738508638,PGECommercialAnnual
+120,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2051Q4,119,1.733746206,0.088202225,1.821948432,PGECommercialAnnual
+121,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2052Q1,120,1.864356192,0.134066506,1.998422697,PGECommercialAnnual
+122,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2052Q2,121,1.855733272,0.0,1.855733272,PGECommercialAnnual
+123,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2052Q3,122,1.852415818,0.0,1.852415818,PGECommercialAnnual
+124,PGE,2024,2022,Commercial,Annual,PGECommercialAnnual,2052Q4,123,1.847583153,0.08937767,1.936960823,PGECommercialAnnual
+125,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2022Q1,0,0.0,0.0,0.0,PGECommercialSummer Only
+126,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2022Q2,1,0.618109144,0.0,0.618109144,PGECommercialSummer Only
+127,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2022Q3,2,0.614730033,0.0,0.614730033,PGECommercialSummer Only
+128,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2022Q4,3,0.0,0.0,0.0,PGECommercialSummer Only
+129,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2023Q1,4,0.0,0.0,0.0,PGECommercialSummer Only
+130,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2023Q2,5,0.657085496,0.0,0.657085496,PGECommercialSummer Only
+131,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2023Q3,6,0.65288519,0.0,0.65288519,PGECommercialSummer Only
+132,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2023Q4,7,0.0,0.0,0.0,PGECommercialSummer Only
+133,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2024Q1,8,0.0,0.0,0.0,PGECommercialSummer Only
+134,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2024Q2,9,0.695236993,0.0,0.695236993,PGECommercialSummer Only
+135,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2024Q3,10,0.690981867,0.0,0.690981867,PGECommercialSummer Only
+136,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2024Q4,11,0.0,0.0,0.0,PGECommercialSummer Only
+137,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2025Q1,12,0.0,0.0,0.0,PGECommercialSummer Only
+138,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2025Q2,13,0.736058318,0.0,0.736058318,PGECommercialSummer Only
+139,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2025Q3,14,0.732172586,0.0,0.732172586,PGECommercialSummer Only
+140,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2025Q4,15,0.0,0.0,0.0,PGECommercialSummer Only
+141,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2026Q1,16,0.0,0.0,0.0,PGECommercialSummer Only
+142,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2026Q2,17,0.780212095,0.0,0.780212095,PGECommercialSummer Only
+143,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2026Q3,18,0.776126877,0.0,0.776126877,PGECommercialSummer Only
+144,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2026Q4,19,0.0,0.0,0.0,PGECommercialSummer Only
+145,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2027Q1,20,0.0,0.0,0.0,PGECommercialSummer Only
+146,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2027Q2,21,0.827023753,0.0,0.827023753,PGECommercialSummer Only
+147,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2027Q3,22,0.822894242,0.0,0.822894242,PGECommercialSummer Only
+148,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2027Q4,23,0.0,0.0,0.0,PGECommercialSummer Only
+149,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2028Q1,24,0.0,0.0,0.0,PGECommercialSummer Only
+150,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2028Q2,25,0.876867641,0.0,0.876867641,PGECommercialSummer Only
+151,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2028Q3,26,0.87272028,0.0,0.87272028,PGECommercialSummer Only
+152,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2028Q4,27,0.0,0.0,0.0,PGECommercialSummer Only
+153,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2029Q1,28,0.0,0.0,0.0,PGECommercialSummer Only
+154,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2029Q2,29,0.93008485,0.0,0.93008485,PGECommercialSummer Only
+155,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2029Q3,30,0.92579947,0.0,0.92579947,PGECommercialSummer Only
+156,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2029Q4,31,0.0,0.0,0.0,PGECommercialSummer Only
+157,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2030Q1,32,0.0,0.0,0.0,PGECommercialSummer Only
+158,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2030Q2,33,0.986385839,0.0,0.986385839,PGECommercialSummer Only
+159,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2030Q3,34,0.981447454,0.0,0.981447454,PGECommercialSummer Only
+160,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2030Q4,35,0.0,0.0,0.0,PGECommercialSummer Only
+161,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2031Q1,36,0.0,0.0,0.0,PGECommercialSummer Only
+162,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2031Q2,37,1.044697704,0.0,1.044697704,PGECommercialSummer Only
+163,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2031Q3,38,1.039953042,0.0,1.039953042,PGECommercialSummer Only
+164,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2031Q4,39,0.0,0.0,0.0,PGECommercialSummer Only
+165,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2032Q1,40,0.0,0.0,0.0,PGECommercialSummer Only
+166,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2032Q2,41,1.10695336,0.0,1.10695336,PGECommercialSummer Only
+167,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2032Q3,42,1.102120076,0.0,1.102120076,PGECommercialSummer Only
+168,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2032Q4,43,0.0,0.0,0.0,PGECommercialSummer Only
+169,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2033Q1,44,0.0,0.0,0.0,PGECommercialSummer Only
+170,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2033Q2,45,1.173230543,0.0,1.173230543,PGECommercialSummer Only
+171,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2033Q3,46,1.168332873,0.0,1.168332873,PGECommercialSummer Only
+172,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2033Q4,47,0.0,0.0,0.0,PGECommercialSummer Only
+173,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2034Q1,48,0.0,0.0,0.0,PGECommercialSummer Only
+174,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2034Q2,49,1.243842037,0.0,1.243842037,PGECommercialSummer Only
+175,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2034Q3,50,1.238829944,0.0,1.238829944,PGECommercialSummer Only
+176,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2034Q4,51,0.0,0.0,0.0,PGECommercialSummer Only
+177,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2035Q1,52,0.0,0.0,0.0,PGECommercialSummer Only
+178,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2035Q2,53,1.319035137,0.0,1.319035137,PGECommercialSummer Only
+179,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2035Q3,54,1.313955421,0.0,1.313955421,PGECommercialSummer Only
+180,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2035Q4,55,0.0,0.0,0.0,PGECommercialSummer Only
+181,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2036Q1,56,0.0,0.0,0.0,PGECommercialSummer Only
+182,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2036Q2,57,1.39883167,0.0,1.39883167,PGECommercialSummer Only
+183,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2036Q3,58,1.393653132,0.0,1.393653132,PGECommercialSummer Only
+184,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2036Q4,59,0.0,0.0,0.0,PGECommercialSummer Only
+185,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2037Q1,60,0.0,0.0,0.0,PGECommercialSummer Only
+186,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2037Q2,61,1.483741724,0.0,1.483741724,PGECommercialSummer Only
+187,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2037Q3,62,1.478472162,0.0,1.478472162,PGECommercialSummer Only
+188,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2037Q4,63,0.0,0.0,0.0,PGECommercialSummer Only
+189,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2038Q1,64,0.0,0.0,0.0,PGECommercialSummer Only
+190,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2038Q2,65,1.57411679,0.0,1.57411679,PGECommercialSummer Only
+191,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2038Q3,66,1.568756205,0.0,1.568756205,PGECommercialSummer Only
+192,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2038Q4,67,0.0,0.0,0.0,PGECommercialSummer Only
+193,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2039Q1,68,0.0,0.0,0.0,PGECommercialSummer Only
+194,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2039Q2,69,1.670368019,0.0,1.670368019,PGECommercialSummer Only
+195,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2039Q3,70,1.66491641,0.0,1.66491641,PGECommercialSummer Only
+196,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2039Q4,71,0.0,0.0,0.0,PGECommercialSummer Only
+197,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2040Q1,72,0.0,0.0,0.0,PGECommercialSummer Only
+198,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2040Q2,73,1.772937493,0.0,1.772937493,PGECommercialSummer Only
+199,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2040Q3,74,1.767394862,0.0,1.767394862,PGECommercialSummer Only
+200,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2040Q4,75,0.0,0.0,0.0,PGECommercialSummer Only
+201,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2041Q1,76,0.0,0.0,0.0,PGECommercialSummer Only
+202,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2041Q2,77,1.882300556,0.0,1.882300556,PGECommercialSummer Only
+203,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2041Q3,78,1.876666902,0.0,1.876666902,PGECommercialSummer Only
+204,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2041Q4,79,0.0,0.0,0.0,PGECommercialSummer Only
+205,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2042Q1,80,0.0,0.0,0.0,PGECommercialSummer Only
+206,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2042Q2,81,1.998968313,0.0,1.998968313,PGECommercialSummer Only
+207,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2042Q3,82,1.993243635,0.0,1.993243635,PGECommercialSummer Only
+208,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2042Q4,83,0.0,0.0,0.0,PGECommercialSummer Only
+209,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2043Q1,84,0.0,0.0,0.0,PGECommercialSummer Only
+210,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2043Q2,85,2.123490319,0.0,2.123490319,PGECommercialSummer Only
+211,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2043Q3,86,2.117674618,0.0,2.117674618,PGECommercialSummer Only
+212,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2043Q4,87,0.0,0.0,0.0,PGECommercialSummer Only
+213,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2044Q1,88,0.0,0.0,0.0,PGECommercialSummer Only
+214,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2044Q2,89,2.256457475,0.0,2.256457475,PGECommercialSummer Only
+215,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2044Q3,90,2.250550752,0.0,2.250550752,PGECommercialSummer Only
+216,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2044Q4,91,0.0,0.0,0.0,PGECommercialSummer Only
+217,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2045Q1,92,0.0,0.0,0.0,PGECommercialSummer Only
+218,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2045Q2,93,2.39850514,0.0,2.39850514,PGECommercialSummer Only
+219,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2045Q3,94,2.392507393,0.0,2.392507393,PGECommercialSummer Only
+220,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2045Q4,95,0.0,0.0,0.0,PGECommercialSummer Only
+221,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2046Q1,96,0.0,0.0,0.0,PGECommercialSummer Only
+222,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2046Q2,97,2.550316469,0.0,2.550316469,PGECommercialSummer Only
+223,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2046Q3,98,2.544227699,0.0,2.544227699,PGECommercialSummer Only
+224,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2046Q4,99,0.0,0.0,0.0,PGECommercialSummer Only
+225,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2047Q1,100,0.0,0.0,0.0,PGECommercialSummer Only
+226,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2047Q2,101,2.712626015,0.0,2.712626015,PGECommercialSummer Only
+227,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2047Q3,102,2.706446222,0.0,2.706446222,PGECommercialSummer Only
+228,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2047Q4,103,0.0,0.0,0.0,PGECommercialSummer Only
+229,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2048Q1,104,0.0,0.0,0.0,PGECommercialSummer Only
+230,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2048Q2,105,2.886223595,0.0,2.886223595,PGECommercialSummer Only
+231,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2048Q3,106,2.879952779,0.0,2.879952779,PGECommercialSummer Only
+232,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2048Q4,107,0.0,0.0,0.0,PGECommercialSummer Only
+233,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2049Q1,108,0.0,0.0,0.0,PGECommercialSummer Only
+234,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2049Q2,109,3.071958445,0.0,3.071958445,PGECommercialSummer Only
+235,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2049Q3,110,3.065596606,0.0,3.065596606,PGECommercialSummer Only
+236,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2049Q4,111,0.0,0.0,0.0,PGECommercialSummer Only
+237,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2050Q1,112,0.0,0.0,0.0,PGECommercialSummer Only
+238,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2050Q2,113,3.270743692,0.0,3.270743692,PGECommercialSummer Only
+239,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2050Q3,114,3.26429083,0.0,3.26429083,PGECommercialSummer Only
+240,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2050Q4,115,0.0,0.0,0.0,PGECommercialSummer Only
+241,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2051Q1,116,0.0,0.0,0.0,PGECommercialSummer Only
+242,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2051Q2,117,3.483561162,0.0,3.483561162,PGECommercialSummer Only
+243,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2051Q3,118,3.477017276,0.0,3.477017276,PGECommercialSummer Only
+244,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2051Q4,119,0.0,0.0,0.0,PGECommercialSummer Only
+245,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2052Q1,120,0.0,0.0,0.0,PGECommercialSummer Only
+246,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2052Q2,121,3.711466544,0.0,3.711466544,PGECommercialSummer Only
+247,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2052Q3,122,3.704831635,0.0,3.704831635,PGECommercialSummer Only
+248,PGE,2024,2022,Commercial,Summer Only,PGECommercialSummer Only,2052Q4,123,0.0,0.0,0.0,PGECommercialSummer Only
+745,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2022Q1,0,0.311510134,0.091012272,0.402522406,PGEResidentialAnnual
+746,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2022Q2,1,0.306790624,0.0,0.306790624,PGEResidentialAnnual
+747,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2022Q3,2,0.305101069,0.0,0.305101069,PGEResidentialAnnual
+748,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2022Q4,3,0.302465837,0.060674848,0.363140685,PGEResidentialAnnual
+749,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2023Q1,4,0.330926732,0.093011236,0.423937968,PGEResidentialAnnual
+750,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2023Q2,5,0.326052405,0.0,0.326052405,PGEResidentialAnnual
+751,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2023Q3,6,0.323952252,0.0,0.323952252,PGEResidentialAnnual
+752,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2023Q4,7,0.3211456,0.062007491,0.38315309,PGEResidentialAnnual
+753,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2024Q1,8,0.349998902,0.095054105,0.445053007,PGEResidentialAnnual
+754,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2024Q2,9,0.3449501,0.0,0.3449501,PGEResidentialAnnual
+755,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2024Q3,10,0.342822536,0.0,0.342822536,PGEResidentialAnnual
+756,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2024Q4,11,0.339910848,0.063369403,0.403280252,PGEResidentialAnnual
+757,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2025Q1,12,0.370265291,0.096988809,0.4672541,PGEResidentialAnnual
+758,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2025Q2,13,0.365163589,0.0,0.365163589,PGEResidentialAnnual
+759,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2025Q3,14,0.363220723,0.0,0.363220723,PGEResidentialAnnual
+760,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2025Q4,15,0.360333857,0.064659206,0.424993063,PGEResidentialAnnual
+761,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2026Q1,16,0.392221633,0.098966666,0.491188299,PGEResidentialAnnual
+762,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2026Q2,17,0.387043305,0.0,0.387043305,PGEResidentialAnnual
+763,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2026Q3,18,0.385000696,0.0,0.385000696,PGEResidentialAnnual
+764,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2026Q4,19,0.382063945,0.065977777,0.448041722,PGEResidentialAnnual
+765,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2027Q1,20,0.41553362,0.100944523,0.516478143,PGEResidentialAnnual
+766,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2027Q2,21,0.410251962,0.0,0.410251962,PGEResidentialAnnual
+767,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2027Q3,22,0.408187206,0.0,0.408187206,PGEResidentialAnnual
+768,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2027Q4,23,0.405200733,0.067296349,0.472497081,PGEResidentialAnnual
+769,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2028Q1,24,0.440361282,0.10292238,0.543283662,PGEResidentialAnnual
+770,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2028Q2,25,0.434976733,0.0,0.434976733,PGEResidentialAnnual
+771,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2028Q3,26,0.432903052,0.0,0.432903052,PGEResidentialAnnual
+772,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2028Q4,27,0.429872016,0.06861492,0.498486936,PGEResidentialAnnual
+773,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2029Q1,28,0.46689996,0.104900238,0.571800198,PGEResidentialAnnual
+774,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2029Q2,29,0.461388164,0.0,0.461388164,PGEResidentialAnnual
+775,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2029Q3,30,0.459245474,0.0,0.459245474,PGEResidentialAnnual
+776,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2029Q4,31,0.45614244,0.069933492,0.526075931,PGEResidentialAnnual
+777,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2030Q1,32,0.495088751,0.106878095,0.601966845,PGEResidentialAnnual
+778,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2030Q2,33,0.489341486,0.0,0.489341486,PGEResidentialAnnual
+779,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2030Q3,34,0.486872294,0.0,0.486872294,PGEResidentialAnnual
+780,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2030Q4,35,0.483566047,0.071252063,0.55481811,PGEResidentialAnnual
+781,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2031Q1,36,0.524207367,0.108855952,0.633063319,PGEResidentialAnnual
+782,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2031Q2,37,0.518300246,0.0,0.518300246,PGEResidentialAnnual
+783,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2031Q3,38,0.515927915,0.0,0.515927915,PGEResidentialAnnual
+784,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2031Q4,39,0.512558441,0.072570635,0.585129076,PGEResidentialAnnual
+785,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2032Q1,40,0.555257868,0.110833809,0.666091677,PGEResidentialAnnual
+786,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2032Q2,41,0.549230901,0.0,0.549230901,PGEResidentialAnnual
+787,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2032Q3,42,0.546814259,0.0,0.546814259,PGEResidentialAnnual
+788,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2032Q4,43,0.543379195,0.073889206,0.617268401,PGEResidentialAnnual
+789,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2033Q1,44,0.588319863,0.112811666,0.70113153,PGEResidentialAnnual
+790,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2033Q2,45,0.58217232,0.0,0.58217232,PGEResidentialAnnual
+791,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2033Q3,46,0.579723485,0.0,0.579723485,PGEResidentialAnnual
+792,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2033Q4,47,0.576226122,0.075207778,0.6514339,PGEResidentialAnnual
+793,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2034Q1,48,0.623558081,0.114789524,0.738347604,PGEResidentialAnnual
+794,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2034Q2,49,0.617280894,0.0,0.617280894,PGEResidentialAnnual
+795,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2034Q3,50,0.614774848,0.0,0.614774848,PGEResidentialAnnual
+796,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2034Q4,51,0.611204619,0.076526349,0.687730969,PGEResidentialAnnual
+797,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2035Q1,52,0.661088404,0.116767381,0.777855785,PGEResidentialAnnual
+798,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2035Q2,53,0.654680272,0.0,0.654680272,PGEResidentialAnnual
+799,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2035Q3,54,0.652140414,0.0,0.652140414,PGEResidentialAnnual
+800,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2035Q4,55,0.648502585,0.077844921,0.726347505,PGEResidentialAnnual
+801,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2036Q1,56,0.700919575,0.118745238,0.819664813,PGEResidentialAnnual
+802,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2036Q2,57,0.694381366,0.0,0.694381366,PGEResidentialAnnual
+803,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2036Q3,58,0.691792096,0.0,0.691792096,PGEResidentialAnnual
+804,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2036Q4,59,0.688083157,0.079163492,0.767246649,PGEResidentialAnnual
+805,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2037Q1,60,0.743307724,0.120723095,0.864030819,PGEResidentialAnnual
+806,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2037Q2,61,0.73663922,0.0,0.73663922,PGEResidentialAnnual
+807,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2037Q3,62,0.734004439,0.0,0.734004439,PGEResidentialAnnual
+808,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2037Q4,63,0.730225267,0.080482064,0.810707331,PGEResidentialAnnual
+809,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2038Q1,64,0.788428378,0.122700953,0.911129331,PGEResidentialAnnual
+810,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2038Q2,65,0.78162958,0.0,0.78162958,PGEResidentialAnnual
+811,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2038Q3,66,0.778949288,0.0,0.778949288,PGEResidentialAnnual
+812,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2038Q4,67,0.775099883,0.081800635,0.856900518,PGEResidentialAnnual
+813,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2039Q1,68,0.836487114,0.12467881,0.961165924,PGEResidentialAnnual
+814,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2039Q2,69,0.829558022,0.0,0.829558022,PGEResidentialAnnual
+815,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2039Q3,70,0.826832218,0.0,0.826832218,PGEResidentialAnnual
+816,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2039Q4,71,0.82291258,0.083119207,0.906031787,PGEResidentialAnnual
+817,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2040Q1,72,0.887704973,0.126656667,1.01436164,PGEResidentialAnnual
+818,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2040Q2,73,0.880645586,0.0,0.880645586,PGEResidentialAnnual
+819,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2040Q3,74,0.877874271,0.0,0.877874271,PGEResidentialAnnual
+820,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2040Q4,75,0.8738844,0.084437778,0.958322178,PGEResidentialAnnual
+821,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2041Q1,76,0.942319627,0.128634524,1.070954151,PGEResidentialAnnual
+822,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2041Q2,77,0.935129945,0.0,0.935129945,PGEResidentialAnnual
+823,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2041Q3,78,0.932313118,0.0,0.932313118,PGEResidentialAnnual
+824,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2041Q4,79,0.928253015,0.08575635,1.014009364,PGEResidentialAnnual
+825,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2042Q1,80,1.000586627,0.130612381,1.131199008,PGEResidentialAnnual
+826,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2042Q2,81,0.993266651,0.0,0.993266651,PGEResidentialAnnual
+827,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2042Q3,82,0.990404312,0.0,0.990404312,PGEResidentialAnnual
+828,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2042Q4,83,0.986273976,0.087074921,1.073348897,PGEResidentialAnnual
+829,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2043Q1,84,1.062780751,0.132590239,1.19537099,PGEResidentialAnnual
+830,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2043Q2,85,1.055330481,0.0,1.055330481,PGEResidentialAnnual
+831,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2043Q3,86,1.052422631,0.0,1.052422631,PGEResidentialAnnual
+832,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2043Q4,87,1.048222062,0.088393492,1.136615554,PGEResidentialAnnual
+833,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2044Q1,88,1.129197451,0.134568096,1.263765547,PGEResidentialAnnual
+834,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2044Q2,89,1.121616887,0.0,1.121616887,PGEResidentialAnnual
+835,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2044Q3,90,1.118663525,0.0,1.118663525,PGEResidentialAnnual
+836,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2044Q4,91,1.114392723,0.089712064,1.204104787,PGEResidentialAnnual
+837,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2045Q1,92,1.200154405,0.136545953,1.336700358,PGEResidentialAnnual
+838,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2045Q2,93,1.192443546,0.0,1.192443546,PGEResidentialAnnual
+839,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2045Q3,94,1.189444673,0.0,1.189444673,PGEResidentialAnnual
+840,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2045Q4,95,1.185103638,0.091030635,1.276134273,PGEResidentialAnnual
+841,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2046Q1,96,1.275993191,0.13852381,1.414517002,PGEResidentialAnnual
+842,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2046Q2,97,1.268152038,0.0,1.268152038,PGEResidentialAnnual
+843,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2046Q3,98,1.265107653,0.0,1.265107653,PGEResidentialAnnual
+844,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2046Q4,99,1.260696385,0.092349207,1.353045592,PGEResidentialAnnual
+845,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2047Q1,100,1.357081086,0.140501668,1.497582754,PGEResidentialAnnual
+846,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2047Q2,101,1.349109638,0.0,1.349109638,PGEResidentialAnnual
+847,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2047Q3,102,1.346019742,0.0,1.346019742,PGEResidentialAnnual
+848,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2047Q4,103,1.341538242,0.093667778,1.43520602,PGEResidentialAnnual
+849,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2048Q1,104,1.443812998,0.142479525,1.586292523,PGEResidentialAnnual
+850,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2048Q2,105,1.435711256,0.0,1.435711256,PGEResidentialAnnual
+851,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2048Q3,106,1.432575848,0.0,1.432575848,PGEResidentialAnnual
+852,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2048Q4,107,1.428024115,0.09498635,1.523010464,PGEResidentialAnnual
+853,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2049Q1,108,1.536613545,0.144457382,1.681070927,PGEResidentialAnnual
+854,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2049Q2,109,1.528381508,0.0,1.528381508,PGEResidentialAnnual
+855,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2049Q3,110,1.525200588,0.0,1.525200588,PGEResidentialAnnual
+856,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2049Q4,111,1.520578622,0.096304921,1.616883544,PGEResidentialAnnual
+857,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2050Q1,112,1.63593929,0.146435239,1.782374529,PGEResidentialAnnual
+858,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2050Q2,113,1.627576959,0.0,1.627576959,PGEResidentialAnnual
+859,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2050Q3,114,1.624350528,0.0,1.624350528,PGEResidentialAnnual
+860,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2050Q4,115,1.619658329,0.097623493,1.717281822,PGEResidentialAnnual
+861,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2051Q1,116,1.742281146,0.148413097,1.890694243,PGEResidentialAnnual
+862,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2051Q2,117,1.733788521,0.0,1.733788521,PGEResidentialAnnual
+863,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2051Q3,118,1.730516578,0.0,1.730516578,PGEResidentialAnnual
+864,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2051Q4,119,1.725754146,0.098942064,1.824696211,PGEResidentialAnnual
+865,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2052Q1,120,1.856166959,0.150390954,2.006557913,PGEResidentialAnnual
+866,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2052Q2,121,1.847544039,0.0,1.847544039,PGEResidentialAnnual
+867,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2052Q3,122,1.844226585,0.0,1.844226585,PGEResidentialAnnual
+868,PGE,2024,2022,Residential,Annual,PGEResidentialAnnual,2052Q4,123,1.83939392,0.100260636,1.939654556,PGEResidentialAnnual
+993,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2022Q1,0,0.623020268,0.182024544,0.805044811,PGEResidentialWinter Only
+994,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2022Q2,1,0.0,0.0,0.0,PGEResidentialWinter Only
+995,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2022Q3,2,0.0,0.0,0.0,PGEResidentialWinter Only
+996,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2022Q4,3,0.604931675,0.121349696,0.726281371,PGEResidentialWinter Only
+997,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2023Q1,4,0.661853465,0.186022472,0.847875937,PGEResidentialWinter Only
+998,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2023Q2,5,0.0,0.0,0.0,PGEResidentialWinter Only
+999,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2023Q3,6,0.0,0.0,0.0,PGEResidentialWinter Only
+1000,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2023Q4,7,0.642291199,0.124014982,0.766306181,PGEResidentialWinter Only
+1001,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2024Q1,8,0.699997804,0.19010821,0.890106014,PGEResidentialWinter Only
+1002,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2024Q2,9,0.0,0.0,0.0,PGEResidentialWinter Only
+1003,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2024Q3,10,0.0,0.0,0.0,PGEResidentialWinter Only
+1004,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2024Q4,11,0.679821696,0.126738807,0.806560503,PGEResidentialWinter Only
+1005,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2025Q1,12,0.740530583,0.193977617,0.9345082,PGEResidentialWinter Only
+1006,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2025Q2,13,0.0,0.0,0.0,PGEResidentialWinter Only
+1007,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2025Q3,14,0.0,0.0,0.0,PGEResidentialWinter Only
+1008,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2025Q4,15,0.720667714,0.129318411,0.849986125,PGEResidentialWinter Only
+1009,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2026Q1,16,0.784443266,0.197933332,0.982376597,PGEResidentialWinter Only
+1010,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2026Q2,17,0.0,0.0,0.0,PGEResidentialWinter Only
+1011,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2026Q3,18,0.0,0.0,0.0,PGEResidentialWinter Only
+1012,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2026Q4,19,0.764127889,0.131955554,0.896083444,PGEResidentialWinter Only
+1013,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2027Q1,20,0.83106724,0.201889046,1.032956286,PGEResidentialWinter Only
+1014,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2027Q2,21,0.0,0.0,0.0,PGEResidentialWinter Only
+1015,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2027Q3,22,0.0,0.0,0.0,PGEResidentialWinter Only
+1016,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2027Q4,23,0.810401465,0.134592697,0.944994162,PGEResidentialWinter Only
+1017,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2028Q1,24,0.880722564,0.205844761,1.086567325,PGEResidentialWinter Only
+1018,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2028Q2,25,0.0,0.0,0.0,PGEResidentialWinter Only
+1019,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2028Q3,26,0.0,0.0,0.0,PGEResidentialWinter Only
+1020,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2028Q4,27,0.859744032,0.13722984,0.996973873,PGEResidentialWinter Only
+1021,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2029Q1,28,0.933799921,0.209800475,1.143600396,PGEResidentialWinter Only
+1022,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2029Q2,29,0.0,0.0,0.0,PGEResidentialWinter Only
+1023,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2029Q3,30,0.0,0.0,0.0,PGEResidentialWinter Only
+1024,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2029Q4,31,0.912284879,0.139866983,1.052151863,PGEResidentialWinter Only
+1025,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2030Q1,32,0.990177501,0.213756189,1.203933691,PGEResidentialWinter Only
+1026,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2030Q2,33,0.0,0.0,0.0,PGEResidentialWinter Only
+1027,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2030Q3,34,0.0,0.0,0.0,PGEResidentialWinter Only
+1028,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2030Q4,35,0.967132094,0.142504126,1.109636221,PGEResidentialWinter Only
+1029,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2031Q1,36,1.048414734,0.217711904,1.266126638,PGEResidentialWinter Only
+1030,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2031Q2,37,0.0,0.0,0.0,PGEResidentialWinter Only
+1031,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2031Q3,38,0.0,0.0,0.0,PGEResidentialWinter Only
+1032,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2031Q4,39,1.025116883,0.145141269,1.170258152,PGEResidentialWinter Only
+1033,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2032Q1,40,1.110515736,0.221667618,1.332183355,PGEResidentialWinter Only
+1034,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2032Q2,41,0.0,0.0,0.0,PGEResidentialWinter Only
+1035,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2032Q3,42,0.0,0.0,0.0,PGEResidentialWinter Only
+1036,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2032Q4,43,1.086758389,0.147778412,1.234536801,PGEResidentialWinter Only
+1037,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2033Q1,44,1.176639726,0.225623333,1.402263059,PGEResidentialWinter Only
+1038,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2033Q2,45,0.0,0.0,0.0,PGEResidentialWinter Only
+1039,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2033Q3,46,0.0,0.0,0.0,PGEResidentialWinter Only
+1040,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2033Q4,47,1.152452244,0.150415555,1.302867799,PGEResidentialWinter Only
+1041,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2034Q1,48,1.247116161,0.229579047,1.476695209,PGEResidentialWinter Only
+1042,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2034Q2,49,0.0,0.0,0.0,PGEResidentialWinter Only
+1043,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2034Q3,50,0.0,0.0,0.0,PGEResidentialWinter Only
+1044,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2034Q4,51,1.222409239,0.153052698,1.375461937,PGEResidentialWinter Only
+1045,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2035Q1,52,1.322176807,0.233534762,1.555711569,PGEResidentialWinter Only
+1046,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2035Q2,53,0.0,0.0,0.0,PGEResidentialWinter Only
+1047,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2035Q3,54,0.0,0.0,0.0,PGEResidentialWinter Only
+1048,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2035Q4,55,1.29700517,0.155689841,1.452695011,PGEResidentialWinter Only
+1049,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2036Q1,56,1.40183915,0.237490476,1.639329626,PGEResidentialWinter Only
+1050,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2036Q2,57,0.0,0.0,0.0,PGEResidentialWinter Only
+1051,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2036Q3,58,0.0,0.0,0.0,PGEResidentialWinter Only
+1052,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2036Q4,59,1.376166314,0.158326984,1.534493298,PGEResidentialWinter Only
+1053,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2037Q1,60,1.486615448,0.241446191,1.728061638,PGEResidentialWinter Only
+1054,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2037Q2,61,0.0,0.0,0.0,PGEResidentialWinter Only
+1055,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2037Q3,62,0.0,0.0,0.0,PGEResidentialWinter Only
+1056,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2037Q4,63,1.460450534,0.160964127,1.621414661,PGEResidentialWinter Only
+1057,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2038Q1,64,1.576856757,0.245401905,1.822258662,PGEResidentialWinter Only
+1058,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2038Q2,65,0.0,0.0,0.0,PGEResidentialWinter Only
+1059,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2038Q3,66,0.0,0.0,0.0,PGEResidentialWinter Only
+1060,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2038Q4,67,1.550199766,0.16360127,1.713801036,PGEResidentialWinter Only
+1061,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2039Q1,68,1.672974229,0.24935762,1.922331848,PGEResidentialWinter Only
+1062,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2039Q2,69,0.0,0.0,0.0,PGEResidentialWinter Only
+1063,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2039Q3,70,0.0,0.0,0.0,PGEResidentialWinter Only
+1064,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2039Q4,71,1.64582516,0.166238413,1.812063573,PGEResidentialWinter Only
+1065,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2040Q1,72,1.775409947,0.253313334,2.028723281,PGEResidentialWinter Only
+1066,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2040Q2,73,0.0,0.0,0.0,PGEResidentialWinter Only
+1067,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2040Q3,74,0.0,0.0,0.0,PGEResidentialWinter Only
+1068,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2040Q4,75,1.7477688,0.168875556,1.916644356,PGEResidentialWinter Only
+1069,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2041Q1,76,1.884639253,0.257269049,2.141908302,PGEResidentialWinter Only
+1070,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2041Q2,77,0.0,0.0,0.0,PGEResidentialWinter Only
+1071,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2041Q3,78,0.0,0.0,0.0,PGEResidentialWinter Only
+1072,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2041Q4,79,1.856506029,0.171512699,2.028018728,PGEResidentialWinter Only
+1073,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2042Q1,80,2.001173253,0.261224763,2.262398016,PGEResidentialWinter Only
+1074,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2042Q2,81,0.0,0.0,0.0,PGEResidentialWinter Only
+1075,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2042Q3,82,0.0,0.0,0.0,PGEResidentialWinter Only
+1076,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2042Q4,83,1.972547952,0.174149842,2.146697794,PGEResidentialWinter Only
+1077,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2043Q1,84,2.125561502,0.265180477,2.39074198,PGEResidentialWinter Only
+1078,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2043Q2,85,0.0,0.0,0.0,PGEResidentialWinter Only
+1079,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2043Q3,86,0.0,0.0,0.0,PGEResidentialWinter Only
+1080,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2043Q4,87,2.096444123,0.176786985,2.273231108,PGEResidentialWinter Only
+1081,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2044Q1,88,2.258394902,0.269136192,2.527531094,PGEResidentialWinter Only
+1082,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2044Q2,89,0.0,0.0,0.0,PGEResidentialWinter Only
+1083,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2044Q3,90,0.0,0.0,0.0,PGEResidentialWinter Only
+1084,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2044Q4,91,2.228785446,0.179424128,2.408209574,PGEResidentialWinter Only
+1085,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2045Q1,92,2.40030881,0.273091906,2.673400717,PGEResidentialWinter Only
+1086,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2045Q2,93,0.0,0.0,0.0,PGEResidentialWinter Only
+1087,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2045Q3,94,0.0,0.0,0.0,PGEResidentialWinter Only
+1088,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2045Q4,95,2.370207276,0.182061271,2.552268547,PGEResidentialWinter Only
+1089,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2046Q1,96,2.551986383,0.277047621,2.829034003,PGEResidentialWinter Only
+1090,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2046Q2,97,0.0,0.0,0.0,PGEResidentialWinter Only
+1091,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2046Q3,98,0.0,0.0,0.0,PGEResidentialWinter Only
+1092,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2046Q4,99,2.521392771,0.184698414,2.706091185,PGEResidentialWinter Only
+1093,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2047Q1,100,2.714162173,0.281003335,2.995165508,PGEResidentialWinter Only
+1094,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2047Q2,101,0.0,0.0,0.0,PGEResidentialWinter Only
+1095,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2047Q3,102,0.0,0.0,0.0,PGEResidentialWinter Only
+1096,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2047Q4,103,2.683076483,0.187335557,2.87041204,PGEResidentialWinter Only
+1097,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2048Q1,104,2.887625996,0.28495905,3.172585046,PGEResidentialWinter Only
+1098,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2048Q2,105,0.0,0.0,0.0,PGEResidentialWinter Only
+1099,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2048Q3,106,0.0,0.0,0.0,PGEResidentialWinter Only
+1100,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2048Q4,107,2.856048229,0.1899727,3.046020929,PGEResidentialWinter Only
+1101,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2049Q1,108,3.073227089,0.288914764,3.362141854,PGEResidentialWinter Only
+1102,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2049Q2,109,0.0,0.0,0.0,PGEResidentialWinter Only
+1103,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2049Q3,110,0.0,0.0,0.0,PGEResidentialWinter Only
+1104,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2049Q4,111,3.041157245,0.192609843,3.233767088,PGEResidentialWinter Only
+1105,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2050Q1,112,3.27187858,0.292870479,3.564749059,PGEResidentialWinter Only
+1106,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2050Q2,113,0.0,0.0,0.0,PGEResidentialWinter Only
+1107,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2050Q3,114,0.0,0.0,0.0,PGEResidentialWinter Only
+1108,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2050Q4,115,3.239316658,0.195246986,3.434563644,PGEResidentialWinter Only
+1109,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2051Q1,116,3.484562293,0.296826193,3.781388486,PGEResidentialWinter Only
+1110,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2051Q2,117,0.0,0.0,0.0,PGEResidentialWinter Only
+1111,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2051Q3,118,0.0,0.0,0.0,PGEResidentialWinter Only
+1112,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2051Q4,119,3.451508293,0.197884129,3.649392422,PGEResidentialWinter Only
+1113,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2052Q1,120,3.712333918,0.300781908,4.013115826,PGEResidentialWinter Only
+1114,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2052Q2,121,0.0,0.0,0.0,PGEResidentialWinter Only
+1115,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2052Q3,122,0.0,0.0,0.0,PGEResidentialWinter Only
+1116,PGE,2024,2022,Residential,Winter Only,PGEResidentialWinter Only,2052Q4,123,3.678787841,0.200521272,3.879309113,PGEResidentialWinter Only
+1117,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2022Q1,0,0.313127119,0.038565571,0.35169269,SCECommercialAnnual
+1118,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2022Q2,1,0.308437564,0.0,0.308437564,SCECommercialAnnual
+1119,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2022Q3,2,0.306758733,0.0,0.306758733,SCECommercialAnnual
+1120,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2022Q4,3,0.304140227,0.025710381,0.329850608,SCECommercialAnnual
+1121,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2023Q1,4,0.332752407,0.039386146,0.372138553,SCECommercialAnnual
+1122,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2023Q2,5,0.327909018,0.0,0.327909018,SCECommercialAnnual
+1123,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2023Q3,6,0.325822194,0.0,0.325822194,SCECommercialAnnual
+1124,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2023Q4,7,0.323033356,0.02625743,0.349290786,SCECommercialAnnual
+1125,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2024Q1,8,0.351988689,0.04022418,0.392212869,SCECommercialAnnual
+1126,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2024Q2,9,0.346971932,0.0,0.346971932,SCECommercialAnnual
+1127,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2024Q3,10,0.344857872,0.0,0.344857872,SCECommercialAnnual
+1128,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2024Q4,11,0.341964665,0.02681612,0.368780785,SCECommercialAnnual
+1129,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2025Q1,12,0.372439345,0.041019181,0.413458526,SCECommercialAnnual
+1130,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2025Q2,13,0.367370024,0.0,0.367370024,SCECommercialAnnual
+1131,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2025Q3,14,0.365439489,0.0,0.365439489,SCECommercialAnnual
+1132,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2025Q4,15,0.362570945,0.027346121,0.389917066,SCECommercialAnnual
+1133,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2026Q1,16,0.394576489,0.041831352,0.436407841,SCECommercialAnnual
+1134,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2026Q2,17,0.389431028,0.0,0.389431028,SCECommercialAnnual
+1135,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2026Q3,18,0.387401384,0.0,0.387401384,SCECommercialAnnual
+1136,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2026Q4,19,0.384483272,0.027887568,0.41237084,SCECommercialAnnual
+1137,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2027Q1,20,0.418068484,0.042643523,0.460712006,SCECommercialAnnual
+1138,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2027Q2,21,0.412820348,0.0,0.412820348,SCECommercialAnnual
+1139,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2027Q3,22,0.410768698,0.0,0.410768698,SCECommercialAnnual
+1140,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2027Q4,23,0.407801179,0.028429015,0.436230195,SCECommercialAnnual
+1141,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2028Q1,24,0.44307493,0.043455694,0.486530624,SCECommercialAnnual
+1142,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2028Q2,25,0.437724557,0.0,0.437724557,SCECommercialAnnual
+1143,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2028Q3,26,0.435664038,0.0,0.435664038,SCECommercialAnnual
+1144,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2028Q4,27,0.43265224,0.028970462,0.461622702,SCECommercialAnnual
+1145,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2029Q1,28,0.469790561,0.044267865,0.514058425,SCECommercialAnnual
+1146,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2029Q2,29,0.464313748,0.0,0.464313748,SCECommercialAnnual
+1147,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2029Q3,30,0.462184658,0.0,0.462184658,SCECommercialAnnual
+1148,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2029Q4,31,0.459101319,0.02951191,0.488613228,SCECommercialAnnual
+1149,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2030Q1,32,0.498155538,0.045080035,0.543235573,SCECommercialAnnual
+1150,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2030Q2,33,0.492444752,0.0,0.492444752,SCECommercialAnnual
+1151,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2030Q3,34,0.489991231,0.0,0.489991231,SCECommercialAnnual
+1152,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2030Q4,35,0.486705969,0.030053357,0.516759326,SCECommercialAnnual
+1153,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2031Q1,36,0.527454878,0.045892206,0.573347084,SCECommercialAnnual
+1154,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2031Q2,37,0.521585249,0.0,0.521585249,SCECommercialAnnual
+1155,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2031Q3,38,0.519227975,0.0,0.519227975,SCECommercialAnnual
+1156,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2031Q4,39,0.515879888,0.030594804,0.546474692,SCECommercialAnnual
+1157,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2032Q1,40,0.558685063,0.046704377,0.60538944,SCECommercialAnnual
+1158,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2032Q2,41,0.55269635,0.0,0.55269635,SCECommercialAnnual
+1159,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2032Q3,42,0.550295046,0.0,0.550295046,SCECommercialAnnual
+1160,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2032Q4,43,0.546881784,0.031136251,0.578018035,SCECommercialAnnual
+1161,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2033Q1,44,0.591926043,0.047516548,0.639442591,SCECommercialAnnual
+1162,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2033Q2,45,0.585817519,0.0,0.585817519,SCECommercialAnnual
+1163,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2033Q3,46,0.583384227,0.0,0.583384227,SCECommercialAnnual
+1164,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2033Q4,47,0.579909061,0.031677699,0.61158676,SCECommercialAnnual
+1165,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2034Q1,48,0.627342409,0.048328719,0.675671128,SCECommercialAnnual
+1166,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2034Q2,49,0.621105064,0.0,0.621105064,SCECommercialAnnual
+1167,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2034Q3,50,0.618614923,0.0,0.618614923,SCECommercialAnnual
+1168,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2034Q4,51,0.615067355,0.032219146,0.647286501,SCECommercialAnnual
+1169,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2035Q1,52,0.665050283,0.04914089,0.714191173,SCECommercialAnnual
+1170,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2035Q2,53,0.658682824,0.0,0.658682824,SCECommercialAnnual
+1171,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2035Q3,54,0.656159086,0.0,0.656159086,SCECommercialAnnual
+1172,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2035Q4,55,0.652544347,0.032760593,0.68530494,SCECommercialAnnual
+1173,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2036Q1,56,0.705059404,0.049953061,0.755012464,SCECommercialAnnual
+1174,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2036Q2,57,0.698562692,0.0,0.698562692,SCECommercialAnnual
+1175,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2036Q3,58,0.695989857,0.0,0.695989857,SCECommercialAnnual
+1176,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2036Q4,59,0.692304459,0.033302041,0.725606499,SCECommercialAnnual
+1177,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2037Q1,60,0.747625402,0.050765232,0.798390634,SCECommercialAnnual
+1178,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2037Q2,61,0.740999223,0.0,0.740999223,SCECommercialAnnual
+1179,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2037Q3,62,0.738381165,0.0,0.738381165,SCECommercialAnnual
+1180,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2037Q4,63,0.73462598,0.033843488,0.768469468,SCECommercialAnnual
+1181,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2038Q1,64,0.792923906,0.051577403,0.844501309,SCECommercialAnnual
+1182,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2038Q2,65,0.78616826,0.0,0.78616826,SCECommercialAnnual
+1183,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2038Q3,66,0.78350498,0.0,0.78350498,SCECommercialAnnual
+1184,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2038Q4,67,0.779680007,0.034384935,0.814064942,SCECommercialAnnual
+1185,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2039Q1,68,0.841160492,0.052389573,0.893550065,SCECommercialAnnual
+1186,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2039Q2,69,0.834275378,0.0,0.834275378,SCECommercialAnnual
+1187,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2039Q3,70,0.831566875,0.0,0.831566875,SCECommercialAnnual
+1188,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2039Q4,71,0.827672115,0.034926382,0.862598498,SCECommercialAnnual
+1189,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2040Q1,72,0.8925562,0.053201744,0.945757945,SCECommercialAnnual
+1190,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2040Q2,73,0.88554162,0.0,0.88554162,SCECommercialAnnual
+1191,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2040Q3,74,0.882787894,0.0,0.882787894,SCECommercialAnnual
+1192,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2040Q4,75,0.878823347,0.03546783,0.914291176,SCECommercialAnnual
+1193,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2041Q1,76,0.947348703,0.054013915,1.001362619,SCECommercialAnnual
+1194,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2041Q2,77,0.940204655,0.0,0.940204655,SCECommercialAnnual
+1195,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2041Q3,78,0.937405706,0.0,0.937405706,SCECommercialAnnual
+1196,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2041Q4,79,0.933371373,0.036009277,0.96938065,SCECommercialAnnual
+1197,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2042Q1,80,1.005793553,0.054826086,1.060619639,SCECommercialAnnual
+1198,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2042Q2,81,0.998520037,0.0,0.998520037,SCECommercialAnnual
+1199,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2042Q3,82,0.995675866,0.0,0.995675866,SCECommercialAnnual
+1200,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2042Q4,83,0.991571745,0.036550724,1.028122469,SCECommercialAnnual
+1201,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2043Q1,84,1.068165527,0.055638257,1.123803784,SCECommercialAnnual
+1202,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2043Q2,85,1.060762544,0.0,1.060762544,SCECommercialAnnual
+1203,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2043Q3,86,1.05787315,0.0,1.05787315,SCECommercialAnnual
+1204,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2043Q4,87,1.053699242,0.037092171,1.090791414,SCECommercialAnnual
+1205,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2044Q1,88,1.134760077,0.056450428,1.191210505,SCECommercialAnnual
+1206,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2044Q2,89,1.127227626,0.0,1.127227626,SCECommercialAnnual
+1207,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2044Q3,90,1.12429301,0.0,1.12429301,SCECommercialAnnual
+1208,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2044Q4,91,1.120049315,0.037633619,1.157682933,SCECommercialAnnual
+1209,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2045Q1,92,1.20589488,0.057262599,1.263157479,SCECommercialAnnual
+1210,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2045Q2,93,1.198232962,0.0,1.198232962,SCECommercialAnnual
+1211,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2045Q3,94,1.195253123,0.0,1.195253123,SCECommercialAnnual
+1212,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2045Q4,95,1.190939641,0.038175066,1.229114707,SCECommercialAnnual
+1213,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2046Q1,96,1.281911516,0.05807477,1.339986286,SCECommercialAnnual
+1214,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2046Q2,97,1.274120131,0.0,1.274120131,SCECommercialAnnual
+1215,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2046Q3,98,1.271095069,0.0,1.271095069,SCECommercialAnnual
+1216,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2046Q4,99,1.2667118,0.038716513,1.305428313,SCECommercialAnnual
+1217,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2047Q1,100,1.363177261,0.058886941,1.422064202,SCECommercialAnnual
+1218,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2047Q2,101,1.355256408,0.0,1.355256408,SCECommercialAnnual
+1219,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2047Q3,102,1.352186123,0.0,1.352186123,SCECommercialAnnual
+1220,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2047Q4,103,1.347733067,0.03925796,1.386991028,SCECommercialAnnual
+1221,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2048Q1,104,1.450087022,0.059699112,1.509786134,SCECommercialAnnual
+1222,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2048Q2,105,1.442036702,0.0,1.442036702,SCECommercialAnnual
+1223,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2048Q3,106,1.438921195,0.0,1.438921195,SCECommercialAnnual
+1224,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2048Q4,107,1.434398352,0.039799408,1.474197759,SCECommercialAnnual
+1225,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2049Q1,108,1.543065419,0.060511282,1.603576701,SCECommercialAnnual
+1226,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2049Q2,109,1.534885631,0.0,1.534885631,SCECommercialAnnual
+1227,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2049Q3,110,1.531724901,0.0,1.531724901,SCECommercialAnnual
+1228,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2049Q4,111,1.527132271,0.040340855,1.567473126,SCECommercialAnnual
+1229,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2050Q1,112,1.642569014,0.061323453,1.703892467,SCECommercialAnnual
+1230,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2050Q2,113,1.634259759,0.0,1.634259759,SCECommercialAnnual
+1231,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2050Q3,114,1.631053806,0.0,1.631053806,SCECommercialAnnual
+1232,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2050Q4,115,1.626391388,0.040882302,1.667273691,SCECommercialAnnual
+1233,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2051Q1,116,1.74908872,0.062135624,1.811224344,SCECommercialAnnual
+1234,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2051Q2,117,1.740649997,0.0,1.740649997,SCECommercialAnnual
+1235,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2051Q3,118,1.737398822,0.0,1.737398822,SCECommercialAnnual
+1236,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2051Q4,119,1.732666617,0.041423749,1.774090367,SCECommercialAnnual
+1237,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2052Q1,120,1.863152382,0.062947795,1.926100177,SCECommercialAnnual
+1238,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2052Q2,121,1.854584192,0.0,1.854584192,SCECommercialAnnual
+1239,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2052Q3,122,1.851287794,0.0,1.851287794,SCECommercialAnnual
+1240,SCE,2024,2022,Commercial,Annual,SCECommercialAnnual,2052Q4,123,1.846485802,0.041965197,1.888450999,SCECommercialAnnual
+1861,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2022Q1,0,0.310863171,0.057943918,0.368807089,SCEResidentialAnnual
+1862,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2022Q2,1,0.306173616,0.0,0.306173616,SCEResidentialAnnual
+1863,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2022Q3,2,0.304494784,0.0,0.304494784,SCEResidentialAnnual
+1864,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2022Q4,3,0.301876279,0.038629279,0.340505558,SCEResidentialAnnual
+1865,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2023Q1,4,0.330262064,0.059176813,0.389438878,SCEResidentialAnnual
+1866,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2023Q2,5,0.325418675,0.0,0.325418675,SCEResidentialAnnual
+1867,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2023Q3,6,0.323331852,0.0,0.323331852,SCEResidentialAnnual
+1868,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2023Q4,7,0.320543013,0.039451209,0.359994222,SCEResidentialAnnual
+1869,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2024Q1,8,0.349320292,0.060435942,0.409756234,SCEResidentialAnnual
+1870,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2024Q2,9,0.344303535,0.0,0.344303535,SCEResidentialAnnual
+1871,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2024Q3,10,0.342189475,0.0,0.342189475,SCEResidentialAnnual
+1872,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2024Q4,11,0.339296268,0.040290628,0.379586895,SCEResidentialAnnual
+1873,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2025Q1,12,0.369573775,0.061630413,0.431204188,SCEResidentialAnnual
+1874,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2025Q2,13,0.364504454,0.0,0.364504454,SCEResidentialAnnual
+1875,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2025Q3,14,0.362573919,0.0,0.362573919,SCEResidentialAnnual
+1876,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2025Q4,15,0.359705376,0.041086942,0.400792318,SCEResidentialAnnual
+1877,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2026Q1,16,0.391513747,0.062850682,0.454364428,SCEResidentialAnnual
+1878,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2026Q2,17,0.386368286,0.0,0.386368286,SCEResidentialAnnual
+1879,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2026Q3,18,0.384338641,0.0,0.384338641,SCEResidentialAnnual
+1880,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2026Q4,19,0.38142053,0.041900454,0.423320984,SCEResidentialAnnual
+1881,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2027Q1,20,0.414808568,0.064070951,0.478879519,SCEResidentialAnnual
+1882,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2027Q2,21,0.409560433,0.0,0.409560433,SCEResidentialAnnual
+1883,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2027Q3,22,0.407508783,0.0,0.407508783,SCEResidentialAnnual
+1884,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2027Q4,23,0.404541264,0.042713967,0.447255231,SCEResidentialAnnual
+1885,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2028Q1,24,0.439617842,0.065291219,0.504909061,SCEResidentialAnnual
+1886,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2028Q2,25,0.434267469,0.0,0.434267469,SCEResidentialAnnual
+1887,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2028Q3,26,0.43220695,0.0,0.43220695,SCEResidentialAnnual
+1888,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2028Q4,27,0.429195152,0.04352748,0.472722631,SCEResidentialAnnual
+1889,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2029Q1,28,0.4661363,0.066511488,0.532647788,SCEResidentialAnnual
+1890,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2029Q2,29,0.460659488,0.0,0.460659488,SCEResidentialAnnual
+1891,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2029Q3,30,0.458530397,0.0,0.458530397,SCEResidentialAnnual
+1892,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2029Q4,31,0.455447058,0.044340992,0.49978805,SCEResidentialAnnual
+1893,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2030Q1,32,0.494304105,0.067731757,0.562035862,SCEResidentialAnnual
+1894,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2030Q2,33,0.488593319,0.0,0.488593319,SCEResidentialAnnual
+1895,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2030Q3,34,0.486139798,0.0,0.486139798,SCEResidentialAnnual
+1896,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2030Q4,35,0.482854536,0.045154505,0.528009041,SCEResidentialAnnual
+1897,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2031Q1,36,0.523406272,0.068952026,0.592358297,SCEResidentialAnnual
+1898,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2031Q2,37,0.517536643,0.0,0.517536643,SCEResidentialAnnual
+1899,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2031Q3,38,0.515179369,0.0,0.515179369,SCEResidentialAnnual
+1900,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2031Q4,39,0.511831282,0.045968017,0.557799299,SCEResidentialAnnual
+1901,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2032Q1,40,0.554439284,0.070172295,0.624611579,SCEResidentialAnnual
+1902,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2032Q2,41,0.548450571,0.0,0.548450571,SCEResidentialAnnual
+1903,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2032Q3,42,0.546049268,0.0,0.546049268,SCEResidentialAnnual
+1904,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2032Q4,43,0.542636005,0.04678153,0.589417535,SCEResidentialAnnual
+1905,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2033Q1,44,0.587483092,0.071392563,0.658875655,SCEResidentialAnnual
+1906,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2033Q2,45,0.581374567,0.0,0.581374567,SCEResidentialAnnual
+1907,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2033Q3,46,0.578941275,0.0,0.578941275,SCEResidentialAnnual
+1908,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2033Q4,47,0.57546611,0.047595042,0.623061152,SCEResidentialAnnual
+1909,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2034Q1,48,0.622702284,0.072612832,0.695315117,SCEResidentialAnnual
+1910,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2034Q2,49,0.61646494,0.0,0.61646494,SCEResidentialAnnual
+1911,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2034Q3,50,0.613974799,0.0,0.613974799,SCEResidentialAnnual
+1912,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2034Q4,51,0.610427231,0.048408555,0.658835786,SCEResidentialAnnual
+1913,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2035Q1,52,0.660212986,0.073833101,0.734046087,SCEResidentialAnnual
+1914,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2035Q2,53,0.653845527,0.0,0.653845527,SCEResidentialAnnual
+1915,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2035Q3,54,0.65132179,0.0,0.65132179,SCEResidentialAnnual
+1916,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2035Q4,55,0.64770705,0.049222067,0.696929117,SCEResidentialAnnual
+1917,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2036Q1,56,0.700024934,0.07505337,0.775078304,SCEResidentialAnnual
+1918,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2036Q2,57,0.693528223,0.0,0.693528223,SCEResidentialAnnual
+1919,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2036Q3,58,0.690955388,0.0,0.690955388,SCEResidentialAnnual
+1920,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2036Q4,59,0.687269989,0.05003558,0.737305569,SCEResidentialAnnual
+1921,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2037Q1,60,0.74239376,0.076273639,0.818667398,SCEResidentialAnnual
+1922,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2037Q2,61,0.735767581,0.0,0.735767581,SCEResidentialAnnual
+1923,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2037Q3,62,0.733149523,0.0,0.733149523,SCEResidentialAnnual
+1924,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2037Q4,63,0.729394338,0.050849092,0.78024343,SCEResidentialAnnual
+1925,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2038Q1,64,0.787495091,0.077493908,0.864988999,SCEResidentialAnnual
+1926,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2038Q2,65,0.780739445,0.0,0.780739445,SCEResidentialAnnual
+1927,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2038Q3,66,0.778076165,0.0,0.778076165,SCEResidentialAnnual
+1928,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2038Q4,67,0.774251192,0.051662605,0.825913797,SCEResidentialAnnual
+1929,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2039Q1,68,0.835534504,0.078714176,0.914248681,SCEResidentialAnnual
+1930,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2039Q2,69,0.828649391,0.0,0.828649391,SCEResidentialAnnual
+1931,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2039Q3,70,0.825940887,0.0,0.825940887,SCEResidentialAnnual
+1932,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2039Q4,71,0.822046128,0.052476118,0.874522245,SCEResidentialAnnual
+1933,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2040Q1,72,0.88673304,0.079934445,0.966667485,SCEResidentialAnnual
+1934,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2040Q2,73,0.879718459,0.0,0.879718459,SCEResidentialAnnual
+1935,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2040Q3,74,0.876964733,0.0,0.876964733,SCEResidentialAnnual
+1936,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2040Q4,75,0.873000187,0.05328963,0.926289817,SCEResidentialAnnual
+1937,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2041Q1,76,0.94132837,0.081154714,1.022483084,SCEResidentialAnnual
+1938,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2041Q2,77,0.934184322,0.0,0.934184322,SCEResidentialAnnual
+1939,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2041Q3,78,0.931385373,0.0,0.931385373,SCEResidentialAnnual
+1940,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2041Q4,79,0.92735104,0.054103143,0.981454182,SCEResidentialAnnual
+1941,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2042Q1,80,0.999576047,0.082374983,1.08195103,SCEResidentialAnnual
+1942,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2042Q2,81,0.992302532,0.0,0.992302532,SCEResidentialAnnual
+1943,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2042Q3,82,0.98945836,0.0,0.98945836,SCEResidentialAnnual
+1944,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2042Q4,83,0.985354239,0.054916655,1.040270895,SCEResidentialAnnual
+1945,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2043Q1,84,1.061750849,0.083595252,1.1453461,SCEResidentialAnnual
+1946,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2043Q2,85,1.054347866,0.0,1.054347866,SCEResidentialAnnual
+1947,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2043Q3,86,1.051458472,0.0,1.051458472,SCEResidentialAnnual
+1948,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2043Q4,87,1.047284564,0.055730168,1.103014732,SCEResidentialAnnual
+1949,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2044Q1,88,1.128148226,0.084815521,1.212963746,SCEResidentialAnnual
+1950,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2044Q2,89,1.120615775,0.0,1.120615775,SCEResidentialAnnual
+1951,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2044Q3,90,1.117681159,0.0,1.117681159,SCEResidentialAnnual
+1952,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2044Q4,91,1.113437464,0.05654368,1.169981144,SCEResidentialAnnual
+1953,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2045Q1,92,1.199085857,0.086035789,1.285121646,SCEResidentialAnnual
+1954,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2045Q2,93,1.191423939,0.0,1.191423939,SCEResidentialAnnual
+1955,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2045Q3,94,1.188444099,0.0,1.188444099,SCEResidentialAnnual
+1956,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2045Q4,95,1.184130617,0.057357193,1.24148781,SCEResidentialAnnual
+1957,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2046Q1,96,1.27490532,0.087256058,1.362161378,SCEResidentialAnnual
+1958,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2046Q2,97,1.267113934,0.0,1.267113934,SCEResidentialAnnual
+1959,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2046Q3,98,1.264088872,0.0,1.264088872,SCEResidentialAnnual
+1960,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2046Q4,99,1.259705603,0.058170705,1.317876309,SCEResidentialAnnual
+1961,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2047Q1,100,1.355973892,0.088476327,1.444450219,SCEResidentialAnnual
+1962,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2047Q2,101,1.348053039,0.0,1.348053039,SCEResidentialAnnual
+1963,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2047Q3,102,1.344982754,0.0,1.344982754,SCEResidentialAnnual
+1964,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2047Q4,103,1.340529698,0.058984218,1.399513916,SCEResidentialAnnual
+1965,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2048Q1,104,1.44268648,0.089696596,1.532383076,SCEResidentialAnnual
+1966,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2048Q2,105,1.43463616,0.0,1.43463616,SCEResidentialAnnual
+1967,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2048Q3,106,1.431520653,0.0,1.431520653,SCEResidentialAnnual
+1968,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2048Q4,107,1.42699781,0.059797731,1.48679554,SCEResidentialAnnual
+1969,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2049Q1,108,1.535467704,0.090916865,1.626384569,SCEResidentialAnnual
+1970,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2049Q2,109,1.527287916,0.0,1.527287916,SCEResidentialAnnual
+1971,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2049Q3,110,1.524127186,0.0,1.524127186,SCEResidentialAnnual
+1972,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2049Q4,111,1.519534556,0.060611243,1.580145799,SCEResidentialAnnual
+1973,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2050Q1,112,1.634774126,0.092137133,1.72691126,SCEResidentialAnnual
+1974,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2050Q2,113,1.626464871,0.0,1.626464871,SCEResidentialAnnual
+1975,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2050Q3,114,1.623258918,0.0,1.623258918,SCEResidentialAnnual
+1976,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2050Q4,115,1.618596501,0.061424756,1.680021257,SCEResidentialAnnual
+1977,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2051Q1,116,1.74109666,0.093357402,1.834454062,SCEResidentialAnnual
+1978,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2051Q2,117,1.732657937,0.0,1.732657937,SCEResidentialAnnual
+1979,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2051Q3,118,1.729406762,0.0,1.729406762,SCEResidentialAnnual
+1980,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2051Q4,119,1.724674557,0.062238268,1.786912825,SCEResidentialAnnual
+1981,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2052Q1,120,1.854963149,0.094577671,1.94954082,SCEResidentialAnnual
+1982,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2052Q2,121,1.846394959,0.0,1.846394959,SCEResidentialAnnual
+1983,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2052Q3,122,1.843098561,0.0,1.843098561,SCEResidentialAnnual
+1984,SCE,2024,2022,Residential,Annual,SCEResidentialAnnual,2052Q4,123,1.83829657,0.063051781,1.901348351,SCEResidentialAnnual
+3225,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2022Q1,0,0.621726342,0.115887836,0.737614178,SCGResidentialWinter Only
+3226,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2022Q2,1,0.0,0.0,0.0,SCGResidentialWinter Only
+3227,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2022Q3,2,0.0,0.0,0.0,SCGResidentialWinter Only
+3228,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2022Q4,3,0.603752558,0.077258557,0.681011116,SCGResidentialWinter Only
+3229,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2023Q1,4,0.660524129,0.118353627,0.778877756,SCGResidentialWinter Only
+3230,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2023Q2,5,0.0,0.0,0.0,SCGResidentialWinter Only
+3231,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2023Q3,6,0.0,0.0,0.0,SCGResidentialWinter Only
+3232,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2023Q4,7,0.641086026,0.078902418,0.719988444,SCGResidentialWinter Only
+3233,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2024Q1,8,0.698640584,0.120871884,0.819512468,SCGResidentialWinter Only
+3234,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2024Q2,9,0.0,0.0,0.0,SCGResidentialWinter Only
+3235,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2024Q3,10,0.0,0.0,0.0,SCGResidentialWinter Only
+3236,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2024Q4,11,0.678592535,0.080581256,0.759173791,SCGResidentialWinter Only
+3237,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2025Q1,12,0.73914755,0.123260826,0.862408376,SCGResidentialWinter Only
+3238,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2025Q2,13,0.0,0.0,0.0,SCGResidentialWinter Only
+3239,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2025Q3,14,0.0,0.0,0.0,SCGResidentialWinter Only
+3240,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2025Q4,15,0.719410751,0.082173884,0.801584635,SCGResidentialWinter Only
+3241,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2026Q1,16,0.783027493,0.125701363,0.908728856,SCGResidentialWinter Only
+3242,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2026Q2,17,0.0,0.0,0.0,SCGResidentialWinter Only
+3243,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2026Q3,18,0.0,0.0,0.0,SCGResidentialWinter Only
+3244,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2026Q4,19,0.762841059,0.083800909,0.846641968,SCGResidentialWinter Only
+3245,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2027Q1,20,0.829617137,0.128141901,0.957759038,SCGResidentialWinter Only
+3246,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2027Q2,21,0.0,0.0,0.0,SCGResidentialWinter Only
+3247,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2027Q3,22,0.0,0.0,0.0,SCGResidentialWinter Only
+3248,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2027Q4,23,0.809082529,0.085427934,0.894510463,SCGResidentialWinter Only
+3249,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2028Q1,24,0.879235684,0.130582439,1.009818123,SCGResidentialWinter Only
+3250,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2028Q2,25,0.0,0.0,0.0,SCGResidentialWinter Only
+3251,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2028Q3,26,0.0,0.0,0.0,SCGResidentialWinter Only
+3252,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2028Q4,27,0.858390304,0.087054959,0.945445263,SCGResidentialWinter Only
+3253,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2029Q1,28,0.932272601,0.133022976,1.065295577,SCGResidentialWinter Only
+3254,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2029Q2,29,0.0,0.0,0.0,SCGResidentialWinter Only
+3255,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2029Q3,30,0.0,0.0,0.0,SCGResidentialWinter Only
+3256,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2029Q4,31,0.910894116,0.088681984,0.9995761,SCGResidentialWinter Only
+3257,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2030Q1,32,0.988608209,0.135463514,1.124071723,SCGResidentialWinter Only
+3258,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2030Q2,33,0.0,0.0,0.0,SCGResidentialWinter Only
+3259,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2030Q3,34,0.0,0.0,0.0,SCGResidentialWinter Only
+3260,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2030Q4,35,0.965709072,0.090309009,1.056018082,SCGResidentialWinter Only
+3261,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2031Q1,36,1.046812543,0.137904052,1.184716595,SCGResidentialWinter Only
+3262,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2031Q2,37,0.0,0.0,0.0,SCGResidentialWinter Only
+3263,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2031Q3,38,0.0,0.0,0.0,SCGResidentialWinter Only
+3264,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2031Q4,39,1.023662564,0.091936034,1.115598598,SCGResidentialWinter Only
+3265,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2032Q1,40,1.108878569,0.140344589,1.249223158,SCGResidentialWinter Only
+3266,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2032Q2,41,0.0,0.0,0.0,SCGResidentialWinter Only
+3267,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2032Q3,42,0.0,0.0,0.0,SCGResidentialWinter Only
+3268,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2032Q4,43,1.08527201,0.09356306,1.17883507,SCGResidentialWinter Only
+3269,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2033Q1,44,1.174966184,0.142785127,1.317751311,SCGResidentialWinter Only
+3270,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2033Q2,45,0.0,0.0,0.0,SCGResidentialWinter Only
+3271,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2033Q3,46,0.0,0.0,0.0,SCGResidentialWinter Only
+3272,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2033Q4,47,1.15093222,0.095190085,1.246122305,SCGResidentialWinter Only
+3273,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2034Q1,48,1.245404569,0.145225665,1.390630234,SCGResidentialWinter Only
+3274,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2034Q2,49,0.0,0.0,0.0,SCGResidentialWinter Only
+3275,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2034Q3,50,0.0,0.0,0.0,SCGResidentialWinter Only
+3276,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2034Q4,51,1.220854462,0.09681711,1.317671572,SCGResidentialWinter Only
+3277,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2035Q1,52,1.320425972,0.147666202,1.468092175,SCGResidentialWinter Only
+3278,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2035Q2,53,0.0,0.0,0.0,SCGResidentialWinter Only
+3279,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2035Q3,54,0.0,0.0,0.0,SCGResidentialWinter Only
+3280,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2035Q4,55,1.2954141,0.098444135,1.393858235,SCGResidentialWinter Only
+3281,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2036Q1,56,1.400049868,0.15010674,1.550156608,SCGResidentialWinter Only
+3282,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2036Q2,57,0.0,0.0,0.0,SCGResidentialWinter Only
+3283,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2036Q3,58,0.0,0.0,0.0,SCGResidentialWinter Only
+3284,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2036Q4,59,1.374539979,0.10007116,1.474611138,SCGResidentialWinter Only
+3285,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2037Q1,60,1.484787519,0.152547277,1.637334797,SCGResidentialWinter Only
+3286,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2037Q2,61,0.0,0.0,0.0,SCGResidentialWinter Only
+3287,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2037Q3,62,0.0,0.0,0.0,SCGResidentialWinter Only
+3288,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2037Q4,63,1.458788676,0.101698185,1.560486861,SCGResidentialWinter Only
+3289,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2038Q1,64,1.574990183,0.154987815,1.729977998,SCGResidentialWinter Only
+3290,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2038Q2,65,0.0,0.0,0.0,SCGResidentialWinter Only
+3291,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2038Q3,66,0.0,0.0,0.0,SCGResidentialWinter Only
+3292,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2038Q4,67,1.548502384,0.10332521,1.651827594,SCGResidentialWinter Only
+3293,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2039Q1,68,1.671069008,0.157428353,1.828497361,SCGResidentialWinter Only
+3294,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2039Q2,69,0.0,0.0,0.0,SCGResidentialWinter Only
+3295,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2039Q3,70,0.0,0.0,0.0,SCGResidentialWinter Only
+3296,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2039Q4,71,1.644092256,0.104952235,1.749044491,SCGResidentialWinter Only
+3297,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2040Q1,72,1.77346608,0.15986889,1.933334971,SCGResidentialWinter Only
+3298,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2040Q2,73,0.0,0.0,0.0,SCGResidentialWinter Only
+3299,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2040Q3,74,0.0,0.0,0.0,SCGResidentialWinter Only
+3300,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2040Q4,75,1.746000373,0.10657926,1.852579634,SCGResidentialWinter Only
+3301,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2041Q1,76,1.882656741,0.162309428,2.044966169,SCGResidentialWinter Only
+3302,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2041Q2,77,0.0,0.0,0.0,SCGResidentialWinter Only
+3303,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2041Q3,78,0.0,0.0,0.0,SCGResidentialWinter Only
+3304,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2041Q4,79,1.854702079,0.108206285,1.962908365,SCGResidentialWinter Only
+3305,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2042Q1,80,1.999152094,0.164749966,2.16390206,SCGResidentialWinter Only
+3306,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2042Q2,81,0.0,0.0,0.0,SCGResidentialWinter Only
+3307,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2042Q3,82,0.0,0.0,0.0,SCGResidentialWinter Only
+3308,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2042Q4,83,1.970708479,0.10983331,2.080541789,SCGResidentialWinter Only
+3309,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2043Q1,84,2.123501698,0.167190503,2.290692201,SCGResidentialWinter Only
+3310,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2043Q2,85,0.0,0.0,0.0,SCGResidentialWinter Only
+3311,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2043Q3,86,0.0,0.0,0.0,SCGResidentialWinter Only
+3312,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2043Q4,87,2.094569128,0.111460336,2.206029463,SCGResidentialWinter Only
+3313,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2044Q1,88,2.256296452,0.169631041,2.425927493,SCGResidentialWinter Only
+3314,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2044Q2,89,0.0,0.0,0.0,SCGResidentialWinter Only
+3315,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2044Q3,90,0.0,0.0,0.0,SCGResidentialWinter Only
+3316,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2044Q4,91,2.226874927,0.113087361,2.339962288,SCGResidentialWinter Only
+3317,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2045Q1,92,2.398171713,0.172071579,2.570243292,SCGResidentialWinter Only
+3318,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2045Q2,93,0.0,0.0,0.0,SCGResidentialWinter Only
+3319,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2045Q3,94,0.0,0.0,0.0,SCGResidentialWinter Only
+3320,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2045Q4,95,2.368261235,0.114714386,2.48297562,SCGResidentialWinter Only
+3321,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2046Q1,96,2.54981064,0.174512116,2.724322756,SCGResidentialWinter Only
+3322,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2046Q2,97,0.0,0.0,0.0,SCGResidentialWinter Only
+3323,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2046Q3,98,0.0,0.0,0.0,SCGResidentialWinter Only
+3324,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2046Q4,99,2.519411207,0.116341411,2.635752617,SCGResidentialWinter Only
+3325,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2047Q1,100,2.711947784,0.176952654,2.888900438,SCGResidentialWinter Only
+3326,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2047Q2,101,0.0,0.0,0.0,SCGResidentialWinter Only
+3327,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2047Q3,102,0.0,0.0,0.0,SCGResidentialWinter Only
+3328,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2047Q4,103,2.681059396,0.117968436,2.799027832,SCGResidentialWinter Only
+3329,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2048Q1,104,2.885372961,0.179393192,3.064766153,SCGResidentialWinter Only
+3330,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2048Q2,105,0.0,0.0,0.0,SCGResidentialWinter Only
+3331,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2048Q3,106,0.0,0.0,0.0,SCGResidentialWinter Only
+3332,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2048Q4,107,2.853995619,0.119595461,2.97359108,SCGResidentialWinter Only
+3333,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2049Q1,108,3.070935408,0.181833729,3.252769138,SCGResidentialWinter Only
+3334,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2049Q2,109,0.0,0.0,0.0,SCGResidentialWinter Only
+3335,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2049Q3,110,0.0,0.0,0.0,SCGResidentialWinter Only
+3336,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2049Q4,111,3.039069112,0.121222486,3.160291598,SCGResidentialWinter Only
+3337,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2050Q1,112,3.269548253,0.184274267,3.45382252,SCGResidentialWinter Only
+3338,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2050Q2,113,0.0,0.0,0.0,SCGResidentialWinter Only
+3339,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2050Q3,114,0.0,0.0,0.0,SCGResidentialWinter Only
+3340,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2050Q4,115,3.237193002,0.122849511,3.360042514,SCGResidentialWinter Only
+3341,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2051Q1,116,3.482193319,0.186714805,3.668908124,SCGResidentialWinter Only
+3342,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2051Q2,117,0.0,0.0,0.0,SCGResidentialWinter Only
+3343,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2051Q3,118,0.0,0.0,0.0,SCGResidentialWinter Only
+3344,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2051Q4,119,3.449349115,0.124476536,3.573825651,SCGResidentialWinter Only
+3345,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2052Q1,120,3.709926299,0.189155342,3.899081641,SCGResidentialWinter Only
+3346,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2052Q2,121,0.0,0.0,0.0,SCGResidentialWinter Only
+3347,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2052Q3,122,0.0,0.0,0.0,SCGResidentialWinter Only
+3348,SCG,2024,2022,Residential,Winter Only,SCGResidentialWinter Only,2052Q4,123,3.67659314,0.126103561,3.802696701,SCGResidentialWinter Only

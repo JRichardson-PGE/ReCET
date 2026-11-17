@@ -1,0 +1,1531 @@
+"""The web app: FastAPI pages (Jinja templates) mounted under `Settings.prefix` (`/ReCET`).
+
+Every page except the login and setup-link pages needs a signed-in user. A run belongs to the person who started it: other users get "not found", admins see
+everything. Forms carry the session's CSRF token; the Edit inputs page sends it as the X-CSRF-Token header. The app is mounted (not proxied with a root_path),
+so the same paths work behind the edge nginx (which passes /ReCET/... through unchanged) and on localhost.
+"""
+from __future__ import annotations
+
+import json
+import math
+import secrets
+import shutil
+import time
+import zipfile
+from contextlib import asynccontextmanager
+from dataclasses import fields as dc_fields
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from .. import __version__, cost_test_sets, outputs, progress, versions
+from . import auth, eta, jobzip
+from .config import Settings
+from .db import Database
+from .runner import Runner, write_config
+
+HERE = Path(__file__).resolve().parent
+SESSION_COOKIE = "recet_session"
+LOGIN_CSRF_COOKIE = "recet_login_csrf"
+DOCS_DIR = HERE.parent / "docs"
+DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "COST_TESTS.md", "USER_GUIDE.md", "ARCHITECTURE.md",
+             "README.md"]
+# what the Docs pages call each document (the file names are for the repository and the desktop window)
+DOC_TITLES = {"WEB_GUIDE.md": "Getting started on the web", "INPUT_FORMATS.md": "Input formats", "INPUT_FIELDS.md": "Input fields",
+              "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "COST_TESTS.md": "Cost tests as configuration",
+              "USER_GUIDE.md": "Desktop and command line",
+              "ARCHITECTURE.md": "System architecture", "README.md": "About these documents"}
+DOCS_HOME = "WEB_GUIDE.md"
+
+
+def doc_names() -> list[str]:
+    """The Docs pages' documents, in reading order."""
+    return [d for d in DOC_ORDER if (DOCS_DIR / d).exists()] + sorted(p.name for p in DOCS_DIR.glob("*.md") if p.name not in DOC_ORDER)
+
+
+def doc_title(name: str) -> str:
+    return DOC_TITLES.get(name, name.removesuffix(".md").replace("_", " ").capitalize())
+
+
+# Upload fields of the New run form: field -> (RunConfig field, accepted extensions, label)
+UPLOADS = {
+    "workbook": ("workbook", (".xlsx", ".xlsm"), "Job workbook"),
+    "job_zip": ("job_zip", (".zip",), "Job zip (Measure.csv, optional ProgramCost.csv)"),     # unpacked into measures / programcost (jobzip.py)
+    "profiles_8760": ("profiles_8760_file", (".csv", ".parquet", ".xlsx"), "8,760 electric profiles"),
+    "profiles_gas": ("profiles_gas_file", (".csv", ".parquet", ".xlsx"), "Gas monthly profiles"),
+    "run_parameters": ("run_parameters_file", (".csv", ".parquet", ".xlsx"), "Run parameters"),
+    "sw_factors": ("sw_factors_file", (".csv", ".parquet", ".xlsx"), "Statewide allocation factors"),
+    "programs": ("programs_file", (".csv", ".parquet", ".xlsx"), "Program metadata"),
+    "cet_outputs": ("cet_outputs", (".csv",), "CET outputs to compare against"),
+    "cost_tests": ("cost_test_set", (".yaml", ".yml"), "Cost-test set (YAML; analysis runs only)"),
+}
+TEMPLATE_FILES = {
+    "workbook": ("template_job_workbook.xlsx", "Job workbook (Measure, ProgramCost and the optional sheets)"),
+    "measure": ("template_Measure_header.csv", "Measure.csv header"),
+    "run-parameters": ("template_run_parameters.csv", "Run parameters"),
+    "sw-factors": ("template_sw_allocation_factors.csv", "Statewide allocation factors"),
+    "programs": ("template_programs.csv", "Program metadata"),
+    "profiles-8760": ("template_electric_8760_profiles.csv", "8,760 electric profiles"),
+    "profiles-gas": ("template_gas_monthly_profiles.csv", "Gas monthly profiles"),
+}
+# the template offered beside each upload on the New run page: upload field -> TEMPLATE_FILES key
+UPLOAD_TEMPLATES = {"workbook": "workbook", "job_zip": "measure", "profiles_8760": "profiles-8760", "profiles_gas": "profiles-gas",
+                    "run_parameters": "run-parameters", "sw_factors": "sw-factors", "programs": "programs"}
+STATUS_TEXT = {"queued": "Queued", "running": "Running", "finished": "Finished", "failed": "Failed", "cancelled": "Stopped", "expired": "Expired"}
+
+
+class NotSignedIn(Exception):
+    pass
+
+
+class Ctx:
+    """What every request handler needs: settings, database, run queue, templates, and small helpers."""
+
+    def __init__(self, s: Settings):
+        self.s = s
+        self.db = Database(s.db_path)
+        self.runner = Runner(s, self.db)
+        self.templates = Jinja2Templates(directory=str(HERE / "templates"))
+        self.templates.env.globals.update(u=self.u, version=__version__, zip=zip, status_text=STATUS_TEXT, fmt_time=fmt_time, fmt_size=fmt_size,
+                                          acc_label=acc_name, doc_title=doc_title)
+        self._frames: dict[str, tuple[float, object]] = {}
+
+    def u(self, path: str = "/") -> str:
+        """A link inside the app: the prefix (/ReCET, exact casing) + path."""
+        return self.s.prefix + (path if path.startswith("/") else "/" + path)
+
+    def ip(self, request: Request) -> str:
+        if self.s.trust_proxy:
+            real = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            if real:
+                return real[:64]
+        return request.client.host if request.client else ""
+
+    def user(self, request: Request):
+        u, sess = auth.session_of(self.db, request.cookies.get(SESSION_COOKIE))
+        request.state.user, request.state.session = u, sess
+        return u
+
+    def need_user(self, request: Request):
+        u = self.user(request)
+        if u is None:
+            raise NotSignedIn()
+        return u
+
+    def need_admin(self, request: Request):
+        u = self.need_user(request)
+        if u["role"] != "admin":
+            raise HTTPException(404)
+        return u
+
+    def check_csrf(self, request: Request, given: str | None) -> None:
+        sess = getattr(request.state, "session", None)
+        if sess is None or not auth.csrf_ok(sess["csrf"], given):
+            raise HTTPException(400, "The form expired. Go back, reload the page and try again.")
+
+    def render(self, request: Request, template: str, /, status_code: int = 200, **kw) -> HTMLResponse:
+        """Render a page. `request` and `template` are positional-only, so any keyword (`name=` included) is free for the template's own variables."""
+        sess = getattr(request.state, "session", None)
+        kw.setdefault("user", getattr(request.state, "user", None))
+        kw.setdefault("csrf", sess["csrf"] if sess else "")
+        return self.templates.TemplateResponse(request, template, kw, status_code=status_code)
+
+    def redirect(self, path: str) -> RedirectResponse:
+        return RedirectResponse(self.u(path), status_code=303)
+
+    def set_cookie(self, resp: Response, name: str, value: str, max_age: int | None) -> None:
+        resp.set_cookie(name, value, max_age=max_age, path=self.s.prefix or "/", secure=self.s.secure_cookies, httponly=True, samesite="lax")
+
+    # --- runs
+    def run_for(self, request: Request, run_id: str, owner: bool = False):
+        """The run if this user may see it (its owner, an admin, or a user it is shared with), else 404. `owner`: only its owner or an admin, for what
+        changes the run (Stop, Delete, sharing); a user it is shared with may read everything else and rerun its inputs as a run of their own."""
+        u = self.need_user(request)
+        row = self.db.one("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id WHERE r.id = ?", (run_id,))
+        if row is None:
+            raise HTTPException(404)
+        if row["user_id"] != u["id"] and u["role"] != "admin":
+            shared = self.db.one("SELECT 1 FROM run_shares WHERE run_id = ? AND user_id = ?", (run_id, u["id"])) is not None
+            if not shared or owner:
+                raise HTTPException(404)
+        return row
+
+    def shared_with(self, run_id: str) -> list:
+        return self.db.all("SELECT u.id, u.email FROM run_shares s JOIN users u ON u.id = s.user_id WHERE s.run_id = ? ORDER BY u.email", (run_id,))
+
+    def queue_run(self, request: Request, u, run_id: str, cfg: dict, label: str, names: list[str]) -> None:
+        """Write a run's config.json and log header (its inputs are already in its folder), add it to the queue and the audit log."""
+        from .. import jobs
+        folder = self.runner.folder(run_id)
+        acc, cmp_ = cfg["acc_version"], cfg.get("compare_with") or ""
+        from ..cet_versions import job as cet_job
+        known = {f.name for f in dc_fields(jobs.RunConfig)}
+        defaults = self.s.run_defaults
+        replica = cet_job.release_of(cfg.get("engine")) is not None
+        if replica:                                     # a server default a replica cannot use (e.g. a test ACC file) is not the user's choice: left out
+            defaults = {k: v for k, v in defaults.items() if k not in dict(cet_job.REFUSED)}
+        full = {k: v for k, v in {**defaults, **cfg}.items() if k in known}
+        full.update(out_dir=str(folder / "out"), run_name="run")
+        folder.mkdir(parents=True, exist_ok=True)
+        write_config(folder, jobs.RunConfig.from_dict(full).__dict__)
+        (folder / "log.txt").write_text(f"recet {__version__}  -  {'preflight' if cfg.get('preflight_only') else 'run'}  -  ACC {acc}"
+                                        + (f" vs {cmp_}" if cmp_ else "") + (f"  -  {cet_job.label(cfg['engine'])}" if replica else "")
+                                        + "\n" + "\n".join(names) + "\n\n", encoding="utf-8")
+        inputs_text = "; ".join(names)
+        eta.size(folder)                                # count the job's measures once, for the queue's time estimates (eta.py)
+        self.db.run("INSERT INTO runs (id, user_id, label, status, acc_version, compare_with, preflight_only, inputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (run_id, u["id"], label, "queued", acc, cmp_ or None, int(bool(cfg.get("preflight_only"))), inputs_text, time.time()))
+        self.db.audit("run queued", u, detail=f"{run_id}: ACC {acc}{' vs ' + cmp_ if cmp_ else ''}; {inputs_text}", ip=self.ip(request))
+
+    def preflight_report(self, run) -> dict | None:
+        """The input check a run wrote (preflight.json), or None if it has not got that far."""
+        out = self.runner.folder(run["id"]) / "out"
+        hits = sorted(out.rglob("preflight.json")) if out.exists() else []
+        if not hits:
+            return None
+        try:
+            return json.loads(hits[0].read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def queue_eta(self) -> dict[str, dict]:
+        """Every queued run's estimated start and finish (eta.py), from the running runs' progress and the queued runs' sizes."""
+        running = self.db.all("SELECT * FROM runs WHERE status = 'running'")
+        left = {}
+        for r in running:
+            p = self.progress(r)
+            left[r["id"]] = p.get("seconds_left") if p else None
+        return eta.queue(self.db, self.s.runs_dir, self.s.workers, left)
+
+    def progress(self, run) -> dict | None:
+        """A running run's progress (recet/progress.py) with `text` added for the page; None for any other run or before its first report."""
+        if run["status"] != "running":
+            return None
+        p = progress.live(progress.read(self.runner.folder(run["id"]) / progress.FILE_NAME))     # time left counted down since the last report
+        if p is not None:
+            p["text"] = progress.describe(p)
+        return p
+
+    def result_path(self, run, sub: str = "") -> Path | None:
+        if not run["result_dir"]:
+            return None
+        base = (self.runner.folder(run["id"]) / run["result_dir"]).resolve()
+        p = (base / sub).resolve() if sub else base
+        if not p.is_dir() or not p.is_relative_to(base):
+            return None
+        return p
+
+    def engine_label(self, run) -> str:
+        """The engine that priced the run, as its run_settings.json records it ("ReCET 0.1.70 (hourly)", "CET 25.1 replica"), else as its config names
+        it; "" once its folder is gone."""
+        from ..cet_versions import job as cet_job
+        base = self.result_path(run)
+        try:
+            label = json.loads((base / "run_settings.json").read_text(encoding="utf-8")).get("engine", {}).get("label") if base else None
+        except (OSError, ValueError):
+            label = None
+        if label:
+            return label
+        cfg = self.run_config(run)
+        return cet_job.label(cfg.get("engine")) if cfg is not None else ""
+
+    def run_config(self, run) -> dict | None:
+        """The run's config.json (every RunConfig field), or None once its folder is gone."""
+        try:
+            return json.loads((self.runner.folder(run["id"]) / "config.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def run_size(self, run) -> dict | None:
+        """The run's size as the queue estimate counted it (eta.size: measures and the options that change its time), or None once its folder is gone."""
+        folder = self.runner.folder(run["id"])
+        return eta.size(folder) if (folder / "config.json").exists() else None
+
+    # the run page's headline numbers: (column key, label); the ratio tiles are the run's cost-test set's (cost_test_sets.tile_tests)
+    HEADLINE = [("TotalSystemBenefit", "Total system benefit"), ("TotalExpenditures", "Budget")]
+
+    @staticmethod
+    def headline_keys(cset) -> list[tuple[str, str]]:
+        return Ctx.HEADLINE + [(f"{t}_ratio", cost_test_sets.short_label(t)) for t in cost_test_sets.tile_tests(cset)]
+
+    def headline(self, run) -> list[dict]:
+        """A finished run's portfolio numbers for its run page: [{"name": "" or "ACC 2024" (a comparison's runs), "tiles": [{label, value, help}]}].
+        Read from the Results page's group sums, so never the whole measure-level table; empty when the run wrote no results."""
+        from .. import results_view as rv
+        base = self.result_path(run)
+        if base is None:
+            return []
+        folders = [base] if any(base.glob("measure_level_*.*")) else sorted({p.parent for p in base.glob("*/measure_level_*.*")
+                                                                             if p.parent.name != outputs.RESULTS_DIR})
+        out = []
+        for folder in folders:
+            source = outputs.results_source(folder)
+            if source is None:
+                continue
+            try:
+                res = self.results(source)
+                cat = res.catalog()
+                headline = self.headline_keys(res.cset)
+                keys = [k for k, _ in headline if k in cat]
+                t = res.table("portfolio", rv.ALL_PAS, keys)
+            except Exception:                                    # the run page must open whatever state the results are in
+                continue
+            if not len(t):
+                continue
+            row = t.iloc[0]
+            labels = dict(headline)
+            tiles = [{"label": "Measures", "value": f"{res.n:,}", "help": "measures priced in this run"}]
+            tiles += [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys]
+            out.append({"name": "" if folder == base else str(folder.relative_to(base)).replace("run_acc", "ACC "), "tiles": tiles})
+        return out
+
+    def frame(self, path: Path):
+        """A small results table (a comparison or portfolio summary), cached by path and modification time (a few recent ones)."""
+        from .. import outputs
+        return self._cached(("frame", str(path)), path, lambda: outputs.read_table(path))
+
+    def results(self, path: Path):
+        """A run's Results tables (results_view.RunResults: group sums only, never the whole measure-level table), cached like frame()."""
+        from .. import results_view as rv
+        return self._cached(("results", str(path)), path, lambda: rv.RunResults.from_file(path))
+
+    def _cached(self, key, path: Path, make):
+        mtime = path.stat().st_mtime
+        hit = self._frames.get(key)
+        if hit and hit[0] == mtime:
+            return hit[1]
+        f = make()
+        self._frames[key] = (mtime, f)
+        while len(self._frames) > 8:
+            self._frames.pop(next(iter(self._frames)))
+        return f
+
+
+def fmt_time(t) -> str:
+    return datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M") if t else ""
+
+
+def fmt_size(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:,.0f} {unit}" if unit == "B" else f"{n:,.1f} {unit}"
+        n /= 1024
+    return str(n)
+
+
+# input-check findings that leave measures unpriced (preflight.py): shown on the run page, not only in the log
+UNPRICED_CODES = ("no_electric_profile", "no_electric_profile_2nd", "no_water_profile", "no_gas_profile")
+SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+
+
+def check_summary(report: dict | None) -> dict | None:
+    """The run page's Input check card from a run's preflight.json: counts by severity, the findings (errors first) and those that leave measures unpriced."""
+    if not report:
+        return None
+    issues = sorted(report.get("issues") or [], key=lambda i: SEVERITY_ORDER.get(i.get("severity"), 3))
+    for i in issues:                                  # the energy the finding's records carry: "12,346 first-year net kWh"
+        i["impact_text"] = "; ".join(f"{v:,.0f} {k}" for k, v in (i.get("impact") or {}).items())
+    n = {k: sum(1 for i in issues if i.get("severity") == k) for k in SEVERITY_ORDER}
+    unpriced = [i for i in issues if i.get("code") in UNPRICED_CODES and i.get("count")]
+    return {"n": n, "issues": issues, "unpriced": unpriced, "stats": report.get("stats") or {}, "acc": report.get("acc_check")}
+
+
+FORMAT_NAMES = {"csv": "CSV", "csv.zip": "CSV", "xlsx": "Excel", "parquet": "Parquet"}
+FILING_NAMES = {"claims": "Quarterly Claims checks", "budget_filing": "Budget filing checks"}
+
+
+def settings_summary(cfg: dict | None, size: dict | None = None) -> str:
+    """A run's settings in one line, for the run page and the runs list: "1,000,000 measures · First Year 2028 · market effects 5% · SCT on ..."."""
+    if not cfg:
+        return ""
+    parts = []
+    if size and size.get("measures") is not None:
+        parts.append(f"{size['measures']:,} measure{'' if size['measures'] == 1 else 's'}")
+    parts.append(f"First Year {cfg['base_year']}" if cfg.get("base_year") else "First Year = earliest claim year")
+    parts.append(f"market effects {float(cfg.get('market_effects') or 0):.0%}")
+    if not cfg.get("preflight_only"):
+        parts.append("SCT on" if cfg.get("include_societal", True) else "SCT off")
+        parts.append("emissions on" if cfg.get("emissions", True) else "emissions off")
+    if cfg.get("acc_purpose"):
+        parts.append("priced for " + versions.acc_purpose_label(cfg["acc_purpose"]))
+    if cfg.get("cost_test_set"):
+        cts = str(cfg["cost_test_set"])
+        parts.append("cost tests " + (cts if cts in cost_test_sets.builtin() else f"from {Path(cts).name}"))
+    if cfg.get("filing_validation"):
+        parts.append(FILING_NAMES.get(cfg["filing_validation"], cfg["filing_validation"]) + (f" ({cfg['filing_year']})" if cfg.get("filing_year") else ""))
+    if cfg.get("allocate_statewide"):
+        parts.append("statewide programs split")
+    if cfg.get("apply_exclude_from_ce"):
+        parts.append("Exclude_From_CE left out of the summary")
+    if cfg.get("components"):
+        parts.append("ACC components priced separately")
+    if cfg.get("portfolio_8760"):
+        parts.append("combined 8,760 profile")
+    if cfg.get("output_template") and not cfg.get("preflight_only"):
+        parts.append(f"output template {cfg.get('output_template_name') or ''} ({len(cfg['output_template'])} columns)".replace("  ", " "))
+    if not cfg.get("preflight_only"):
+        parts.append(FORMAT_NAMES.get(str(cfg.get("output_format") or ""), str(cfg.get("output_format") or "")) + " output")
+    return " · ".join(p for p in parts if p)
+
+
+def rerun_stem(run) -> str:
+    """The name a "Rerun with different settings" starts from: the earlier run's name without the ACC part a blank name gave it, plus "(rerun)"."""
+    import re
+    base = re.sub(r" · \d{4} ACC.*$", "", run["label"] or "") or f"run {run['id']}"
+    return base if base.endswith("(rerun)") else f"{base} (rerun)"
+
+
+def fmt_duration(seconds: float) -> str:
+    """A run's time: "45 s", "6 min 47 s", "1 h 12 min"."""
+    s = int(round(max(seconds, 0)))
+    if s < 60:
+        return f"{s} s"
+    if s < 3600:
+        return f"{s // 60} min {s % 60} s"
+    return f"{s // 3600} h {s % 3600 // 60} min"
+
+
+def cost_set_rows() -> list[dict]:
+    """New run's Cost tests select and its help table: each built-in cost-test set's id, label, program years and tests."""
+    sets = cost_test_sets.builtin()
+    return [{"id": i, "label": t, "years": cost_test_sets.years_text(sets[i]), "tests": [f"{k} ({v.label})" for k, v in sets[i].tests.items()],
+             "draft": sets[i].draft} for i, t in cost_test_sets.catalog()]
+
+
+def engine_acc_table(recet_accs) -> list[tuple[str, str, list[str]]]:
+    """(engine key, label, the ACCs it has) of every engine, for New run: ReCET's own has the server's ACCs, a CET replica those of its release."""
+    from ..cet_versions import job as cet_job
+    out = []
+    for key, label in cet_job.engines():
+        rel = cet_job.release_of(key)
+        out.append((key, label, list(recet_accs) if rel is None else [str(a) for a in cet_job.accs(rel)]))
+    return out
+
+
+def acc_name(key) -> str:
+    """An ACC version as the web pages name it: "2026 ACC" (Jake, 2026-10-26: CET's "Avoided Cost Version" number is being retired; the New run
+    page's table says which ACC applies to which filing instead)."""
+    return versions.acc_short(key)
+
+
+def expires_text(run, retention_days: int, now: float | None = None) -> str:
+    """When the run's files are deleted, for the run page and the runs list: "deleted in 5 days", "deleted within a day"; "" once expired."""
+    if run["status"] == "expired":
+        return ""
+    left = run["created_at"] + retention_days * 86400 - (time.time() if now is None else now)
+    days = int(left // 86400)
+    return "deleted within a day" if days < 1 else f"deleted in {days} day{'' if days == 1 else 's'}"
+
+
+def _safe_next(prefix: str, nxt: str | None) -> str:
+    """Only same-app paths after login (no open redirects)."""
+    if nxt and nxt.startswith(prefix + "/") and not nxt.startswith("//") and "\\" not in nxt:
+        return nxt
+    return prefix + "/"
+
+
+async def save_upload(up: UploadFile, dest: Path, limit: int) -> int:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    n = 0
+    with open(dest, "wb") as f:
+        while True:
+            chunk = await up.read(1024 * 1024)
+            if not chunk:
+                break
+            n += len(chunk)
+            if n > limit:
+                f.close()
+                dest.unlink(missing_ok=True)
+                raise ValueError(f"{up.filename} is larger than the {limit // (1024 * 1024)} MB limit")
+            f.write(chunk)
+    return n
+
+
+BARE_CSV_MESSAGE = ("Upload Measure.csv and ProgramCost.csv together in one .zip file (ProgramCost.csv is optional), as CET takes them: "
+                    "a CSV on its own is not accepted.")
+
+
+ALREADY_COMPRESSED = (".zip", ".parquet", ".xlsx", ".xlsm", ".gz")
+
+
+def zip_to_file(entries: list[tuple[Path, str]], tmp_dir: Path) -> Path:
+    """A .zip of `entries` ((file, name in the zip)) built in a temporary file under `tmp_dir`, never in memory: a 1,000,000-measure run's files are gigabytes.
+    Files that are already compressed (zips, parquet, Excel) are stored as they are; the rest are deflated. The caller deletes the file after sending it."""
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    out = tmp_dir / f"download_{secrets.token_hex(8)}.zip"
+    try:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+            for f, name in entries:
+                z.write(f, name, compress_type=zipfile.ZIP_STORED if f.suffix.lower() in ALREADY_COMPRESSED else zipfile.ZIP_DEFLATED)
+    except BaseException:
+        out.unlink(missing_ok=True)
+        raise
+    return out
+
+
+def _excel_max_rows() -> int:
+    from ..jobs import RunConfig
+    return RunConfig.excel_max_rows
+
+
+def new_run_id() -> str:
+    return datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
+
+
+# --------------------------------------------------------------------------------------------------------------------------------- the app
+def create_app(settings: Settings | None = None) -> FastAPI:
+    s = settings or Settings.from_env()
+    ctx = Ctx(s)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        if s.start_workers:
+            ctx.runner.start()
+            from . import edit_api
+            edit_api.warm_choices()                      # the profile catalog for the editor's dropdowns, read once in the background
+        yield
+        ctx.runner.stop()
+
+    app = FastAPI(title="ReCET", docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.ctx = ctx
+    app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+
+    @app.exception_handler(NotSignedIn)
+    async def _not_signed_in(request: Request, _exc):
+        if request.url.path.startswith(s.prefix + "/edit/api") or request.headers.get("accept", "").startswith("application/json"):
+            return JSONResponse({"error": "signed out: reload the page and sign in again"}, status_code=401)
+        nxt = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(ctx.u("/login") + f"?next={nxt}", status_code=303)
+
+    @app.exception_handler(StarletteHTTPException)                      # also the router's own 404 / 405
+    async def _http_error(request: Request, exc: StarletteHTTPException):
+        if request.url.path.startswith(s.prefix + "/edit/api"):
+            return JSONResponse({"error": exc.detail if isinstance(exc.detail, str) else "error"}, status_code=exc.status_code)
+        ctx.user(request)
+        msg = exc.detail if exc.status_code != 404 else "Not found."
+        return ctx.render(request, "error.html", status_code=exc.status_code, message=msg)
+
+    # ----------------------------------------------------------------------------------------------------------------- sign-in
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page(request: Request, next: str = ""):
+        if ctx.user(request):
+            return RedirectResponse(_safe_next(s.prefix, next), status_code=303)
+        token = secrets.token_urlsafe(24)
+        resp = ctx.render(request, "login.html", next=next, login_csrf=token, error="")
+        ctx.set_cookie(resp, LOGIN_CSRF_COOKIE, token, 3600)
+        return resp
+
+    @app.post("/login")
+    async def login(request: Request):
+        form = await request.form()
+        email, pw, nxt = str(form.get("email", "")), str(form.get("password", "")), str(form.get("next", ""))
+        if not auth.csrf_ok(request.cookies.get(LOGIN_CSRF_COOKIE), str(form.get("login_csrf", ""))):
+            return RedirectResponse(ctx.u("/login") + "?expired=1", status_code=303)
+        ip = ctx.ip(request)
+        token = secrets.token_urlsafe(24)
+        if auth.login_blocked(ctx.db, email, ip):
+            ctx.db.audit("login blocked", detail=email[:254], ip=ip)
+            resp = ctx.render(request, "login.html", status_code=429, next=nxt, login_csrf=token,
+                              error="Too many failed sign-ins. Wait 15 minutes and try again.")
+        else:
+            u = auth.check_login(ctx.db, email, pw, ip)
+            if u is not None:
+                ctx.db.audit("sign in", u, ip=ip)
+                resp = RedirectResponse(_safe_next(s.prefix, nxt), status_code=303)
+                ctx.set_cookie(resp, SESSION_COOKIE, auth.new_session(ctx.db, u["id"], s.session_days), s.session_days * 86400)
+                resp.delete_cookie(LOGIN_CSRF_COOKIE, path=s.prefix or "/")
+                return resp
+            ctx.db.audit("sign-in failed", detail=email[:254], ip=ip)
+            resp = ctx.render(request, "login.html", status_code=401, next=nxt, login_csrf=token, error="That email and password do not match an active account.")
+        ctx.set_cookie(resp, LOGIN_CSRF_COOKIE, token, 3600)
+        return resp
+
+    @app.post("/logout")
+    async def logout(request: Request):
+        u = ctx.user(request)
+        form = await request.form()
+        if u:
+            ctx.check_csrf(request, str(form.get("csrf", "")))
+            ctx.db.audit("sign out", u, ip=ctx.ip(request))
+        auth.end_session(ctx.db, request.cookies.get(SESSION_COOKIE))
+        resp = ctx.redirect("/login")
+        resp.delete_cookie(SESSION_COOKIE, path=s.prefix or "/")
+        return resp
+
+    @app.get("/setup/{token}", response_class=HTMLResponse)
+    async def setup_page(request: Request, token: str):
+        ctx.user(request)
+        u = auth.setup_link_user(ctx.db, token)
+        return ctx.render(request, "setup.html", status_code=200 if u else 404, link_user=u, token=token, error="")
+
+    @app.post("/setup/{token}")
+    async def setup(request: Request, token: str):
+        ctx.user(request)
+        form = await request.form()
+        u = auth.setup_link_user(ctx.db, token)
+        if u is None:
+            return ctx.render(request, "setup.html", status_code=404, link_user=None, token=token, error="")
+        pw, again = str(form.get("password", "")), str(form.get("password2", ""))
+        problem = auth.password_problem(pw, again)
+        if problem:
+            return ctx.render(request, "setup.html", status_code=400, link_user=u, token=token, error=problem)
+        auth.use_setup_link(ctx.db, token, pw)
+        ctx.db.audit("password set from link", u, ip=ctx.ip(request))
+        resp = ctx.redirect("/")
+        ctx.set_cookie(resp, SESSION_COOKIE, auth.new_session(ctx.db, u["id"], s.session_days), s.session_days * 86400)
+        return resp
+
+    # ----------------------------------------------------------------------------------------------------------------- output templates
+    def user_templates(uid: int) -> dict[str, list[str]]:
+        """The built-in output templates, then the user's saved ones."""
+        from .. import output_templates as ot
+        out = dict(ot.BUILTIN)
+        for r in ctx.db.all("SELECT name, columns FROM output_templates WHERE user_id = ? ORDER BY name", (uid,)):
+            try:
+                out[r["name"]] = ot.current(json.loads(r["columns"]))            # names renamed in 0.1.50 read as the new ones
+            except ValueError:
+                pass
+        return out
+    ctx.user_templates = user_templates
+
+    def default_template(uid: int, mine: dict[str, list[str]] | None = None) -> str:
+        """The template this user's new runs start with: "All columns" unless one was set and still exists."""
+        from .. import output_templates as ot
+        r = ctx.db.one("SELECT value FROM user_settings WHERE user_id = ? AND key = 'default_output_template'", (uid,))
+        name = r["value"] if r else ""
+        return name if name in (user_templates(uid) if mine is None else mine) else ot.ALL
+    ctx.default_template = default_template
+
+    def set_default_template(uid: int, name: str) -> None:
+        from .. import output_templates as ot
+        if name == ot.ALL:
+            ctx.db.run("DELETE FROM user_settings WHERE user_id = ? AND key = 'default_output_template'", (uid,))
+        else:
+            ctx.db.run("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, 'default_output_template', ?)", (uid, name))
+
+    def templates_page(request: Request, status_code: int = 200, **kw):
+        from .. import output_templates as ot
+        u = ctx.need_user(request)
+        fields = [{"c": col, "g": g, "k": ot.kind(g), "d": text, "l": ctx.u("/docs/" + link) if link else ""} for g, col, text, link in ot.catalog()]
+        groups = list(dict.fromkeys(f["g"] for f in fields if f["k"] == "Output fields"))
+        mine = user_templates(u["id"])
+        editing = kw.pop("editing", "")
+        kw.setdefault("columns", mine.get(editing, []))
+        return ctx.render(request, "output_templates.html", status_code=status_code, all_templates=mine, builtin=set(ot.BUILTIN), all_name=ot.ALL,
+                          fields=fields, kinds=ot.KINDS, output_groups=groups, editing=editing, default=default_template(u["id"], mine),
+                          **{"error": "", "saved_ok": "", **kw})
+
+    @app.get("/output-templates", response_class=HTMLResponse)
+    async def output_templates_page(request: Request, edit: str = "", saved: str = "", default: str = ""):
+        return templates_page(request, editing=edit, saved_ok=saved, default_ok=bool(default))
+
+    @app.post("/output-templates")
+    async def output_templates_save(request: Request):
+        from .. import output_templates as ot
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        name = str(form.get("name", "")).strip()[:60]
+        if form.get("set_default"):                                  # "Default for new runs"
+            if name != ot.ALL and name not in user_templates(u["id"]):
+                return templates_page(request, 400, error="Unknown output template.")
+            set_default_template(u["id"], name)
+            return ctx.redirect("/output-templates?default=1")
+        if form.get("delete"):
+            ctx.db.run("DELETE FROM output_templates WHERE user_id = ? AND name = ?", (u["id"], name))
+            return ctx.redirect("/output-templates")
+        cols, bad = ot.check(ot.parse(str(form.get("columns", ""))))
+        error = ("Give the template a name." if not name else f'"{name}" is a built-in template: save your copy under another name.'
+                 if name in ot.BUILTIN or name == ot.ALL else f"Not columns ReCET writes: {', '.join(bad)}." if bad
+                 else "Pick at least one column." if not cols else "")
+        if error:
+            return templates_page(request, 400, editing=name, columns=ot.parse(str(form.get("columns", ""))), error=error)
+        ctx.db.run("INSERT OR REPLACE INTO output_templates (user_id, name, columns) VALUES (?,?,?)", (u["id"], name, json.dumps(cols)))
+        if form.get("make_default"):
+            set_default_template(u["id"], name)
+        from urllib.parse import quote
+        return ctx.redirect(f"/output-templates?edit={quote(name)}&saved={quote(name)}")
+
+    def account_kw(u) -> dict:
+        from . import notify
+        return dict(email_on=notify.enabled(s), notify_runs=notify.wants(ctx.db, u["id"]))
+
+    @app.get("/account", response_class=HTMLResponse)
+    async def account_page(request: Request, done: str = ""):
+        u = ctx.need_user(request)
+        return ctx.render(request, "account.html", error="", done=done, **account_kw(u))
+
+    @app.post("/account/notifications")
+    async def account_notifications(request: Request):
+        """The Account page's "Email me when a run finishes or fails" (notify.py)."""
+        from . import notify
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        on = bool(form.get("notify_runs"))
+        notify.set_wants(ctx.db, u["id"], on)
+        ctx.db.audit("run emails " + ("on" if on else "off"), u, ip=ctx.ip(request))
+        return ctx.redirect("/account?done=email")
+
+    @app.post("/account")
+    async def account(request: Request):
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        if auth.check_login(ctx.db, u["email"], str(form.get("current", "")), ctx.ip(request)) is None:
+            return ctx.render(request, "account.html", status_code=400, error="Your current password is not right.", done="", **account_kw(u))
+        pw, again = str(form.get("password", "")), str(form.get("password2", ""))
+        problem = auth.password_problem(pw, again)
+        if problem:
+            return ctx.render(request, "account.html", status_code=400, error=problem, done="", **account_kw(u))
+        auth.set_password(ctx.db, u["id"], pw)          # ends every session, this one too: sign in again with a fresh one
+        ctx.db.audit("password changed", u, ip=ctx.ip(request))
+        resp = ctx.redirect("/account?done=1")
+        ctx.set_cookie(resp, SESSION_COOKIE, auth.new_session(ctx.db, u["id"], s.session_days), s.session_days * 86400)
+        return resp
+
+    # ----------------------------------------------------------------------------------------------------------------- admin
+    def setup_url(request: Request, token: str) -> str:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("host") or request.url.netloc
+        return f"{proto}://{host}{ctx.u('/setup/' + token)}"
+
+    def users_page(request: Request, **kw):
+        users = ctx.db.all("SELECT u.*, (SELECT COUNT(*) FROM runs r WHERE r.user_id = u.id) AS n_runs FROM users u ORDER BY u.role, u.email")
+        kw.setdefault("error", "")
+        kw.setdefault("link", "")
+        kw.setdefault("link_for", "")
+        return ctx.render(request, "admin_users.html", users=users, link_hours=s.setup_link_hours, **kw)
+
+    @app.get("/admin/users", response_class=HTMLResponse)
+    async def admin_users(request: Request):
+        ctx.need_admin(request)
+        return users_page(request)
+
+    @app.post("/admin/users")
+    async def admin_add_user(request: Request):
+        admin = ctx.need_admin(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        email, name, role = str(form.get("email", "")).strip(), str(form.get("name", "")), str(form.get("role", "user"))
+        try:
+            uid = auth.create_user(ctx.db, email, name, role)
+        except ValueError as exc:
+            return users_page(request, error=str(exc).capitalize() + ".")
+        token = auth.new_setup_link(ctx.db, uid, s.setup_link_hours)
+        ctx.db.audit("user added", admin, detail=f"{email} ({role})", ip=ctx.ip(request))
+        return users_page(request, link=setup_url(request, token), link_for=email)
+
+    @app.post("/admin/users/{user_id}/{action}")
+    async def admin_user_action(request: Request, user_id: int, action: str):
+        admin = ctx.need_admin(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        target = auth.get_user(ctx.db, user_id)
+        if target is None:
+            raise HTTPException(404)
+        admins = ctx.db.one("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0")["n"]
+        last_admin = target["role"] == "admin" and not target["disabled"] and admins <= 1
+        if action == "disable":
+            if target["id"] == admin["id"] or last_admin:
+                return users_page(request, error="You cannot disable your own account or the last admin.")
+            ctx.db.run("UPDATE users SET disabled = 1 WHERE id = ?", (user_id,))
+            auth.end_sessions(ctx.db, user_id)
+        elif action == "enable":
+            ctx.db.run("UPDATE users SET disabled = 0 WHERE id = ?", (user_id,))
+        elif action == "role":
+            role = str(form.get("role", "user"))
+            if role not in ("admin", "user"):
+                raise HTTPException(400, "Unknown role.")
+            if role == "user" and (target["id"] == admin["id"] or last_admin):
+                return users_page(request, error="You cannot remove your own admin role or the last admin.")
+            ctx.db.run("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+        elif action == "reset":
+            ctx.db.run("UPDATE users SET password_hash = NULL WHERE id = ?", (user_id,))
+            auth.end_sessions(ctx.db, user_id)
+            token = auth.new_setup_link(ctx.db, user_id, s.setup_link_hours)
+            ctx.db.audit("password reset", admin, detail=target["email"], ip=ctx.ip(request))
+            return users_page(request, link=setup_url(request, token), link_for=target["email"])
+        else:
+            raise HTTPException(404)
+        ctx.db.audit(f"user {action}", admin, detail=target["email"], ip=ctx.ip(request))
+        return ctx.redirect("/admin/users")
+
+    @app.get("/admin/audit", response_class=HTMLResponse)
+    async def admin_audit(request: Request):
+        ctx.need_admin(request)
+        rows = ctx.db.all("SELECT * FROM audit ORDER BY id DESC LIMIT 500")
+        return ctx.render(request, "admin_audit.html", rows=rows)
+
+    # ----------------------------------------------------------------------------------------------------------------- runs
+    @app.get("/", response_class=HTMLResponse)
+    async def home(request: Request):
+        ctx.need_user(request)
+        return ctx.redirect("/runs")
+
+    def visible_runs(u, everyone: bool, where: str = "", args: tuple = ()) -> list:
+        return ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id WHERE 1=1 "
+                          + ("" if everyone else "AND r.user_id = ? ") + where + " ORDER BY r.created_at DESC LIMIT 200",
+                          (() if everyone else (u["id"],)) + args)
+
+    @app.get("/runs", response_class=HTMLResponse)
+    async def runs_list(request: Request, all: int = 0, expired: int = 0):
+        u = ctx.need_user(request)
+        everyone = bool(all) and u["role"] == "admin"
+        rows = visible_runs(u, everyone, "" if expired else "AND r.status != 'expired'")
+        n_expired = ctx.db.one("SELECT COUNT(*) n FROM runs WHERE status = 'expired'" + ("" if everyone else " AND user_id = ?"),
+                               () if everyone else (u["id"],))["n"]
+        bars = {r["id"]: ctx.progress(r) for r in rows if r["status"] == "running"}
+        waits = {k: eta.describe(v) for k, v in ctx.queue_eta().items()} if any(r["status"] == "queued" for r in rows) else {}
+        extra = {}
+        for r in rows:
+            folder = ctx.runner.folder(r["id"])
+            size = eta.known_size(folder) if r["status"] != "expired" else None
+            took = r["finished_at"] - r["started_at"] if r["finished_at"] and r["started_at"] else None
+            extra[r["id"]] = {"measures": (size or {}).get("measures"), "took": fmt_duration(took) if took is not None else "",
+                              "expires": expires_text(r, s.retention_days) if r["status"] not in ("queued", "running") else "",
+                              "settings": settings_summary(ctx.run_config(r)) if r["status"] != "expired" else ""}
+        live_ids = [r["id"] for r in rows if r["status"] in ("queued", "running")]
+        shared = ctx.db.all("SELECT r.*, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id JOIN run_shares s ON s.run_id = r.id "
+                            "WHERE s.user_id = ? AND r.status != 'expired' ORDER BY r.created_at DESC LIMIT 200", (u["id"],))
+        return ctx.render(request, "runs.html", shared=shared, runs=rows, everyone=everyone, retention=s.retention_days, bars=bars, waits=waits, extra=extra,
+                          n_expired=n_expired, show_expired=bool(expired), live_ids=live_ids)
+
+    @app.get("/runs/live")
+    async def runs_live(request: Request, ids: str = ""):
+        """The runs list's live cells for the given queued or running runs (the page updates them in place instead of reloading)."""
+        u = ctx.need_user(request)
+        wanted = [i for i in ids.split(",") if i][:50]
+        if not wanted:
+            return JSONResponse({})
+        rows = visible_runs(u, u["role"] == "admin", f"AND r.id IN ({','.join('?' * len(wanted))})", tuple(wanted))
+        waits = {k: eta.describe(v) for k, v in ctx.queue_eta().items()} if any(r["status"] == "queued" for r in rows) else {}
+        out = {}
+        for r in rows:
+            p = ctx.progress(r)
+            out[r["id"]] = {"status": r["status"], "status_text": STATUS_TEXT.get(r["status"], r["status"]), "wait": waits.get(r["id"], ""),
+                            "progress": {"fraction": p["fraction"], "text": p["text"]} if p else None}
+        return JSONResponse(out)
+
+    field_label = {fld: label for fld, _ext, label in UPLOADS.values()}
+
+    JOB_FILE_LABELS = {"workbook": "Job workbook", "measures": "Measure.csv", "programcost": "ProgramCost.csv"}
+
+    def new_run_page(request: Request, status_code=200, **kw):
+        from .. import editor
+        from . import edit_api
+        draft = kw.pop("draft", None)
+        from_run = kw.pop("from_run", None)            # "Rerun with different settings": a run whose files and settings the page starts from
+        rerun = edit_api.load_rerun(ctx, draft["id"]) if draft is not None else None
+        kw.setdefault("error", "")
+        carried, job_files = [], []
+        source_run = None
+        if rerun:
+            kw.setdefault("form", dict(rerun["settings"]))
+            carried = [(f, field_label.get(f, f)) for f in rerun.get("supplied", {})]
+            source_run = ctx.db.one("SELECT id, label FROM runs WHERE id = ?", (rerun["run"],))
+        elif from_run is not None:
+            cfg, job, supplied = edit_api.run_inputs(ctx, from_run)
+            # the name is left blank: the new run is then named after the earlier one and the ACC it is priced on (an ACC carried in a prefilled
+            # name would be wrong as soon as the ACC is changed)
+            kw.setdefault("form", {**edit_api._run_settings(cfg, "", "rerun"), "label": ""})
+            carried = [(f, field_label.get(f, f)) for f in supplied]
+            job_files = [JOB_FILE_LABELS[f] for f in job]
+            source_run = from_run
+        kw.setdefault("form", {})
+        engine_accs = engine_acc_table(s.acc_versions)
+        replica_only = sorted({a for _k, _l, have in engine_accs for a in have} - set(s.acc_versions))
+        return ctx.render(request, "new_run.html", default_template=ctx.default_template(request.state.user["id"]), status_code=status_code, accs=s.acc_versions,
+                          acc_labels={k: acc_name(k) for k in [*s.acc_versions, *replica_only]}, replica_accs=replica_only, engines=engine_accs,
+                          acc_map=versions.acc_summary(), purposes=versions.acc_purposes(), output_templates=list(ctx.user_templates(request.state.user["id"])),
+                          cost_sets=cost_set_rows(),
+                          uploads=UPLOADS, templates_=TEMPLATE_FILES,
+                          max_mb=s.max_upload_mb, max_unzipped_mb=s.max_unzipped_mb, excel_max_rows=_excel_max_rows(), draft=draft, max_rows=editor.MAX_EDIT_ROWS, carried=carried,
+                          source_run=source_run, from_run=from_run, job_files=job_files, upload_templates=UPLOAD_TEMPLATES, **kw)
+
+    def source_run_for(request: Request, run_id: str):
+        """The run a "Rerun with different settings" starts from: one this user may see, whose files still exist (else 404 / a 400 page saying so)."""
+        from . import edit_api
+        run = ctx.run_for(request, run_id)
+        got = edit_api.run_inputs(ctx, run) if run["status"] != "expired" else None
+        if got is None or not got[1]:
+            raise HTTPException(400, "That run's files have been deleted, so it cannot be rerun. Start a new run with the files instead.")
+        return run
+
+    @app.get("/runs/new", response_class=HTMLResponse)
+    async def new_run(request: Request, draft: str = "", source: str = Query("", alias="from")):
+        u = ctx.need_user(request)
+        d = None
+        if draft:
+            d = ctx.db.one("SELECT * FROM drafts WHERE id = ? AND user_id = ?", (draft, u["id"]))
+            if d is None:
+                raise HTTPException(404)
+        return new_run_page(request, draft=d, from_run=source_run_for(request, source) if source and d is None else None)
+
+    @app.post("/runs")
+    async def create_run(request: Request):
+        u = ctx.need_user(request)
+        form = await request.form(max_files=20, max_fields=200, max_part_size=s.max_upload_bytes + 1024)
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        values = {k: v for k, v in form.items() if not isinstance(v, UploadFile)}
+        draft_id = str(form.get("draft", "")).strip()
+        draft = ctx.db.one("SELECT * FROM drafts WHERE id = ? AND user_id = ?", (draft_id, u["id"])) if draft_id else None
+        if draft_id and draft is None:
+            raise HTTPException(404)
+        from_id = str(form.get("from_run", "")).strip()
+        from_run = source_run_for(request, from_id) if from_id and draft is None else None
+
+        def fail(msg: str):
+            return new_run_page(request, status_code=400, error=msg, form=values, draft=draft, from_run=from_run)
+
+        # --- options
+        cfg: dict = {}
+        from ..cet_versions import job as cet_job
+        engine = str(form.get("engine", "") or cet_job.RECET).strip()
+        if engine not in dict(cet_job.engines()):
+            return fail("Choose a calculation engine.")
+        replica = cet_job.release_of(engine)
+        cfg["engine"] = "" if replica is None else engine
+        acc = str(form.get("acc_version", ""))
+        engine_has = s.acc_versions if replica is None else tuple(str(a) for a in cet_job.accs(replica))
+        if acc not in engine_has:
+            name = cet_job.label(engine)
+            return fail(f"The {name} has no {acc_name(acc) or 'such ACC'}: choose one of " + ", ".join(acc_name(a) for a in engine_has) + "."
+                        if acc else "Choose an ACC version.")
+        cfg["acc_version"] = acc
+        cmp_ = str(form.get("compare_with", "")).strip()
+        if cmp_:
+            if cmp_ not in s.acc_versions or cmp_ == acc:
+                return fail("Compare with must be a different ACC version.")
+            cfg["compare_with"] = cmp_
+        by = str(form.get("base_year", "")).strip()
+        if by:
+            if not by.isdigit() or not 2000 <= int(by) <= 2100:
+                return fail("First Year must be a year such as 2028 (or blank for the earliest claim year).")
+            cfg["base_year"] = int(by)
+        me = str(form.get("market_effects", "0"))
+        if me not in ("0", "0.05"):
+            return fail("Market effects must be 0% or 5%.")
+        cfg["market_effects"] = float(me)
+        for flag in ("components", "portfolio_8760", "allocate_statewide", "apply_exclude_from_ce", "preflight_only"):
+            cfg[flag] = form.get(flag) == "on"
+        cfg["include_societal"] = form.get("include_societal") == "on"
+        cfg["emissions"] = form.get("emissions") == "on"
+        fv = str(form.get("filing_validation", "")).strip()
+        if fv not in ("", "claims", "budget_filing"):
+            return fail("Unknown CEDARS filing checks choice.")
+        cfg["filing_validation"] = fv
+        fy = str(form.get("filing_year", "")).strip()
+        if fy:
+            if not fy.isdigit() or not 2000 <= int(fy) <= 2100:
+                return fail("Filing year must be a year such as 2028 (or blank for each record's claim year).")
+            cfg["filing_year"] = int(fy)
+        purpose = str(form.get("acc_purpose", "")).strip()
+        if purpose not in dict(versions.acc_purposes()):
+            return fail("Unknown 'Priced for' choice.")
+        cfg["acc_purpose"] = purpose
+        cts = str(form.get("cost_test_set", "")).strip()
+        if cts and cts not in cost_test_sets.builtin():
+            return fail("Unknown cost-test set.")
+        cfg["cost_test_set"] = cts                                     # a supplied set file (the Cost-test set upload) replaces it below
+        if cfg["portfolio_8760"]:
+            years = str(form.get("profile_years", "")).replace(",", " ").split()
+            if not all(y.isdigit() and 2000 <= int(y) <= 2100 for y in years):
+                return fail("Profile years must be years such as 2028 2029.")
+            cfg["profile_years"] = [int(y) for y in years]
+        fmt_ = str(form.get("output_format", "csv"))
+        if fmt_ not in ("csv", "xlsx", "parquet"):
+            return fail("Unknown output format.")
+        cfg["output_format"] = "csv.zip" if fmt_ == "csv" else fmt_     # the web app always zips its CSVs: a fifth of the size to store and to download
+        cfg["excel_fallback"] = "csv.zip"                               # an Excel table over the row limit is written as zipped CSV (outputs.ExcelLimit)
+        tname = str(form.get("output_template", "")).strip()
+        if tname:
+            tmpl = ctx.user_templates(u["id"]).get(tname)
+            if tmpl is None:
+                return fail("Unknown output template.")
+            cfg["output_template"], cfg["output_template_name"] = tmpl, tname
+        label = str(form.get("label", "")).strip()[:120]
+
+        # --- inputs
+        mode = "draft" if draft else str(form.get("input_mode", "workbook"))
+        if any(isinstance(form.get(k), UploadFile) and form.get(k).filename for k in ("measures", "programcost")):
+            return fail(BARE_CSV_MESSAGE)
+        ups = {k: form.get(k) for k in UPLOADS}
+        ups = {k: v for k, v in ups.items() if isinstance(v, UploadFile) and v.filename}
+        for k, v in ups.items():
+            if Path(v.filename).suffix.lower() not in UPLOADS[k][1]:
+                return fail(BARE_CSV_MESSAGE if k == "job_zip" and Path(v.filename).suffix.lower() in jobzip.SUFFIXES
+                            else f"{UPLOADS[k][2]}: use a {' or '.join(UPLOADS[k][1])} file ({v.filename} was given).")
+        if mode == "workbook":
+            ups.pop("job_zip", None)
+            if "workbook" not in ups:
+                return fail("Choose a job workbook (or switch to CET files).")
+        elif mode == "files":
+            ups.pop("workbook", None)
+            if "job_zip" not in ups:
+                return fail("Choose a job zip holding Measure.csv and, optionally, ProgramCost.csv (or switch to a job workbook).")
+        elif mode == "from_run":
+            if from_run is None:
+                return fail("Choose a job workbook or a job zip.")
+            ups.pop("workbook", None)
+            ups.pop("job_zip", None)
+        else:
+            ups.pop("workbook", None)
+            ups.pop("job_zip", None)
+
+        run_id = new_run_id()
+        folder = ctx.runner.folder(run_id)
+        names = []
+        try:
+            for k, up in ups.items():
+                dest = folder / "inputs" / f"{k}{Path(up.filename).suffix.lower()}"
+                await save_upload(up, dest, s.max_upload_bytes)
+                if k == "job_zip":                                   # the job's files, copied out to inputs/measures.csv and inputs/programcost.csv
+                    try:
+                        got = jobzip.unpack(dest, folder / "inputs", s.max_unzipped_bytes)
+                    finally:
+                        dest.unlink(missing_ok=True)
+                    for key, p in got.items():
+                        cfg[key] = str(p)
+                    names.append(f"Job zip: {Path(up.filename).name} ({', '.join('Measure.csv' if key == 'measures' else 'ProgramCost.csv' for key in got)})")
+                    continue
+                cfg[UPLOADS[k][0]] = str(dest)
+                names.append(f"{UPLOADS[k][2]}: {Path(up.filename).name}")
+            if from_run is not None:                         # Rerun with different settings: the earlier run's files, linked (not uploaded again)
+                from . import edit_api
+                _cfg, job, supplied = edit_api.run_inputs(ctx, from_run)
+                title = from_run["label"] or from_run["id"]
+                if mode == "from_run":
+                    for f, p in job.items():
+                        dest = folder / "inputs" / f"from_run_{p.name}"
+                        edit_api.link_or_copy(p, dest)
+                        cfg[f] = str(dest)
+                    names.insert(0, f"Job: the files of run {title} ({', '.join(JOB_FILE_LABELS[f] for f in job)})")
+                for f, p in supplied.items():
+                    if cfg.get(f) or form.get(f"keep_{f}") != "on":
+                        continue
+                    dest = folder / "inputs" / f"carried_{f}{p.suffix.lower()}"
+                    edit_api.link_or_copy(p, dest)
+                    cfg[f] = str(dest)
+                    names.append(f"{field_label.get(f, f)}: from run {title}")
+            if draft is not None:
+                from . import edit_api
+                names += edit_api.carry_supplied(ctx, draft["id"], folder, cfg, field_label, lambda fld: form.get(f"keep_{fld}") == "on")
+                problem, updates = edit_api.prepare_draft_run(ctx, draft, folder, edit_api.given_files(cfg))
+                if problem:
+                    shutil.rmtree(folder, ignore_errors=True)
+                    return fail(problem)
+                cfg.update(updates)
+                names.insert(0, f"Edited inputs: {draft['name']}")
+        except jobzip.JobZipError as exc:
+            shutil.rmtree(folder, ignore_errors=True)
+            return fail(f"Job zip: {exc}.")
+        except Exception as exc:
+            shutil.rmtree(folder, ignore_errors=True)
+            return fail(str(exc))
+
+        if replica is not None:                 # what a replica cannot do (a filing accepts only ReCET's own engine), now that every option and file is known
+            from ..jobs import RunConfig
+            bad = cet_job.problems(RunConfig.from_dict(cfg))
+            if bad:
+                shutil.rmtree(folder, ignore_errors=True)
+                return fail(bad[0][0].upper() + bad[0][1:] + "." + (f" (Also: {'; '.join(bad[1:])}.)" if len(bad) > 1 else ""))
+        if not label:                       # a name to tell runs apart on the list: the job's file (or draft, or earlier run) and the ACC
+            stem = (draft["name"] if draft is not None else
+                    Path(ups["workbook"].filename).stem if "workbook" in ups else
+                    Path(ups["job_zip"].filename).stem if "job_zip" in ups else
+                    rerun_stem(from_run) if from_run is not None else "")
+            label = ((f"{stem} · " if stem else "") + f"{acc} ACC" + (f" vs {cmp_}" if cmp_ else "") + (" · input check" if cfg.get("preflight_only") else "")
+                     + (f" · {replica.label}" if replica is not None else ""))
+            label = label[:120]
+        ctx.queue_run(request, u, run_id, cfg, label, names)
+        return ctx.redirect(f"/runs/{run_id}")
+
+    def run_page_for(request: Request, run, status_code: int = 200, error: str = ""):
+        from .. import editor
+        has_inputs = (ctx.runner.folder(run["id"]) / "config.json").exists() and run["status"] != "expired"
+        wait = eta.describe(ctx.queue_eta().get(run["id"])) if run["status"] == "queued" else ""
+        size = ctx.run_size(run) if has_inputs else None
+        n = (size or {}).get("measures")
+        editable = n is None or n <= editor.MAX_EDIT_ROWS
+        check = check_summary(ctx.preflight_report(run)) if run["status"] not in ("queued", "expired") else None
+        headline = ctx.headline(run) if run["status"] == "finished" and run["result_dir"] else []
+        u = request.state.user
+        owner = run["user_id"] == u["id"] or u["role"] == "admin"
+        sharing = dict(owner=owner, shared_with=ctx.shared_with(run["id"]) if owner else [],
+                       candidates=compare_candidates(u, run["id"]) if run["status"] == "finished" and run["result_dir"] and not run["preflight_only"] else [])
+        return ctx.render(request, "run.html", **sharing, status_code=status_code, run=run, engine=ctx.engine_label(run) if has_inputs or run["result_dir"] else "", position=ctx.runner.position(run["id"]), wait=wait, files=_downloads(run),
+                          retention=s.retention_days, has_inputs=has_inputs, error=error, bar=ctx.progress(run),
+                          settings=settings_summary(ctx.run_config(run), size) if has_inputs else "", editable=editable, n_measures=n,
+                          max_edit_rows=editor.MAX_EDIT_ROWS, check=check, headline=headline, expires=expires_text(run, s.retention_days))
+
+    @app.get("/runs/{run_id}", response_class=HTMLResponse)
+    async def run_page(request: Request, run_id: str):
+        return run_page_for(request, ctx.run_for(request, run_id))
+
+    @app.post("/runs/{run_id}/edit")
+    async def run_edit_inputs(request: Request, run_id: str):
+        """Edit inputs and rerun: the run's tables, workbook, supplied files and settings become a new draft of the signed-in user."""
+        from .. import editor
+        from . import edit_api
+        run = ctx.run_for(request, run_id)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        u = ctx.need_user(request)
+        try:
+            draft_id = await run_in_threadpool(edit_api.draft_from_run, ctx, run, u)
+        except (editor.EditorError, ValueError) as exc:
+            msg = str(exc)
+            if "editor is for jobs" in msg:
+                msg += " Download the inputs below, edit them in Excel, and start a new run with them."
+            return run_page_for(request, run, 400, msg[:1].upper() + msg[1:])
+        ctx.db.audit("draft created", u, detail=f"{draft_id}: from run {run_id}", ip=ctx.ip(request))
+        return ctx.redirect(f"/edit?draft={draft_id}")
+
+    @app.get("/runs/{run_id}/inputs.zip")
+    async def run_inputs_zip(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id)
+        base = ctx.runner.folder(run_id) / "inputs"
+        if run["status"] == "expired" or not base.is_dir():
+            raise HTTPException(404)
+        entries = [(f, str(f.relative_to(base))) for f in sorted(base.rglob("*")) if f.is_file()]
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}_inputs.zip", background=BackgroundTask(z.unlink, missing_ok=True))
+
+    # result files not listed for download: preflight.txt is in the run log (run_log.txt), preflight.json is for the app (preflight_findings.xlsx is the readable form)
+    HIDDEN_RESULT_FILES = {"preflight.txt", "preflight.json"}
+
+    def _files(run) -> list[tuple[str, int]]:
+        """The run's result files (path relative to its result folder, size)."""
+        p = ctx.result_path(run)
+        if p is None:
+            return []
+        out = []
+        for f in sorted(p.rglob("*")):
+            if (f.is_file() and "_prepared_inputs" not in f.parts and outputs.RESULTS_DIR not in f.parts and not f.name.startswith("_config")
+                    and f.name not in HIDDEN_RESULT_FILES):
+                out.append((str(f.relative_to(p)), f.stat().st_size))
+        return out
+
+    def _downloads(run) -> list[dict]:
+        """The run page's downloads: the result files, the run log, and the run's inputs as a zip."""
+        out = [{"name": n, "size": z, "url": ctx.u(f"/runs/{run['id']}/files/{n}")} for n, z in _files(run)]
+        log = ctx.runner.folder(run["id"]) / "log.txt"
+        if run["status"] not in ("queued", "running", "expired") and log.exists():
+            out.append({"name": "run_log.txt", "size": log.stat().st_size, "url": ctx.u(f"/runs/{run['id']}/run_log.txt"),
+                        "note": "everything the run printed, the input check included"})
+        inputs = ctx.runner.folder(run["id"]) / "inputs"
+        if run["status"] != "expired" and inputs.is_dir() and any(f.is_file() for f in inputs.rglob("*")):
+            out.append({"name": "inputs.zip", "size": sum(f.stat().st_size for f in inputs.rglob("*") if f.is_file()),
+                        "url": ctx.u(f"/runs/{run['id']}/inputs.zip"), "note": "the files this run was given (size before zipping)"})
+        return out
+
+    @app.get("/runs/{run_id}/log")
+    async def run_log(request: Request, run_id: str, offset: int = 0):
+        run = ctx.run_for(request, run_id)
+        p = ctx.runner.folder(run_id) / "log.txt"
+        text, end = "", offset
+        if p.exists():
+            with open(p, "rb") as f:
+                f.seek(max(0, offset))
+                data = f.read(256 * 1024)
+            text, end = data.decode("utf-8", errors="replace"), max(0, offset) + len(data)
+        return JSONResponse({"text": text, "offset": end, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]),
+                             "position": ctx.runner.position(run_id), "message": run["message"], "has_results": bool(run["result_dir"]),
+                             "wait": eta.describe(ctx.queue_eta().get(run_id)) if run["status"] == "queued" else "",
+                             "progress": ctx.progress(run)})
+
+    @app.get("/runs/{run_id}/check")
+    def run_check(request: Request, run_id: str):
+        """A run's progress and its input check (preflight) as JSON, for the Edit inputs page's Validate inputs panel."""
+        run = ctx.run_for(request, run_id)
+        report = ctx.preflight_report(run) if run["status"] not in ("queued", "expired") else None
+        tail = ""
+        if run["status"] in ("failed", "cancelled") and report is None:          # stopped before the check could report: the log says why
+            log = ctx.runner.folder(run_id) / "log.txt"
+            if log.exists():
+                tail = "\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-25:])
+        return {"id": run_id, "status": run["status"], "status_text": STATUS_TEXT.get(run["status"], run["status"]), "position": ctx.runner.position(run_id),
+                "message": run["message"] or "", "acc_version": run["acc_version"], "created_at": run["created_at"], "report": report, "log_tail": tail,
+                "url": ctx.u(f"/runs/{run_id}")}
+
+    @app.post("/runs/{run_id}/cancel")
+    async def run_cancel(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        ctx.runner.cancel(run["id"])
+        ctx.db.audit("run stopped", request.state.user, detail=run_id, ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    @app.post("/runs/{run_id}/delete")
+    async def run_delete(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        if run["status"] in ("queued", "running"):
+            raise HTTPException(400, "Stop the run before deleting it.")
+        shutil.rmtree(ctx.runner.folder(run_id), ignore_errors=True)
+        ctx.db.run("UPDATE runs SET status = 'expired', result_dir = NULL, message = 'deleted by its owner' WHERE id = ?", (run_id,))
+        ctx.db.audit("run deleted", request.state.user, detail=run_id, ip=ctx.ip(request))
+        return ctx.redirect("/runs")
+
+    @app.get("/runs/{run_id}/files/{path:path}")
+    async def run_file(request: Request, run_id: str, path: str):
+        run = ctx.run_for(request, run_id)
+        base = ctx.result_path(run)
+        if base is None:
+            raise HTTPException(404)
+        f = (base / path).resolve()
+        if not f.is_file() or not f.is_relative_to(base):
+            raise HTTPException(404)
+        return FileResponse(f, filename=f.name)
+
+    @app.get("/runs/{run_id}/run_log.txt")
+    async def run_log_file(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id)
+        log = ctx.runner.folder(run_id) / "log.txt"
+        if run["status"] == "expired" or not log.is_file():
+            raise HTTPException(404)
+        return FileResponse(log, media_type="text/plain; charset=utf-8", filename=f"recet_{run_id}_run_log.txt")
+
+    @app.get("/runs/{run_id}/zip")
+    async def run_zip(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id)
+        base = ctx.result_path(run)
+        if base is None:
+            raise HTTPException(404)
+        entries = [(base / rel, rel) for rel, _n in _files(run)]
+        log = ctx.runner.folder(run_id) / "log.txt"
+        if log.exists():
+            entries.append((log, "run_log.txt"))
+        z = await run_in_threadpool(zip_to_file, entries, ctx.s.state_dir / "tmp")
+        return FileResponse(z, media_type="application/zip", filename=f"recet_{run_id}.zip", background=BackgroundTask(z.unlink, missing_ok=True))
+
+    # ----------------------------------------------------------------------------------------------------------------- results
+    def user_views(uid: int) -> dict[str, list[str]]:
+        from .. import results_view as rv
+        views = {rv.DEFAULT_VIEW_NAME: list(rv.DEFAULT_VIEW)}
+        for r in ctx.db.all("SELECT name, keys FROM views WHERE user_id = ? ORDER BY name", (uid,)):
+            try:
+                views[r["name"]] = rv.current_keys(json.loads(r["keys"]))      # names renamed in 0.1.50 read as the new ones
+            except ValueError:
+                pass
+        return views
+
+    @app.get("/runs/{run_id}/results", response_class=HTMLResponse)
+    async def run_results(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                          years: list[str] = Query(default=[])):
+        from .. import results_view as rv
+        run = ctx.run_for(request, run_id)
+        u = request.state.user
+        base = ctx.result_path(run)
+        if base is None:
+            raise HTTPException(404, "This run has no results.")
+        folder = ctx.result_path(run, sub) if sub else base
+        if folder is None:
+            raise HTTPException(404)
+        # a comparison's runs are sub-folders with a measure-level table; the kept results parquet's folder (outputs.RESULTS_DIR) is not one
+        subruns = sorted(str(p.parent.relative_to(base)) for p in base.glob("*/measure_level_*.*") if p.parent.name != outputs.RESULTS_DIR)
+        measure_files = sorted(folder.glob("measure_level_*.*"))
+        source = outputs.results_source(folder)                # a CSV run's kept parquet (outputs.RESULTS_DIR) when there is one
+        comparison = sorted(folder.glob("comparison_summary_*.*"))
+        kw = dict(run=run, sub=sub, subruns=subruns, levels=rv.LEVELS, level=level, plain=None, plain_name="")
+        if not measure_files:
+            plain_file = comparison[0] if comparison else next(iter(sorted(folder.glob("portfolio_summary_*.*"))), None)
+            if plain_file is None:
+                return ctx.render(request, "results.html", **kw, note="This run wrote no results tables (a preflight-only run, or it stopped early).",
+                                  table=None)
+            df = ctx.frame(plain_file)
+            kw.update(plain=df, plain_name=plain_file.name)
+            return ctx.render(request, "results.html", **kw, note="", table=None)
+        res = ctx.results(source)
+        pas = res.pas()
+        pa = pa if pa in pas else rv.ALL_PAS
+        all_years = res.years()
+        years = [y for y in rv.parse_years(years) if y in all_years]            # program years to total; none = every year
+        if set(years) == set(all_years):
+            years = []
+        views = user_views(u["id"])
+        cat = res.catalog()
+        if columns:                                          # an unsaved choice from the column picker
+            keys = [k for k in columns.split(",") if k in cat]
+            view = ""
+        else:
+            view = view if view in views else rv.DEFAULT_VIEW_NAME
+            keys = views[view]
+        levels_ok = {k for k, _ in rv.LEVELS}
+        level = level if level in levels_ok else "portfolio"
+        note = ""
+        table = None
+        measure_ok = res.measure_level_available()
+        if level == "measure" and not measure_ok:
+            note = (f"This run has {res.n:,} measures: the measure level is shown only for runs of up to {rv.MAX_RUN_MEASURE_ROWS:,}. "
+                    "Its measure-level table is in the downloads on the run page.")
+        elif level == "measure" and not res.measure_level_allowed(pa, years):
+            note = f"The measure level is off above {rv.MAX_MEASURE_ROWS:,} measures: download the measure-level file instead, or pick one PA or fewer years."
+        else:
+            table = res.table(level, pa, keys, years)
+        shown = [cat[k] for k in keys if k in cat]
+        kw.update(level=level, pa=pa, pas=pas, views=views, view=view, keys=keys, catalog=cat, shown=shown, file_name=measure_files[0].name,
+                  n_measures=res.n, measure_ok=measure_ok, max_run_measures=rv.MAX_RUN_MEASURE_ROWS, all_years=all_years, years=years,
+                  years_param=",".join(years),
+                  tiles=results_tiles(res, cat, pa, years), chart=sector_chart(res, cat, pa, years=years), groups=picker_groups(cat),
+                  labels={k: rv.display_label(c) for k, c in cat.items()})
+        return ctx.render(request, "results.html", **kw, note=note, table=table, rv=rv)
+
+    def results_tiles(res, cat, pa, years=None) -> list[dict]:
+        """The Results page's headline numbers for the chosen PA and program years: measures, then Ctx.HEADLINE's columns that this run has."""
+        from .. import results_view as rv
+        keys = [k for k, _ in Ctx.HEADLINE if k in cat]
+        t = res.table("portfolio", pa, keys, years)
+        if not len(t):
+            return []
+        row, labels = t.iloc[0], dict(Ctx.HEADLINE)
+        return ([{"label": "Measures", "value": f"{int(row['Measures']):,}", "help": "measures in the table below"}]
+                + [{"label": labels[k], "value": rv.format_value(cat[k], row[k]) or "–", "help": cat[k].help or cat[k].label} for k in keys])
+
+    def sector_chart(res, cat, pa, limit: int = 12, years=None) -> dict | None:
+        """Total system benefit by program sector, as bars for the Results page (widths in percent of the largest value; negative bars marked)."""
+        from .. import results_view as rv
+        key = "TotalSystemBenefit"
+        if key not in cat:
+            return None
+        t = res.table("sector", pa, [key], years)
+        if len(t) < 2 or key not in t:
+            return None
+        t = t.sort_values(key, ascending=False).head(limit)
+        top = max(float(t[key].abs().max()), 1e-9)
+        bars = [{"name": str(r["Program sector"]) or "(blank)", "value": rv.format_value(cat[key], r[key]),
+                 "pct": round(100 * abs(float(r[key])) / top, 1), "neg": float(r[key]) < 0} for _, r in t.iterrows()]
+        return {"title": "Total system benefit by program sector", "bars": bars}
+
+    def picker_groups(cat) -> list[tuple[str, list]]:
+        """The column picker's groups, in rv.GROUP_ORDER: [(group, [(key, label, help)])]."""
+        from .. import results_view as rv
+        out: dict[str, list] = {g: [] for g in rv.GROUP_ORDER}
+        for k, c in cat.items():
+            out[rv.column_group(c)].append((k, rv.display_label(c), c.help or f"Output column {k}, summed over the measures in each row."))
+        return [(g, items) for g, items in out.items() if items]
+
+    @app.get("/runs/{run_id}/results.csv")
+    async def run_results_csv(request: Request, run_id: str, level: str = "portfolio", pa: str = "", view: str = "", sub: str = "", columns: str = "",
+                              years: list[str] = Query(default=[])):
+        from .. import results_view as rv
+        run = ctx.run_for(request, run_id)
+        base = ctx.result_path(run, sub) if sub else ctx.result_path(run)
+        source = outputs.results_source(base) if base else None
+        if source is None:
+            raise HTTPException(404)
+        res = ctx.results(source)
+        cat = res.catalog()
+        views = user_views(request.state.user["id"])
+        keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
+        pa = pa if pa in res.pas() else rv.ALL_PAS
+        years = [y for y in rv.parse_years(years) if y in res.years()]
+        level = level if level in {k for k, _ in rv.LEVELS} else "portfolio"
+        if level == "measure" and not res.measure_level_allowed(pa, years):
+            raise HTTPException(400, "The measure level is too large to show: download the measure-level file instead.")
+        t = res.table(level, pa, keys, years).rename(columns={k: c.label for k, c in cat.items()})
+        name = f"recet_{run_id}_{level}.csv"
+        return Response(t.to_csv(index=False), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    # ----------------------------------------------------------------------------------------------------------------- sharing and comparing runs
+    def compare_candidates(u, run_id: str) -> list:
+        """Finished runs with results this user may compare a run with: their own and the ones shared with them, newest first."""
+        return ctx.db.all("SELECT r.id, r.label, r.acc_version, r.created_at, u.email AS owner_email FROM runs r JOIN users u ON u.id = r.user_id "
+                          "WHERE r.status = 'finished' AND r.result_dir IS NOT NULL AND r.preflight_only = 0 AND r.id != ? "
+                          "AND (r.user_id = ? OR r.id IN (SELECT run_id FROM run_shares WHERE user_id = ?)) ORDER BY r.created_at DESC LIMIT 100",
+                          (run_id, u["id"], u["id"]))
+
+    @app.post("/runs/{run_id}/share")
+    async def run_share(request: Request, run_id: str):
+        """Share a run read-only with another user, by their email (owner or admin only). They see it under Shared with you on the runs list."""
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        email = str(form.get("email", "")).strip()
+        target = ctx.db.one("SELECT id, email FROM users WHERE email = ? AND disabled = 0", (email,)) if email else None
+        if target is None:
+            return run_page_for(request, run, 400, f"No active user has the email {email!r}: an admin adds users on the Users page.")
+        if target["id"] == run["user_id"]:
+            return run_page_for(request, run, 400, "That is the run's owner.")
+        ctx.db.run("INSERT OR IGNORE INTO run_shares (run_id, user_id, shared_by, created_at) VALUES (?,?,?,?)",
+                   (run_id, target["id"], request.state.user["id"], time.time()))
+        ctx.db.audit("run shared", request.state.user, detail=f"{run_id} with {target['email']}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    @app.post("/runs/{run_id}/unshare")
+    async def run_unshare(request: Request, run_id: str):
+        run = ctx.run_for(request, run_id, owner=True)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        uid = int(str(form.get("user_id", "0")) or 0)
+        ctx.db.run("DELETE FROM run_shares WHERE run_id = ? AND user_id = ?", (run["id"], uid))
+        ctx.db.audit("run unshared", request.state.user, detail=f"{run_id} user {uid}", ip=ctx.ip(request))
+        return ctx.redirect(f"/runs/{run_id}")
+
+    def compare_tables(request: Request, run_id: str, other: str, level: str, view: str, columns: str, years):
+        """(run a, run b, its results a and b, keys, level, years, the compare frame) for the compare page and its CSV."""
+        from .. import results_view as rv
+        a, b = ctx.run_for(request, run_id), ctx.run_for(request, other)
+        def source(r):
+            base = ctx.result_path(r)
+            return outputs.results_source(base) if base else None
+        sa, sb = source(a), source(b)
+        if sa is None or sb is None:
+            raise HTTPException(404, "Both runs need results to compare them.")
+        ra, rb = ctx.results(sa), ctx.results(sb)
+        cat = {**rb.catalog(), **ra.catalog()}
+        views = user_views(request.state.user["id"])
+        keys = [k for k in columns.split(",") if k in cat] if columns else views.get(view, views[rv.DEFAULT_VIEW_NAME])
+        level = level if level in {k for k, _ in rv.COMPARE_LEVELS} else "portfolio"
+        known = sorted(set(ra.years()) | set(rb.years()))
+        years = [y for y in rv.parse_years(years) if y in known]
+        if set(years) == set(known):
+            years = []
+        return a, b, cat, keys, level, known, years, rv.compare(ra, rb, level, keys, years=years)
+
+    @app.get("/runs/{run_id}/compare", response_class=HTMLResponse)
+    async def run_compare(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                          columns: str = "", years: list[str] = Query(default=[])):
+        """Any two runs the user may see, side by side at one level: each run's value, the difference (b - a) and the % change."""
+        from .. import results_view as rv
+        u = ctx.need_user(request)
+        if not other:
+            return ctx.redirect(f"/runs/{run_id}")
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        views = user_views(u["id"])
+        return ctx.render(request, "compare.html", a=a, b=b, engine_a=ctx.engine_label(a), engine_b=ctx.engine_label(b), table=table, ids=[c for c in table.columns if "__" not in c], keys=["Measures"] + [k for k in keys if k in cat], catalog=cat, level=level,
+                          levels=rv.COMPARE_LEVELS, view=view if view in views else ("" if columns else rv.DEFAULT_VIEW_NAME), views=views,
+                          columns=columns, all_years=known, years=years, years_param=",".join(years),
+                          labels={k: rv.display_label(c) for k, c in cat.items()}, rv=rv, candidates=compare_candidates(u, run_id))
+
+    @app.get("/runs/{run_id}/compare.csv")
+    async def run_compare_csv(request: Request, run_id: str, other: str = Query(default="", alias="with"), level: str = "portfolio", view: str = "",
+                              columns: str = "", years: list[str] = Query(default=[])):
+        a, b, cat, keys, level, known, years, table = compare_tables(request, run_id, other, level, view, columns, years)
+        side = {"a": f"run {a['id']}", "b": f"run {b['id']}", "diff": "difference", "pct": "% change"}
+
+        def name(c: str) -> str:
+            k, _, part = c.rpartition("__")
+            return f"{cat[k].label if k in cat else k} ({side[part]})" if k and part in side else c
+        name_csv = f"recet_compare_{a['id']}_{b['id']}_{level}.csv"
+        return Response(table.rename(columns=name).to_csv(index=False), media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{name_csv}"'})
+
+    @app.post("/views")
+    async def save_view(request: Request):
+        u = ctx.need_user(request)
+        form = await request.form()
+        ctx.check_csrf(request, str(form.get("csrf", "")))
+        from .. import results_view as rv
+        name = str(form.get("name", "")).strip()[:60]
+        back = str(form.get("back", ""))
+        keys = [str(k) for k in form.getlist("keys")][:200]
+        if form.get("delete"):
+            ctx.db.run("DELETE FROM views WHERE user_id = ? AND name = ?", (u["id"], name))
+            name = rv.DEFAULT_VIEW_NAME
+        elif not name or name == rv.DEFAULT_VIEW_NAME or not keys:
+            raise HTTPException(400, "Give the view a name (not 'Default') and pick at least one column.")
+        else:
+            ctx.db.run("INSERT OR REPLACE INTO views (user_id, name, keys) VALUES (?,?,?)", (u["id"], name, json.dumps(keys)))
+        target = _safe_next(s.prefix, back)
+        sep = "&" if "?" in target else "?"
+        from urllib.parse import quote
+        return RedirectResponse(f"{target}{sep}view={quote(name)}", status_code=303)
+
+    # ----------------------------------------------------------------------------------------------------------------- templates and docs
+    @app.get("/templates/{kind}")
+    async def template_file(request: Request, kind: str):
+        from .. import templates
+        ctx.need_user(request)
+        if kind not in TEMPLATE_FILES:
+            raise HTTPException(404)
+        acc = s.acc_versions[-1]
+        out = s.state_dir / "templates" / acc / TEMPLATE_FILES[kind][0]
+        if not out.exists():
+            tmp = out.with_name(f".{secrets.token_hex(4)}{out.suffix}")
+            templates.write_template(kind, tmp, acc)
+            tmp.replace(out)
+        return FileResponse(out, filename=out.name)
+
+    from . import value_lists
+    value_lists.register(app, ctx)                   # before /docs/{name}, which would otherwise take /docs/value-lists
+    value_lists.sync(ctx)
+
+    @app.get("/docs")
+    async def docs_index(request: Request):
+        ctx.need_user(request)
+        return ctx.redirect("/docs/" + DOCS_HOME)   # a redirect, not a render, so the document's relative links resolve under /docs/
+
+    @app.get("/docs/{name}", response_class=HTMLResponse)
+    async def doc(request: Request, name: str):
+        import markdown
+        ctx.need_user(request)
+        p = (DOCS_DIR / name).resolve()
+        if p.suffix != ".md" or not p.is_file() or p.parent != DOCS_DIR.resolve():
+            raise HTTPException(404)
+        html = markdown.markdown(p.read_text(encoding="utf-8"), extensions=["tables", "fenced_code", "toc", "sane_lists"])
+        # code blocks and tables scroll sideways (app.css): focusable, so they can be scrolled from the keyboard (WCAG 2.1.1)
+        html = html.replace("<pre>", '<pre tabindex="0">').replace("<table>", '<table tabindex="0">')
+        # a ```mermaid block becomes <code class="language-mermaid">; the page then loads the vendored Mermaid (static/docs.js draws it), only when needed
+        return ctx.render(request, "docs.html", docs=doc_names(), html=html, title=doc_title(name), current=name, mermaid='class="language-mermaid"' in html)
+
+    @app.get("/healthz", response_class=PlainTextResponse)
+    async def healthz():
+        ctx.db.one("SELECT 1")
+        return "ok"
+
+    from . import edit_api
+    edit_api.register(app, ctx)
+
+    # ----------------------------------------------------------------------------------------------------------------- the outer app
+    outer = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    outer.state.ctx = ctx
+
+    @outer.middleware("http")
+    async def headers(request: Request, call_next):
+        path = request.url.path
+        low, pre = path.lower(), s.prefix.lower()
+        if s.prefix and (low == pre or low.startswith(pre + "/")) and not path.startswith(s.prefix):
+            fixed = s.prefix + path[len(s.prefix):]           # /recet/runs -> /ReCET/runs: cookies are scoped to the exact casing
+            q = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(fixed + q, status_code=301)
+        if s.prefix and path == s.prefix:                     # /ReCET -> /ReCET/ as a relative redirect (the mount's own would name http://host)
+            q = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(s.prefix + "/" + q, status_code=307)
+        resp = await call_next(request)
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Referrer-Policy", "same-origin")
+        resp.headers.setdefault("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                                           "frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+        if not path.startswith(s.prefix + "/static/"):
+            resp.headers.setdefault("Cache-Control", "no-store")
+        return resp
+
+    @outer.get("/healthz", response_class=PlainTextResponse)
+    async def outer_health():
+        return "ok"
+
+    if s.prefix:
+        @outer.get("/")
+        async def outer_root():
+            return RedirectResponse(s.prefix + "/", status_code=307)
+        outer.mount(s.prefix, app)
+    else:
+        outer.mount("", app)
+    return outer
+
+
+def _nan_to_none(v):
+    return None if isinstance(v, float) and math.isnan(v) else v

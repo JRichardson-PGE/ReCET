@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}New run{% endblock %}
+{% block content %}
+<h1>New run</h1>
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{{ u('/runs') }}" enctype="multipart/form-data" class="run-form" id="run-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{% set f = form %}
+{% macro template_link(key) %}{% if key in upload_templates %}<a class="small" href="{{ u('/templates/' + upload_templates[key]) }}">template</a>{% endif %}{% endmacro %}
+
+<section class="card">
+  <label class="name-field">Name <span class="muted small">(optional; blank names the run after its input file and ACC)</span>
+    <input type="text" name="label" maxlength="120" value="{{ f.get('label', '') }}"></label>
+</section>
+
+<section class="card">
+  <h2>Inputs</h2>
+  {% if draft %}
+  <input type="hidden" name="draft" value="{{ draft.id }}">
+  <p>Runs the edited tables of <strong>{{ draft.name }}</strong> (last saved {{ fmt_time(draft.updated_at) }}). <a href="{{ u('/edit?draft=' + draft.id) }}">Back to Edit inputs</a></p>
+  <p class="muted small">If the draft came from a job workbook, that workbook's other sheets (run parameters, profiles, programs ...) are used too, unless you upload a file for them below.</p>
+  {% if source_run %}<p class="muted small">The settings below start from run <a href="{{ u('/runs/' + source_run.id) }}">{{ source_run.label or source_run.id }}</a>.</p>{% endif %}
+  {% else %}
+  {% set mode = f.get('input_mode') or ('from_run' if from_run else 'workbook') %}
+  {% if from_run %}<input type="hidden" name="from_run" value="{{ from_run.id }}">{% endif %}
+  <div class="radios" id="input-mode">
+    {% if from_run %}<label><input type="radio" name="input_mode" value="from_run" {% if mode == 'from_run' %}checked{% endif %}> The files of run {{ from_run.label or from_run.id }}</label>{% endif %}
+    <label><input type="radio" name="input_mode" value="workbook" {% if mode == 'workbook' %}checked{% endif %}> Job workbook (.xlsx)</label>
+    <label><input type="radio" name="input_mode" value="files" {% if mode == 'files' %}checked{% endif %}> CET files in a .zip (Measure.csv, ProgramCost.csv)</label>
+  </div>
+  {% if from_run %}
+  <div class="mode-from_run">
+    <p class="small">Uses {{ job_files|join(' and ') }} from run <a href="{{ u('/runs/' + from_run.id) }}">{{ from_run.label or from_run.id }}</a>, as it was given; nothing is uploaded again.
+      The settings below start from that run's. Pick a workbook or a zip above to price other files instead.</p>
+  </div>
+  {% endif %}
+  <div class="mode-workbook">
+    <label class="file">Job workbook <input type="file" name="workbook" accept=".xlsx,.xlsm"></label>
+    <p class="muted small">Sheets: Measure (required), ProgramCost, and the optional RunParameters, SWAllocation, GasProfiles, Profiles8760 and Programs. {{ template_link('workbook') }}</p>
+  </div>
+  <div class="mode-files">
+    <label class="file">Job zip <input type="file" name="job_zip" accept=".zip"></label>
+    <p class="muted small">One .zip holding <code>Measure.csv</code> and, optionally, <code>ProgramCost.csv</code>, as CET takes them (a CSV on its own is not accepted).
+      Each in CET's pipe-delimited format, or an ordinary comma-delimited CSV with the same columns. Up to {{ max_unzipped_mb }} MB once unzipped. {{ template_link('job_zip') }}</p>
+  </div>
+  {% endif %}
+  {% if carried %}
+  <div class="checks">
+    <p class="small">Supplied files from the earlier run (a file chosen below replaces one):</p>
+    {% for fld, label in carried %}
+    <label><input type="checkbox" name="keep_{{ fld }}" {% if not f.get('csrf') or f.get('keep_' + fld) %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <details>
+    <summary>Optional supplied files</summary>
+    <p class="muted small">Each replaces the matching built-in rows for this run only. A file chosen here wins over the workbook's sheet.</p>
+    {% for k in ('profiles_8760', 'profiles_gas', 'run_parameters', 'sw_factors', 'programs', 'cet_outputs') %}
+    <label class="file">{{ uploads[k][2] }} <input type="file" name="{{ k }}" accept="{{ uploads[k][1]|join(',') }}"> {{ template_link(k) }}</label>
+    {% endfor %}
+  </details>
+  <p class="muted small">Up to {{ max_mb }} MB per file.</p>
+</section>
+
+{% set fresh = not f %}
+<section class="card">
+  <h2>Pricing</h2>
+  <div class="grid2">
+    <label class="wide"><span id="engine-label">Calculation engine</span>
+      <select name="engine" id="engine" aria-labelledby="engine-label" aria-describedby="engine-help">{% for k, t, _have in engines %}<option value="{{ k }}" {% if f.get('engine', 'recet') == k %}selected{% endif %}>{{ t }}{% if not loop.first %} (CET's errors kept){% endif %}</option>{% endfor %}</select>
+      <span class="small muted" id="engine-help">ReCET's own hourly pricing, or an exact replica of a CET release on that release's own tables, for evaluation and history. Filings accept only ReCET's own engine.</span></label>
+    <label>ACC version
+      <select name="acc_version" id="acc-version" aria-describedby="acc-help-title">{% for a in accs %}<option value="{{ a }}" {% if f.get('acc_version', accs[-1]) == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}{% if replica_accs %}
+        <optgroup label="CET replicas only">{% for a in replica_accs %}<option value="{{ a }}" {% if f.get('acc_version') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}</option>{% endfor %}</optgroup>{% endif %}</select></label>
+    <label>Compare with
+      <select name="compare_with" id="compare-with"><option value="">(no comparison)</option>{% for a in accs %}<option value="{{ a }}" {% if f.get('compare_with') == a %}selected{% endif %}>{{ acc_labels.get(a, a ~ ' ACC') }}{% if a in ("2021", "2022") %} (TRC only){% endif %}</option>{% endfor %}</select></label>
+    <label>First Year <input type="text" name="base_year" inputmode="numeric" placeholder="earliest claim year" value="{{ f.get('base_year', '') }}"></label>
+    <label><span id="purpose-label">Priced for</span>
+      <select name="acc_purpose" aria-labelledby="purpose-label" aria-describedby="purpose-help">{% for k, t in purposes %}<option value="{{ k }}" {% if f.get('acc_purpose', '') == k %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+      <span class="small muted" id="purpose-help">Records on an ACC that does not normally apply to their program year are flagged, not stopped.</span></label>
+    <label><span id="cost-tests-label">Cost tests</span>
+      <select name="cost_test_set" id="cost-test-set" aria-labelledby="cost-tests-label" aria-describedby="cost-tests-help"><option value="">In force for the first program year</option>{% for c in cost_sets %}<option value="{{ c.id }}" {% if f.get('cost_test_set', '') == c.id %}selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
+      <span class="small muted" id="cost-tests-help">The tests and value streams the run prices. A filing uses a published set; a custom set (a YAML file under Supplied files) is for analysis runs.</span></label>
+    <label>Market effects
+      <select name="market_effects"><option value="0">0%</option><option value="0.05" {% if f.get('market_effects') == '0.05' %}selected{% endif %}>5% (benefits and costs)</option></select></label>
+  </div>
+  <details class="info-box" id="acc-help">
+    <summary id="acc-help-title">Which ACC applies to my filing?</summary>
+    <table class="list compact acc-map">
+      <thead><tr><th>ACC</th><th>Budget filings</th><th>Claims (program years)</th></tr></thead>
+      <tbody>{% for r in acc_map %}<tr class="{% if not r.builtin %}dim{% endif %}">
+        <td class="nowrap">{{ r.acc }}{% if not r.builtin %} <span class="small">(not in ReCET yet)</span>{% endif %}</td><td>{{ r.filings|join('; ') }}</td><td class="nowrap">{{ r.claims or '–' }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">Claims use the ACC of the year's final budget filing. Dimmed rows are not in ReCET yet.</p>
+  </details>
+  <details class="info-box" id="cost-sets-help">
+    <summary>Which tests each cost-test set writes</summary>
+    <table class="list compact">
+      <thead><tr><th>Set</th><th>Program years</th><th>Tests</th></tr></thead>
+      <tbody>{% for c in cost_sets %}<tr><td class="nowrap">{{ c.label }}</td><td>{{ c.years }}</td><td>{{ c.tests|join('; ') }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">Each test writes its benefits, cost and ratio columns (TRCBen, TRCCost, TRCRatio ...). The Docs page "Cost tests as configuration" describes the sets.</p>
+  </details>
+  <details class="info-box" id="engine-accs">
+    <summary>Which ACCs each engine has</summary>
+    <table class="list compact">
+      <thead><tr><th>Engine</th><th>ACCs</th></tr></thead>
+      <tbody>{% for k, t, have in engines %}<tr><td class="nowrap">{{ t }}</td><td>{{ have|join(', ') or '–' }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small muted">A CET replica prices what that release priced, on its own quarterly tables: the supplied files, statewide split, ACC components,
+      combined 8,760, comparison and CEDARS filing checks are ReCET options and are refused on a replica, and its SCT and emissions columns are those
+      the release wrote. Its outputs are the release's SavedCE, SavedSavings, SavedEmissions and SavedCost tables, plus the measure-level table the
+      Results and Compare pages read. To set two engines side by side, run the job on each and compare the two runs.</p>
+  </details>
+  <div class="checks">
+    <label><input type="checkbox" name="include_societal" {% if fresh or f.get('include_societal') %}checked{% endif %}> Societal Cost Tests (SCT Base and High; about 15% of the run time)</label>
+    <label><input type="checkbox" name="allocate_statewide" {% if f.get('allocate_statewide') %}checked{% endif %}> Split statewide (SW_) programs across the IOUs</label>
+    <label><input type="checkbox" name="components" {% if f.get('components') %}checked{% endif %}> Price each ACC component separately</label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Outputs</h2>
+  <div class="grid2">
+    <label class="wide">Output format
+      <select name="output_format">{% for o, t in (('csv', 'CSV (each file zipped)'), ('xlsx', 'Excel (up to {:,} measures; a larger job: every file zipped CSV)'.format(excel_max_rows)), ('parquet', 'Parquet')) %}<option value="{{ o }}" {% if f.get('output_format') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label class="wide"><span id="template-label">Output template</span> <a href="{{ u('/output-templates') }}">(edit templates)</a>
+      {% set chosen = default_template if fresh else f.get('output_template_name', '') %}
+      <select name="output_template" aria-labelledby="template-label"><option value="">All columns</option>{% for t in output_templates %}<option value="{{ t }}" {% if chosen == t %}selected{% endif %}>{{ t }}{% if t == default_template %} (your default){% endif %}</option>{% endfor %}</select></label>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" name="emissions" {% if fresh or f.get('emissions') %}checked{% endif %}> Emissions (CO2, NOx, PM10)</label>
+    <label><input type="checkbox" name="apply_exclude_from_ce" {% if f.get('apply_exclude_from_ce') %}checked{% endif %}> Leave Exclude_From_CE programs out of the portfolio summary</label>
+    <label><input type="checkbox" name="portfolio_8760" {% if f.get('portfolio_8760') %}checked{% endif %}> Combined 8,760 electric load profile for years
+      <input type="text" name="profile_years" class="short" placeholder="every year covered" value="{{ f.get('profile_years', '') }}" aria-label="Years of the combined 8,760 profile"></label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>CEDARS filing checks</h2>
+  <div class="grid2">
+    <label>Checks
+      <select name="filing_validation" id="filing-validation">{% for o, t in (('', 'None'), ('claims', 'Quarterly Claims'), ('budget_filing', 'Budget filing')) %}<option value="{{ o }}" {% if f.get('filing_validation', '') == o %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label class="filing-year">Filing year <input type="text" name="filing_year" inputmode="numeric" placeholder="each record's claim year" value="{{ f.get('filing_year', '') }}"></label>
+  </div>
+  <p class="muted small">Applies CEDARS' own upload checks for that filing and flags the records it would reject or warn on (the filing_validation table and
+    the input check); the records are still priced.</p>
+</section>
+
+<div class="submit-row">
+  <button class="primary big" name="go" value="run">Start run</button>
+  <button class="big" name="preflight_only" value="on" aria-describedby="preflight-help">Check inputs only</button>
+  <span id="upload-progress" class="small" role="status" aria-live="polite" hidden><progress max="1" value="0" aria-label="Upload"></progress> <span class="text"></span></span>
+  <span class="muted small"><span id="preflight-help">Check inputs only runs the input check a run makes before pricing (what would stop the run or leave measures unpriced); nothing is priced.</span>
+    Runs go through a queue, one at a time; input checks go first.</span>
+</div>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/app.js') }}?v={{ version }}"></script>{% endblock %}

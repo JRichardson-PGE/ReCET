@@ -1,0 +1,48 @@
+code,start_year,end_year,start_date,end_date,claim_spec,filing_spec,description
+AirComp,2013,,2013-01-01,,1,1,Air Compressor
+AnDigestor,2013,,2013-01-01,,1,1,Anaerobic Digestor
+AuditInfoTest,2013,,2013-01-01,,1,1,"Audit, Information, Testing Services"
+Behavior,2023,,2023-01-01,,1,1,Behavioral program offering
+BldgShell,2013,,2013-01-01,,1,1,Building Shell (Opaque)
+Chiller,2013,,2013-01-01,,1,1,Liquid Chilling Equipment
+Clean_equip,2013,,2013-01-01,,1,1,Cleaning Equipment
+Cook_equip,2013,,2013-01-01,,1,1,Cooking Equipment
+C&S,2013,,2013-01-01,,1,1,Codes & Standards
+dxAC_equip,2013,,2013-01-01,,1,1,dX AC Equipment
+dxHP_equip,2013,,2013-01-01,,1,1,dx HP Equipment
+Electronics,2013,,2013-01-01,,1,1,Business and Consumer Electronics
+EvapCool_eq,2013,,2013-01-01,,1,1,Evaporative Cooling Equipment
+FacPondAer,2013,,2013-01-01,,1,1,Facultative Pond Aerator
+Fenest,2013,,2013-01-01,,1,1,Fenestration
+FoodService,2013,,2013-01-01,,1,1,Food Service
+HeatEx,2013,,2013-01-01,,1,1,Heat Exchanger
+HeatReject,2013,,2013-01-01,,1,1,Heat Rejection Equipment
+HV_AirDist,2013,,2013-01-01,,1,1,HVAC Air Distribution
+HV_Tech,2013,,2013-01-01,,1,1,HVAC Technology
+Irrigation,2013,,2013-01-01,,1,1,Irrigation Equipment
+LiquidCirc,2013,,2013-01-01,,1,1,Liquid Circulation
+Ltg_Ballast,2013,,2013-01-01,,1,1,Lighting - Ballasts
+Ltg_Controls,2013,,2013-01-01,,1,1,Lighting - Controls
+Ltg_Fixture,2013,,2013-01-01,,1,1,Lighting - Fixtures
+Ltg_Lamp,2013,,2013-01-01,,1,1,Lighting - Lamps
+Ltg_Lmp+Blst,2013,,2013-01-01,,1,1,Lighting - Lamps + Ballasts
+Ltg_PlugIn,2013,,2013-01-01,,1,1,Lighting - Plug-in
+Motor,2013,,2013-01-01,,1,1,Motor
+Motor_gen,2013,,2013-01-01,,1,1,General Purpose Motor
+Motor_Spd,2013,,2013-01-01,,1,1,Motor Speed Control (Non-HVAC)
+NonSav,2013,,2013-01-01,,1,1,Non-Savings Measure
+Operation,2023,,2023-01-01,,1,1,Operational program offering
+PatioHeat,2023,,2023-05-01,,1,1,Patio Heaters
+PoolSpa_eq,2013,,2013-01-01,,1,1,Pool and Spa Equipment
+ProcessHt,2023,,2023-01-01,,1,1,Process heating equipment
+PumpSystem,2013,,2013-01-01,,1,1,Pump System
+Ref_SelfCon,2013,,2013-01-01,,1,1,Self-Contained Refrigeration
+Ref_Storage,2013,,2013-01-01,,1,1,Refrigerated Storage
+RodPumps,2013,,2013-01-01,,1,1,Rod Beam Pump
+SpaceHtg_eq,2013,,2013-01-01,,1,1,Space Heating Equipment
+SteamCirc,2013,,2013-01-01,,1,1,Steam Circulation
+SteamHtg_eq,2013,,2013-01-01,,1,1,Steam Heating Equipment
+VertTrans,2013,,2013-01-01,,1,1,Vertical Transportation
+WaterFixt,2013,,2013-01-01,,1,1,Plumbing Fixture
+WaterHtg_eq,2013,,2013-01-01,,1,1,Water Heating Equipment
+WhlBldg,2013,,2013-01-01,,1,1,Whole Building

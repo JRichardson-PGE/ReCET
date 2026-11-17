@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JRichardson-PGE/ReCET/blob/main/recet/data/cost_tests/cost_test_set.schema.json",
+  "title": "ReCET cost-test definition set, schema version 1",
+  "description": "One YAML file per set (recet/data/cost_tests/<id>/definition.yaml; recet/docs/COST_TESTS.md). recet/cost_test_sets.py validate() checks these rules and the cross-references a schema cannot (a stream a test names is priced in the test's pricing, a share names a test that shares program costs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "workstream", "version", "label", "pricings", "streams", "tests"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9]{0,15}-[0-9]{4}(-[a-z0-9]+)*$", "description": "<workstream>-<first program year>, e.g. EE-2026"},
+    "workstream": {"type": "string", "pattern": "^[A-Z][A-Z0-9]{0,15}$"},
+    "version": {"type": "string", "minLength": 1},
+    "label": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "draft": {"type": "boolean"},
+    "program_years": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"from": {"$ref": "#/$defs/year"}, "to": {"$ref": "#/$defs/year"}}
+    },
+    "pricings": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["acc_rows", "discount_rate_quarterly", "discount_rate_annual"],
+        "properties": {
+          "label": {"type": "string"},
+          "acc_rows": {"enum": ["trc", "sct_base", "sct_high"]},
+          "discount_rate_quarterly": {"$ref": "#/$defs/rate"},
+          "discount_rate_annual": {"$ref": "#/$defs/rate"},
+          "suffix": {"$ref": "#/$defs/suffix"},
+          "participant_suffix": {"$ref": "#/$defs/suffix"}
+        }
+      }
+    },
+    "streams": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source", "kind"],
+        "properties": {
+          "source": {"enum": ["engine", "input", "program"]},
+          "kind": {"enum": ["benefit", "cost"]},
+          "fuel": {"enum": ["elec", "gas", "water", "none"]},
+          "pricings": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "naming": {"enum": ["suffix", "participant_suffix", "none"]},
+          "gross": {"type": "string", "description": "divide_ntg, same, or the gross column's name"},
+          "unit": {"type": "string"},
+          "definition": {"type": "string"},
+          "internal": {"type": "boolean"},
+          "columns": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "columns_2nd": {"type": "array", "items": {"type": "string"}},
+          "basis": {"enum": ["one_time", "annual_over_life"]},
+          "ntg": {"enum": ["kwh", "therm", "none"]},
+          "market_effects": {"enum": ["benefits", "costs", "none"]}
+        },
+        "allOf": [
+          {"if": {"properties": {"source": {"const": "input"}}}, "then": {"required": ["columns", "basis", "ntg", "market_effects", "pricings"]}},
+          {"if": {"properties": {"source": {"const": "engine"}}}, "then": {"required": ["pricings"]}},
+          {"if": {"properties": {"source": {"const": "program"}}},
+           "then": {"not": {"anyOf": [{"required": ["pricings"]}, {"required": ["naming"]}, {"required": ["gross"]}]}}}
+        ]
+      }
+    },
+    "aggregates": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["pricing"],
+        "properties": {
+          "pricing": {"type": "string"},
+          "plus": {"type": "array", "items": {"type": "string"}},
+          "minus": {"type": "array", "items": {"type": "string"}},
+          "gross": {"type": "boolean"},
+          "unit": {"type": "string"},
+          "definition": {"type": "string"}
+        }
+      }
+    },
+    "tests": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]{1,15}$"},
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["label", "pricing", "benefits", "costs"],
+        "properties": {
+          "label": {"type": "string", "minLength": 1},
+          "pricing": {"type": "string"},
+          "benefits": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "numerator_adders": {"type": "array", "items": {"type": "string"}},
+          "costs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "program_costs": {
+            "oneOf": [
+              {"const": "none"}, {"type": "null"},
+              {"type": "object", "additionalProperties": false, "required": ["share"], "properties": {"share": {"type": "string"}}}
+            ]
+          },
+          "variants": {"type": "array", "uniqueItems": true, "items": {"enum": ["NoAdmin", "Gross"]}},
+          "lifecycle_net_benefit": {"type": "boolean"},
+          "levelized": {"type": "array", "uniqueItems": true, "items": {"enum": ["", "NoAdmin"]}},
+          "headline": {"type": "boolean"},
+          "filing": {"type": "boolean"},
+          "definition": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"},
+    "year": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 1990, "maximum": 2100}]},
+    "rate": {"enum": ["DiscountRateQtr", "DiscountRateAnnual", "DiscountRateQtr_SCT", "DiscountRateAnnual_SCT"]},
+    "suffix": {"type": "string", "pattern": "^(_[A-Za-z0-9]+)?$"}
+  }
+}

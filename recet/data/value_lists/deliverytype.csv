@@ -1,0 +1,23 @@
+code,start_year,end_year,start_date,end_date,claim_spec,filing_spec,description
+BldgDesInc,2013,2018,2013-01-01,2018-12-31,1,1,Building Design Incentive
+C&S,2016,,2016-04-28,,1,1,Codes and Standards (C&S advocacy and related programs)
+CustIncent,2013,2018,2013-01-01,2018-12-31,1,1,Custom Incentive
+CustIncentDown,2013,2018,2013-01-01,2018-12-31,1,1,Downstream Custom Incentive
+DI,2026,,2026-01-01,,1,1,Incentivizes the installation of an energy-efficient technology or service at a customer property by a program implementer managed third-party contractor or installer
+DirInstall,2013,2018,2013-01-01,2018-12-31,1,1,Direct Install
+DnCust,2019,,2019-01-01,,1,1,Downstream custom
+DnCustDI,2019,,2019-01-01,,1,1,Downstream custom direct install
+DnDeemDI,2019,,2019-01-01,,1,1,Downstream deemed direct install
+DnDeemed,2019,,2019-01-01,,1,1,Downstream deemed
+Down,2026,,2026-01-01,,1,1,Incentivizes an energy-efficient technology or service to a participating customer for them to install or have installed
+Mid-Distr,2026,,2026-01-01,,1,1,Incentivizes an energy-efficient technology through a program adminstrator partnership with the distributor
+Mid-Retail,2026,,2026-01-01,,1,1,Incentivizes an energy-efficient technology through a program adminstrator partnership with the retailer
+NonUpStrm,2013,2018,2013-01-01,2018-12-31,1,1,All non-upstream delivery types for deemed measures
+OnLineAudit,2013,2018,2013-01-01,2018-12-31,1,1,On-line Audit
+OnSiteAudit,2013,2018,2013-01-01,2018-12-31,1,1,On-site Audit
+PreReb,2013,2018,2013-01-01,2018-12-31,1,1,Prescriptive Rebate
+PreRebDI,2013,2018,2013-01-01,2018-12-31,1,1,Direct Install Prescriptive Rebate
+PreRebDown,2013,2018,2013-01-01,2018-12-31,1,1,Downstream Prescriptive Rebate
+PreRebUp,2013,2018,2013-01-01,2018-12-31,1,1,Upstream Prescriptive Rebate
+UpDeemed,2019,,2019-01-01,,1,1,Upstream deemed
+Up-Manuf,2026,,2026-01-01,,1,1,Incentivizes an energy-efficient technology through a program adminstrator partnership with the manufacturer
