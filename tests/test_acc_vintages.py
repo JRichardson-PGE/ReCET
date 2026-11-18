@@ -1,5 +1,5 @@
-"""The 2021 and 2022 ACCs: versions named by ACC, settings picked by ACC version, the ACC's own hourly calendar, and TRC-only pricing. No reference data needed:
-the electric ACC is synthetic; the 2021/2022 gas ACCs ship in the package."""
+"""The 2020, 2021 and 2022 ACCs: versions named by ACC, settings picked by ACC version, the ACC's own hourly calendar, and TRC-only pricing. No reference data needed:
+the electric ACC is synthetic; the 2020/2021/2022 gas ACCs ship in the package."""
 from __future__ import annotations
 
 import math
@@ -15,17 +15,17 @@ from conftest import expected_flat_value, make_electric_acc, make_flat_profile_c
 
 
 def test_cet_version_numbers_map_to_acc_versions():
-    assert {k: versions.acc_of_cet_version(k) for k in (2022, 2024, 2026, 2027)} == {2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
+    assert {k: versions.acc_of_cet_version(k) for k in (2021, 2022, 2024, 2026, 2027)} == {2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
     assert versions.acc_of_cet_version(2013) is None and versions.acc_of_cet_version(2017) is None and versions.acc_of_cet_version("x") is None
-    assert [k for k, _ in versions.choices()] == ["2021", "2022", "2024", "2026"]
-    assert [label for _, label in versions.choices()] == ["2021 ACC (Avoided Cost Version 2022)", "2022 ACC (Avoided Cost Version 2024)",
+    assert [k for k, _ in versions.choices()] == ["2020", "2021", "2022", "2024", "2026"]
+    assert [label for _, label in versions.choices()] == ["2020 ACC (Avoided Cost Version 2021)", "2021 ACC (Avoided Cost Version 2022)", "2022 ACC (Avoided Cost Version 2024)",
                                                           "2024 ACC (Avoided Cost Version 2026)", "2026 ACC (Avoided Cost Version 2028)"]
 
 
 def test_run_parameters_are_picked_by_acc_version():
     assert {2017, 2018, 2019, 2020, 2021, 2022, 2024, 2026} <= set(discount_settings.known_versions())
     assert 2027 not in discount_settings.known_versions()                        # 2027 was CET's number for the 2026 ACC, not an ACC
-    for acc, base in ((2021, 2021), (2022, 2022), (2024, 2024), (2026, 2024)):
+    for acc, base in ((2020, 2020), (2021, 2021), (2022, 2022), (2024, 2024), (2026, 2024)):
         s = discount_settings.get_settings("PGE", acc)
         assert s["BaseYear"] == base and s["DiscountRateAnnual"] == pytest.approx(0.0766)
 
@@ -41,6 +41,9 @@ def test_calendar_is_read_from_the_acc_file(tmp_path):
     assert real_impact_profiles.acc_calendar_year() == 2020
     assert real_impact_profiles.alignment_offset_days(2025) == 0                    # TOU 8,760s (2025, Wednesday start) need no rotation on 2020
     assert real_impact_profiles.alignment_offset_days(2009) == -1                   # 2009 starts on a Thursday, 2020 on a Wednesday
+    runtime.apply(versions.resolve_acc("2020", electric_file=make_electric_acc(tmp_path / "a25.parquet", calendar_year=2025)))
+    assert real_impact_profiles.acc_calendar_year() == 2025                         # the 2020 ACC: a Wednesday start too, without 29 February
+    assert real_impact_profiles.alignment_offset_days(2025) == 0 and real_impact_profiles.alignment_offset_days(2018) == 2
     runtime.apply(versions.resolve_acc("2024", electric_file=make_electric_acc(tmp_path / "a18.parquet", calendar_year=2018)))
     assert real_impact_profiles.acc_calendar_year() == 2018 and real_impact_profiles.alignment_offset_days(2025) == -2
     runtime.apply(versions.resolve_acc("2024", electric_file=make_electric_acc(tmp_path / "anone.parquet")))
@@ -91,8 +94,8 @@ def test_trc_only_acc_leaves_the_societal_columns_blank(tmp_path):
     assert any("no Societal Cost Test avoided costs" in n for n in r.notes)
 
 
-def test_2021_and_2022_gas_acc_have_no_air_quality_adder_and_trc_only(tmp_path):
-    for key, years in (("2021", (2020, 2050)), ("2022", (2022, 2052))):
+def test_2020_2021_and_2022_gas_acc_have_no_air_quality_adder_and_trc_only(tmp_path):
+    for key, years in (("2020", (2020, 2050)), ("2021", (2020, 2050)), ("2022", (2022, 2052))):
         runtime.apply(versions.resolve_acc(key, electric_file=make_electric_acc(tmp_path / f"e{key}.parquet")))
         assert gas_avoided_cost.available_cost_tests() == ("TRC",)
         assert "air_quality_adder" not in gas_avoided_cost.available_components()
@@ -100,3 +103,15 @@ def test_2021_and_2022_gas_acc_have_no_air_quality_adder_and_trc_only(tmp_path):
         parts = gas_avoided_cost.get_components_for_measure("PGE", "Residential", years[0] + 5)
         assert (parts["air_quality_adder"] == 0).all() and parts["co2"].min() > 0
     assert real_avoided_cost_v2.available_cost_tests() == ("TRC", "SCT Base", "SCT High")
+
+
+def test_2020_gas_acc_is_the_models_dashboard(tmp_path):
+    """The packaged 2020 gas table against values read off the 2020 Gas Model's dashboard arithmetic: methane leakage at the model's 20-year
+    warming potential (16.0416% upstream, 10.8864% behind the meter, of the CO2 cost), and each year's CO2 cost on the previous year's price, as the
+    dashboard pairs them (2020 on the 2019 price of $72.67/ton, x 0.00585 tons per therm)."""
+    g = pd.read_parquet(versions.resolve_acc("2020").gas)
+    assert len(g) == 279 and sorted(g["year"].unique()) == list(range(2020, 2051)) and set(g["cost_test"]) == {"TRC"}
+    assert np.allclose(g["upstream_methane"], g["co2"] * 0.160416, rtol=1e-12) and np.allclose(g["behind_meter_methane"], g["co2"] * 0.108864, rtol=1e-12)
+    first = g[(g["utility"] == "PG&E") & (g["class"] == "Residential") & (g["year"] == 2020)].iloc[0]
+    assert first["co2"] == pytest.approx(72.66776223955118 * 0.00585, rel=1e-12)
+    assert first["td_apr"] == 0 and first["td_jan"] == pytest.approx(1.6063096255812614 * 0.2118933836111234 * 1.0241, rel=1e-12)   # winter months only

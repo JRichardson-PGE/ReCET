@@ -6,7 +6,7 @@ total electric avoided cost over the full length of the avoided cost data:
     total(z) = sum over every year y in the ACC file of  sum over hours h of  shape_z[h] x total_avoided_cost(PA, z, TRC, y, h)
 
 where shape_z is the profile's own normalized 8,760 for zone z (it sums to 1, so this is $ per annual kWh), re-aligned once to the ACC's weekdays (2018, or
-2020 for the 2021/2022 ACCs) exactly as the pricing does (real_impact_profiles.shift_to_acc), and total_avoided_cost is the ACC's Gen + T&D for the measure's PA in zone z, resolved by the same rules
+2020 for the 2021/2022 ACCs, 2025 for the 2020 ACC) exactly as the pricing does (real_impact_profiles.shift_to_acc), and total_avoided_cost is the ACC's Gen + T&D for the measure's PA in zone z, resolved by the same rules
 every other price lookup uses (real_avoided_cost_v2.get_acc_series: SCG routing, the documented SCE CZ5 / SDG&E CZ6 / CZ8 stand-ins). Undiscounted. The TRC
 cost test decides the zone and that zone is then used for every cost test and component, so a measure's SCT and component values are priced in the same zone
 as its TRC value. A zone whose prices the ACC cannot supply (the old blended fallback) is not an option. Ties go to the first zone in natural order (1, 2, 3A,
@@ -223,7 +223,7 @@ def build_catalog(out_dir: Path | None = None, version_keys: tuple[str, ...] | N
             runtime.clear_caches()
             sums[k] = {(pa, z): price_sum(pa, z) for pa in PAS for z in priceable_zones(pa)}
             years = sorted(acc.get_acc_series("PGE", "1", DECIDING_COST_TEST)[0])
-            calendars[k] = rip.acc_calendar_year()                      # 2018 for 2024/2026, 2020 for 2021/2022: the profiles are aligned to it below
+            calendars[k] = rip.acc_calendar_year()                      # 2018 for 2024/2026, 2020 for 2021/2022, 2025 for 2020: the profiles are aligned to it below
             info["acc"][k] = {"electric_bytes": f.stat().st_size, "years": [years[0], years[-1]], "calendar_year": calendars[k]}
             log(f"ACC {k}: price sums for {len(sums[k])} PA x zone options, years {years[0]}-{years[-1]}")
     finally:

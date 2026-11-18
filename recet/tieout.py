@@ -4,7 +4,7 @@ Three parts, each PASS or FAIL, written as tieout_acc<version>.json and .md:
 
 1. **Structure.** Every (utility, zone, cost test, year) block of the electric ACC has hours 1-8,760 once each; no value is missing; the components add up
    to `total_avoided_cost` (within COMPONENT_TOLERANCE $/MWh); the years run without a gap; the cost tests are TRC, SCT Base and SCT High (TRC only for the
-   2021 and 2022 ACCs).
+   2020, 2021 and 2022 ACCs).
 2. **Control totals against the source workbook.** `control_totals` sums every value column per (utility, zone, cost test, year). With `--source-totals`, a
    CSV of the same totals computed from the published workbook by the extraction that made the file (CEDARS-Research `<year> ACC Final Extraction`), every
    total must match within TOTALS_RTOL; without it the part reports the pack's totals only (written as control_totals_acc<version>.csv) and is not a pass.
@@ -56,7 +56,8 @@ def structure(df: pd.DataFrame, acc: str) -> dict:
     if years != list(range(int(years[0]), int(years[-1]) + 1)):
         problems.append(f"the years have gaps: {years}")
     tests = sorted(df["cost_test"].unique())
-    want = ["TRC"] if str(acc) in ("2021", "2022") else ["SCT Base", "SCT High", "TRC"]
+    from . import versions
+    want = ["TRC"] if str(acc) in versions.TRC_ONLY else ["SCT Base", "SCT High", "TRC"]
     if tests != want:
         problems.append(f"cost tests {tests}, expected {want}")
     return {"name": "structure", "status": "PASS" if not problems else "FAIL", "problems": problems,

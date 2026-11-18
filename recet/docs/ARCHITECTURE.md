@@ -85,7 +85,7 @@ flowchart LR
         direction TB
         ui["Interfaces"] --> job["Job layer"] --> core["Pricing core"] --> out["Outputs and Results views"]
     end
-    acc["E3 ACC releases 2021 / 2022 / 2024 / 2026<br/>electric hourly, gas monthly<br/>(extracted and validated in CEDARS-Research)"] --> recet
+    acc["E3 ACC releases 2020 / 2021 / 2022 / 2024 / 2026<br/>electric hourly, gas monthly<br/>(extracted and validated in CEDARS-Research)"] --> recet
     cedars["CEDARS data<br/>impact-profile library (8,760s), Programs list,<br/>statewide factors, filing rule files"] --> recet
     cet["CET tables, exported once<br/>run parameters (E3Settings), emissions,<br/>combustion type, rate schedules, value lists"] --> recet
     recet --> files["Result files per run<br/>measure-level table, summaries, key metrics,<br/>field definitions, input check, run settings"]
@@ -329,7 +329,7 @@ differences listed in C17.
 | Tier | What | Where | Size | Changes |
 |---|---|---|---|---|
 | Package data | run parameters (CET E3Settings), emissions, combustion type and rate-schedule tables, gas ACCs, gas monthly profiles, statewide factors and field rules, the Programs list, System-zone catalog, value lists, CEDARS filing rule files | `recet/data/`, in git and in the package | megabytes | with a ReCET release |
-| Reference data | electric ACC hourly parquets (2021, 2022, 2024, 2026) and the CEDARS impact-profile library (catalog and 8,760s) | the *reference data folder*: `RECET_DATA`, `~/.recet/config.json`, or `--data-dir` | about 11 GB | rarely; `manifest.json` holds each file's size and SHA-256 |
+| Reference data | electric ACC hourly parquets (2020, 2021, 2022, 2024, 2026) and the CEDARS impact-profile library (catalog and 8,760s) | the *reference data folder*: `RECET_DATA`, `~/.recet/config.json`, or `--data-dir` | about 11 GB | rarely; `manifest.json` holds each file's size and SHA-256 |
 | Cache | the electric ACC as memory-mapped arrays, profile indexes | `~/.recet/cache` (`RECET_CACHE`; `RECET_NO_CACHE` turns it off) | a few GB | rebuilt on demand; never the only copy (`recet data clear-cache`) |
 
 Reference data never goes in git. `recet data status | verify | pack | unpack | build` (`datapack.py`) move it between machines; the web server mounts it
@@ -342,9 +342,9 @@ so a caller such as the CEDARS platform's reference-data service can turn a pack
 
 ### 7.2 ACC versions
 
-A run names an ACC version by its year (`2021`, `2022`, `2024`, `2026`). The version selects the electric parquet, the gas table, the run parameters and the
+A run names an ACC version by its year (`2020`, `2021`, `2022`, `2024`, `2026`). The version selects the electric parquet, the gas table, the run parameters and the
 CET tables (`versions.py`). Supplied ACC files replace the built-in ones for that version or define a new one. A measure's optional `ACCVersion` column
-prices it on another version within the same run (C3.5). Each ACC's hours follow one calendar's weekdays (2018 for 2024 and 2026, 2020 for 2021 and
+prices it on another version within the same run (C3.5). Each ACC's hours follow one calendar's weekdays (2018 for 2024 and 2026, 2025 for 2020, 2020 for 2021 and
 2022), and every ACC year has 8,760 hours.
 
 ### 7.3 The run folder
@@ -468,7 +468,7 @@ running runs' own time left, and a calibration against this server's recent runs
 | `RECET_WEB_SECURE_COOKIES` | 1 | session cookie over HTTPS only |
 | `RECET_WEB_TRUST_PROXY` | 1 | client address from `X-Real-IP` (the edge nginx) |
 | `RECET_WEB_WORKERS` | 1 | runs at once |
-| `RECET_WEB_ACC_VERSIONS` | `2024,2026` (`2021,2022,2024,2026` on the server) | ACC versions offered |
+| `RECET_WEB_ACC_VERSIONS` | `2024,2026` (`2020,2021,2022,2024,2026` on the server) | ACC versions offered |
 | `RECET_WEB_RETENTION_DAYS` | 7 | days a run is kept |
 | `RECET_WEB_DRAFT_DAYS` | 30 | days an untouched draft is kept |
 | `RECET_WEB_MAX_UPLOAD_MB` | 150 | largest upload per file |

@@ -119,7 +119,7 @@ def test_builtin_versions_and_replacement(tmp_path):
     assert c.settings_acc == 2024 and c.label == "Custom ACC '2030'" and any("no gas ACC supplied" in n for n in c.notes)
     d = versions.resolve_acc("2031", electric_file=tmp_path / "e.parquet")
     assert d.settings_acc == 2026                                         # a new version borrows the newest built-in ACC's settings
-    for key, acc in (("2021", 2021), ("2022", 2022)):
+    for key, acc in (("2020", 2020), ("2021", 2021), ("2022", 2022)):
         v = versions.resolve_acc(key)
         assert v.settings_acc == acc and v.label == versions.acc_label(acc) and v.gas.exists()
     assert all("CET" not in label for _k, label in versions.choices())   # labels name the ACC only

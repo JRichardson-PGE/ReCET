@@ -4,7 +4,7 @@
 quarterly avoided costs, and runs the same cost tests as the CET (TRC, PAC, RIM, SCT Base/High, TSB) plus the Participant Cost Test, which the CET does not yet have. It started as the proof of concept in the CEDARS
 review research repository and was moved here on its own.
 
-It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`; CET's legacy E3 field names such as `E3ClimateZone` are accepted alongside ReCET's `AC_...` names) on the **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
+It prices CET-format inputs (`Measure.csv`, `ProgramCost.csv`; CET's legacy E3 field names such as `E3ClimateZone` are accepted alongside ReCET's `AC_...` names) on the **2020**, **2021**, **2022**, **2024** or **2026 ACC** (the 2026 ACC is the final v1b release; the 2021 and
 2022 ACCs are TRC only) and writes one row per
 measure with every input column and every output, from a graphical interface or the command line.
 
@@ -18,7 +18,7 @@ Python 3.11+. Needs `numpy`, `pandas`, `pyarrow` (installed automatically); the 
 
 ## The reference data folder (the big files)
 
-The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2021 and 2022 ones are smaller and optional) and the CEDARS 8,760-hour profile library (~9 GB) are too large for GitHub, so they are **not in the package**. They live in a
+The electric ACC files (~1 GB each for the 2024 and 2026 ACCs; the TRC-only 2020, 2021 and 2022 ones are smaller and optional) and the CEDARS 8,760-hour profile library (~9 GB) are too large for GitHub, so they are **not in the package**. They live in a
 *reference data folder* you can put anywhere (another drive, a share) and change at any time:
 
 * the **Reference data folder** box in the window (with *Save as default*), or
@@ -49,7 +49,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 
 1. **Job inputs** - one Excel job workbook (sheets Measure, ProgramCost, RunParameters, SWAllocation, Programs, GasProfiles, Profiles8760), or `Measure.csv` and optional
    `ProgramCost.csv`; an output folder.
-2. **ACC version** - 2021, 2022, 2024 or 2026 (the 2021 and 2022 ACCs are TRC only), or type a new label; and CET's *First Year*.
+2. **ACC version** - 2020, 2021, 2022, 2024 or 2026 (the 2020, 2021 and 2022 ACCs are TRC only), or type a new label; and CET's *First Year*.
 3. **Separate inputs** - 8,760 electric profiles, gas monthly profiles, run parameters (discount rates, base year, gas CO2 per PA), SW allocation factors,
    program metadata (the CEDARS Programs list), an electric ACC, a gas ACC. Each has a **Template…** button. *A supplied item that matches a built-in
    one replaces it; one that matches nothing is added.* Formats and matching rules: `recet/docs/INPUT_FORMATS.md` (Help > Documentation).

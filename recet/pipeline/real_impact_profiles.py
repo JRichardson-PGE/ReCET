@@ -33,7 +33,7 @@ functions build the (shape, represents_year) pair per measure.
 
 DAY-OF-WEEK SHIFT (2026-10-02, Jake: the 8,760 path with the correct shift, not CEDARS' errors). A profile is drawn on its own represents_year's calendar
 (the catalog's `year_represented`; 2009, the DEER reference year, when blank; 2018 for the TOU H-factor 8,760s), while the ACC's hourly data follow one
-calendar's weekdays in every forecast year: 2018 for the 2024 and 2026 ACCs, 2020 for the 2021 and 2022 ACCs (acc_calendar_year(), read from the ACC file's
+calendar's weekdays in every forecast year: 2018 for the 2024 and 2026 ACCs, 2020 for the 2021 and 2022 ACCs, 2025 for the 2020 ACC (acc_calendar_year(), read from the ACC file's
 hour stamps). shift_for_year() therefore rotates every profile once, by the signed weekday difference to that calendar taken the short way round (-3..+3
 days), and the same aligned shape prices every year. The TOU 8,760s are drawn on the 2026 ACC's 2018-calendar TOU map (since 0.1.18; before, on the
 2025-chronology map of the 2021-2024 ACCs, with year_represented 2025), so they need no rotation on the 2024/2026 ACCs and move +2 days on the 2021/2022 ACCs. CEDARS instead aligns each forecast year to that year's real Jan-1 weekday
@@ -370,12 +370,12 @@ def profile_meta(profile_id: int) -> dict:
 ACC_CALENDAR_YEAR = 2018
 """The default weekday calendar of an ACC's hourly data, used when the ACC file has no hour stamps. Every forecast year of the 2024 and 2026 Electric ACCs uses
 2018's weekdays (hour 1 = a Monday): checked 2026-10-02 on the data itself -- distribution/transmission avoided cost falls on days 6-7 of every week in every
-year, and the 2026 ACC's generation capacity is zero on exactly those days. The 2021 and 2022 ACCs use 2020's (hour 1 = Wednesday 1 January 2020); see
+year, and the 2026 ACC's generation capacity is zero on exactly those days. The 2021 and 2022 ACCs use 2020's (hour 1 = Wednesday 1 January 2020) and the 2020 ACC 2025's (a Wednesday too, no 29 February); see
 acc_calendar_year(). Either way a profile is aligned to the ACC's calendar once, and the same aligned shape prices every forecast year."""
 
 
 def acc_calendar_year() -> int:
-    """The calendar year of the loaded electric ACC's hour stamps: the year of its earliest `datetime` (2018 for the 2024/2026 ACCs, 2020 for 2021/2022), or
+    """The calendar year of the loaded electric ACC's hour stamps: the year of its earliest `datetime` (2018 for the 2024/2026 ACCs, 2020 for 2021/2022, 2025 for 2020), or
     ACC_CALENDAR_YEAR when the file has no `datetime` column (a supplied file may leave it out).
 
     Leap years: the ACC keeps 8,760 hours by dropping the last day of the year, so a 2020 calendar includes 29 February and ends on 30 December. Hour n is the

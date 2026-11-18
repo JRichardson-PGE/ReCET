@@ -154,7 +154,7 @@ def write_workbook_template(out_path: str | Path, acc_key: str = "2026") -> Path
         ("Sheet", True),
         ("Measure        REQUIRED. CET Measure.csv columns, one measure per row. Replace the yellow example row. The last five columns are optional ReCET-only "
          "columns (not CET fields; leave blank for the defaults): AC_Elec_Impact_Profile_2nd_Baseline (2nd-baseline shape), AC_Elec_Impact_Profile_Water (water-energy shape), "
-         "ACCVersion (2021, 2022, 2024 or 2026; blank = the run's version), AC_Elec_Impact_Profile_Parent and AC_Elec_Impact_Profile_Parent_2nd_Baseline (a "
+         "ACCVersion (2020, 2021, 2022, 2024 or 2026; blank = the run's version), AC_Elec_Impact_Profile_Parent and AC_Elec_Impact_Profile_Parent_2nd_Baseline (a "
          "true-up's parent profiles: the record is also priced on them and the ...Incremental columns give the difference).", False),
         ("ProgramCost    Optional. CET ProgramCost.csv columns. Replace or delete the yellow example row.", False),
         ("RunParameters  Optional. Discount rates, base year and gas CO2 per PA. Filled in with the built-in values for ACC " + acc_key

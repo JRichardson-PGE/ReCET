@@ -110,12 +110,12 @@ def _table() -> pd.DataFrame:
 
 
 def available_cost_tests() -> tuple[str, ...]:
-    """The cost tests the loaded gas extraction has rows for: ("TRC",) for the 2021 and 2022 Gas ACCs, ("TRC", "SCT") for 2024 and 2026."""
+    """The cost tests the loaded gas extraction has rows for: ("TRC",) for the 2020, 2021 and 2022 Gas ACCs, ("TRC", "SCT") for 2024 and 2026."""
     return tuple(sorted(_table()["cost_test"].astype(str).unique(), key=lambda t: (t != "TRC", t)))
 
 
 def available_components() -> tuple[str, ...]:
-    """The components the loaded extraction has columns for. The 2021 and 2022 Gas ACCs have no air quality adder; a missing component is priced as zero."""
+    """The components the loaded extraction has columns for. The 2020, 2021 and 2022 Gas ACCs have no air quality adder; a missing component is priced as zero."""
     cols = set(_table().columns)
     return tuple(c for c in ALL_COMPONENTS if c in cols or f"{c}_jan" in cols)
 
@@ -189,7 +189,7 @@ def _component_index() -> dict[tuple, dict[str, np.ndarray]]:
         for name in MONTHLY_COMPONENTS:
             comps[name] = np.array([row[f"{name}_{m}"] for m in MONTHS], dtype=np.float64)
         for name in ANNUAL_COMPONENTS:
-            # A component the extraction does not have (the 2021/2022 Gas ACCs have no air quality adder) is zero.
+            # A component the extraction does not have (the 2020/2021/2022 Gas ACCs have no air quality adder) is zero.
             comps[name] = np.full(12, float(row[name]) if name in row else 0.0, dtype=np.float64)
         for arr in comps.values():
             arr.setflags(write=False)

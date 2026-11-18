@@ -157,7 +157,7 @@ EFFECTS = {
         "AC_Elec_Impact_Profile_Parent_2nd_Baseline": ("the incremental columns of an early replacement's 2nd-baseline years; nothing else",
                                                        "Optional ReCET column (not a CET field): the parent's 2nd-baseline load shape. Blank = AC_Elec_Impact_Profile_Parent."),
         "ACCVersion": ("every avoided-cost value of the measure, its discount rates, bill impacts and emissions, " + _REST,
-                       "Optional ReCET column (not a CET field): the ACC version this measure is priced on (2021, 2022, 2024, 2026). Blank = the run's version."),
+                       "Optional ReCET column (not a CET field): the ACC version this measure is priced on (2020, 2021, 2022, 2024, 2026). Blank = the run's version."),
         "AC_Gas_Target_Sector": (_GAS + ", the gas bill impact, " + _REST, "Picks the gas ACC class (Residential, Commercial, Core) and the gas retail rate schedule."),
         "AC_Gas_Impact_Profile": (_GAS + ", " + _REST + " (no gas value if the name matches nothing)",
                             "The 12-month shape the therm savings are spread over. A ...FuelSub... name on a residential measure adds behind-the-meter methane."),
