@@ -36,12 +36,12 @@ HERE = Path(__file__).resolve().parent
 SESSION_COOKIE = "recet_session"
 LOGIN_CSRF_COOKIE = "recet_login_csrf"
 DOCS_DIR = HERE.parent / "docs"
-DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "COST_TESTS.md", "USER_GUIDE.md", "ARCHITECTURE.md",
-             "README.md"]
+DOC_ORDER = ["WEB_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "COST_TESTS.md", "USER_GUIDE.md", "WORKER.md",
+             "ARCHITECTURE.md", "README.md"]
 # what the Docs pages call each document (the file names are for the repository and the desktop window)
 DOC_TITLES = {"WEB_GUIDE.md": "Getting started on the web", "INPUT_FORMATS.md": "Input formats", "INPUT_FIELDS.md": "Input fields",
               "OUTPUT_FIELDS.md": "Output fields", "CALCULATIONS.md": "Calculations", "COST_TESTS.md": "Cost tests as configuration",
-              "USER_GUIDE.md": "Desktop and command line",
+              "USER_GUIDE.md": "Desktop and command line", "WORKER.md": "Batch worker",
               "ARCHITECTURE.md": "System architecture", "README.md": "About these documents"}
 DOCS_HOME = "WEB_GUIDE.md"
 

@@ -233,7 +233,7 @@ The JSON key is the name in `RunConfig`; command-line flags override a settings 
 | `emissions` | Include emissions | `--no-emissions` (turns it off) | true | Compute the CO2 / NOx / PM10 columns (C14). |
 | `allocate_statewide` | Allocate statewide (SW_) programs | `--allocate-statewide` | false | Split statewide programs across the IOUs before pricing (C15). |
 | `apply_exclude_from_ce` | Leave Exclude_From_CE programs out of the portfolio summary | `--apply-exclude-from-ce` | false | Measures of programs whose `Exclude_From_CE` is true in the program metadata are left out of every summary row and shown in one `excluded` row (OUTPUT_FIELDS 2.2). They are still priced and in the measure-level table. |
-| `base_year` | First Year | `--base-year` | earliest claim year | CET's First Year: the reference point of all discounting (C2.5). |
+| `base_year` | First Year | `--base-year` | earliest claim year | CET's First Year: the reference point of all discounting (C2.5). Not the run parameters' `BaseYear` (section 4.5), a different value despite the name. |
 | `output_template` | Output template | `--output-template` | every column | The measure-level file's columns, in order: a built-in template (*Key results*, *Participant costs*), one you saved, or a file (one column per line, or JSON `{"name": ..., "columns": [...]}`). Only the measure-level file is shaped: the Results tables, the summary and the key metrics still use every column. A column the run does not produce (an SCT column with the societal tests off) is left out, with a note. Names are those of OUTPUT_FIELDS.md section 1 and the input columns. |
 | `output_template_name` | (the template's name) | (from `--output-template`) | blank | The template's name, for the record in `run_settings.json`. |
 | `acc_purpose` | Priced for | `--priced-for` | any filing | What the run is priced for, for the ACC check (OUTPUT_FIELDS 2.9b): blank = any filing (a record is flagged when no filing covering its program year uses its ACC), `claims` (the ACC of the program year's final budget filing), or one budget filing by key, e.g. `2028-2035-application`, `true-up-advice-letter-september-2027` (`recet run --help` lists them). Flagged records are still priced. |
@@ -293,7 +293,7 @@ One row per `(iou, climate_zone, cost_test, year, hour_of_year)`; dollar columns
 | `total_avoided_cost` | $/MWh | yes | The sum of the component columns below (checked to 1e-6). |
 | `transmission`, `distribution` | $/MWh | for water energy | The T&D part; `Gen` = total minus these (water energy is priced on `Gen`). |
 | `emission_rate_tonnes_per_kwh` | metric tons CO2 per kWh | for electric CO2 | The grid emission rate of that hour. |
-| `energy`, `generation_capacity`, `avoided_as_procurement`, `losses`, `methane_leakage`, `ghg_cap_and_trade`, `ghg_portfolio_rebalancing` (2024 ACC) or `ghg_cap_and_invest` (2026 ACC), `ghg_adder`, `air_quality_adder` | $/MWh | for components mode | The avoided-cost components. |
+| `energy`, `generation_capacity`, `avoided_as_procurement`, `losses`, `methane_leakage`, `ghg_cap_and_trade`, `ghg_portfolio_rebalancing` (2020, 2021, 2022 and 2024 ACCs) or `ghg_cap_and_invest` (2026 ACC), `ghg_adder`, `air_quality_adder` (2024 and 2026 ACCs) | $/MWh | for components mode | The avoided-cost components. The 2020, 2021 and 2022 ACCs have the 2024 ACC's set without `air_quality_adder`. |
 | `price_zone`, `datetime`, `month`, `day`, `hour` | - | no | Ignored. |
 
 ### 4.4 Gas ACC (CSV or Parquet)
@@ -326,7 +326,7 @@ The built-in run parameters are the RunParameters table (section 6). A supplied 
 | `DiscountRateQtr` | fraction | optional (default `DiscountRateAnnual / 4`) | Quarterly rate for measure-level streams (C2.4). CET stores the annual rate / 4. |
 | `DiscountRateAnnual_SCT` | fraction | yes | Annual societal discount rate (SCB / SCH). |
 | `DiscountRateQtr_SCT` | fraction | optional (default `DiscountRateAnnual_SCT / 4`) | Quarterly societal rate. |
-| `BaseYear` | year | optional (default: the built-in value for the run's version) | CalcCE's `Yr1` base for the bill-impact window (C9). |
+| `BaseYear` | year | optional (default: the built-in value for the run's version) | CalcCE's `Yr1` base for the bill-impact window (C9). Not the `base_year` setting or `--base-year` flag (section 3), which is CET's First Year. |
 | `CO2Gas` | metric tons CO2 per therm | yes | Gas CO2 factor for the emission columns (C14). |
 
 ### 4.6 SW allocation factors (CSV, Parquet or xlsx)

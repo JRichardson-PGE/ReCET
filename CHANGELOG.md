@@ -3,6 +3,14 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.97 (2026-11-20, Jake; the second documentation review's omissions): documentation only, no change to any run or output. The batch worker's
+  contract has its own document, `recet/docs/WORKER.md` (the job spec, what the worker writes, progress and log, the receipt, exit codes, the check spec
+  and the image), packaged with the others, listed in the window's Help menu and on the web Docs pages, so the CEDARS platform can show it with the
+  engine's other documents; the README keeps a short summary. Also: the README and USER_GUIDE list every installed dependency; the README points at
+  USER_GUIDE for every command; WEB_GUIDE covers the "CET outputs to compare against" upload, the run email setting on Your account, and the
+  administrators' Users, Audit and value-list pages; INPUT_FIELDS warns that the `base_year` setting (CET's First Year) and the run parameters'
+  `BaseYear` are different values; INPUT_FIELDS 4.3 and INPUT_FORMATS name the 2020, 2021 and 2022 ACCs' component columns (the 2024 set without
+  `air_quality_adder`, as the extraction scripts write them); ARCHITECTURE 1.2 says other systems integrate through the worker's job spec.
 - 0.1.96 (2026-11-18, Jake: "let's just do 2020 ACC, and leave 2019 and prior out"): the **2020 ACC** is a built-in version (`--acc 2020`, New run,
   the window's list; CET's Avoided Cost Version 2021, the ACC of the 2021-2023 filings and claims). Electric: `acc/2020/electric_hourly.parquet` in the
   reference data folder (optional, as for 2021 and 2022: 22 utility and zone pairs, 2020-2050, TRC only); gas: packaged

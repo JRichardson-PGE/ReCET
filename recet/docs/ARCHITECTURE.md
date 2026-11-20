@@ -29,7 +29,7 @@ values), input checking (format, pricing coverage, CEDARS' own filing rules, the
 ACC files, comparisons between ACC versions, and the results views.
 
 Out of scope, by design: the CEDARS claims and budget-filing workflow (confirmation, reopening, Kiteworks PII handling), the Programs, Monthly Reports
-and Documents modules, and an integration API. ReCET reads the CEDARS Programs list and CEDARS' published rule files as data; it does not talk to
+and Documents modules, and a web API (other systems run ReCET through the batch worker's job spec, section 11 and [Batch worker](WORKER.md)). ReCET reads the CEDARS Programs list and CEDARS' published rule files as data; it does not talk to
 CEDARS.
 
 ### 1.3 Functional requirements and how they are met
@@ -563,7 +563,7 @@ would use the second vCPU but needs twice the pricing memory, so it waits for a 
   service, with its files in object storage and its accounts in the platform's own database. On this server the state (the SQLite database, run and
   draft folders) is copied to S3 every night and can be restored by `deploy/backup` (its README is the setup and restore runbook).
 * **No web API.** The web app's users upload files and download results. Another system calls ReCET through the worker and its job spec
-  (`recet worker run`, `jobspec.py`) or through Python (`recet.jobs`).
+  (`recet worker run`, `jobspec.py`, [Batch worker](WORKER.md)) or through Python (`recet.jobs`).
 * **No lifecycle-savings input**: inputs stay the CET's per-unit annual values.
 * **Multi-file batch upload** is not built: one job zip holds one `Measure.csv`.
 * **No integration with CEDARS or eTRM.** Profiles, programs and rules are files refreshed by hand.

@@ -128,7 +128,7 @@ Parquet (recommended: the built-in files have ~17 million rows) or CSV, **one ro
 | `total_avoided_cost` | yes | the sum of the component columns |
 | `transmission`, `distribution` | for water energy | the T&D part of the total (water is priced on the rest) |
 | `emission_rate_tonnes_per_kwh` | for CO2 | grid emission rate |
-| component columns | for "components" mode | `energy generation_capacity avoided_as_procurement losses methane_leakage ghg_adder air_quality_adder` plus `ghg_cap_and_trade ghg_portfolio_rebalancing` (2024 ACC) or `ghg_cap_and_invest` (2026 ACC); their sum should equal `total_avoided_cost` |
+| component columns | for "components" mode | `energy generation_capacity avoided_as_procurement losses methane_leakage ghg_adder` plus `air_quality_adder` (2024 and 2026 ACCs) and `ghg_cap_and_trade ghg_portfolio_rebalancing` (2020, 2021, 2022 and 2024 ACCs) or `ghg_cap_and_invest` (2026 ACC); their sum should equal `total_avoided_cost` |
 | `price_zone`, `datetime`, `month`, `day`, `hour` | no | ignored |
 
 **Which version it replaces:** you choose the ACC version label in the GUI (or `--acc`). If the label is one the package ships (`2020`, `2021`, `2022`, `2024`, `2026`) the supplied file replaces that

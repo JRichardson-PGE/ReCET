@@ -13,7 +13,7 @@ measure with every input column and every output, from a graphical interface or 
     pip install recet-<version>-py3-none-any.whl        # or, from a checkout:  pip install -e .
     python -m recet                                   # opens the window   (also: recet, recet-gui)
 
-Python 3.11+. Needs `numpy`, `pandas`, `pyarrow` (installed automatically); the window uses `tkinter`, which ships with the python.org installers for Windows and macOS
+Python 3.11+. Its dependencies (`numpy`, `pandas`, `pyarrow`, `openpyxl`, `pyyaml`, `sv-ttk`, `tksheet`; `pyproject.toml`) are installed automatically; the window uses `tkinter`, which ships with the python.org installers for Windows and macOS
 (on some Linux distributions: `apt install python3-tk`).
 
 ## The reference data folder (the big files)
@@ -64,7 +64,7 @@ The tool also keeps a rebuildable **cache** of what it derives from those files 
 ## Documentation
 
 In the package (`recet/docs`, and **Help > Documentation** in the window): `USER_GUIDE.md` (every control, the command line, common jobs), `INPUT_FORMATS.md`, `INPUT_FIELDS.md` (every input field),
-`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number), `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example), `COST_TESTS.md` (the cost tests and value streams as a versioned definition set), `WEB_GUIDE.md` (the web app's pages) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
+`OUTPUT_FIELDS.md` (every output field with its complete formula in terms of the input fields, its unit and a worked number), `CALCULATIONS.md` (every formula, the validation against CET, the limitations, a worked example), `COST_TESTS.md` (the cost tests and value streams as a versioned definition set), `WEB_GUIDE.md` (the web app's pages), `WORKER.md` (the batch worker's job spec, receipt and image) and `ARCHITECTURE.md` (requirements, layers and modules, the run flow, data, the web app's deployment and security, the performance design). Start with `docs/README.md`.
 What changed in each release is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Web app
@@ -98,6 +98,9 @@ upload size (`client_max_body_size`). `recet-web warm-cache` builds the ACC cach
 
 ## Command line
 
+The main commands; every command and flag (including `recet cost-tests`, `regress`, `openbca` and `data build-system-zones`) is in
+`recet/docs/USER_GUIDE.md`.
+
     recet run --measures Measure.csv --programcost ProgramCost.csv --acc 2026 --out results
     recet run --measures Measure.csv --acc 2024 --compare-with 2026 --out results       # two runs + per-measure comparison
     recet run --measures Measure.csv --acc 2026 --profiles-8760 my_shapes.csv --acc-electric-file my_acc.parquet --components --portfolio-8760
@@ -113,44 +116,11 @@ releases' table export in `<reference data folder>/cet_versions/`. ReCET's own r
 
 ## Batch worker: a job spec in, outputs and a receipt out
 
-`recet worker run job.json` is the contract a batch system (the CEDARS platform's Calculations module) calls: it reads a versioned job spec (schema:
-`recet worker schema`, `recet/data/job_spec/job_spec_v1.schema.json`; rules: `recet/jobspec.py`), fetches the inputs from local paths, `file://` or
-`s3://` (`pip install ".[s3]"`; boto3 is imported only for S3), refuses the job when its engine release, a pinned input or reference file, or the
-allocation table differs from what it asks for, runs it, and sends the run folder with `receipt.json` to the spec's outputs URI.
-
-    {"spec_version": 1, "job_id": "2028-claims-pge-0001",
-     "engine": {"release": "0.1.93", "calculation": "recet"},
-     "inputs": {"job_zip": {"uri": "s3://bucket/jobs/0001/job.zip", "sha256": "..."}},
-     "settings": {"acc_version": "2024", "acc_purpose": "claims"},
-     "packs": {"files": {"acc/2024/electric_hourly.parquet": {"sha256": "..."}}},
-     "allocation_version": "statewide_factors_20260918",
-     "outputs": {"uri": "s3://bucket/runs/0001/", "format": "csv.zip"},
-     "context": {"platform_run_id": 123}}
-
-The receipt names the engine (release, calculation, image and commit from `RECET_IMAGE` / `RECET_COMMIT`, Python and library versions), every input's
-URI, SHA-256, size and row count, the full settings, the ACC and the ACC each record was priced on, every reference file used with its SHA-256 (from the
-reference folder's `manifest.json`, else computed) and the packaged data's hash, the run parameters and statewide factor table, the filing rule set,
-every output file's SHA-256, the totals and notes, and the spec's `context` (the caller's own references) as given. While the job runs, the worker
-sends `progress.json` (stage, parts done, fraction, seconds left; progress.py) to the outputs URI at each stage change and at most every 10 s, and `log.txt`
-(what the run printed, each line timed) with it when it has grown; the whole log goes with the outputs at the end and is listed in the receipt. A spec with `compare_with` prices the job on both ACCs
-(`run_acc<ACC>/` each) and writes the comparison beside them, as `recet run --compare-with` does; the receipt's totals are the primary ACC's. Exit codes: 0 succeeded, 1 the run failed (a receipt is still written), 2 the spec was refused.
-`recet worker validate job.json` checks a spec without running it.
-
-`recet worker check check.json` runs a filing's rules in this release instead of pricing it (`recet/checkjob.py`): the CEDARS platform keeps each
-filing's rules as data and has the worker of the release its specification names check the filing, so the findings come from the release that prices it.
-The check spec gives the rules (each with its definition), the tables by URI (UTF-8 CSV, read as text, optionally pinned by SHA-256), and what the wider
-rule language reads (the filing year, the upload date, who files, each table's key columns, the program records, value lists the engine does not ship,
-changes over the shipped lists); `findings.json` (each failing rule's rows and values, and notes on rules that could not be checked) and `receipt.json`
-go to its outputs URI. Same exit codes. The rule language (`recet/filing_rules.py`) reads CEDARS' rule files as before and, for rules kept as data,
-conditions on another table of the filing (linked by the tables' keys), on the program record or on who files, groups of conditions (all / any, one
-level), and tests for text, flags, dates, a date within so many years of the upload and a code in effect on a date.
-
-The worker image (`Dockerfile.worker`: the locked `requirements/worker.txt`, which is the engine plus boto3, and no web app) is published for each
-engine release: push the tag `vX.Y.Z` matching `recet/__init__.py` and `.github/workflows/worker-image.yml` builds it for amd64 and arm64 as
-`ghcr.io/jrichardson-pge/recet-worker:X.Y.Z`, with `RECET_IMAGE` and `RECET_COMMIT` set so every receipt names the image. Mount the reference data
-read-only at `/data`; S3 credentials come from the environment or the instance / task role:
-
-    docker run --rm -v /path/to/reference:/data:ro ghcr.io/jrichardson-pge/recet-worker:X.Y.Z run s3://bucket/jobs/0001/job.json
+`recet worker run job.json` is the contract a batch system (the CEDARS platform's Calculations module) calls: it reads a versioned job spec, fetches
+the inputs (local, `file://` or `s3://`), refuses the job when its engine release or pinned reference data differ, runs it, and sends the outputs with
+`receipt.json` (exactly what produced them) to the spec's outputs URI. `recet worker check` runs a filing's rules the same way. The image is published
+for each release tag as `ghcr.io/jrichardson-pge/recet-worker:X.Y.Z`. The spec, the receipt, progress, exit codes and the image are in
+[`recet/docs/WORKER.md`](recet/docs/WORKER.md).
 
 ## From Python
 

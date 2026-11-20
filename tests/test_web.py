@@ -658,7 +658,7 @@ def test_docs_pages_render(web):
     c = _login(app, "docs@example.com")
     r = c.get(f"{P}/docs")
     assert r.status_code == 303 and r.headers["location"] == f"{P}/docs/WEB_GUIDE.md"     # the web guide is the Docs home
-    for name in ["WEB_GUIDE.md", "README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "ARCHITECTURE.md"]:
+    for name in ["WEB_GUIDE.md", "README.md", "USER_GUIDE.md", "INPUT_FORMATS.md", "INPUT_FIELDS.md", "OUTPUT_FIELDS.md", "CALCULATIONS.md", "WORKER.md", "ARCHITECTURE.md"]:
         r = c.get(f"{P}/docs/{name}")
         assert r.status_code == 200, name
         assert f'href="{P}/docs/{name}" class="on"' in r.text, name

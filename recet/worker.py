@@ -11,7 +11,8 @@ file's SHA-256, the totals, notes and timings. A failed run still gets a receipt
 
 Exit codes: 0 succeeded; 1 the run failed (receipt written); 2 the spec was refused (nothing run; the reasons on stderr).
 
-`recet worker check check.json` runs a filing's rules instead (checkjob.py): the platform's check of a filing in the release its specification names."""
+`recet worker check check.json` runs a filing's rules instead (checkjob.py): the platform's check of a filing in the release its specification names.
+The contract for callers is documented in recet/docs/WORKER.md."""
 from __future__ import annotations
 
 import hashlib
