@@ -3,6 +3,13 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.98 (2026-11-20, Jake; the second documentation review's shortening items): documentation only, no change to any run or output. The
+  README is a one-page front door (about 14 KB to 5 KB): what ReCET is, how to install and start each way of running it, the reference data folder,
+  the performance headline and a table of the documents; what it repeated is in the documents. INPUT_FORMATS links INPUT_FIELDS section 4's column
+  tables instead of repeating them and keeps the matching, zone, sum and calendar rules; its "What a run writes" links OUTPUT_FIELDS section 2.
+  CALCULATIONS C2 keeps the reasons and cites OUTPUT_FIELDS 0.2-0.4 for the quarter, discounting and baseline-phasing formulas, which were in both.
+  ARCHITECTURE section 11 keeps only the deployment's limits (1.3's Status column is the record of what is not built). Release-history asides are
+  cut from COST_TESTS (its History section), ARCHITECTURE 1.4 and INPUT_FORMATS; CHANGELOG keeps the history.
 - 0.1.97 (2026-11-20, Jake; the second documentation review's omissions): documentation only, no change to any run or output. The batch worker's
   contract has its own document, `recet/docs/WORKER.md` (the job spec, what the worker writes, progress and log, the receipt, exit codes, the check spec
   and the image), packaged with the others, listed in the window's Help menu and on the web Docs pages, so the CEDARS platform can show it with the
