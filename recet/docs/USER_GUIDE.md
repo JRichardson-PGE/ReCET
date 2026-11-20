@@ -44,7 +44,7 @@ pip install recet-<version>-py3-none-any.whl          (or, from a checkout of th
 python -m recet                                     opens the window      (also: recet  or  recet-gui)
 ```
 
-Python 3.11 or newer; `numpy`, `pandas`, `pyarrow`, `openpyxl`, `sv-ttk` and `tksheet` (the Edit inputs grid) install automatically; the window needs `tkinter` (included with the python.org installers; on some Linux systems `apt install python3-tk`).
+Python 3.11 or newer; `numpy`, `pandas`, `pyarrow`, `openpyxl`, `pyyaml`, `sv-ttk` and `tksheet` (the Edit inputs grid) install automatically; the window needs `tkinter` (included with the python.org installers; on some Linux systems `apt install python3-tk`).
 The first time, set the **reference data folder** (below) so the large files can be found.
 
 ---------------------------------------------------------------------------------------------------------------------------------

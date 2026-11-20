@@ -8,7 +8,7 @@ how every number is calculated; [Desktop and command line](USER_GUIDE.md) covers
 
 Accounts are by invitation. An administrator adds you and sends you a setup link, which works once and expires after a few days; on it you choose a
 password of at least 10 characters. If you forget your password, ask an administrator for a new setup link. **Your account** (your name, top right)
-changes your password.
+changes your password and turns the email about your finished runs on or off (section 4).
 
 ## 2. Run a job
 
@@ -19,7 +19,9 @@ Open **New run**.
    `Profiles8760` and `Programs` sheets, or **CET files in a .zip**: `Measure.csv` and, optionally, `ProgramCost.csv`, exactly as CET takes them (a CSV on
    its own is not accepted). Each upload has a **template** link beside it. **Optional supplied files** replace the built-in 8,760 electric profiles, gas
    monthly profiles, run parameters, statewide allocation factors or program metadata for this run only; their layouts are in
-   [Input formats](INPUT_FORMATS.md). The page states the size limits (150 MB per file, 1,024 MB once unzipped, unless your site set others).
+   [Input formats](INPUT_FORMATS.md). **CET outputs to compare against** takes a CET run's `*_outputs.csv`: the run then compares its results
+   with CET's, per measure and in total (`cet_comparison_*`, [Output fields](OUTPUT_FIELDS.md) section 2.6); it means something only when the job is
+   run the way the CET run was. The page states the size limits (150 MB per file, 1,024 MB once unzipped, unless your site set others).
 3. **Pricing.** **Calculation engine** is ReCET's current release (the default; the only one a filing accepts) or a replica of an earlier CET release
    (21.0 to 25.1), which prices the job exactly as that release's RunCET did, its errors included, on that release's own avoided-cost tables, for
    evaluation and history. **Which ACCs each engine has** lists them; a replica takes none of the options below except First Year, Market effects, the
@@ -123,6 +125,13 @@ are kept 30 days after their last change.
 - **Download** the draft as a job workbook or as CET files.
 
 The values offered in the lists are on the [Value lists](value-lists) page.
+
+## 5a. For administrators
+
+Administrators see three more things. **Users** adds a person (email, name, role) and makes their one-time setup link, which you send them yourself;
+it also makes a new setup link, switches a person between user and admin, and disables or enables an account (a disabled person is signed out at once).
+**Audit** lists the latest 500 events: sign-ins, runs and user changes. On a **Value lists** page an administrator can add a code, or retire and
+unretire one; the change reaches Edit inputs' dropdowns and checks at once.
 
 ## 6. Where to read more
 
