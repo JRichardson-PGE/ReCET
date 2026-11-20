@@ -356,7 +356,7 @@ per-measure loop to floating-point rounding (relative differences below 1e-14). 
 this route.
 
 **C5.2 Retired (2026-10-02): the TOU (H-factor) route.** TOU end uses are priced by C5.1 from their 8,760s in the library (C4.1). The quarterly
-TOU-period route (CET's kWh term plus a demand-scaled T&D term from five period factors) is no longer used; its formulas are in the git history.
+TOU-period route (CET's kWh term plus a demand-scaled T&D term from five period factors) is no longer used.
 
 **C5.3 Retired (2026-10-02): CET's SCG table.** SCG measures are priced by C5.1 on the SCG routing of C3.1; CET's quarterly SCG table is no longer read.
 

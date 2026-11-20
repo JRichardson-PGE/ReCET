@@ -1,7 +1,7 @@
 # Changelog
 
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
-Releases before 0.1.31 are in the git history.
+Releases before 0.1.31 are not recorded here.
 
 - 0.1.96 (2026-11-18, Jake: "let's just do 2020 ACC, and leave 2019 and prior out"): the **2020 ACC** is a built-in version (`--acc 2020`, New run,
   the window's list; CET's Avoided Cost Version 2021, the ACC of the 2021-2023 filings and claims). Electric: `acc/2020/electric_hourly.parquet` in the
@@ -228,7 +228,7 @@ Releases before 0.1.31 are in the git history.
 - 0.1.71 (2026-10-29): `cet_versions.QuarterlyTables.from_release` reads an avoided-cost parquet in 1M-row batches and keeps only the job's PA / end-use
   rows before it becomes a DataFrame (the largest quarter is read from the Qac column alone). The first real 25.1 run on the laptop ran out of memory
   (17.3 GB) loading the whole 23.3M-row 2026 electric table; C3 needs about 1,100 rows. 24.3 (2022 ACC) and 25.0 (2024 ACC) already matched RunCET on the full export.
-- 0.1.70 (2026-10-29, Jake; 0.1.69 is the prior-CET-releases PR #58): the screen-reader pass. `tests/screenreader` is an NVDA walk-through of the web
+- 0.1.70 (2026-10-29, Jake; 0.1.69 is the prior-CET-releases release): the screen-reader pass. `tests/screenreader` is an NVDA walk-through of the web
   app (Guidepup 0.36 + Playwright, Windows only, not part of pytest): `serve_a11y.py` serves this checkout on a throwaway state, `recet.nvda.spec.ts` drives
   NVDA and Chrome through sign in, Runs, New run, a run, Results and Edit inputs and writes what NVDA said after each key to `results/<flow>.json` (ignored
   by git). Guidepup finds the browser with Alt+Esc and failed on a busy desktop; `focusWindow.ps1` raises Chrome by its title first, and the title match
@@ -339,8 +339,8 @@ Releases before 0.1.31 are in the git history.
   `engine.rul_in_use` in the electric / gas / water lifetime values, bill impacts and participant cost (grouped and per measure) and in
   `tests/reference_calc.py`. Before, a fractional life blended the 2nd baseline into its last part-quarter / year, and the participant cost took the
   2nd-baseline cost plus the deferred difference; emissions, the combined 8,760 and the savings already treated it as single-baseline (the savings give the
-  same values either way). test_calcs' EX4 is such a measure. Same PR: the docs audit of PR #43 (stale names and formulas after 0.1.50-0.1.56).
-- 0.1.56 (2026-10-28; made 2026-10-27 for 0.1.52 but pushed after PR #38 merged): default `chunk_size` 50,000 (was 20,000), as the web server
+  same values either way). test_calcs' EX4 is such a measure. Same release: a docs audit (stale names and formulas after 0.1.50-0.1.56).
+- 0.1.56 (2026-10-28; made 2026-10-27 for 0.1.52 but released later): default `chunk_size` 50,000 (was 20,000), as the web server
   already ran; about 1 GiB peak at 1M on the server. Diagrams use SVG text labels (`htmlLabels: false` in each diagram's front matter, for GitHub,
   and in docs.js): HTML labels sit in a foreignObject that clips any text wider than Mermaid measured (e.g. a font that loads after measuring).
   No `<b>` in labels (it prints literally as SVG text).
@@ -362,7 +362,7 @@ Releases before 0.1.31 are in the git history.
   fields / program fields (Prg_*) / output fields / one OUTPUT_FIELDS group (`output_templates.KINDS`, `kind()`), search over names and definitions;
   right list in file order with Top / Up / Down / Bottom. A saved default template starts new runs: web `user_settings` table (key
   `default_output_template`; a fresh New run page preselects it, a rerun keeps its own), window config key `default_output_template` (applied at
-  startup over the restored last-run template once a default is set). Skipped 0.1.53 (PR #39, ratio numerators, used it).
+  startup over the restored last-run template once a default is set). Skipped 0.1.53 (the ratio-numerators change used it).
 - 0.1.53 (2026-10-27, Jake): every ratio has its numerator as its own column, just before its ratios: `TRCBen` (B + TaxCredits), `PACBen` (B), `RIMBen`
   (B + bill increases), `SCBBen` / `SCHBen` (the _SB / _SH benefits + OtherBen); PCT already had `PCTBen`. So `<test>Ratio = <test>Ben / <test>Cost` and
   `<test>RatioNoAdmin = <test>Ben / <test>CostNoAdmin` from two columns of one file (0 when the cost is 0). The portfolio summary, Results group sums and
