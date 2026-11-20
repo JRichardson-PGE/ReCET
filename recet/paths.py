@@ -16,6 +16,7 @@ The reference data folder is resolved, first match wins:
 
 Layout of the reference folder (`recet data status` lists what is present; `manifest.json` carries sizes and checksums):
 
+  acc/2020/electric_hourly.parquet          2020 ACC hourly electric avoided costs (2020-2050, TRC only)
   acc/2021/electric_hourly.parquet          2021 ACC hourly electric avoided costs (2020-2050, TRC only)
   acc/2022/electric_hourly.parquet          2022 ACC hourly electric avoided costs (2022-2052, TRC only)
   acc/2024/electric_hourly.parquet          2024 ACC hourly electric avoided costs
@@ -114,6 +115,7 @@ class RefFile:
 
 
 REF_FILES: dict[str, RefFile] = {r.key: r for r in (
+    RefFile("acc_electric_2020", "acc/2020/electric_hourly.parquet", "2020 ACC hourly electric avoided costs (TRC only)", required=False),
     RefFile("acc_electric_2021", "acc/2021/electric_hourly.parquet", "2021 ACC hourly electric avoided costs (TRC only)", required=False),
     RefFile("acc_electric_2022", "acc/2022/electric_hourly.parquet", "2022 ACC hourly electric avoided costs (TRC only)", required=False),
     RefFile("acc_electric_2024", "acc/2024/electric_hourly.parquet", "2024 ACC hourly electric avoided costs"),

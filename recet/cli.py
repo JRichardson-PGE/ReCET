@@ -38,7 +38,7 @@ def _add_run_options(ap: argparse.ArgumentParser) -> None:
     g.add_argument("--engine", help="the calculation engine: recet (default: ReCET's own hourly pricing) or cet-<release> (an exact replica of that CET "
                    "release, errors included: cet-25.1, cet-25.0, cet-24.3, cet-24.2, cet-24.1, cet-22.1, cet-21.0; see `recet cet-version list`)")
     g = ap.add_argument_group("ACC version and supplied files")
-    g.add_argument("--acc", dest="acc_version", help="ACC version: 2021, 2022, 2024, 2026, or a new label defined by the files below")
+    g.add_argument("--acc", dest="acc_version", help="ACC version: 2020, 2021, 2022, 2024, 2026, or a new label defined by the files below")
     g.add_argument("--acc-electric-file", help="electric ACC file: replaces the built-in one for --acc (or defines a new version)")
     g.add_argument("--acc-gas-file", help="gas ACC file: same")
     g.add_argument("--acc-draft", action="store_true", default=None,

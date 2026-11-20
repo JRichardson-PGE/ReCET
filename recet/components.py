@@ -37,7 +37,7 @@ def price_components(measures: pd.DataFrame, *, acc_version: int, base_year: int
                                          market_effects_bens=market_effects_bens, component=c)
         s = priced.values.groupby("CEInputID")["LifetimeValuePV"].sum() if len(priced.values) else pd.Series(dtype=float)
         out[f"ElecValue_{c}"] = s.reindex(out.index).fillna(0.0)
-    gas = gas_avoided_cost.available_components()          # the 2021/2022 Gas ACCs have no air quality adder: no column for it
+    gas = gas_avoided_cost.available_components()          # the 2020/2021/2022 Gas ACCs have no air quality adder: no column for it
     for i, c in enumerate(gas, 1):
         log(f"  gas component {i}/{len(gas)}: {c}")
         g, _n, _m = run_poc.run_gas_benefit(measures, cost_test="TRC", acc_version=acc_version, base_year=base_year,

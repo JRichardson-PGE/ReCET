@@ -7,7 +7,7 @@
     time_basis    per unit or per measure, first year, annual, lifecycle (undiscounted), present value to the First Year, nominal, or a ratio of PVs
     aggregation   how a group total (the portfolio summary, the Results levels) combines it: summed, recomputed from summed parts, or not combined
     rounding      ReCET never rounds a written value; formats only change how a number is shown
-    years_in_use  which ACCs fill it (the SCT columns are blank on the TRC-only 2021 and 2022 ACCs) and, for a column renamed since, its earlier names
+    years_in_use  which ACCs fill it (the SCT columns are blank on the TRC-only 2020, 2021 and 2022 ACCs) and, for a column renamed since, its earlier names
 
 The rules work on the column's name and its documented unit, so a new column gets attributes without an entry here; `tests/test_field_attributes.py`
 checks them against the cost tests the run writes (the set's benefits and costs add up to each test's Ben and CostNoAdmin).
@@ -142,7 +142,7 @@ def attributes(column: str, definition: str = "", acc: str = "", cset=None) -> d
         version = "as filed (CET input field)"
     former = sorted(old for old, new in fieldnames.OUTPUT_RENAMES.items() if new == column)
     former += sorted(old for old, new in fieldnames.LEGACY_TO_RECET.items() if new == column)
-    years = ("2024 ACC on; blank on the TRC-only 2021 and 2022 ACCs" if SCT_ONLY.search(column) and column not in inputs else "every ACC (2021-2026)")
+    years = ("2024 ACC on; blank on the TRC-only 2020, 2021 and 2022 ACCs" if SCT_ONLY.search(column) and column not in inputs else "every ACC (2020-2026)")
     if former:
         years += "; earlier name " + ", ".join(former)
     return {"unit": u, "source": _source(column, inputs), "version": version, "cost_tests": _cost_tests(column, cset),

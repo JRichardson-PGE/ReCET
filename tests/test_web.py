@@ -345,7 +345,7 @@ def test_the_web_pages_name_accs_by_year_and_show_which_acc_applies(web, tmp_pat
     assert re.search(r'<td class="nowrap">2026</td><td>Sep 2027 true-up \(2028-31\)</td><td class="nowrap">2028-2029</td>', page)
     assert "*" not in page.split('id="acc-help"')[1].split("</details>")[0]
     # dimmed = not shipped with ReCET (the 2028 ACC), whatever this server offers (the test server offers only 2024 and 2026)
-    assert [(r["acc"], r["builtin"]) for r in versions.acc_summary()] == [(2021, True), (2022, True), (2024, True), (2026, True), (2028, False)]
+    assert [(r["acc"], r["builtin"]) for r in versions.acc_summary()] == [(2020, True), (2021, True), (2022, True), (2024, True), (2026, True), (2028, False)]
     assert page.count('<tr class="dim">') == 1
     run_id = _start_run(c, tmp_path)
     assert re.search(r'<p class="muted">ReCET [0-9.]+ \(hourly\) · 2026 ACC\s+· started', c.get(f"{P}/runs/{run_id}").text)   # the engine first

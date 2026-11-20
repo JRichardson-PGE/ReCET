@@ -451,7 +451,7 @@ def prepare_electric_acc(path: str | Path, work_dir: str | Path) -> Path:
 GAS_ACC_MONTHS = _MONTHS
 GAS_ACC_COLUMNS = (["utility", "class", "cost_test", "scc", "year"] + [f"market_{m}" for m in _MONTHS] + [f"td_{m}" for m in _MONTHS]
                    + ["nox", "co2", "upstream_methane", "behind_meter_methane"])
-GAS_ACC_OPTIONAL = ("air_quality_adder",)   # SCT-only component; the 2021/2022 Gas ACCs have none (priced as zero when missing)
+GAS_ACC_OPTIONAL = ("air_quality_adder",)   # SCT-only component; the 2020/2021/2022 Gas ACCs have none (priced as zero when missing)
 _GAS_UTILITY_ALIASES = {"PG&E": "PG&E", "PGE": "PG&E", "SOCAL GAS": "Socal Gas", "SOCALGAS": "Socal Gas", "SCG": "Socal Gas", "SDG&E": "SDG&E", "SDGE": "SDG&E"}
 _GAS_CLASSES = {"Residential", "Commercial", "Total Core"}
 
@@ -470,7 +470,7 @@ def check_gas_acc(path: str | Path) -> AccCheck:
     if missing:
         return AccCheck(ok=False, errors=[f"missing column(s) {missing}"])
     if "air_quality_adder" not in df.columns:
-        chk.warnings.append("no air_quality_adder column: priced as zero (as in the 2021 and 2022 Gas ACCs)")
+        chk.warnings.append("no air_quality_adder column: priced as zero (as in the 2020, 2021 and 2022 Gas ACCs)")
     num = [c for c in GAS_ACC_COLUMNS + [c for c in GAS_ACC_OPTIONAL if c in df.columns] if c not in ("utility", "class", "cost_test", "scc")]
     if df[num].isna().any().any():
         chk.errors.append("blank/NaN in a numeric column (year, monthly market/td, nox, co2, upstream_methane, behind_meter_methane, air_quality_adder)")

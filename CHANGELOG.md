@@ -3,6 +3,18 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are in the git history.
 
+- 0.1.96 (2026-11-18, Jake: "let's just do 2020 ACC, and leave 2019 and prior out"): the **2020 ACC** is a built-in version (`--acc 2020`, New run,
+  the window's list; CET's Avoided Cost Version 2021, the ACC of the 2021-2023 filings and claims). Electric: `acc/2020/electric_hourly.parquet` in the
+  reference data folder (optional, as for 2021 and 2022: 22 utility and zone pairs, 2020-2050, TRC only); gas: packaged
+  (`data/acc/2020/gas_components.parquet`, 279 rows). Run parameters, emission factors and rate schedules were already packaged under CET's Version 2021.
+  Both tables come from E3's 2020 models, whose formulas the extraction reproduces to 3.6e-12 $/MWh (electric) and 8.9e-16 $/therm (gas) and whose
+  results match the Version 2021 avoided-cost tables of a CET backup (gas 2.4e-9; electric generation 7e-9 and T&D 5e-6 on the time-of-use profiles).
+  What is particular to this ACC (CALCULATIONS C3.6): its hours follow the 2025 calendar (read from the table's hour stamps like every ACC's, so no
+  pricing code changed); the model has no hourly distribution allocation for SCE zones 13 and 16 (SCE zone 10's stands in) and misfiles SDG&E zone 10's
+  (used); methane leakage is at the model's 20-year warming potential; the gas table pairs each year with the previous year's T&D cost and emission prices,
+  as the model's dashboard and CET do. A System-zone measure on the 2020 ACC has its zone calculated in the run until the packaged catalog is rebuilt with
+  it (the same rule and result, a little slower). `versions.TRC_ONLY` names the three TRC-only ACCs (the tie-out and New run read it or list them);
+  `acc_summary` starts at 2020, so New run's "Which ACC applies to my filing?" shows the 2020 ACC as built in. No output of a run on another ACC changes.
 - 0.1.95 (2026-11-14, Jake; step 4 of CEDARS-Platform's filing specifications: a filing's rules run in the release its specification names, and the
   rule language grows): `recet worker check check.json` (`checkjob.py`) runs a filing's rules, given as data, on its tables in this release and sends
   `findings.json` (each failing rule's rows and values, notes on rules not checked) and `receipt.json` (engine, the rules' SHA-256, each table's

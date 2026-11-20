@@ -1,8 +1,9 @@
 """ACC versions: which electric and gas avoided-cost files a run prices against, and which run parameters and E3 tables (discount rates, emissions, rate
 schedules) go with it.
 
-Four versions ship with the package, each named by its ACC:
+Five versions ship with the package, each named by its ACC:
 
+  key "2020"  2020 ACC   electric: reference folder acc/2020/electric_hourly.parquet   gas: packaged   TRC only, 2025 hourly calendar
   key "2021"  2021 ACC   electric: reference folder acc/2021/electric_hourly.parquet   gas: packaged   TRC only, 2020 hourly calendar
   key "2022"  2022 ACC   electric: reference folder acc/2022/electric_hourly.parquet   gas: packaged   TRC only, 2020 hourly calendar
   key "2024"  2024 ACC   electric: reference folder acc/2024/electric_hourly.parquet   gas: packaged   TRC, SCT Base, SCT High; 2018 calendar
@@ -92,7 +93,7 @@ BUDGET_FILING_ACC = [
 CLAIMS_LAST_YEAR = 2035          # later years will get filings not in the table yet
 
 
-def acc_summary(first_acc: int = 2021, last_acc: int = 2028) -> list[dict]:
+def acc_summary(first_acc: int = 2020, last_acc: int = 2028) -> list[dict]:
     """One row per ACC for the New run page: {"acc", "filings" (short names), "claims" (program years, "" if none), "builtin" (ReCET ships it)}. Kept to
     the ACCs a user is likely to pick (from `first_acc`) and the next one (`last_acc`); the full lists are BUDGET_FILING_ACC and claims_acc()."""
     claims: dict[int, list[str]] = {}
@@ -190,12 +191,14 @@ class AccVersion:
 
 
 BUILTIN: dict[str, AccVersion] = {v.key: v for v in (
+    AccVersion("2020", acc_label(2020), 2020, "acc_electric_2020", ("acc", "2020", "gas_components.parquet")),
     AccVersion("2021", acc_label(2021), 2021, "acc_electric_2021", ("acc", "2021", "gas_components.parquet")),
     AccVersion("2022", acc_label(2022), 2022, "acc_electric_2022", ("acc", "2022", "gas_components.parquet")),
     AccVersion("2024", acc_label(2024), 2024, "acc_electric_2024", ("acc", "2024", "gas_components.parquet")),
     AccVersion("2026", acc_label(2026), 2026, "acc_electric_2026", ("acc", "2026", "gas_components.parquet")),
 )}
 NEWEST_BUILTIN = "2026"
+TRC_ONLY = ("2020", "2021", "2022")     # built-in ACCs with no Societal Cost Test avoided costs
 
 
 @dataclass

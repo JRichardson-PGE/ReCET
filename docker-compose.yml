@@ -1,7 +1,7 @@
 # The ReCET web app on its server, behind a reverse proxy (nginx) that routes /ReCET to recet:3000.
 #
 # Before the first start:
-#   - the reference data folder is at ~/recet-data (acc/2021, acc/2022, acc/2024, acc/2026 and impact_profiles/; check with
+#   - the reference data folder is at ~/recet-data (acc/2020, acc/2021, acc/2022, acc/2024, acc/2026 and impact_profiles/; check with
 #     `docker compose run --rm recet recet data status`)
 #   - the edge stack is running (it creates the "web" network)
 # Then:
@@ -26,7 +26,7 @@ services:
       RECET_WEB_TRUST_PROXY: ${RECET_WEB_TRUST_PROXY:-1}
       RECET_WEB_WORKERS: "1"
       OPENBLAS_NUM_THREADS: "1"               # recet sets this too; here it also covers anything that imports numpy first
-      RECET_WEB_ACC_VERSIONS: "2021,2022,2024,2026"
+      RECET_WEB_ACC_VERSIONS: "2020,2021,2022,2024,2026"
       # run emails (recet/web/notify.py): set these in the server's .env (never in git); with no SMTP host no email is sent
       RECET_WEB_BASE_URL: ${RECET_WEB_BASE_URL:-}
       RECET_WEB_SMTP_HOST: ${RECET_WEB_SMTP_HOST:-}

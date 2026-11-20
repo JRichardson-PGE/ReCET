@@ -211,7 +211,7 @@ def available_components() -> tuple[str, ...]:
 
 
 def available_cost_tests() -> tuple[str, ...]:
-    """The cost tests the loaded electric ACC has rows for: ("TRC",) for the 2021 and 2022 ACCs, ("TRC", "SCT Base", "SCT High") for 2024 and 2026."""
+    """The cost tests the loaded electric ACC has rows for: ("TRC",) for the 2020, 2021 and 2022 ACCs, ("TRC", "SCT Base", "SCT High") for 2024 and 2026."""
     tests = {t for (_iou, _zone, t) in _store().blocks}
     return tuple(t for t in ("TRC", "SCT Base", "SCT High") if t in tests) + tuple(sorted(tests - {"TRC", "SCT Base", "SCT High"}))
 
