@@ -47,7 +47,7 @@ from pathlib import Path
 import pandas as pd
 
 # The full dbo.E3Settings export, shipped as run_parameters.csv (every ACC Version 2013-2027, one row per PA), supplied by Jake 2026-09-20. It replaces the earlier 20-row
-# avoided_cost_settings.csv, which had no Version 2027 (the 2026 ACC's version, AvoidedCostVersion 5/25/2026).
+# avoided_cost_settings.csv, which had no Version 2027 (AvoidedCostVersion 5/25/2026, the rows the 2026 ACC reads; the 2026 ACC is Avoided Cost Version 2028).
 from .. import paths, versions
 SETTINGS_CSV = paths.package_data("run_parameters.csv")
 

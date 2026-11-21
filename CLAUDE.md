@@ -44,7 +44,7 @@ TOU work) stays in that repo; its CLAUDE.md and `poc/README.md` hold the evidenc
   program year, through CLAIMS_LAST_YEAR 2035). The page shows it compactly (Jake: the two full tables were too big): `versions.acc_summary()`, one row per
   ACC 2020-2028 with its filings' short names and its claim years; dimmed = not in versions.BUILTIN (not by the server's ACC list). That table is also the source for the preflight's ACC check (0.1.47). The desktop window and the outputs'
   POC_ACC label still show both names (`versions.acc_label`, "2024 ACC (Avoided Cost Version 2026)", as of 2026-10-22); the 2026 ACC is Avoided
-  Cost Version 2028 although CET's draft tables number it 2027 (`AVOIDED_COST_VERSION`; tables are still read through `versions.CET_VERSION_TO_ACC`).
+  Cost Version 2028 (Jake, 2026-11-20). CET has no Version 2028 rows yet, so its tables are read from CET's Version 2027 rows, a corrected Version 2026 for the 2024 ACC with the same values (`AVOIDED_COST_VERSION`; tables read through `versions.CET_VERSION_TO_ACC`). Never call the 2026 ACC Version 2027 in docs or pages.
   Inside the packaged CET exports CET's numbers are mapped on read.
 - Each ACC's hourly data follow one calendar's weekdays: 2018 for 2024/2026, 2020 for 2021/2022, 2025 for 2020 (read from the file's hour stamps,
   `real_impact_profiles.acc_calendar_year`). An ACC year always has 8,760 hours (the last day of a leap year is dropped); never add leap-day handling.
