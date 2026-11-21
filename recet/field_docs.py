@@ -97,13 +97,21 @@ def _output_entries() -> dict[str, Definition]:
 
 @lru_cache(maxsize=None)
 def _input_entries() -> dict[str, Definition]:
-    """Every Measure.csv column INPUT_FIELDS.md section 1 defines: its first cell names it, its last cell describes it."""
+    """Every Measure.csv column INPUT_FIELDS.md section 1 defines, then every ProgramCost.csv column section 2 defines (a name both files have,
+    PrgID and ClaimYearQuarter, keeps its Measure.csv definition): a table row's first cell names it, its last cell describes it."""
+    out: dict[str, Definition] = {}
+    _read_input_section("## 1. `Measure.csv`", out)
+    _read_input_section("## 2. `ProgramCost.csv`", out)
+    return out
+
+
+def _read_input_section(heading: str, out: dict[str, Definition]) -> None:
     doc = "INPUT_FIELDS.md"
     text = (DOCS / doc).read_text(encoding="utf-8")
-    start = text.index("## 1. `Measure.csv`")
-    text = text[start:text.index("## 2. ", start)]
-    out: dict[str, Definition] = {}
-    section = slug("1. `Measure.csv`")
+    start = text.index(heading)
+    end = re.search(r"^## \d+\. ", text[start + len(heading):], re.M)
+    text = text[start:start + len(heading) + end.start()] if end else text[start:]
+    section = slug(heading[3:])
     names_table = False                                  # the table of CET's legacy names: not a definition
     for line in text.splitlines():
         m = re.match(r"^(#{2,4}) (.+)$", line)
@@ -121,7 +129,6 @@ def _input_entries() -> dict[str, Definition]:
             if names and len(cells) > 1:
                 for n in names:
                     out.setdefault(n, Definition(n, doc, section, _plain(cells[-1])))
-    return out
 
 
 def definition(column: str) -> Definition | None:

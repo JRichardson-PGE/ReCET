@@ -161,3 +161,14 @@ def test_every_catalog_column_has_a_definition_and_a_link_that_resolves():
         assert text, col
         doc, _, anchor = link.partition("#")
         assert anchor in slugs[doc], (col, link)
+
+
+def test_every_input_column_has_a_definition_including_programcost():
+    """Measure.csv and ProgramCost.csv columns each get INPUT_FIELDS.md's definition (the platform's data dictionary is exported from these);
+    a column both files have keeps its Measure.csv entry."""
+    from recet import templates
+    for col in [*templates.MEASURE_COLUMNS, *templates.PROGRAMCOST_COLUMNS]:
+        d = field_docs.definition(col)
+        assert d is not None and d.text, col
+    assert field_docs.definition("OnBillFinancing").anchor == field_docs.slug("2. `ProgramCost.csv`")
+    assert field_docs.definition("PrgID").anchor == field_docs.slug("1.1 Identification and program link")

@@ -3,6 +3,12 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.100 (2026-11-21, Jake; the data dictionary overlap review): no change to any run or output. `field_docs.definition` now reads
+  INPUT_FIELDS.md section 2 as well as section 1, so the thirteen ProgramCost.csv columns (PrgYear, PA, the ten cost fields, OnBillFinancing) get
+  their definitions and links; before, only Measure.csv columns had one, and the CEDARS platform's data dictionary (exported from it) showed those
+  thirteen blank. A name both files have (PrgID, ClaimYearQuarter) keeps its Measure.csv entry. OUTPUT_FIELDS no longer lists every code of
+  `Prg_ProgramStatus` and `Prg_ProgramSegment` in their definitions (the program list's value lists are versioned, so a fixed list there would go
+  stale); each gives two examples. Checked by a new test that every Measure and ProgramCost column has a definition.
 - 0.1.99 (2026-11-20, Jake): documentation only, no change to any run or output. The 2026 ACC is CET's Avoided Cost Version 2028, not 2027.
   CALCULATIONS C3.3 and the user guide's version table said 2027; they now give each ACC's Avoided Cost Version (2021, 2022, 2024, 2026, 2028) and,
   separately, the rows ReCET reads from CET's tables: CET has no Version 2028 rows yet, so the 2026 ACC reads the rows labeled 2027, which CET added
