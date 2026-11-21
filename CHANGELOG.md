@@ -3,6 +3,12 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.100 (2026-11-21, Jake; the data dictionary overlap review): no change to any run or output. `field_docs.definition` now reads
+  INPUT_FIELDS.md section 2 as well as section 1, so the thirteen ProgramCost.csv columns (PrgYear, PA, the ten cost fields, OnBillFinancing) get
+  their definitions and links; before, only Measure.csv columns had one, and the CEDARS platform's data dictionary (exported from it) showed those
+  thirteen blank. A name both files have (PrgID, ClaimYearQuarter) keeps its Measure.csv entry. OUTPUT_FIELDS no longer lists every code of
+  `Prg_ProgramStatus` and `Prg_ProgramSegment` in their definitions (the program list's value lists are versioned, so a fixed list there would go
+  stale); each gives two examples. Checked by a new test that every Measure and ProgramCost column has a definition.
 - 0.1.98 (2026-11-20, Jake; the second documentation review's shortening items): documentation only, no change to any run or output. The
   README is a one-page front door (about 14 KB to 5 KB): what ReCET is, how to install and start each way of running it, the reference data folder,
   the performance headline and a table of the documents; what it repeated is in the documents. INPUT_FORMATS links INPUT_FIELDS section 4's column
