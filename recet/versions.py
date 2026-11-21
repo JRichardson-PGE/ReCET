@@ -31,13 +31,14 @@ from pathlib import Path
 from . import paths
 
 # CET avoided-cost version -> the ACC it holds. Release dates (RunParameters AvoidedCostVersion): 2018 = 9/1/2017, 2019 = 6/28/2018, 2020 = 9/15/2019,
-# 2021 = 6/24/2020, 2022 = 8/28/2021, 2024 = 9/26/2022, 2026 = 12/12/2024, 2027 = 5/25/2026 (the draft 2026 ACC; the final v1b uses the same tables).
-# Confirmed by Jake for 2022, 2024, 2026 and 2027. CET versions 2013 and 2017 both carry 2011 dates and are not mapped (not selectable).
+# 2021 = 6/24/2020, 2022 = 8/28/2021, 2024 = 9/26/2022, 2026 = 12/12/2024, 2027 = 5/25/2026. Version 2027 is a corrected Version 2026 (the 2024 ACC,
+# Jake 2026-10-29); the 2026 ACC is Avoided Cost Version 2028 (Jake 2026-11-20), which has no rows yet, so the 2026 ACC reads the 2027 rows, whose values
+# equal Version 2026's in every packaged table. Confirmed by Jake for 2022, 2024 and 2026. CET versions 2013 and 2017 both carry 2011 dates and are not mapped (not selectable).
 CET_VERSION_TO_ACC = {2018: 2017, 2019: 2018, 2020: 2019, 2021: 2020, 2022: 2021, 2024: 2022, 2026: 2024, 2027: 2026}
 
 
 # ACC year -> CET's Avoided Cost Version (the first year the ACC is in effect for claims or forecasts). The same as CET's table numbers above, except the 2026 ACC:
-# CET's draft tables call it Version 2027, but it takes effect as Avoided Cost Version 2028 (Jake, 2026-10-22).
+# its tables are read from CET's Version 2027 rows (above), but it takes effect as Avoided Cost Version 2028 (Jake, 2026-10-22 and 2026-11-20).
 AVOIDED_COST_VERSION = {**{acc: cet for cet, acc in CET_VERSION_TO_ACC.items()}, 2026: 2028}
 
 

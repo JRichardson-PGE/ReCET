@@ -3,6 +3,12 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.99 (2026-11-20, Jake): documentation only, no change to any run or output. The 2026 ACC is CET's Avoided Cost Version 2028, not 2027.
+  CALCULATIONS C3.3 and the user guide's version table said 2027; they now give each ACC's Avoided Cost Version (2021, 2022, 2024, 2026, 2028) and,
+  separately, the rows ReCET reads from CET's tables: CET has no Version 2028 rows yet, so the 2026 ACC reads the rows labeled 2027, which CET added
+  as a corrected Version 2026 for the 2024 ACC and which hold the same values as Version 2026 in every packaged table (checked: run parameters,
+  emissions and the four rate-schedule tables). The labels in the outputs and the window already said 2028 (`versions.AVOIDED_COST_VERSION`). The
+  user guide now says five built-in versions, not four. Comments in `versions.py` and `discount_settings.py` corrected to match.
 - 0.1.98 (2026-11-20, Jake; the second documentation review's shortening items): documentation only, no change to any run or output. The
   README is a one-page front door (about 14 KB to 5 KB): what ReCET is, how to install and start each way of running it, the reference data folder,
   the performance headline and a table of the documents; what it repeated is in the documents. INPUT_FORMATS links INPUT_FIELDS section 4's column
