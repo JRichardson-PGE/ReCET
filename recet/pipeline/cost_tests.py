@@ -111,8 +111,11 @@ def program_cost_sums(program: pd.DataFrame | None, first_year: int, acc_version
         return pd.DataFrame(columns=["PrgID", "SumCosts", "SumCostsNPV", "SumCostsNPV_SCT"] + [f"Sum{f}" for f in _COST_FIELDS])
     p = program.copy()
     p["RowCosts"] = p[_COST_FIELDS].fillna(0.0).sum(axis=1)                                     # a ProgramCost row's ten cost fields, nominal
-    annual_discount_factor = p["PA"].map(lambda pa: 1.0 + discount_settings.get_discount_rate_annual(pa, acc_version))                 # CalcCE's Raf
-    annual_discount_factor_sct = p["PA"].map(lambda pa: 1.0 + discount_settings.get_settings(pa, acc_version)["DiscountRateAnnual_SCT"])
+    # a row whose PA has no run parameters at this ACC (a REN or CCA on the 2022 ACC on) is discounted at SCE's, as CEDARS passes non-IOU program
+    # costs to CET (C11.1); a PA with its own rows (built-in or supplied) keeps them
+    cost_pa = p["PA"].map(lambda pa: pa if discount_settings.has_settings(pa, acc_version) else UNALLOCATED_SW_PA)
+    annual_discount_factor = cost_pa.map(lambda pa: 1.0 + discount_settings.get_discount_rate_annual(pa, acc_version))                 # CalcCE's Raf
+    annual_discount_factor_sct = cost_pa.map(lambda pa: 1.0 + discount_settings.get_settings(pa, acc_version)["DiscountRateAnnual_SCT"])
     years_from_first_year = p["Used_Year"] - first_year
     p["RowCostsNPV"] = p["RowCosts"] / annual_discount_factor ** years_from_first_year
     p["RowCostsNPV_SCT"] = p["RowCosts"] / annual_discount_factor_sct ** years_from_first_year

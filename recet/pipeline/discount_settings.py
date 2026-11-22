@@ -136,6 +136,15 @@ def _settings_row(pa_key: str, acc_version: int) -> tuple[dict, float]:
     }, float(row["CO2Gas"]))
 
 
+def has_settings(pa: str, acc_version: int) -> bool:
+    """Whether the PA has run parameters for the ACC version: a user-supplied row, or a built-in row of that version."""
+    pa_key = PA_ALIASES.get(pa.upper().replace("&", ""), pa.upper())
+    if _USER is not None and pa_key in _USER.index:
+        return True
+    table = _table()
+    return bool(((table["PA"] == pa_key) & (table["ACC"] == int(acc_version))).any())
+
+
 def get_discount_rate_qtr(pa: str, acc_version: int = 2024) -> float:
     """SCG has no electric ACC (see real_avoided_cost_v2.PA_TO_IOU_LABEL) but
     DOES have its own real discount rate row here -- CET still discounts an
