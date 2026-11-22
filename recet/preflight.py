@@ -326,7 +326,7 @@ def _expected_text(exp: set[int], year: int, purpose: str) -> str:
 
 def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpose: str, mrows) -> None:
     """Each record's ACC (its ACCVersion, else the run's) against the ACCs that normally apply to its program year (its claim year) for
-    `purpose` (versions.expected_accs). A warning per (ACC, program year) that does not apply, naming the records; the counts by (ACC version, program year)
+    `purpose` (versions.expected_accs). With no purpose (Any filing) nothing is checked: every record is counted as not checked. A warning per (ACC, program year) that does not apply, naming the records; the counts by (ACC version, program year)
     go to rep.agg["acc_check"] for _finish_acc_check (a file checked in parts adds its parts' up)."""
     from . import versions
     run_key = acc.key if acc is not None else ""
@@ -338,7 +338,7 @@ def _check_acc_applies(rep: PreflightReport, measures: pd.DataFrame, acc, purpos
     for (key, year), idx in pd.Series(np.arange(len(measures))).groupby([keys, years]).groups.items():
         idx = np.asarray(idx)
         acc_year = versions.acc_year_of(key) if key else None
-        exp = versions.expected_accs(int(year), purpose)
+        exp = versions.expected_accs(int(year), purpose) if purpose else None   # Any filing: the ACC is not checked (Jake, 2026-11-22)
         status = "not checked" if acc_year is None or exp is None else ("ok" if acc_year in exp else "flagged")
         c = counts.setdefault((str(key), acc_year, int(year)), {"measures": 0, "status": status, "expected": sorted(exp) if exp is not None else None})
         c["measures"] += len(idx)
@@ -366,6 +366,9 @@ def _finish_acc_check(rep: PreflightReport, purpose: str) -> None:
     unchecked = sum(r["measures"] for r in rows if r["status"] == "not checked")
     label = versions.acc_purpose_label(purpose)
     rep.acc_check = {"purpose": purpose, "label": label, "measures": n, "flagged": flagged, "not_checked": unchecked, "by_acc_and_year": rows}
+    if not purpose:
+        rep.stats["ACC check"] = f"{label}: not checked ({n:,} measures)"
+        return
     rep.stats["ACC check"] = (f"{label}: {flagged:,} of {n:,} measures priced on an ACC that does not normally apply to their program year"
                               + (f" ({unchecked:,} not checked: the ACC or the program year is not in the table)" if unchecked else ""))
 

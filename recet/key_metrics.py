@@ -116,17 +116,22 @@ def build(totals: pd.DataFrame, base_url: str = "", cset=None) -> pd.DataFrame:
         rows.append({"section": "Portfolio", "item": label, "measures": int(port["measures"]), "value": value, "definition": d.text if d else "",
                      "documentation": f"{base_url}{d.link}" if d else ""})
     first_cost = f"{head[0]}Cost"
+    # CET 21.0 and earlier write no TotalSystemBenefit: the drivers are then ordered by the first headline test's cost and carry no TSB or share of it
+    has_tsb = "TotalSystemBenefit" in totals.columns
     tsb, trc = float(port.get("TotalSystemBenefit", 0.0) or 0.0), float(port.get(first_cost, 0.0) or 0.0)
+    order = "TotalSystemBenefit" if has_tsb else (first_cost if first_cost in totals.columns else None)
     for dim in DIMENSIONS:
         g = totals[totals["dimension"] == dim].copy()
         if g.empty:
             continue
-        g["share_of_TSB"] = g["TotalSystemBenefit"] / tsb if tsb else None
-        g = g.reindex(g["TotalSystemBenefit"].abs().sort_values(ascending=False, kind="stable").index).head(TOP_N)
+        if order is not None:
+            g = g.reindex(g[order].abs().sort_values(ascending=False, kind="stable").index)
+        g = g.head(TOP_N)
         for _, r in g.iterrows():
             ratios = {name: (None if num is None or not den else num / den) for name, num, den in outputs._ratio_parts(get_from(r), cset)}
-            rows.append({"section": dim, "item": r["key"], "measures": int(r["measures"]), "TotalSystemBenefit": float(r["TotalSystemBenefit"]),
-                         "share_of_TSB": (float(r["TotalSystemBenefit"]) / tsb) if tsb else None,
+            r_tsb = float(r["TotalSystemBenefit"]) if has_tsb else None
+            rows.append({"section": dim, "item": r["key"], "measures": int(r["measures"]), "TotalSystemBenefit": r_tsb,
+                         "share_of_TSB": (r_tsb / tsb) if has_tsb and tsb else None,
                          first_cost: float(r.get(first_cost, 0.0) or 0.0),
                          f"share_of_{head[0]}_cost": (float(r.get(first_cost, 0.0) or 0.0) / trc) if trc else None,
                          **{f"{t}_ratio": ratios.get(t) for t in head}})

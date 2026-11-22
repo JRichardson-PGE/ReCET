@@ -147,16 +147,18 @@ def _cset(cset=None):
 
 
 def _numerators(get, cset=None) -> dict[str, object]:
-    """{test: the numerator of its ratios} for every test of the set: the total of the measure-level <test>Ben column, or (a table written before
-    0.1.53, which has no such column) the same sum built from its benefits and numerator adders (a missing benefit = no numerator; a missing adder = 0)."""
+    """{test: the numerator of its ratios} for every test of the set: the total of the measure-level <test>Ben column, or (a table without one: written
+    before 0.1.53, or by a CET replica) the same sum built from its benefits and numerator adders. A benefit stream the table does not have counts 0 when
+    it has at least one of the test's benefits (CET 22.1 and earlier write no WaterEnergyBen); with none of them there is no numerator. A missing adder = 0."""
     s = _cset(cset)
     out = {}
     for t in s.tests.values():
         v = get(f"{t.id}Ben")
         if v is None:
             parts = [get(s.column(x, t.pricing)) for x in t.benefits]
-            if not any(p is None for p in parts):
-                v = sum(parts) + sum(0.0 if (a := get(s.column(x, t.pricing))) is None else a for x in t.numerator_adders)
+            if any(p is not None for p in parts):
+                v = (sum(0.0 if p is None else p for p in parts)
+                     + sum(0.0 if (a := get(s.column(x, t.pricing))) is None else a for x in t.numerator_adders))
         out[t.id] = v
     return out
 

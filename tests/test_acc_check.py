@@ -75,9 +75,21 @@ def test_claims_flag_the_measure_on_an_acc_that_does_not_apply_and_still_price_i
     assert "acc_not_for_program_year" in text and "ACC check: Quarterly Claims: 1 of 2 measures" in text
 
 
-def test_any_filing_accepts_both_accs_of_2028(tmp_path):
+def test_any_filing_does_not_check_the_acc(tmp_path):
+    """Any filing (no purpose) checks no record's ACC against its program year: nothing is flagged, every record is 'not checked'."""
     r = _run(tmp_path, "")
-    assert r.acc_check["flagged"] == 0
+    assert r.acc_check["flagged"] == 0 and r.acc_check["not_checked"] == 2
+    assert {x["status"] for x in r.acc_check["by_acc_and_year"]} == {"not checked"}
+    text = (r.run_dir / "preflight.txt").read_text(encoding="utf-8")
+    assert "acc_not_for_program_year" not in text and "ACC check: Any filing (the ACC is not checked): not checked (2 measures)" in text
+
+
+def test_any_filing_does_not_flag_an_acc_outside_the_program_year(tmp_path):
+    rep = preflight.check_inputs(_two_measures(tmp_path), acc=versions.resolve_acc("2026", tmp_path / "e.parquet", None), acc_purpose="")
+    assert not [i for i in rep.issues if i.code == "acc_not_for_program_year"]
+    named = preflight.check_inputs(_two_measures(tmp_path), acc=versions.resolve_acc("2026", tmp_path / "e.parquet", None),
+                                   acc_purpose="2028-2035-application")
+    assert [i for i in named.issues if i.code == "acc_not_for_program_year"]  # the same job is flagged for a named filing
 
 
 def test_a_named_filing_flags_the_other_acc_and_points_at_the_cells(tmp_path):

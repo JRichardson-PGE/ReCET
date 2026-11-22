@@ -3,6 +3,16 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.102 (2026-11-22, Jake): two CET replica fixes and the ACC check. (1) The CET 22.1 replica (2021 ACC) wrote no ratio columns in
+  portfolio_summary: a table without the measure-level <test>Ben columns builds each ratio's numerator from the test's benefit streams, and a stream
+  the table lacked made the whole numerator blank; CET 22.1 and earlier write no WaterEnergyBen. A stream the table does not have now counts 0 when
+  it has at least one of the test's benefits (`outputs._numerators`); with none of them the ratio stays blank. (2) The CET 21.0 replica (2019 ACC)
+  failed with KeyError 'TotalSystemBenefit' writing key_metrics, because CET 21.0 writes no TotalSystemBenefit; key_metrics now orders the
+  drivers by the first headline test's cost and leaves their TSB and share of it blank (`key_metrics.build`). (3) *Any filing*, the default
+  "Priced for", no longer checks the ACC against the program year: every record is `not checked` and nothing is flagged (`acc_not_for_program_year`
+  is raised only for Quarterly Claims or a named budget filing). Before, a run on the 2026 ACC flagged every program-year-2027 record by default.
+  Found by the advanced-options test of the CEDARS demo (75-measure job: CET 22.1 TRC was blank, now 0.387; CET 21.0 failed, now TRC 0.446; the CET
+  24.3 control is unchanged at 0.656). Checked by new tests in tests/test_cost_test_consumers.py and tests/test_acc_check.py.
 - 0.1.101 (2026-11-21, Jake): a ProgramCost row whose PA has no run parameters at the run's ACC is discounted at SCE's rates instead of
   stopping the run. CET's run-parameter table carries the RENs and CCAs (BAY, MCE, SCR, ...) only through the 2021 ACC, so a REN or CCA filing on
   the 2022 ACC or later failed with "No run parameters for PA='BAY'" (found loading the example filings on the CEDARS demo). CEDARS passes

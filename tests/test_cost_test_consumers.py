@@ -108,3 +108,28 @@ def test_a_table_without_test_numerators_builds_them_from_the_set():
                       "TRCCost": [4.0, 4.0], "PACCost": [2.0, 2.0]})
     r = outputs.group_ratios(g, cts.load("EE-2026"))
     assert r["TRC_ratio"] == pytest.approx(19.0 / 8.0) and r["PAC_ratio"] == pytest.approx(17.0 / 4.0)
+
+
+def test_a_benefit_stream_the_table_lacks_counts_zero():
+    """CET 22.1 and earlier write no WaterEnergyBen: the ratios are still built from the benefits the table has (they were all blank before)."""
+    g = pd.DataFrame({"ElecBen": [10.0, 5.0], "GasBen": [1.0, 0.0], "OtherBen": [0.0, 1.0], "TRCCost": [4.0, 4.0], "PACCost": [2.0, 2.0]})
+    r = outputs.group_ratios(g, cts.load("EE-2026"))
+    assert r["TRC_ratio"] == pytest.approx(17.0 / 8.0) and r["PAC_ratio"] == pytest.approx(17.0 / 4.0)
+
+
+def test_a_table_with_none_of_a_tests_benefits_has_no_ratio_for_it():
+    g = pd.DataFrame({"TRCCost": [4.0], "PACCost": [2.0]})
+    assert "TRC_ratio" not in outputs.group_ratios(g, cts.load("EE-2026"))
+
+
+def test_key_metrics_without_total_system_benefit():
+    """CET 21.0 writes no TotalSystemBenefit: key_metrics is still written (it failed with KeyError), drivers ordered by TRC cost, no TSB share."""
+    frame = pd.DataFrame({"PrgID": ["A", "B", "C"], "Prg_ProgramName": ["a", "b", "c"], "UseCategory": ["Ltg", "HVAC", "Ltg"],
+                          "TRCBen": [5.0, 1.0, 2.0], "PACBen": [5.0, 1.0, 2.0], "TRCCost": [1.0, 9.0, 3.0], "PACCost": [1.0, 2.0, 1.0]})
+    s = cts.load("EE-2026")
+    km = key_metrics.build(key_metrics.sums(frame, s), cset=s)
+    progs = km[km["section"] == "Top programs"]
+    assert list(progs["item"]) == ["B - b", "C - c", "A - a"]                    # by TRC cost
+    assert progs["TotalSystemBenefit"].isna().all() and progs["share_of_TSB"].isna().all()
+    port = km[km["section"] == "Portfolio"].set_index("item")
+    assert "Total system benefit ($)" not in port.index and port.loc["TRC ratio", "value"] == pytest.approx(8.0 / 13.0)
