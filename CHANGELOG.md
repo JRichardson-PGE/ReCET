@@ -3,6 +3,11 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.103 (2026-11-22, Jake): 0.1.102's numerator rule gave a CET replica without the Societal Cost Test an SCB and SCH ratio of 0 instead
+  of blank (CET 25.0 on the 2024 ACC, seen on the CEDARS demo). The SCT benefits are ElecBen_SB, GasBen_SB, WaterEnergyBen_SB and OtherBen, and
+  CET 25.0's SCT is electric only (ElecBen_SB, 0 on the 2024 ACC, and no GasBen_SB), so "at least one benefit present" was met. Only a missing
+  water-energy or other benefit now counts 0 (`outputs.OPTIONAL_BENEFITS`: streams CET 22.1 and 21.0 did not price), so their ratios stay; a missing
+  electric or gas benefit means no numerator, as before 0.1.102. Checked by a new test in tests/test_cost_test_consumers.py and replica runs (22.1, 21.0, 24.3, 25.0, 25.1).
 - 0.1.102 (2026-11-22, Jake): two CET replica fixes and the ACC check. (1) The CET 22.1 replica (2021 ACC) wrote no ratio columns in
   portfolio_summary: a table without the measure-level <test>Ben columns builds each ratio's numerator from the test's benefit streams, and a stream
   the table lacked made the whole numerator blank; CET 22.1 and earlier write no WaterEnergyBen. A stream the table does not have now counts 0 when
