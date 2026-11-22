@@ -130,7 +130,7 @@ ACC_PURPOSE_CLAIMS = "claims"
 
 def acc_purposes() -> list[tuple[str, str]]:
     """[(key, label)] for the run option 'priced for': any filing, Quarterly Claims, or one budget filing."""
-    return ([("", "Any filing (the ACCs valid for the program year)"), (ACC_PURPOSE_CLAIMS, "Quarterly Claims")]
+    return ([("", "Any filing (the ACC is not checked)"), (ACC_PURPOSE_CLAIMS, "Quarterly Claims")]
             + [(k, f"{f.filing} ({f.years}, {f.acc} ACC)") for k, f in FILINGS.items()])
 
 
