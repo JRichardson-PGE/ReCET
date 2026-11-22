@@ -3,6 +3,14 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.101 (2026-11-21, Jake): a ProgramCost row whose PA has no run parameters at the run's ACC is discounted at SCE's rates instead of
+  stopping the run. CET's run-parameter table carries the RENs and CCAs (BAY, MCE, SCR, ...) only through the 2021 ACC, so a REN or CCA filing on
+  the 2022 ACC or later failed with "No run parameters for PA='BAY'" (found loading the example filings on the CEDARS demo). CEDARS passes
+  non-IOU program costs to CET as SCE's: CET_UI job 123406 (CET 25.1, 2024 ACC) returned ProgramCost rows filed under BAY and MCE as SCE, with
+  the same costs as the PG&E control. The CET replica path already did this (`cet_versions/job.cet_programs`); ReCET's own engine now does too
+  (`cost_tests.program_cost_sums`, `discount_settings.has_settings`). A PA with its own rows, built-in or supplied in a run-parameters file,
+  keeps them; measures are unchanged (they use IOU_AC_Territory). Costs filed in the first year are not discounted, so most results are
+  unchanged; only later-year costs move, by SCE's rate. Checked by new tests in tests/test_program_cost_pa.py.
 - 0.1.100 (2026-11-21, Jake; the data dictionary overlap review): no change to any run or output. `field_docs.definition` now reads
   INPUT_FIELDS.md section 2 as well as section 1, so the thirteen ProgramCost.csv columns (PrgYear, PA, the ten cost fields, OnBillFinancing) get
   their definitions and links; before, only Measure.csv columns had one, and the CEDARS platform's data dictionary (exported from it) showed those
