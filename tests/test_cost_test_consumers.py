@@ -117,6 +117,20 @@ def test_a_benefit_stream_the_table_lacks_counts_zero():
     assert r["TRC_ratio"] == pytest.approx(17.0 / 8.0) and r["PAC_ratio"] == pytest.approx(17.0 / 4.0)
 
 
+def test_a_table_with_part_of_a_tests_benefits_has_no_ratio_for_it():
+    """CET 25.0's SCT is electric only: ElecBen_SB (0 here) but no GasBen_SB. OtherBen is shared by every pricing. No SCB ratio, not one of 0."""
+    g = pd.DataFrame({"ElecBen": [10.0], "GasBen": [1.0], "OtherBen": [0.0], "ElecBen_SB": [0.0], "ElecBen_SH": [0.0], "TRCCost": [4.0],
+                      "PACCost": [2.0], "SCBCost": [4.0], "SCHCost": [4.0]})
+    r = outputs.group_ratios(g, cts.load("EE-2026"))
+    assert r["TRC_ratio"] == pytest.approx(11.0 / 4.0) and "SCB_ratio" not in r and "SCH_ratio" not in r
+
+
+def test_a_cet_21_table_without_other_or_water_benefits_has_ratios():
+    g = pd.DataFrame({"ElecBen": [10.0], "GasBen": [1.0], "TRCCost": [4.0], "PACCost": [2.0]})
+    r = outputs.group_ratios(g, cts.load("EE-2026"))
+    assert r["TRC_ratio"] == pytest.approx(11.0 / 4.0) and r["PAC_ratio"] == pytest.approx(11.0 / 2.0)
+
+
 def test_a_table_with_none_of_a_tests_benefits_has_no_ratio_for_it():
     g = pd.DataFrame({"TRCCost": [4.0], "PACCost": [2.0]})
     assert "TRC_ratio" not in outputs.group_ratios(g, cts.load("EE-2026"))

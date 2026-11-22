@@ -146,17 +146,23 @@ def _cset(cset=None):
     return cost_tests.default_set()
 
 
+OPTIONAL_BENEFITS = ("WaterEnergyBen", "OtherBen")  # benefit streams older CET releases did not price: absent from a table = 0 (_numerators)
+
+
 def _numerators(get, cset=None) -> dict[str, object]:
     """{test: the numerator of its ratios} for every test of the set: the total of the measure-level <test>Ben column, or (a table without one: written
-    before 0.1.53, or by a CET replica) the same sum built from its benefits and numerator adders. A benefit stream the table does not have counts 0 when
-    it has at least one of the test's benefits (CET 22.1 and earlier write no WaterEnergyBen); with none of them there is no numerator. A missing adder = 0."""
+    before 0.1.53, or by a CET replica) the same sum built from its benefits and numerator adders. A missing water-energy or other benefit counts 0 (CET 22.1
+    and earlier write no WaterEnergyBen, CET 21.0 no OtherBen either: streams those releases did not price); a missing electric or gas benefit means no
+    numerator (CET 25.0 writes ElecBen_SB but no GasBen_SB: its SCB stays blank, not
+    a ratio built from part of its benefits). A missing adder = 0."""
     s = _cset(cset)
     out = {}
     for t in s.tests.values():
         v = get(f"{t.id}Ben")
         if v is None:
-            parts = [get(s.column(x, t.pricing)) for x in t.benefits]
-            if any(p is not None for p in parts):
+            cols = [s.column(x, t.pricing) for x in t.benefits]
+            parts = [get(c) for c in cols]
+            if all(p is not None or c.startswith(OPTIONAL_BENEFITS) for c, p in zip(cols, parts)):
                 v = (sum(0.0 if p is None else p for p in parts)
                      + sum(0.0 if (a := get(s.column(x, t.pricing))) is None else a for x in t.numerator_adders))
         out[t.id] = v
