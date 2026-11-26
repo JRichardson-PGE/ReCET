@@ -819,7 +819,7 @@ V_elec_SB = SUM over k = 0 ... n-1 of
 V_elec_SH: the same with the SCT High row
 ```
 
-For TOU end uses these differ from CET's by design: CET's TOU societal values keep the cap-and-trade carbon component alongside the social cost of carbon (counting carbon twice)
+For TOU end uses these differ from CET's by design: CET's TOU societal values on the 2024 ACC add back the cap-and-trade carbon component the adopted model leaves out of the SCT
 and carry its TOU T&D error; ReCET prices them on the ACC's own SCT rows like every other end use (CALCULATIONS.md C17, deliberate difference 8).
 **Inputs:** those of `ElecBen`; the ACC's `SCT Base` / `SCT High` rows; `DiscountRateQtr_SCT`.
 
