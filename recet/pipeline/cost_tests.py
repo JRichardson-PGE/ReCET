@@ -76,6 +76,19 @@ _COST_FIELDS = [
 UNALLOCATED_SW_PA = "SCE"
 
 
+def program_years(df: pd.DataFrame) -> pd.Series:
+    """Each ProgramCost row's year, the year its costs are incurred and discounted from: its PrgYear. ProgramCost has no ClaimYearQuarter of
+    its own (0.1.105; a file that still has one is read and the column ignored); a quarter is only ever a measure's."""
+    if "PrgYear" not in df.columns:
+        raise ValueError("ProgramCost has no PrgYear column: each row's PrgYear is the year its costs are discounted from")
+    years = pd.to_numeric(df["PrgYear"].astype("string").str.strip(), errors="coerce")
+    bad = years.isna() | (years != years.round())
+    if bad.any():
+        rows = [int(i) + 2 for i in np.flatnonzero(bad.to_numpy())][:10]
+        raise ValueError(f"ProgramCost PrgYear must be a year on every row (rows {', '.join(map(str, rows))})")
+    return years.astype(int)
+
+
 def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataFrame:
     """A real ProgramCost.csv (pipe-delimited, or comma-delimited: pipeline/delimited.py).
 
@@ -92,7 +105,7 @@ def load_program_costs(path: Path, allocate_statewide: bool = False) -> pd.DataF
         warn_unmatched(report, "ProgramCost.csv")
     df["PrgID"] = df["PrgID"].astype(str).str.strip()
     df["PA"] = df["PA"].astype(str).str.strip().replace({"SW": UNALLOCATED_SW_PA})
-    df["Used_Year"] = df["ClaimYearQuarter"].astype(str).str[:4].astype(int)          # the year a row's costs are discounted from
+    df["Used_Year"] = program_years(df)          # the year a row's costs are discounted from
     return df
 
 

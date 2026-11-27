@@ -62,7 +62,7 @@ def cmd_run(a) -> int:
     rel = get(a.release)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
+    programs = _read(a.programcost) if a.programcost else pd.DataFrame(columns=["PA", "PrgID", "PrgYear"])
     from .job import cet_inputs, cet_programs, settings_pas
 
     upload = [False]

@@ -127,7 +127,9 @@ def input_program(p: pd.DataFrame, release: Release) -> pd.DataFrame:
         s = s.astype("string")
         return s.str.replace("\r", "", regex=False).str.replace("\n", "", regex=False).str.strip() if release.trim_program_keys else s
 
-    c = pd.DataFrame({"PrgID": clean(p.PrgID), "PA": clean(p.PA), "Year": p.ClaimYearQuarter.str[:4].astype(int)})
+    # CET reads a program cost row's year from its ClaimYearQuarter; a file without one (ReCET's ProgramCost has none since 0.1.105) gives PrgYear
+    year = p.ClaimYearQuarter.str[:4] if "ClaimYearQuarter" in p.columns else p.PrgYear.astype("string").str.strip()
+    c = pd.DataFrame({"PrgID": clean(p.PrgID), "PA": clean(p.PA), "Year": year.astype(int)})
     for k in PROGRAM_COST_FIELDS:
         c[k] = number(_col(p, k), 0)
     c["pa_k"] = key(c.PA)

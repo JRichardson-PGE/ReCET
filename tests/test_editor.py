@@ -212,7 +212,7 @@ def test_display_layout_shows_every_column_once_pinned_then_calculation_then_no_
     assert not set(preflight.REQUIRED_MEASURE_COLUMNS) & no_effect - {"Sector", "CEInputID", "MeasDescription"}
     assert {"RateScheduleElec", "RateScheduleGas", "NTG_ID", "Comments"} <= no_effect
     frozen, scroll, no_effect = editor.display_layout("ProgramCost", editor.PROGRAMCOST_COLUMNS)
-    assert frozen == ["PrgID"] and no_effect == {"PrgYear", "OnBillFinancing"} and scroll[-2:] == ["PrgYear", "OnBillFinancing"]
+    assert frozen == ["PrgID"] and no_effect == {"OnBillFinancing"} and scroll[-1] == "OnBillFinancing" and "PrgYear" in scroll  # PrgYear discounts
 
 
 def test_files_keep_cets_column_order_whatever_order_they_are_given_in(tmp_path):

@@ -142,6 +142,9 @@ def test_every_constraint_of_the_spec_becomes_a_rule(name):
     import re
     rs = fr.rule_set(name)
     text = next(rs.folder.glob("*_spec*.sql")).read_text()
+    # ProgramCost has no ClaimYearQuarter in ReCET (fr.NOT_TAKEN): CEDARS' constraint line on it gives no rule
+    at = text.lower().index("create table programcost")
+    text = text[:at] + re.sub(r"^\s*ClaimYearQuarter\b.*$", "", text[at:], count=1, flags=re.M | re.I)
     fields = re.findall(r"^\s*(\w+)\s+(nvarchar|numeric|bit|CedarsYearQuarter)", text, re.M | re.I)
     kinds = [r.spec["check"] for r in rs.rules if r.kind == "spec"]
     assert len(fields) > 80
@@ -152,6 +155,7 @@ def test_every_constraint_of_the_spec_becomes_a_rule(name):
     assert kinds.count("numeric") == len(re.findall(r"\snumeric\b", text))
     assert len(rs.rules) == sum(1 for r in rs.rules if r.kind == "rule") + len(kinds)
     rows = sum(len(pd.read_csv(f)) for f in [*rs.folder.glob("validation_rules*.csv"), *rs.folder.glob("warning_rules*.csv")])
+    rows -= 1                                                              # "PrgYear matches_year_quarter ClaimYearQuarter" on ProgramCost: NOT_TAKEN
     assert sum(r.kind == "rule" for r in rs.rules) in (rows, rows - 1)     # the claims file lists one rule twice: kept once
 
 

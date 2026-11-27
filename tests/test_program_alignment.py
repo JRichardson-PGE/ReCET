@@ -17,7 +17,7 @@ QUIET = dict(log=lambda s: None)
 def _costs(pc, path, drop=(), zero=(), extra=None):
     cost = pd.read_csv(pc, sep="|", dtype=str, keep_default_na=False)
     cost = cost[~cost["PrgID"].isin(drop)].copy()
-    num = [c for c in cost.columns if c not in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")]
+    num = [c for c in cost.columns if c not in ("PrgID", "PrgYear", "PA")]
     cost.loc[cost["PrgID"].isin(zero), num] = "0"
     if extra is not None:
         add = cost.iloc[:2].copy()
@@ -41,7 +41,7 @@ def test_unmatched_prgids_warn_and_still_price(tmp_path, chunk):
     assert issues["measures_without_program_costs"]["message"].startswith(f"{n_prg2} measure(s) in 1 program(s)")
     assert len(issues["measures_without_program_costs"]["cells"]) == n_prg2
     orphan = cost[cost["PrgID"] == "PRG9"]
-    dollars = orphan.drop(columns=["PrgID", "PrgYear", "ClaimYearQuarter", "PA", "OnBillFinancing"]).astype(float).to_numpy().sum()
+    dollars = orphan.drop(columns=["PrgID", "PrgYear", "PA", "OnBillFinancing"]).astype(float).to_numpy().sum()
     assert issues["program_costs_without_measures"]["severity"] == "warning" and f"${dollars:,.0f}" in issues["program_costs_without_measures"]["message"]
     assert not any(i["severity"] == "error" for i in issues.values())
 

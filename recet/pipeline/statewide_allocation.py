@@ -25,7 +25,7 @@ ProgramCost rows stay unique on (PrgID, PrgYear) as CET's upload spec requires,
 and each IOU's program costs are shared only among that IOU's own measures
 when priced. A row whose PrgID is not in the table for its year is left
 untouched (not a statewide program) and reported if the PrgID starts with
-`SW_`. The year is the claim year (first four characters of ClaimYearQuarter);
+`SW_`. The year is the claim year (a measure's ClaimYearQuarter's first four characters, a program cost row's PrgYear);
 outputs carry no year, so callers pass `year_by_id` (CET_ID -> year).
 
 CONSEQUENCES OF THE RULES AS WRITTEN (worth knowing, not changed here):
@@ -108,10 +108,11 @@ def electric_factors(prg_ids: pd.Series, years: pd.Series) -> pd.Series:
 
 
 def _claim_year(df: pd.DataFrame, table: str) -> pd.Series:
+    if table == "program_cost":  # ProgramCost has no ClaimYearQuarter of its own (0.1.105): its year is PrgYear
+        from .cost_tests import program_years
+        return program_years(df)
     if "ClaimYearQuarter" in df.columns:
         return df["ClaimYearQuarter"].astype(str).str[:4].astype(int)
-    if table == "program_cost" and "PrgYear" in df.columns:
-        return df["PrgYear"].astype(int)
     raise KeyError(f"Cannot determine the year of {table} rows: no ClaimYearQuarter column")
 
 
