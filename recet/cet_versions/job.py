@@ -255,7 +255,7 @@ def run_job(cfg, log=print):
     from .parts import PART_SIZE, plan
     size = PART_SIZE if cfg.replica_part_size is None else int(cfg.replica_part_size)      # RunConfig.replica_part_size; 0 = one part
     work = run_dir / "_parts"
-    programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "ClaimYearQuarter"])
+    programs = _read(cfg.programcost) if cfg.programcost else pd.DataFrame(columns=["PA", "PrgID", "PrgYear"])
     counted, upload = [0], [False]
 
     def read(f):

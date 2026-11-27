@@ -29,7 +29,7 @@ from . import paths, preflight, templates
 MAX_EDIT_ROWS = 500
 MEASURE_COLUMNS = list(templates.MEASURE_COLUMNS)
 PROGRAMCOST_COLUMNS = list(templates.PROGRAMCOST_COLUMNS)
-PROGRAMCOST_NUMERIC = [c for c in PROGRAMCOST_COLUMNS if c not in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")]
+PROGRAMCOST_NUMERIC = [c for c in PROGRAMCOST_COLUMNS if c not in ("PrgID", "PrgYear", "PA")]
 MEASURE_NUMERIC = preflight.NUMERIC_COLUMNS + ["UnitkWhIOUWater1stBaseline", "UnitkWhIOUWater2ndBaseline"]
 FLAG_COLUMNS = ("Residential_Flag", "Upstream_Flag")
 END_USE_COLUMNS = ("AC_Elec_Impact_Profile", "AC_Elec_Impact_Profile_2nd_Baseline", "AC_Elec_Impact_Profile_Water", "AC_Elec_Impact_Profile_Parent",
@@ -71,9 +71,9 @@ MEASURE_CALC = [
 ]
 MEASURE_NO_EFFECT = [c for c in templates.MEASURE_COLUMNS if c not in MEASURE_FROZEN + MEASURE_CALC]
 PROGRAMCOST_FROZEN = ["PrgID"]
-PROGRAMCOST_CALC = ["ClaimYearQuarter", "PA", "AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation",
+PROGRAMCOST_CALC = ["PrgYear", "PA", "AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation",
                     "DIHardwareAndMaterials", "DIRebateAndInspection", "EMV", "UserInputIncentive", "CostsRecoveredFromOtherSources"]
-PROGRAMCOST_NO_EFFECT = [c for c in templates.PROGRAMCOST_COLUMNS if c not in PROGRAMCOST_FROZEN + PROGRAMCOST_CALC]   # PrgYear, OnBillFinancing (not summed)
+PROGRAMCOST_NO_EFFECT = [c for c in templates.PROGRAMCOST_COLUMNS if c not in PROGRAMCOST_FROZEN + PROGRAMCOST_CALC]   # OnBillFinancing (not summed)
 
 
 CALC_COLUMNS = {"Measure": frozenset(MEASURE_CALC), "ProgramCost": frozenset(PROGRAMCOST_CALC) | {"PrgID"}}   # PrgID shares program costs among measures
@@ -212,14 +212,13 @@ EFFECTS = {
     },
     "ProgramCost": {
         "PrgID": ("which measures share this row's costs", "Should match the measures' PrgID: a row no measure names is warned about and its costs are in no cost test."),
-        "ClaimYearQuarter": ("the discounting of this row's costs: " + _PROGRAM, "Its year is when the cost is incurred and discounted from."),
+        "PrgYear": ("the discounting of this row's costs: " + _PROGRAM, "The year the cost is incurred and discounted from; it also picks the credited PA's row."),
         "PA": ("the discount rate of this row's costs (" + _PROGRAM + "); the credited PA in the summary",
                "SW is treated as SCE unless statewide allocation is on."),
         **{c: (_PROGRAM, "Summed per program and shared among its measures in proportion to their positive benefits.")
            for c in ("AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation", "DIHardwareAndMaterials",
                      "DIRebateAndInspection", "EMV", "UserInputIncentive")},
         "CostsRecoveredFromOtherSources": (_PROGRAM, "Summed with the other costs: enter it as a negative to reduce the total, as CET does."),
-        "PrgYear": (None, "No priced value: the run uses ClaimYearQuarter's year. Used only to pick the credited PA's row."),
         "OnBillFinancing": (None, "Not part of CET's program-cost sum."),
     },
 }
@@ -762,7 +761,7 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                 add("Measure", i, c, "error", "a cell may not contain '|' (CET files are '|'-delimited)")
 
     if len(pc):
-        keys = pc["PrgID"].str.strip() + "|" + pc["ClaimYearQuarter"].str.strip()
+        keys = pc["PrgID"].str.strip() + "|" + pc["PrgYear"].str.strip()
         dup_keys = set(keys[keys.duplicated(keep=False) & ~pc_blank_row])
         for i, r in pc.iterrows():
             if pc_blank_row.iloc[i]:
@@ -772,14 +771,10 @@ def check_tables(measures: pd.DataFrame, programcost: pd.DataFrame | None, choic
                 add("ProgramCost", i, "PrgID", "error", "PrgID is blank")
             elif g("PrgID") not in m_prg:
                 add("ProgramCost", i, "PrgID", "warning", "no measure has this PrgID: its costs are in no cost test")
-            if claim_year(g("ClaimYearQuarter")) is None:
-                add("ProgramCost", i, "ClaimYearQuarter", "error", "ClaimYearQuarter must look like 2028Q4 (its year is when the cost is incurred)")
+            if not re.fullmatch(r"\d{4}", g("PrgYear")):
+                add("ProgramCost", i, "PrgYear", "error", "PrgYear must be a year such as 2028 (it is when the cost is incurred and discounted from)")
             elif keys.iloc[i] in dup_keys:
-                add("ProgramCost", i, "ClaimYearQuarter", "warning", "another row has the same PrgID and ClaimYearQuarter (both are summed)")
-            if g("PrgYear") and (_num(g("PrgYear")) == "bad"):
-                add("ProgramCost", i, "PrgYear", "error", "PrgYear must be a year")
-            elif g("PrgYear") and claim_year(g("ClaimYearQuarter")) and int(float(g("PrgYear"))) != claim_year(g("ClaimYearQuarter")):
-                add("ProgramCost", i, "PrgYear", "info", "PrgYear differs from the ClaimYearQuarter's year (the run uses ClaimYearQuarter)")
+                add("ProgramCost", i, "PrgYear", "warning", "another row has the same PrgID and PrgYear (both are summed)")
             pa = g("PA").upper()
             if not pa:
                 add("ProgramCost", i, "PA", "error", "PA is blank (it selects the discount rate for this row's costs)")

@@ -3,6 +3,15 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.105 (2026-11-27, Jake): `ProgramCost` has no `ClaimYearQuarter`. A program cost row's year, the year its costs are incurred and discounted
+  from, is its `PrgYear` (`cost_tests.program_years`; C11.1, and C17 deliberate difference 12: CET reads the year of the row's `ClaimYearQuarter`,
+  which CEDARS requires to equal `PrgYear`, so filed rows price the same). A quarter is only ever a measure's. The column is out of the
+  templates, the Edit inputs tables (a new program cost row copies PrgID, PrgYear and PA) and their checks (PrgYear must be a year; a repeated
+  PrgID and PrgYear is warned about); a file that still has it is read and the column ignored. Statewide allocation reads a program cost row's
+  year from PrgYear. CEDARS' rules that test or read `ProgramCost.ClaimYearQuarter` (its year-and-quarter and not-empty constraints, and "PrgYear
+  matches ClaimYearQuarter") are left out of the shipped rule sets (`filing_rules.NOT_TAKEN`: claims 215 to 212 rules, budget filing 221 to 218).
+  The CET replicas read the column as CET did when a file has it, else PrgYear. Checked by new tests in tests/test_program_years.py.
+
 - 0.1.104 (2026-11-27, Jake; the validation rules review): five fixes to the filing rule runner (`filing_rules`), found by running the CEDARS
   platform's rule sets against crafted records. (1) A number in a rule's value or a record reads as written: `contains 2027` looked for "2027.0", so
   "LED 2027 retrofit" failed it; starts with / ends with did the same; an `in ['1']` list refused "1.0"; and the year test refused a year written

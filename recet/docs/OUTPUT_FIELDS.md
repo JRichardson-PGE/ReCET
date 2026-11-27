@@ -2190,7 +2190,7 @@ allocation scales, added up before allocation and over each IOU's allocated rows
 | Column | Meaning |
 |---|---|
 | `table` | `Measure` or `ProgramCost`. |
-| `Year` | The year the factors are looked up by: the claim year (`ClaimYearQuarter`), or `PrgYear` for a `ProgramCost` row without one. |
+| `Year` | The year the factors are looked up by: a measure's claim year (`ClaimYearQuarter`), a `ProgramCost` row's `PrgYear`. |
 | `PrgID` | The statewide program as filed (`SW_...`). |
 | `field` | The allocated field, e.g. `UnitkWh1stBaseline` or `AdminCostsOther`. |
 | `factor` | Its rule: `Electric Factor`, `Gas Factor` or `Weighted Factor`. |

@@ -185,8 +185,25 @@ def rule_set(name: str, as_of: str | None = None) -> RuleSet:
         rules += _read_spec(f)
     seen: dict[str, Rule] = {}
     for r in rules:                 # the same rule twice in one set (the claims file lists one twice): keep one
-        seen.setdefault(r.id, r)
+        if not _reads_not_taken(r):
+            seen.setdefault(r.id, r)
     return RuleSet(name, v, folder, list(seen.values()))
+
+
+# Fields of CEDARS' tables that ReCET does not take, so CEDARS' rules that test or read them are left out of its rule sets: ProgramCost has no
+# ClaimYearQuarter (0.1.105, Jake 2026-11-27): a program cost row's year is its PrgYear, and a quarter is only ever a measure's.
+NOT_TAKEN = frozenset({("programcost", "claimyearquarter")})
+
+
+def _reads_not_taken(r: Rule) -> bool:
+    own = r.table.strip().lower()
+    names = [(own, part.strip()) for part in str(r.field or "").split("+")]
+    if r.kind == "rule":
+        names.append((own, str(r.spec.get("value") or "").strip()))
+        for c in conditions(r.spec):
+            tb = str(c[0] or "").strip().lower() or own
+            names += [(tb, str(c[1] or "").strip()), (tb, str(c[3] if len(c) > 3 else "").strip())]
+    return any((tb, n.lower()) in NOT_TAKEN for tb, n in names)
 
 
 def _rule_id(prefix: str, *parts) -> str:

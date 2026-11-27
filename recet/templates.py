@@ -72,7 +72,7 @@ def _gas_template(acc_key: str) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-_PROGRAMCOST_HEADER = ["PrgID", "PrgYear", "ClaimYearQuarter", "AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation",
+_PROGRAMCOST_HEADER = ["PrgID", "PrgYear", "AdminCostsOverheadAndGA", "AdminCostsOther", "MarketingOutreach", "DIActivity", "DIInstallation",
                        "DIHardwareAndMaterials", "DIRebateAndInspection", "EMV", "UserInputIncentive", "OnBillFinancing", "CostsRecoveredFromOtherSources", "PA"]
 
 # One realistic example row for the workbook template (a PG&E commercial lighting measure on a TOU end use); the user replaces it.
@@ -88,7 +88,7 @@ _EXAMPLE_MEASURE = {
     "InstallationRateTherm": "1", "Residential_Flag": "0", "Upstream_Flag": "0", "IOU_AC_Territory": "PGE", "UnitGasInfraBens": "0", "UnitRefrigCosts": "0",
     "UnitRefrigBens": "0", "UnitMiscCosts": "0", "UnitMiscBens": "0", "UnitTaxCredits": "0", "CombustionType": "Small Boilers (<100 MMBtu/hr Heat Input):Uncontrolled", "MeasInflation": "0",
 }
-_EXAMPLE_PROGRAMCOST = {"PrgID": "EXAMPLE_PRG", "PrgYear": "2028", "ClaimYearQuarter": "2028Q4", "AdminCostsOverheadAndGA": "1500", "AdminCostsOther": "0",
+_EXAMPLE_PROGRAMCOST = {"PrgID": "EXAMPLE_PRG", "PrgYear": "2028", "AdminCostsOverheadAndGA": "1500", "AdminCostsOther": "0",
                         "MarketingOutreach": "500", "DIActivity": "0", "DIInstallation": "0", "DIHardwareAndMaterials": "0", "DIRebateAndInspection": "0", "EMV": "0",
                         "UserInputIncentive": "0", "OnBillFinancing": "0", "CostsRecoveredFromOtherSources": "0", "PA": "PGE"}
 

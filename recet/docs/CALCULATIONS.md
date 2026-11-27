@@ -528,7 +528,7 @@ WaterEnergyBenGross{,_SB,_SH}     = ratio( WaterEnergyBen{...},     NTGRkWh + ME
 
 `ProgramCost.csv` costs belong to a *program*, not a measure, and are spread over the program's measures in proportion to their positive benefits.
 
-**C11.1 Program totals.** For each `ProgramCost` row `r` (with `Year` = the first four characters of its `ClaimYearQuarter`; a `PA` of `SW` is treated as `SCE`, what CET did in the real runs, and so is any `PA` with no run parameters at the run's ACC: a REN or CCA from the 2022 ACC on, whose rows CET's table stops carrying; CEDARS passes those program costs to CET as SCE's, checked in CET_UI job 123406, where ProgramCost rows filed under BAY and MCE came back as SCE. A PA with its own rows, built-in or supplied, keeps them):
+**C11.1 Program totals.** For each `ProgramCost` row `r` (with `Year` = its `PrgYear`, deliberate difference 12; a `PA` of `SW` is treated as `SCE`, what CET did in the real runs, and so is any `PA` with no run parameters at the run's ACC: a REN or CCA from the 2022 ACC on, whose rows CET's table stops carrying; CEDARS passes those program costs to CET as SCE's, checked in CET_UI job 123406, where ProgramCost rows filed under BAY and MCE came back as SCE. A PA with its own rows, built-in or supplied, keeps them):
 
 ```text
 T_r = AdminCostsOverheadAndGA + AdminCostsOther + MarketingOutreach + DIActivity + DIInstallation + DIHardwareAndMaterials + DIRebateAndInspection + EMV + UserInputIncentive
@@ -761,7 +761,7 @@ With "Allocate statewide programs" on, each statewide program's rows are split a
 | Electric factor (x `ElectricFactor`) | `UnitkW1stBaseline`, `UnitkWh1stBaseline`, `UnitkW2ndBaseline`, `UnitkWh2ndBaseline`, `UnitkWhIOUWater1stBaseline`, `UnitkWhIOUWater2ndBaseline` | - |
 | Gas factor (x `GasFactor`) | `UnitTherm1stBaseline`, `UnitTherm2ndBaseline` | - |
 | Weighted factor (x `WeightedFactor`) | the unit costs and benefits (`UnitMeaCost...`, `UnitDirectInstall...`, `UnitEndUserRebate`, `UnitIncentiveToOthers`, `UnitGasInfraBens`, `UnitRefrigCosts`, `UnitRefrigBens`, `UnitMiscCosts`, `UnitMiscBens`, `UnitTaxCredits`) | all ten cost fields and `OnBillFinancing` |
-| Pass through (unchanged) | everything else | `PA`, `PrgID`, `PrgYear`, `ClaimYearQuarter` |
+| Pass through (unchanged) | everything else | `PA`, `PrgID`, `PrgYear` |
 
 The factors are the built-in table, with the rows of a supplied SW allocation factors file replacing matching (`Year`, `ProgramID`) rows and adding new ones.
 For every IOU with a non-zero factor, one row is made with `<IOU>_` prepended to `CEInputID` and `PrgID` (program-cost `PA` is set to that IOU). A measure is still priced on its own `IOU_AC_Territory`; a program's costs are shared
@@ -872,6 +872,11 @@ repository, which runs each year on the 2024 ACC with its claim year as First Ye
 11. **PrgIDs that do not line up between `Measure.csv` and `ProgramCost.csv`** do not stop the run (0.1.59). CET stops the job on either kind. A measure whose program
    has no `ProgramCost.csv` row is priced with no program costs (C11: its share is of a program total of 0), and a `ProgramCost.csv` row whose program has no measures is charged to
    none; preflight warns about both (`measures_without_program_costs`, `program_costs_without_measures`, with the costs left out). A job whose PrgIDs all line up gives CET's results.
+12. **A program cost row's year is its `PrgYear`** (0.1.105, Jake 2026-11-27). `ProgramCost` has no `ClaimYearQuarter` of its own: a quarter is only ever a measure's. CET
+   discounts a program cost row from the year of its `ClaimYearQuarter`; CEDARS requires that year to equal `PrgYear`, so the two agree on every filed row, and results
+   differ only for a file whose rows give two different years. A file that still has the column is read and the column ignored, and CEDARS' rules that test or read
+   `ProgramCost.ClaimYearQuarter` are left out of the rule sets ReCET ships (`filing_rules.NOT_TAKEN`). The CET replicas (`recet/cet_versions`) still read it as CET did when
+   a file has it, else `PrgYear`.
 
 **Limitations.**
 

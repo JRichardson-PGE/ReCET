@@ -490,7 +490,7 @@ class EditorTab:
         else:
             row = {c: "" for c in df.columns}
             if like:
-                row.update({k: like.get(k, "") for k in ("PrgID", "PrgYear", "ClaimYearQuarter", "PA")})
+                row.update({k: like.get(k, "") for k in ("PrgID", "PrgYear", "PA")})
         self._insert([row], (sel[-1] + 1) if sel else len(df))
 
     def duplicate_rows(self) -> None:
