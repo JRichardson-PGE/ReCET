@@ -3,7 +3,10 @@
 CEDARS publishes the checks its upload applies to a Measure.csv / ProgramCost.csv, per kind of filing, in its "source of truth" files: `validation_rules.csv`
 (a record that fails one is rejected), `warning_rules.csv` (a record that fails one gets a warning), and the field constraints of the table spec
 (`cet_spec.sql` / `cei_spec.sql`: NotEmpty, CedarsValueList, CedarsNumRange, ...). They ship unchanged in `data/cet_rules/<set>_<effective date>/`, one folder
-per rule set and version, and this module reads them as they are, so updating a rule set means adding the newer download as a new folder:
+per rule set and version, and this module reads them as they are, so updating a rule set means adding the newer download as a new folder. A folder may
+also hold ReCET's own rule file (`*_rules*.json`, `_read_json_rules`): rules CEDARS publishes only as sentences, written in the rule language, which join
+the folder's CEDARS files and may replace some of their rules by ID. The claims set of 2027-01-01 is CEDARS' CET files of 2026-03-12 with its 2026 claims
+data rules on Measure records (https://cedars.cpuc.ca.gov/claims/specification/) in `claims_rules.2026.json`:
 
 * claims        (Quarterly Claims, https://cedars.cpuc.ca.gov/cet_ui/spec/)
 * budget_filing (Budget & Application Filings, https://cedars.cpuc.ca.gov/filings/spec/)
@@ -109,7 +112,7 @@ class Rule:
 @dataclass
 class RuleSet:
     name: str                      # "claims" | "budget_filing"
-    version: str                   # the effective date of the CEDARS files (the folder's date), e.g. "2026-03-12"
+    version: str                   # the effective date of the folder's rules (its date), e.g. "2027-01-01"
     folder: Path
     rules: list[Rule]
 
@@ -183,9 +186,14 @@ def rule_set(name: str, as_of: str | None = None) -> RuleSet:
         rules += _read_rule_file(f, "warning")
     for f in sorted(folder.glob("*_spec*.sql")):
         rules += _read_spec(f)
+    replaced: set[str] = set()
+    for f in sorted(folder.glob("*_rules*.json")):
+        more, gone = _read_json_rules(f)
+        rules += more
+        replaced |= gone
     seen: dict[str, Rule] = {}
     for r in rules:                 # the same rule twice in one set (the claims file lists one twice): keep one
-        if not _reads_not_taken(r):
+        if not _reads_not_taken(r) and r.id not in replaced:
             seen.setdefault(r.id, r)
     return RuleSet(name, v, folder, list(seen.values()))
 
@@ -224,6 +232,26 @@ def _read_rule_file(path: Path, severity: str) -> list[Rule]:
                        *(x for c in sorted(conds) for x in c))
         out.append(Rule(rid, severity, row["Table"], row["Field"], _describe(spec), "rule", path.name, spec))
     return out
+
+
+def _read_json_rules(path: Path) -> tuple[list[Rule], set[str]]:
+    """ReCET's own rule file: rules CEDARS publishes only as sentences (its claims data rules), written in the rule language. {"replaces":
+    {rule ID: why}, "rules": [{"severity", "table", "field", "rule", "value", "connector", "conds", "source"}]}: the rules it lists join the
+    folder's CEDARS files and the ones it replaces leave them. A condition may be a group ({"connector", "conds"}), as on the platform."""
+    import json
+
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    out = []
+    for d in doc.get("rules") or []:
+        severity = d.get("severity", "reject")
+        if severity not in ("reject", "warning"):
+            raise ValueError(f"{path.name}: severity {severity!r} is neither reject nor warning")
+        conds = [c if isinstance(c, dict) else tuple(str(x) for x in c) for c in d.get("conds") or []]
+        connector = str(d.get("connector") or "all").lower()
+        spec = {"field": d["field"], "rule": str(d["rule"]).lower(), "value": str(d.get("value", "")), "connector": connector, "conds": conds}
+        rid = rule_id(severity, d["table"], d["field"], d["rule"], spec["value"], connector, conds)
+        out.append(Rule(rid, severity, d["table"], d["field"], _describe(spec, d["table"]), "rule", d.get("source") or path.name, spec))
+    return out, set(doc.get("replaces") or {})
 
 
 def _describe(spec: dict, table: str | None = None) -> str:

@@ -142,7 +142,8 @@ def test_ids_of_plain_rules_are_the_ids_cedars_rules_have():
                 continue
             s = r.spec
             assert fr.rule_id(r.severity, r.table, s["field"], s["rule"], s["value"], s["connector"], s["conds"]) == r.id
-            assert fr._describe(s) == r.text                                # CEDARS' wording, with no table named on its conditions
+            # CEDARS' wording, with no table named on its conditions; ReCET's own rule file names a condition's other table ("Claim's ClaimType")
+            assert (fr._describe(s, r.table) if r.source.startswith(("CEDARS 2026", "The budget")) else fr._describe(s)) == r.text
     grouped = [["Claim", "A", "equals", "1"], {"connector": "any", "conds": [["Measure", "B", "equals", "1"], ["Claim", "C", "is null", ""]]}]
     a = fr.rule_id("reject", "Claim", "X", "is not null", "", "all", grouped)
     b = fr.rule_id("reject", "Claim", "X", "is not null", "", "all", list(reversed(grouped)))

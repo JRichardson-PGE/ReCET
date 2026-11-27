@@ -1,0 +1,5 @@
+Table,Field,Rule,Value,Where_connector,Where_table1,Where_field1,Where_rule1,Where_value1,Where_table2,Where_field2,Where_rule2,Where_value2,Where_table3,Where_field3,Where_rule3,Where_value3,Where_table4,Where_field4,Where_rule4,Where_value4,Where_table5,Where_field5,Where_rule5,Where_value5
+Measure,UnitMeaCost1stBaseline,does not equal,0,all,Measure,UnitIncentiveToOthers,equals,0,Measure,UnitEndUserRebate,equals,0,Measure,UnitDirectInstallLab,equals,0,Measure,UnitDirectInstallMat,equals,0,,,,
+Measure,UnitMeaCost2ndBaseline,does not equal,0,all,Measure,UnitIncentiveToOthers,equals,0,Measure,UnitEndUserRebate,equals,0,Measure,UnitDirectInstallLab,equals,0,Measure,UnitDirectInstallMat,equals,0,Measure,RUL_Yrs,greater than,0
+Measure,RUL_Yrs,is less than or equal to,EUL_Yrs /2.75,,,,,,,,,,,,,,,,,,,,,
+Measure,RUL_ID,is not null,,,Measure,RUL_Yrs,greater than,0,,,,,,,,,,,,,,,,

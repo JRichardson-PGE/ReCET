@@ -89,13 +89,25 @@ def _value(rule: str, value: str, hold: bool, row: dict, field: str):
     return True
 
 
-def _rows(r: fr.Rule, base: dict) -> tuple[dict, dict]:
-    """A record that passes rule `r` and one that fails it."""
+def _held(conds: list, connector: str) -> list:
+    """The plain conditions to make hold so that `conds` hold: the first of "any", every one of "all", a group's the same way."""
+    out = []
+    for c in conds[:1] if connector == "any" else conds:
+        out += _held(c.get("conds") or [], str(c.get("connector") or "all")) if isinstance(c, dict) else [c]
+    return out
+
+
+def _rows(r: fr.Rule, base: dict, other: dict | None = None) -> tuple[dict, dict]:
+    """A record that passes rule `r` and one that fails it. A condition on another table is met in `other` ({table: record}), the record
+    of that table both are linked to."""
     good, bad = dict(base), dict(base)
     s = r.spec
     if r.kind == "rule":
-        for row in (good, bad):
-            for _t, f, rule, v in (s["conds"][:1] if s["connector"] == "any" else s["conds"]):
+        for t, f, rule, v in _held(s["conds"], s["connector"]):
+            if str(t).strip() and str(t).strip().lower() != r.table.lower() and other is not None:
+                _value(rule.lower(), v, True, other.setdefault(str(t).strip(), {}), f)
+                continue
+            for row in (good, bad):
                 _value(rule.lower(), v, True, row, f)
         _value(s["rule"], s["value"], True, good, s["field"])
         _value(s["rule"], s["value"], False, bad, s["field"])
@@ -128,9 +140,12 @@ def test_every_rule_passes_a_good_record_and_fails_a_bad_one(name):
                 assert res and res[0].fail.tolist() == [True, True, False], r.text
                 checked += 1
                 continue
-            good, bad = _rows(r, base)
+            other: dict = {}
+            good, bad = _rows(r, dict(base, ClaimID="C1"), other)
             df = pd.DataFrame([good, bad]).astype(str)
-            res, notes = fr.check_frame(fr.RuleSet(name, rs.version, rs.folder, [r]), table, df, ctx)
+            tables = {t: pd.DataFrame([dict(row, ClaimID="C1")]).astype(str) for t, row in other.items()}  # both records' claim
+            rctx = fr.Context(filing_year=YEAR, library=False, tables=tables, keys={t: ["ClaimID"] for t in tables}) if tables else ctx
+            res, notes = fr.check_frame(fr.RuleSet(name, rs.version, rs.folder, [r]), table, df, rctx)
             assert not notes, (r.id, notes)
             assert res and res[0].fail.tolist() == [False, True], f"{r.id} {r.text}: good {good.get(recet_name(r.field))!r}, bad {bad.get(recet_name(r.field))!r}"
             checked += 1
@@ -156,6 +171,9 @@ def test_every_constraint_of_the_spec_becomes_a_rule(name):
     assert len(rs.rules) == sum(1 for r in rs.rules if r.kind == "rule") + len(kinds)
     rows = sum(len(pd.read_csv(f)) for f in [*rs.folder.glob("validation_rules*.csv"), *rs.folder.glob("warning_rules*.csv")])
     rows -= 1                                                              # "PrgYear matches_year_quarter ClaimYearQuarter" on ProgramCost: NOT_TAKEN
+    for f in rs.folder.glob("*_rules*.json"):                               # ReCET's own rule file: its rules join, the ones it replaces leave
+        doc = json.loads(f.read_text())
+        rows += len(doc["rules"]) - len(doc["replaces"])
     assert sum(r.kind == "rule" for r in rs.rules) in (rows, rows - 1)     # the claims file lists one rule twice: kept once
 
 
@@ -170,9 +188,11 @@ def test_the_two_sets_share_ids_for_shared_rules():
 
 
 def test_rule_sets_are_versioned_by_effective_date():
-    assert fr.versions("claims") == ["2026-03-12"] and fr.versions("budget_filing") == ["2026-03-11"]
+    assert fr.versions("claims") == ["2026-03-12", "2027-01-01"] and fr.versions("budget_filing") == ["2026-03-11"]
     d = fr.rule_set("claims").describe()
-    assert d["effective_date"] == "2026-03-12" and d["rules"] == d["rejects"] + d["warnings"] and "cet_spec.2026-03-12.sql" in d["files"]
+    assert d["effective_date"] == "2027-01-01" and d["rules"] == d["rejects"] + d["warnings"] and "cet_spec.2026-03-12.sql" in d["files"]
+    assert "claims_rules.2026.json" in d["files"]
+    assert fr.rule_set("claims", "2026-12-31").version == "2026-03-12"   # the version in effect on a date
     with pytest.raises(ValueError):
         fr.rule_set("claims", as_of="2020-01-01")
     with pytest.raises(ValueError):
@@ -265,7 +285,7 @@ def test_preflight_flags_but_does_not_stop(tmp_path):
     assert blank_dt.count == 12 and blank_dt.cells[0] == ("Measure", 0, "DeliveryType")
     f = rep.filing[rep.filing["table"] == "Measure"]
     assert len(f) == 12 and set(f["FilingValidation"]) == {"reject"}
-    assert json.loads(json.dumps(rep.to_dict()))["filing_rules"]["effective_date"] == "2026-03-12"
+    assert json.loads(json.dumps(rep.to_dict()))["filing_rules"]["effective_date"] == "2027-01-01"
 
 
 def test_checked_in_parts_gives_the_same_report(tmp_path):

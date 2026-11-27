@@ -3,6 +3,19 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.106 (2026-11-27, Jake; the validation rules review, bundle 3): a new claims rule set, effective 2027-01-01, with CEDARS' 2026 claims data
+  rules (https://cedars.cpuc.ca.gov/claims/specification/) on Measure records. CEDARS publishes those only as sentences, so they are written in the
+  rule language in ReCET's own rule file, `data/cet_rules/claims_2027-01-01/claims_rules.2026.json`, beside unchanged copies of CEDARS' CET files of
+  2026-03-12 (a folder's `*_rules*.json` is read by `filing_rules._read_json_rules`: its rules join the set and the ones it `replaces` leave it;
+  each rule names the line of CEDARS' file it comes from). Three CET rules change: E3GasSector and E3TargetSector are not required on a codes and
+  standards claim, and RUL below EUL applies only when both are above 0. Eleven are added: IOU_AC_Territory is an IOU (as pricing requires);
+  EUL_ID, GSIA_ID and Version on a deemed claim's measure, RUL_ID too when RUL is above 0 (conditions on the claim's Claim record); NTG_ID except
+  on C&S; PreDesc when RUL is above 0; StdDesc when there are first-baseline savings or costs; UnitMeaCost2ndBaseline above 0 with second-baseline
+  savings; and the budget filing set's two fuel-substitution sign rules (Jake: the sign is the same on a claim). Rules the two sets share keep
+  their IDs. The set has 223 rules (212 before). `rule_set("claims")` is the newest version, as before; `rule_set("claims", date)` the one in
+  effect on a date. CEDARS' data rules on the other claims tables are the CEDARS platform's built-in checks. Checked by new tests in
+  tests/test_claims_2026_rules.py; the per-rule test now meets grouped conditions and conditions on the Claim record.
+
 - 0.1.105 (2026-11-27, Jake): `ProgramCost` has no `ClaimYearQuarter`. A program cost row's year, the year its costs are incurred and discounted
   from, is its `PrgYear` (`cost_tests.program_years`; C11.1, and C17 deliberate difference 12: CET reads the year of the row's `ClaimYearQuarter`,
   which CEDARS requires to equal `PrgYear`, so filed rows price the same). A quarter is only ever a measure's. The column is out of the
