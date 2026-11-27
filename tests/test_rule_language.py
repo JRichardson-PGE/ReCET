@@ -87,6 +87,31 @@ def test_text_flag_and_date_tests():
     assert _fails(when)[0] == [True, False, False, False]
 
 
+def test_numbers_read_as_written_in_text_tests_lists_and_years():
+    """A number in a rule's value is matched as written ("2027", not "2027.0"), and a record's "1.0" or "2027.0" reads as 1 or 2027."""
+    df = pd.DataFrame({"ClaimID": ["A", "B", "C", "D"], "Note": ["LED 2027 retrofit", "LED 2026", "2027 kit", "kit 2027"],
+                       "Flag": ["1.0", "1", "2", ""], "Yr": ["2027.0", "2027", "2026", "2027"], "CYQ": ["2027Q1"] * 4})
+    tables = {"Claim": df}
+    assert _fails(_rule("N1", "Note", "contains", "2027"), tables=tables)[0] == [False, True, False, False]
+    assert _fails(_rule("N2", "Note", "starts with string", "2027"), tables=tables)[0] == [True, True, False, True]
+    assert _fails(_rule("N3", "Note", "ends with string", "2027"), tables=tables)[0] == [True, True, True, False]
+    assert _fails(_rule("N4", "Flag", "in", "['1']"), tables=tables)[0] == [False, False, True, True]
+    assert _fails(_rule("N5", "Flag", "in", "[1.0]"), tables=tables)[0] == [False, False, True, True]
+    assert _fails(_rule("N6", "Yr", "matches_year_quarter", "CYQ"), tables=tables)[0] == [False, False, True, False]
+
+
+def test_a_blank_key_links_to_nothing():
+    """A record whose key is blank has no linked record, even when the other table also has a record with a blank key."""
+    claim = pd.DataFrame({"ClaimID": ["PGE-2027-1", ""], "ParticipantID": ["", ""]})
+    measure = pd.DataFrame({"ClaimID": ["", "PGE-2027-1"], "MeasImpactType": ["Cust-SEM", "Deemed"]})
+    rule = _rule("K", "ParticipantID", "is not null", conds=[("Measure", "MeasImpactType", "in", "['cust-sem']")])
+    fail, _ = _fails(rule, tables={"Claim": claim, "Measure": measure})
+    assert fail == [False, False]                    # before 0.1.104 the blank-key claim read the blank-key measure and failed
+    rule = _rule("K2", "ParticipantID", "is not null", conds=[("Measure", "MeasImpactType", "is null", "")])
+    fail, _ = _fails(rule, tables={"Claim": claim, "Measure": measure})
+    assert fail == [False, True]                     # no linked measure: its fields read as blank
+
+
 def test_code_in_effect_on_a_date_with_a_list_given_with_the_check():
     lists = {"Bldg": [{"code": "Com", "start_year": 2015, "end_year": None}, {"code": "Res", "start_year": 2015, "end_year": 2020}]}
     rule = _rule("M", "BldgType", "in effect on", "InstallationDate", list="Bldg")

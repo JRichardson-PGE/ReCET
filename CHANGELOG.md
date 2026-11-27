@@ -3,6 +3,18 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
+- 0.1.104 (2026-11-27, Jake; the validation rules review): five fixes to the filing rule runner (`filing_rules`), found by running the CEDARS
+  platform's rule sets against crafted records. (1) A number in a rule's value or a record reads as written: `contains 2027` looked for "2027.0", so
+  "LED 2027 retrofit" failed it; starts with / ends with did the same; an `in ['1']` list refused "1.0"; and the year test refused a year written
+  "2027.0" (`_plain`). (2) A record with a blank key part is linked to nothing: before, a blank key matched another table's blank-key record
+  (`_joined_key`, `_Table._link`), against what the module said. (3) The value lists' `claim_spec` / `filing_spec` marks are honored: a claim may no
+  longer use BldgType `Any` or PA `PAC` (`SPEC_FLAGS`, `_for_filing`; a list given with the check is read by its own marks, else the shipped list's;
+  an administrator's added code has no mark and is accepted). (4) `UploadPA-YYYY` (budget filing CEInputID) names who files when the check says so
+  (`Context.filer`: its PA or SW), else a PA code in effect that year (a retired PA's prefix is refused), then the year and anything but another
+  digit (`PGE-20281` is refused) (`_upload_pas`). (5) That PA list is the one given with the check when there is one (`Context.lists`), so a worker
+  checking a website's codes reads the website's PAs, an administrator's addition included. CEDARS' accepted ID forms (`PGE-2028Q4-...`,
+  `SW-2028-...`) still pass. Checked by new tests in tests/test_filing_rules.py and tests/test_rule_language.py, each failing
+  before the change.
 - 0.1.103 (2026-11-22, Jake): 0.1.102's numerator rule gave a CET replica without the Societal Cost Test an SCB and SCH ratio of 0 instead
   of blank (CET 25.0 on the 2024 ACC, seen on the CEDARS demo). The SCT benefits are ElecBen_SB, GasBen_SB, WaterEnergyBen_SB and OtherBen, and
   CET 25.0's SCT is electric only (ElecBen_SB, 0 on the 2024 ACC, and no GasBen_SB), so "at least one benefit present" was met. Only a missing
