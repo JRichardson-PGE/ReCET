@@ -3,9 +3,9 @@
 ReCET's releases, newest first. Each entry says what changed, why, and how it was checked; the version is `recet/__init__.py`'s `__version__`.
 Releases before 0.1.31 are not recorded here.
 
-- 0.1.106 (2026-11-27, Jake; the validation rules review, bundle 3): a new claims rule set, effective 2027-01-01, with CEDARS' 2026 claims data
+- 0.1.106 (2026-11-27, Jake; the validation rules review, bundle 3): a new claims rule set, effective 2026-11-27 (in force once published), with CEDARS' 2026 claims data
   rules (https://cedars.cpuc.ca.gov/claims/specification/) on Measure records. CEDARS publishes those only as sentences, so they are written in the
-  rule language in ReCET's own rule file, `data/cet_rules/claims_2027-01-01/claims_rules.2026.json`, beside unchanged copies of CEDARS' CET files of
+  rule language in ReCET's own rule file, `data/cet_rules/claims_2026-11-27/claims_rules.2026.json`, beside unchanged copies of CEDARS' CET files of
   2026-03-12 (a folder's `*_rules*.json` is read by `filing_rules._read_json_rules`: its rules join the set and the ones it `replaces` leave it;
   each rule names the line of CEDARS' file it comes from). Three CET rules change: E3GasSector and E3TargetSector are not required on a codes and
   standards claim, and RUL below EUL applies only when both are above 0. Eleven are added: IOU_AC_Territory is an IOU (as pricing requires);

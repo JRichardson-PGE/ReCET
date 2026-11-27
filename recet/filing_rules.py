@@ -5,7 +5,7 @@ CEDARS publishes the checks its upload applies to a Measure.csv / ProgramCost.cs
 (`cet_spec.sql` / `cei_spec.sql`: NotEmpty, CedarsValueList, CedarsNumRange, ...). They ship unchanged in `data/cet_rules/<set>_<effective date>/`, one folder
 per rule set and version, and this module reads them as they are, so updating a rule set means adding the newer download as a new folder. A folder may
 also hold ReCET's own rule file (`*_rules*.json`, `_read_json_rules`): rules CEDARS publishes only as sentences, written in the rule language, which join
-the folder's CEDARS files and may replace some of their rules by ID. The claims set of 2027-01-01 is CEDARS' CET files of 2026-03-12 with its 2026 claims
+the folder's CEDARS files and may replace some of their rules by ID. The claims set of 2026-11-27 is CEDARS' CET files of 2026-03-12 with its 2026 claims
 data rules on Measure records (https://cedars.cpuc.ca.gov/claims/specification/) in `claims_rules.2026.json`:
 
 * claims        (Quarterly Claims, https://cedars.cpuc.ca.gov/cet_ui/spec/)
@@ -112,7 +112,7 @@ class Rule:
 @dataclass
 class RuleSet:
     name: str                      # "claims" | "budget_filing"
-    version: str                   # the effective date of the folder's rules (its date), e.g. "2027-01-01"
+    version: str                   # the effective date of the folder's rules (its date), e.g. "2026-11-27"
     folder: Path
     rules: list[Rule]
 

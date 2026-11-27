@@ -188,11 +188,11 @@ def test_the_two_sets_share_ids_for_shared_rules():
 
 
 def test_rule_sets_are_versioned_by_effective_date():
-    assert fr.versions("claims") == ["2026-03-12", "2027-01-01"] and fr.versions("budget_filing") == ["2026-03-11"]
+    assert fr.versions("claims") == ["2026-03-12", "2026-11-27"] and fr.versions("budget_filing") == ["2026-03-11"]
     d = fr.rule_set("claims").describe()
-    assert d["effective_date"] == "2027-01-01" and d["rules"] == d["rejects"] + d["warnings"] and "cet_spec.2026-03-12.sql" in d["files"]
+    assert d["effective_date"] == "2026-11-27" and d["rules"] == d["rejects"] + d["warnings"] and "cet_spec.2026-03-12.sql" in d["files"]
     assert "claims_rules.2026.json" in d["files"]
-    assert fr.rule_set("claims", "2026-12-31").version == "2026-03-12"   # the version in effect on a date
+    assert fr.rule_set("claims", "2026-11-26").version == "2026-03-12"   # the version in effect on a date
     with pytest.raises(ValueError):
         fr.rule_set("claims", as_of="2020-01-01")
     with pytest.raises(ValueError):
@@ -285,7 +285,7 @@ def test_preflight_flags_but_does_not_stop(tmp_path):
     assert blank_dt.count == 12 and blank_dt.cells[0] == ("Measure", 0, "DeliveryType")
     f = rep.filing[rep.filing["table"] == "Measure"]
     assert len(f) == 12 and set(f["FilingValidation"]) == {"reject"}
-    assert json.loads(json.dumps(rep.to_dict()))["filing_rules"]["effective_date"] == "2027-01-01"
+    assert json.loads(json.dumps(rep.to_dict()))["filing_rules"]["effective_date"] == "2026-11-27"
 
 
 def test_checked_in_parts_gives_the_same_report(tmp_path):

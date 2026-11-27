@@ -1,4 +1,4 @@
-"""CEDARS' 2026 claims data rules on Measure records (the claims rule set of 2027-01-01, `claims_rules.2026.json` beside CEDARS' CET files of
+"""CEDARS' 2026 claims data rules on Measure records (the claims rule set of 2026-11-27, `claims_rules.2026.json` beside CEDARS' CET files of
 2026-03-12): what each rule changes or adds, and how ReCET's own rule file is read."""
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 from recet import filing_rules as fr
 from recet.fieldnames import recet_name
 
-NEW, OLD = fr.rule_set("claims", "2027-01-01"), fr.rule_set("claims", "2026-03-12")
+NEW, OLD = fr.rule_set("claims", "2026-11-27"), fr.rule_set("claims", "2026-03-12")
 DOC = json.loads(next(NEW.folder.glob("*_rules*.json")).read_text())
 
 

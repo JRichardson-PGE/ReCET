@@ -2124,7 +2124,7 @@ priced.
 
 With **CEDARS filing checks** set to *Quarterly Claims* or *Budget filing* (`filing_validation`), preflight applies CEDARS' own upload checks for that filing to
 every record (`filing_rules.py`): the `validation_rules` and `warning_rules` files and the field constraints of the table spec that CEDARS publishes on its spec
-pages, shipped unchanged in the package (`recet/data/cet_rules/<set>_<effective date>/`). The claims set of 2027-01-01 adds ReCET's own rule
+pages, shipped unchanged in the package (`recet/data/cet_rules/<set>_<effective date>/`). The claims set of 2026-11-27 adds ReCET's own rule
 file beside them (`claims_rules.2026.json`): CEDARS' 2026 claims data rules on Measure records, which CEDARS publishes only as sentences, written in
 the rule language, three of them in place of the CET rules they change. A record CEDARS would reject is still priced.
 
@@ -2132,7 +2132,7 @@ One row per record that fails at least one CEDARS upload check, written by prefl
 
 | Column | Meaning |
 |---|---|
-| `rule_set` | The rule set and its effective date, e.g. `Quarterly Claims rules of 2027-01-01`. |
+| `rule_set` | The rule set and its effective date, e.g. `Quarterly Claims rules of 2026-11-27`. |
 | `table` | `Measure` or `ProgramCost`. |
 | `record` | The `CEInputID`, or for `ProgramCost` the `PrgID` and `PrgYear`. |
 | `FilingValidation` | `reject` if the record fails at least one validation rule or spec constraint (CEDARS would not accept the upload with it), `warning` if it fails only warning rules (CEDARS accepts it with a warning). |
