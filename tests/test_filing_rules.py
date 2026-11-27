@@ -186,6 +186,45 @@ def test_upload_pa_year_is_a_plain_prefix():
     assert res[0].fail.tolist() == [True, True, True, False, True, True]     # a filing year given: every record must name it
 
 
+def test_upload_pa_year_names_who_files_a_pa_in_effect_and_a_whole_year():
+    rs = fr.rule_set("budget_filing")
+    sw = fr.RuleSet("budget_filing", rs.version, rs.folder, [r for r in rs.rules if r.spec.get("check") == "starts_with"])
+    ids = ["PGE-2028-1", "SW-2028-1", "SCE-2028-1", "LCE-2028-1", "PGE-20281", "PGE-2028"]
+    df = pd.DataFrame({"CEInputID": ids, "ClaimYearQuarter": ["2028Q1"] * len(ids)})
+    # who files is given: only its own code (or SW), then a dash, the year and anything but another digit
+    res, _ = fr.check_frame(sw, "Measure", df, fr.Context(2028, filer={"PA": "PGE", "PAType": "IOU"}))
+    assert res[0].fail.tolist() == [False, False, True, True, True, False]
+    # not given: any PA code in effect that year (Lancaster Choice Energy ended in 2021)
+    res, _ = fr.check_frame(sw, "Measure", df, fr.Context(2028))
+    assert res[0].fail.tolist() == [False, False, False, True, True, False]
+    # a PA list given with the check (a worker checking a website's codes) is the one read, an added PA included
+    given = [{"code": "PGE", "start_year": 2013, "end_year": None}, {"code": "NEWC", "start_year": 2028, "end_year": None}]
+    df2 = pd.DataFrame({"CEInputID": ["NEWC-2028-1", "SCE-2028-1"], "ClaimYearQuarter": ["2028Q1"] * 2})
+    res, _ = fr.check_frame(sw, "Measure", df2, fr.Context(2028, lists={"PA": given}))
+    assert res[0].fail.tolist() == [False, True]
+
+
+def test_value_lists_accept_only_the_codes_marked_for_the_kind_of_filing():
+    """BldgType Any is marked claim_spec 0: a budget filing may use it, a claim may not; a list given with the check is read by its own marks."""
+    for name, want in (("claims", [False, True]), ("budget_filing", [False, False])):
+        rs = fr.rule_set(name)
+        bt = [r for r in rs.rules if r.spec.get("check") == "value_list" and recet_name(r.field) == "BldgType" and r.table == "Measure"]
+        assert bt, name
+        df = pd.DataFrame({"BldgType": ["Com", "Any"], "ClaimYearQuarter": [f"{YEAR}Q1"] * 2})
+        res, _ = fr.check_frame(fr.RuleSet(name, rs.version, rs.folder, bt), "Measure", df, fr.Context(YEAR))
+        assert (res[0].fail.tolist() if res else [False, False]) == want, name
+    rs = fr.rule_set("claims")
+    bt = [r for r in rs.rules if r.spec.get("check") == "value_list" and recet_name(r.field) == "BldgType" and r.table == "Measure"]
+    given = {bt[0].spec["list"]: [{"code": "Com", "start_year": None, "end_year": None, "claim_spec": "1"},
+                                  {"code": "Any", "start_year": None, "end_year": None, "claim_spec": "1"}]}
+    df = pd.DataFrame({"BldgType": ["Com", "Any"], "ClaimYearQuarter": [f"{YEAR}Q1"] * 2})
+    res, _ = fr.check_frame(fr.RuleSet("claims", rs.version, rs.folder, bt), "Measure", df, fr.Context(YEAR, lists=given))
+    assert not res
+    given = {bt[0].spec["list"]: [{"code": "Com", "start_year": None, "end_year": None}, {"code": "Any", "start_year": None, "end_year": None}]}
+    res, _ = fr.check_frame(fr.RuleSet("claims", rs.version, rs.folder, bt), "Measure", df, fr.Context(YEAR, lists=given))
+    assert res[0].fail.tolist() == [False, True]                             # no marks given: the shipped list's
+
+
 def test_messages_follow_cet_feedback():
     texts = {r.text for r in fr.rule_set("claims").rules}
     assert ("When UnitIncentiveToOthers equals 0 and UnitEndUserRebate equals 0 and UnitDirectInstallLab equals 0 and UnitDirectInstallMat equals 0, "

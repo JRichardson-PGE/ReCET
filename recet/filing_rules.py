@@ -17,7 +17,12 @@ How the rules are read (CEDARS' own code is not published, so these are choices,
 * a rule applies to the rows where its Where conditions hold (all of them, or any for Where_connector = any); it fails where its own test then does not hold;
 * a blank value makes a comparison unknown, as in SQL: a condition on it does not hold, a test on it fails (blank required fields are a NotEmpty failure);
 * text compares case-insensitively; a value that names a column (EUL_Yrs, ClaimYearQuarter) is that row's value, and "EUL_Yrs /2.75" is arithmetic on it;
-* a value list is checked for the record's claim year (active codes only), as the input editor does (editor.code_status), with any admin changes applied;
+* a value list is checked for the record's claim year (active codes only), as the input editor does (editor.code_status), with any admin changes applied,
+  and only the codes the list marks for the kind of filing count (claim_spec for claims, filing_spec for budget filings: BldgType Any is not a claim code);
+* a number in a rule's value or a record reads as written: "2027.0" is 2027 in an "in" list, a text test (contains, starts with, ends with) and a
+  year test, as it is in a numeric comparison;
+* an ID that must start with UploadPA-YYYY starts with the filer's PA code (or SW) when the check says who files (Context.filer), else with a PA
+  code in effect in that year, then a dash and the year, then anything but another digit;
 * CET's AvoidedCostCombo list (22 MB) does not ship with ReCET: the combo rule is checked against the CEDARS impact-profile library instead (an exact
   end use + IOU + target sector match), and is not checked when the library is not installed;
 * the messages follow CET's upload feedback ("When UnitIncentiveToOthers equals 0 and ..., UnitMeaCost1stBaseline should be different from 0, but is 0.0");
@@ -26,7 +31,8 @@ How the rules are read (CEDARS' own code is not published, so these are choices,
 The wider rule language (0.1.95, for rule sets kept as data by the CEDARS platform; CEDARS' own files use none of it):
 * a condition names its table. Blank or the rule's own table: the record itself. Another table of the filing (`Context.tables`): that table's record
   linked to this one by a key, the other table's key columns when this table has them all (a Claim's Measure by ClaimID), else this table's key
-  columns in the other table (`Context.keys`); the first linked record counts, none reads as blank. `Program`: the program's record
+  columns in the other table (`Context.keys`); the first linked record counts, none reads as blank, and a record with a blank key part is
+  linked to nothing (two blank keys are not a match). `Program`: the program's record
   (`Context.programs`, by PrgID). `Filer`: who files (`Context.filer`, e.g. PA and PAType), the same for every record;
 * a condition may instead be a group, {"connector": "all" | "any", "conds": [...]}, of plain conditions (one level: groups do not nest);
 * more tests: "contains" / "does not contain" (text, any case), "is true" / "is not true" (1, true, yes; blank is not true), dates ("is before",
@@ -52,6 +58,7 @@ import pandas as pd
 from .fieldnames import recet_name
 
 SETS = {"claims": "Quarterly Claims", "budget_filing": "Budget & Application Filings"}
+SPEC_FLAGS = {"claims": "claim_spec", "budget_filing": "filing_spec"}   # the value lists' column that marks a code accepted in that kind of filing
 CYQ = re.compile(r"^\d{4}Q[1-4]$")
 # CET value-list name -> the list shipped in data/value_lists (renamed after the AC_ fields they fill, see its SOURCE.txt)
 VALUE_LIST_FILES = {"e3climatezone": "ac_climate_zone", "e3gassavprofile": "ac_gas_impact_profile", "e3gassector": "ac_gas_target_sector",
@@ -69,6 +76,22 @@ PSEUDO_TABLES = ("Program", "Filer")       # condition tables that are not table
 TRUE = frozenset({"1", "1.0", "true", "yes", "y", "t"})
 DATE_TESTS = {"is before": "<", "is on or before": "<=", "is after": ">", "is on or after": ">="}
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_WHOLE = re.compile(r"^([-+]?\d+)\.0*$")          # a whole number written with a decimal point ("2027.0", "1.")
+
+
+def _plain(v) -> str:
+    """A value as text the way a person writes it: a whole number without its ".0" (a number read back from a spreadsheet or a JSON
+    float), anything else unchanged."""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    t = str(v).strip()
+    m = _WHOLE.match(t)
+    return m.group(1) if m else t
+
+
+def _plain_series(s: pd.Series) -> pd.Series:
+    """`_plain` on a text column (blanks stay blank)."""
+    return s.str.replace(_WHOLE, r"\1", regex=True)
 
 
 @dataclass
@@ -343,8 +366,9 @@ class _Table:
         rt = _Table(right, other)
         lkey = _joined_key([self.text(c) for c in on])
         rkey = _joined_key([rt.text(c) for c in on])
-        first = ~rkey.duplicated(keep="first").to_numpy()
-        idx = pd.Index(rkey[first]).get_indexer(lkey)
+        first = (rkey.notna() & ~rkey.duplicated(keep="first")).to_numpy()        # a record with a blank key part is linked to by nothing
+        idx = pd.Index(rkey[first].astype(object)).get_indexer(lkey.fillna("").astype(object))
+        idx[lkey.isna().to_numpy()] = -1                                          # ... and links to nothing
         cols = {}
         for c in right.columns:
             v = rt.text(c).to_numpy(dtype=object)[first]
@@ -392,7 +416,7 @@ def _joined_key(parts: list[pd.Series]) -> pd.Series:
     for p in parts:
         p = p.str.lower()
         out = p if out is None else out + "\x1f" + p
-    return out.fillna("\x00blank")
+    return out
 
 
 def _link_columns(t: _Table, other: str, right: pd.DataFrame, keys: dict) -> list[str]:
@@ -420,7 +444,7 @@ def _operand(raw: str, t: _Table, ctx: Context):
     """A rule's Value: a number, a quoted text, a list, FilingYear, a column of the table, or arithmetic on one ("EUL_Yrs /2.75")."""
     v = str(raw).strip()
     if v.startswith("["):
-        return ("list", [str(x).strip().lower() for x in ast.literal_eval(v)])
+        return ("list", [_plain(x).lower() for x in ast.literal_eval(v)])
     if len(v) >= 2 and v[0] == v[-1] == "'":
         return ("text", v[1:-1])
     try:
@@ -458,7 +482,7 @@ def _compare(t: _Table, col: str, rule: str, value: str, ctx: Context) -> tuple[
     if rule in ("contains", "does not contain"):
         s = t.text(col).str.lower()
         known = s.notna().to_numpy()
-        hit = s.str.contains(str(rest[0] if kind != "col" else value).lower(), regex=False).fillna(False).to_numpy(bool)
+        hit = s.str.contains(_plain(rest[0] if kind != "col" else value).lower(), regex=False).fillna(False).to_numpy(bool)
         return (hit if rule == "contains" else ~hit) & known, known
     if rule in ("is true", "is not true"):
         true = t.text(col).str.lower().isin(TRUE).fillna(False).to_numpy(bool)
@@ -492,16 +516,16 @@ def _compare(t: _Table, col: str, rule: str, value: str, ctx: Context) -> tuple[
     if rule in ("not in", "in"):
         s = t.text(col)
         known = s.notna().to_numpy()
-        inside = s.str.lower().isin(rest[0]).fillna(False).to_numpy(bool)
+        inside = _plain_series(s).str.lower().isin(rest[0]).fillna(False).to_numpy(bool)
         return (inside if rule == "in" else ~inside) & known, known
     if rule in ("ends with string", "starts with string"):
         s = t.text(col).str.lower()
-        v = str(rest[0]).lower()
+        v = _plain(rest[0] if kind != "col" else value).lower()
         hit = (s.str.endswith(v) if rule.startswith("ends") else s.str.startswith(v)).fillna(False).to_numpy(bool)
         return hit, s.notna().to_numpy()
     if rule == "matches_year_quarter":
         q = t.text(value).str[:4]
-        s = t.text(col)
+        s = _plain_series(t.text(col))
         known = (s.notna() & q.notna()).to_numpy()
         return (s == q).fillna(False).to_numpy(bool) & known, known
     numeric = kind == "num" or (kind == "col" and rule not in ("equals", "does not equal"))
@@ -590,7 +614,8 @@ def _given_list(name: str, ctx: Context | None) -> pd.DataFrame | None:
     """A value list given with the check (Context.lists), by name in any case, as code / start_year / end_year."""
     for k, rows in ((ctx.lists or {}) if ctx is not None else {}).items():
         if str(k).lower() == name.lower():
-            df = pd.DataFrame(list(rows), columns=["code", "start_year", "end_year"]) if rows else pd.DataFrame(columns=["code", "start_year", "end_year"])
+            cols = ["code", "start_year", "end_year"] + [c for c in SPEC_FLAGS.values() if any(c in (row or {}) for row in rows if isinstance(row, dict))]
+            df = pd.DataFrame(list(rows), columns=cols) if rows else pd.DataFrame(columns=cols)
             for c in ("start_year", "end_year"):
                 df[c] = pd.to_numeric(df[c], errors="coerce")
             df["code"] = df["code"].astype(str)
@@ -598,9 +623,35 @@ def _given_list(name: str, ctx: Context | None) -> pd.DataFrame | None:
     return None
 
 
-def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None, ctx: Context | None = None) -> np.ndarray:
+def _for_filing(df: pd.DataFrame, use: str | None, name: str) -> pd.DataFrame:
+    """A value list's codes accepted in the kind of filing checked: CET's lists mark each code claim_spec / filing_spec 1 or 0 (BldgType
+    Any and PA PAC are not claim codes). A list given with the check is read by its own marks when it has them, else by the shipped
+    list's; a code with no mark (an administrator's addition) is accepted."""
+    if not use:
+        return df
+    if use in df.columns:
+        return df[pd.to_numeric(df[use], errors="coerce").fillna(1) != 0]
+    off = _not_marked(VALUE_LIST_FILES.get(name.lower(), name.lower()), use)
+    return df[~df["code"].astype(str).str.strip().str.lower().isin(off)] if off else df
+
+
+@lru_cache(maxsize=None)
+def _not_marked(file: str, use: str) -> frozenset:
+    """The codes of a shipped value list marked 0 in column `use` (lower case); none when the list or the column is not there."""
+    from . import paths
+    p = Path(paths.package_data("value_lists", f"{file}.csv"))
+    if not p.exists():
+        return frozenset()
+    df = pd.read_csv(p, dtype=str, keep_default_na=False)
+    if use not in df.columns:
+        return frozenset()
+    return frozenset(df.loc[pd.to_numeric(df[use], errors="coerce") == 0, "code"].str.strip().str.lower())
+
+
+def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None, ctx: Context | None = None, use: str | None = None) -> np.ndarray:
     """Whether each value is an active code of CET value list `name` (or a list given with the check) in its row's year (blank: True, NotEmpty
-    checks it). Worked out once per distinct (value, year)."""
+    checks it), among the codes marked for the kind of filing (`use`: claim_spec or filing_spec, `_for_filing`). Worked out once per
+    distinct (value, year)."""
     given = _given_list(name, ctx)
     if given is None and name.lower() == "prgid":
         from . import programs
@@ -611,6 +662,7 @@ def _value_list_ok(name: str, values: pd.Series, years: pd.Series | None, ctx: C
     else:
         from . import editor
         df = editor.value_list(VALUE_LIST_FILES.get(name.lower(), name.lower()))
+    df = _for_filing(df, use, name)
     spans: dict[str, list] = {}
     for code, a, b in zip(df["code"].astype(str).str.strip().str.lower(), df["start_year"], df["end_year"]):
         spans.setdefault(code, []).append((None if pd.isna(a) else int(a), None if pd.isna(b) else int(b)))
@@ -632,7 +684,7 @@ def _value_list_available(name: str, ctx: Context | None = None) -> bool:
     return Path(paths.package_data("value_lists", f"{VALUE_LIST_FILES.get(name.lower(), name.lower())}.csv")).exists()
 
 
-def _apply_spec(r: Rule, t: _Table, ctx: Context, years: pd.Series | None) -> Result | None:
+def _apply_spec(r: Rule, t: _Table, ctx: Context, years: pd.Series | None, use: str | None = None) -> Result | None:
     s, col = r.spec, r.field
     kind = s["check"]
     if kind == "unique":
@@ -666,20 +718,37 @@ def _apply_spec(r: Rule, t: _Table, ctx: Context, years: pd.Series | None) -> Re
     if kind == "value_list":
         if not _value_list_available(s["list"], ctx):
             return None
-        return Result(r, ~_value_list_ok(s["list"], txt, years, ctx), txt)
-    if kind == "starts_with":                   # UploadPA-YYYY: a plain prefix, a PA code, a dash and the filing year (CET accepts "PGE-2028Q4-...")
-        from . import editor
-        pas = sorted(set(editor.value_list("pa")["code"].astype(str).str.strip().str.lower()))
+        return Result(r, ~_value_list_ok(s["list"], txt, years, ctx, use), txt)
+    if kind == "starts_with":                   # UploadPA-YYYY: a PA code, a dash and the filing year, then anything but a digit (CET accepts "PGE-2028Q4-...")
         want = (pd.Series(float(ctx.filing_year), index=txt.index) if ctx.filing_year is not None
                 else (years if years is not None else pd.Series(np.nan, index=txt.index)).astype(float))
         low = txt.str.lower()
         ok = np.zeros(t.n, bool)
         for y in want.dropna().unique():
             rows = (want == y).to_numpy()
-            heads = tuple(f"{pa}-{int(y)}" for pa in pas)
-            ok[rows] = low[rows].map(lambda x: isinstance(x, str) and x.startswith(heads)).to_numpy(bool)
+            heads = tuple(f"{pa}-{int(y)}" for pa in _upload_pas(ctx, int(y), use))
+            ok[rows] = low[rows].map(lambda x: isinstance(x, str) and any(x.startswith(h) and not x[len(h):len(h) + 1].isdigit()
+                                                                           for h in heads)).to_numpy(bool)
         return Result(r, ~blank & ~ok, txt)
     raise ValueError(f"unknown spec check {kind!r}")
+
+
+def _upload_pas(ctx: Context, year: int, use: str | None = None) -> list[str]:
+    """The PA codes an ID may start with in `year` (lower case): who files and the statewide code when the check says who files
+    (Context.filer's PA), else every PA code in effect that year (the PA value list given with the check, else the engine's)."""
+    pa = str((ctx.filer or {}).get("PA") or "").strip().lower()
+    if pa:
+        return sorted({pa, "sw"})
+    df = _given_list("pa", ctx)
+    if df is None:
+        from . import editor
+        df = editor.value_list("pa")
+    df = _for_filing(df, use, "pa")
+    out = set()
+    for code, a, b in zip(df["code"].astype(str).str.strip().str.lower(), df["start_year"], df["end_year"]):
+        if (pd.isna(a) or int(a) <= year) and (pd.isna(b) or int(b) >= year):
+            out.add(code)
+    return sorted(out)
 
 
 def check_frame(rs: RuleSet, table: str, df: pd.DataFrame, ctx: Context) -> tuple[list[Result], list[str]]:
@@ -691,12 +760,13 @@ def check_frame(rs: RuleSet, table: str, df: pd.DataFrame, ctx: Context) -> tupl
         years = pd.to_numeric(t.text("ClaimYearQuarter").str[:4], errors="coerce")
     elif table == "ProgramCost":
         years = pd.to_numeric(t.text("PrgYear"), errors="coerce")
+    use = SPEC_FLAGS.get(rs.name)
     results, notes = [], []
     for r in rs.rules:
         if r.table != table:
             continue
         try:
-            res = _apply_spec(r, t, ctx, years) if r.kind == "spec" else _apply_rule(r, t, ctx)
+            res = _apply_spec(r, t, ctx, years, use) if r.kind == "spec" else _apply_rule(r, t, ctx)
         except KeyError as exc:
             notes.append(f"{r.id} not checked: no {exc.args[0]} given ({r.text})")
             continue
