@@ -138,6 +138,41 @@ def test_every_rule_passes_a_good_record_and_fails_a_bad_one(name):
 
 
 @pytest.mark.parametrize("name", list(fr.SETS))
+def test_each_condition_of_an_any_rule_applies_it_on_its_own(name):
+    """The test above meets only an "any" rule's first condition: here each condition alone makes the rule apply, and with none
+    of them holding a record that breaks the rule's test is not flagged."""
+    rs = fr.rule_set(name)
+    ctx = fr.Context(filing_year=YEAR, library=False)
+    checked = 0
+    for table in ("Measure", "ProgramCost"):
+        base = _base(rs, table)
+        for r in (x for x in rs.rules if x.table == table and x.kind == "rule" and x.spec["connector"] == "any" and len(x.spec["conds"]) > 1):
+            s = r.spec
+            touched: dict = {}
+            _value(s["rule"], s["value"], False, touched, s["field"])  # the columns the rule's own test sets
+            conds = s["conds"]
+            assert all(isinstance(c, (list, tuple)) and c[0] == table for c in conds), r.id  # plain conditions on the rule's table
+
+            def flagged(holds: set[int]) -> bool:
+                row = dict(base)
+                for j, (_t, f, rule, v) in enumerate(conds):
+                    _value(rule.lower(), v, j in holds, row, f)
+                _value(s["rule"], s["value"], False, row, s["field"])
+                res, notes = fr.check_frame(fr.RuleSet(name, rs.version, rs.folder, [r]), table, pd.DataFrame([row]).astype(str), ctx)
+                assert not notes, (r.id, notes)
+                return bool(res and res[0].fail.tolist()[0])
+
+            for i, (_t, f, _rule, _v) in enumerate(conds):
+                if recet_name(f) in touched:
+                    continue                                                # the test's own column: the condition cannot be met alone
+                assert flagged({i}), f"{r.id} {r.text}: condition {i + 1} alone does not apply it"
+                checked += 1
+            if not {recet_name(c[1]) for c in conds} & set(touched):
+                assert not flagged(set()), f"{r.id} {r.text}: applied with none of its conditions holding"
+    assert checked >= 20
+
+
+@pytest.mark.parametrize("name", list(fr.SETS))
 def test_every_constraint_of_the_spec_becomes_a_rule(name):
     import re
     rs = fr.rule_set(name)
